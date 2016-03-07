@@ -21,6 +21,7 @@ setup(
     test_requires=['PyYAML'],
     test_suite='tests',
     zip_safe=False,
+    url='https://github.com/ecederstrand/exchangelib.git',
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Topic :: Communications',
