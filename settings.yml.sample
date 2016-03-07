@@ -1,0 +1,4 @@
+server: 'example.com'
+username: 'MYWINDOMAIN\myusername'
+password: 'topsecret'
+account: 'johndoe@example.com'
