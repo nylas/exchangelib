@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from datetime import datetime
 import logging
+import os
 
 from pytz import timezone
 from yaml import load
@@ -14,7 +15,7 @@ from exchangelib.folders import CalendarItem
 logging.basicConfig(level=logging.WARNING)
 
 try:
-    with open('settings.yml') as f:
+    with open(os.path.join(os.path.dirname(__file__), 'settings.yml')) as f:
         settings = load(f)
 except FileNotFoundError:
     print('Copy settings.yml.sample to settings.yml and enter values for your test server')

@@ -1,3 +1,4 @@
+import os
 import unittest
 
 from pytz import timezone
@@ -15,7 +16,7 @@ class EWSTest(unittest.TestCase):
     def setUp(self):
         self.tzname = 'Europe/Copenhagen'
         try:
-            with open('settings.yml') as f:
+            with open(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'settings.yml')) as f:
                 settings = load(f)
         except FileNotFoundError:
             print('Copy settings.yml.sample to settings.yml and enter values for your test server')

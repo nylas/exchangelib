@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 import os
-
 from setuptools import setup
 
 
 def read(fname):
-    return open(os.path.join(os.path.dirname(__file__), fname)).read()
+    with open(os.path.join(os.path.dirname(__file__), fname)) as f:
+        return f.read()
 
 setup(
     name='exchangelib',
@@ -18,10 +18,10 @@ setup(
     keywords='Exchange EWS autodiscover',
     install_requires=['requests>=2.7', 'requests-ntlm>=0.2.0', 'dnspython3>=1.12.0', 'pytz', 'lxml'],
     packages=['exchangelib'],
-    test_requires=['PyYAML'],
+    tests_require=['PyYAML'],
     test_suite='tests',
     zip_safe=False,
-    url='https://github.com/ecederstrand/exchangelib.git',
+    url='https://github.com/ecederstrand/exchangelib',
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Topic :: Communications',

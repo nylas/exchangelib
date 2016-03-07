@@ -3,6 +3,7 @@
 # Tries to get optimal values for concurrent sessions and payload size for deletes and creates
 import copy
 import logging
+import os
 from datetime import datetime
 
 from pytz import timezone
@@ -17,7 +18,7 @@ from exchangelib.folders import CalendarItem
 logging.basicConfig(level=logging.WARNING)
 
 try:
-    with open('settings.yml') as f:
+    with open(os.path.join(os.path.dirname(__file__), 'settings.yml')) as f:
         settings = load(f)
 except FileNotFoundError:
     print('Copy settings.yml.sample to settings.yml and enter values for your test server')
