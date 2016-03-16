@@ -6,13 +6,12 @@ import logging
 import os
 from datetime import datetime
 
-from pytz import timezone
 from yaml import load
 
 from exchangelib import DELEGATE, services
 from exchangelib.configuration import Configuration
 from exchangelib.account import Account
-from exchangelib.ewsdatetime import EWSDateTime
+from exchangelib.ewsdatetime import EWSDateTime, EWSTimeZone
 from exchangelib.folders import CalendarItem
 
 logging.basicConfig(level=logging.WARNING)
@@ -25,11 +24,9 @@ except FileNotFoundError:
     raise
 
 categories = ['perftest']
-location = 'Europe/Copenhagen'
-tz = timezone(location)
+tz = EWSTimeZone.timezone('Europe/Copenhagen')
 
-config = Configuration(server=settings['server'], username=settings['username'], password=settings['password'],
-                       timezone=location)
+config = Configuration(server=settings['server'], username=settings['username'], password=settings['password'])
 print(('Exchange server: %s' % config.protocol.server))
 
 account = Account(config=config, primary_smtp_address=settings['account'], access_type=DELEGATE)
@@ -39,8 +36,8 @@ cal = account.calendar
 # Calendar item generator
 def calitems():
     i = 0
-    start = EWSDateTime(2000, 3, 1, 8, 30, 0, tzinfo=tz)
-    end = EWSDateTime(2000, 3, 1, 9, 15, 0, tzinfo=tz)
+    start = tz.localize(EWSDateTime(2000, 3, 1, 8, 30, 0))
+    end = tz.localize(EWSDateTime(2000, 3, 1, 9, 15, 0))
     item = CalendarItem(
         item_id='',
         changekey='',

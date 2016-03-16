@@ -41,7 +41,7 @@ def get_xml_attrs(tree, name):
     return [elem.text.strip() for elem in tree.findall(name) if elem.text is not None]
 
 
-def set_xml_value(elem, value, timezone=None):
+def set_xml_value(elem, value):
     from .ewsdatetime import EWSDateTime
     if isinstance(value, str):
         elem.text = safe_xml_value(value)
@@ -51,7 +51,7 @@ def set_xml_value(elem, value, timezone=None):
     elif isinstance(value, bool):
         elem.text = '1' if value else '0'
     elif isinstance(value, EWSDateTime):
-        elem.text = value.ewsformat(tzinfo=timezone.tz)
+        elem.text = value.ewsformat()
     else:
         raise AttributeError('Unsupported type %s for value %s' % (type(value), value))
     return elem

@@ -6,7 +6,7 @@ from .credentials import Credentials, DELEGATE, IMPERSONATION
 from .errors import ErrorFolderNotFound, ErrorAccessDenied
 from .folders import Root, Calendar, Inbox, Tasks, Contacts, SHALLOW, DEEP
 from .protocol import Protocol
-from .ewsdatetime import EWSDateTime
+from .ewsdatetime import EWSDateTime, EWSTimeZone
 
 log = getLogger(__name__)
 
@@ -32,7 +32,6 @@ class Account:
                                                                 credentials=self.credentials)
             if config:
                 assert isinstance(config, Configuration)
-                self.protocol.timezone = config.timezone
         else:
             self.protocol = config.protocol
         self.root = Root(self)
@@ -45,7 +44,7 @@ class Account:
             self.calendar = Calendar(self).get_folder()
         except ErrorAccessDenied:
             self.calendar = Calendar(self)
-            dt = EWSDateTime(2000, 1, 1, tzinfo=self.protocol.timezone)
+            dt = EWSTimeZone.timezone('UTC').localize(EWSDateTime(2000, 1, 1))
             self.calendar.find_items(start=dt, end=dt, categories=['DUMMY'])
             # Maybe we just don't have GetFolder access
         except ErrorFolderNotFound as e:

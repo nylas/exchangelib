@@ -1,20 +1,50 @@
 import os
 import unittest
+from datetime import timedelta, datetime
 
-from pytz import timezone
 from yaml import load
 
 from exchangelib.account import Account
 from exchangelib.configuration import Configuration
 from exchangelib.credentials import DELEGATE
-from exchangelib.ewsdatetime import EWSDateTime
+from exchangelib.ewsdatetime import EWSDateTime, EWSTimeZone
 from exchangelib.folders import CalendarItem
 from exchangelib.services import GetServerTimeZones, AllProperties, IdOnly
 
 
+class EWSDateTest(unittest.TestCase):
+    def test_ewsdatetime(self):
+        tz = EWSTimeZone.timezone('Europe/Copenhagen')
+        self.assertIsInstance(tz, EWSTimeZone)
+        self.assertEqual(tz.ms_id, 'Romance Standard Time')
+        self.assertEqual(tz.ms_name, '(UTC+01:00) Brussels, Copenhagen, Madrid, Paris')
+
+        dt = tz.localize(EWSDateTime(2000, 1, 2, 3, 4, 5))
+        self.assertIsInstance(dt, EWSDateTime)
+        self.assertIsInstance(dt.tzinfo, EWSTimeZone)
+        self.assertEqual(dt.tzinfo.ms_id, tz.ms_id)
+        self.assertEqual(dt.tzinfo.ms_name, tz.ms_name)
+        self.assertEqual(str(dt), '2000-01-02 03:04:05+01:00')
+        self.assertEqual(
+            repr(dt),
+            "EWSDateTime(2000, 1, 2, 3, 4, 5, tzinfo=<DstTzInfo 'Europe/Copenhagen' CET+1:00:00 STD>)"
+        )
+        self.assertIsInstance(dt + timedelta(days=1), EWSDateTime)
+        self.assertIsInstance(dt - timedelta(days=1), EWSDateTime)
+        self.assertIsInstance(dt - EWSDateTime.now(tz=tz), timedelta)
+        self.assertIsInstance(EWSDateTime.now(tz=tz), EWSDateTime)
+        self.assertEqual(dt, EWSDateTime.from_datetime(tz.localize(datetime(2000, 1, 2, 3, 4, 5))))
+        self.assertEqual(dt.ewsformat(), '2000-01-02T03:04:05')
+        utc_tz = EWSTimeZone.timezone('UTC')
+        self.assertEqual(dt.astimezone(utc_tz).ewsformat(), '2000-01-02T02:04:05Z')
+        # Test summertime
+        dt = tz.localize(EWSDateTime(2000, 8, 2, 3, 4, 5))
+        self.assertEqual(dt.astimezone(utc_tz).ewsformat(), '2000-08-02T01:04:05Z')
+
+
 class EWSTest(unittest.TestCase):
     def setUp(self):
-        self.tzname = 'Europe/Copenhagen'
+        self.tz = EWSTimeZone.timezone('Europe/Copenhagen')
         try:
             with open(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'settings.yml')) as f:
                 settings = load(f)
@@ -23,13 +53,12 @@ class EWSTest(unittest.TestCase):
             raise
         self.categories = ['Test']
         self.config = Configuration(server=settings['server'], username=settings['username'],
-                                    password=settings['password'], timezone=self.tzname)
+                                    password=settings['password'])
         self.account = Account(primary_smtp_address=settings['account'], access_type=DELEGATE, config=self.config)
 
     def tearDown(self):
-        tz = timezone(self.tzname)
-        start = EWSDateTime(1900, 9, 26, 8, 0, 0, tzinfo=tz)
-        end = EWSDateTime(2200, 9, 26, 11, 0, 0, tzinfo=tz)
+        start = self.tz.localize(EWSDateTime(1900, 9, 26, 8, 0, 0))
+        end = self.tz.localize(EWSDateTime(2200, 9, 26, 11, 0, 0))
         ids = self.account.calendar.find_items(start=start, end=end, categories=self.categories, shape=IdOnly)
         if ids:
             self.account.calendar.delete_items(ids)
@@ -48,9 +77,8 @@ class EWSTest(unittest.TestCase):
         self.assertEqual(len(folders), 61, sorted(f.name for f in folders))
 
     def test_finditems(self):
-        tz = timezone(self.tzname)
-        start = EWSDateTime(2009, 9, 26, 8, 0, 0, tzinfo=tz)
-        end = EWSDateTime(2009, 9, 26, 11, 0, 0, tzinfo=tz)
+        start = self.tz.localize(EWSDateTime(2009, 9, 26, 8, 0, 0))
+        end = self.tz.localize(EWSDateTime(2009, 9, 26, 11, 0, 0))
         subject = 'Test Subject'
         body = 'Test Body'
         location = 'Test Location'
@@ -64,9 +92,8 @@ class EWSTest(unittest.TestCase):
         self.account.calendar.delete_items(items)
 
     def test_getitems(self):
-        tz = timezone(self.tzname)
-        start = EWSDateTime(2009, 9, 26, 8, 0, 0, tzinfo=tz)
-        end = EWSDateTime(2009, 9, 26, 11, 0, 0, tzinfo=tz)
+        start = self.tz.localize(EWSDateTime(2009, 9, 26, 8, 0, 0))
+        end = self.tz.localize(EWSDateTime(2009, 9, 26, 11, 0, 0))
         subject = 'Test Subject'
         body = 'Test Body'
         location = 'Test Location'
@@ -81,9 +108,8 @@ class EWSTest(unittest.TestCase):
         self.account.calendar.delete_items(items)
 
     def test_extra_fields(self):
-        tz = timezone(self.tzname)
-        start = EWSDateTime(2009, 9, 26, 8, 0, 0, tzinfo=tz)
-        end = EWSDateTime(2009, 9, 26, 11, 0, 0, tzinfo=tz)
+        start = self.tz.localize(EWSDateTime(2009, 9, 26, 8, 0, 0))
+        end = self.tz.localize(EWSDateTime(2009, 9, 26, 11, 0, 0))
         subject = 'Test Subject'
         body = 'Test Body'
         location = 'Test Location'
@@ -102,11 +128,9 @@ class EWSTest(unittest.TestCase):
         self.account.calendar.delete_items(items)
 
     def test_item(self):
-        tz = timezone(self.tzname)
-
         # Test insert
-        start = EWSDateTime(2011, 10, 12, 8, tzinfo=tz)
-        end = EWSDateTime(2011, 10, 12, 10, tzinfo=tz)
+        start = self.tz.localize(EWSDateTime(2011, 10, 12, 8))
+        end = self.tz.localize(EWSDateTime(2011, 10, 12, 10))
         subject = 'Test Subject'
         body = 'Test Body'
         location = 'Test Location'
@@ -134,8 +158,8 @@ class EWSTest(unittest.TestCase):
         self.assertEqual(item.reminder_is_set, reminder_is_set)
 
         # Test update
-        start = EWSDateTime(2012, 9, 12, 16, tzinfo=tz)
-        end = EWSDateTime(2012, 9, 12, 17, tzinfo=tz)
+        start = self.tz.localize(EWSDateTime(2012, 9, 12, 16))
+        end = self.tz.localize(EWSDateTime(2012, 9, 12, 17))
         subject = 'New Subject'
         body = 'New Body'
         location = 'New Location'
@@ -203,9 +227,8 @@ class EWSTest(unittest.TestCase):
         self.assertEqual(status, [(True, None)])
 
     def test_sessionpool(self):
-        tz = timezone(self.tzname)
-        start = EWSDateTime(2011, 10, 12, 8, tzinfo=tz)
-        end = EWSDateTime(2011, 10, 12, 10, tzinfo=tz)
+        start = self.tz.localize(EWSDateTime(2011, 10, 12, 8))
+        end = self.tz.localize(EWSDateTime(2011, 10, 12, 10))
         items = []
         for i in range(150):
             subject = 'Test Subject %s' % i

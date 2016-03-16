@@ -11,7 +11,7 @@ from xml.etree.cElementTree import Element
 import re
 
 from .credentials import DELEGATE
-from .ewsdatetime import EWSDateTime
+from .ewsdatetime import EWSDateTime, EWSTimeZone
 from .restriction import Restriction
 from .services import TNS, FindItem, IdOnly, SHALLOW, DEEP, DeleteItem, CreateItem, UpdateItem, FindFolder, GetFolder, \
     GetItem
@@ -307,9 +307,9 @@ class Folder:
     def test_access(self):
         """
         Does a simple FindItem to test (read) access to the mailbox. Maybe the account doesn't exist, maybe the
-        service user doesn't have  access to the calendar.
+        service user doesn't have access to the calendar.
         """
-        now = EWSDateTime.now()
+        now = EWSDateTime.now(tz=EWSTimeZone.timezone('UTC'))
         restriction = Restriction.from_params(self.DISTINGUISHED_FOLDER_ID, start=now, end=now)
         FindItem(self.account.protocol).call(folder=self, restriction=restriction, shape=IdOnly)
         return True
@@ -445,11 +445,6 @@ class Folder:
         fielduri = Element('t:FieldURI')
         extended_fielduri = Element('t:ExtendedFieldURI')
         folderitem = Element('t:%s' % self.item_model.ITEM_TYPE)
-        timezone = self.account.protocol.timezone
-        version = self.account.protocol.version
-        meeting_timezone = Element('t:MeetingTimeZone', TimeZoneName=timezone.ms_id)
-        start_timezone = Element('t:StartTimeZone', Id=timezone.ms_id, Name=timezone.name)
-        end_timezone = Element('t:EndTimeZone', Id=timezone.ms_id, Name=timezone.name)
 
         # copy.deepcopy() is an order of magnitude faster than having
         # Element() inside the loop. It matters because 'ids' may
@@ -484,13 +479,13 @@ class Folder:
                 i_folderitem = deepcopy(folderitem)
                 i_value = self.attr_to_request_xml_elem(fieldname)
                 if isinstance(val, EWSDateTime):
-                    i_folderitem.append(set_xml_value(i_value, val, timezone=timezone))
+                    i_folderitem.append(set_xml_value(i_value, val))
                     i_setitemfield.append(i_folderitem)
                     i_updates.append(i_setitemfield)
 
                     # Always set timezone explicitly when updating date fields. Exchange 2007 wants "MeetingTimeZone"
                     # instead of explicit timezone on each datetime field.
-                    if version.major_version < 14:
+                    if self.account.protocol.version.major_version < 14:
                         if meeting_timezone_added:
                             # Let's hope that we're not changing timezone, or that both 'start' and 'end' are supplied.
                             # Exchange 2007 doesn't support different timezone on start and end.
@@ -500,6 +495,7 @@ class Folder:
                         i_fielduri.set('FieldURI', 'calendar:MeetingTimeZone')
                         i_setitemfield_tz.append(i_fielduri)
                         i_folderitem = deepcopy(folderitem)
+                        meeting_timezone = Element('t:MeetingTimeZone', TimeZoneName=val.tzinfo.ms_id)
                         i_folderitem.append(meeting_timezone)
                         i_setitemfield_tz.append(i_folderitem)
                         i_updates.append(i_setitemfield_tz)
@@ -509,10 +505,10 @@ class Folder:
                         i_fielduri = deepcopy(fielduri)
                         if fieldname == 'start':
                             field_uri = 'calendar:StartTimeZone'
-                            timezone_element = start_timezone
+                            timezone_element = Element('t:StartTimeZone', Id=val.tzinfo.ms_id, Name=val.tzinfo.ms_name)
                         elif fieldname == 'end':
                             field_uri = 'calendar:EndTimeZone'
-                            timezone_element = end_timezone
+                            timezone_element = Element('t:EndTimeZone', Id=val.tzinfo.ms_id, Name=val.tzinfo.ms_name)
                         else:
                             assert False, 'Cannot set timezone for field %s' % fieldname
                         i_fielduri.set('FieldURI', field_uri)
@@ -650,7 +646,10 @@ class CalendarItem(Item):
     def __init__(self, **kwargs):
         for k in self.ITEM_FIELDS:
             default = 'Busy' if k == 'legacy_free_busy_status' else None
-            setattr(self, k, kwargs.pop(k, default))
+            v = kwargs.pop(k, default)
+            if k in ('start', 'end') and v and not getattr(v, 'tzinfo'):
+                raise ValueError("'%s' must be timezone aware")
+            setattr(self, k, v)
         super().__init__(**kwargs)
 
     def __repr__(self):
@@ -688,8 +687,6 @@ class Calendar(Folder):
         """
         Takes an array of Calendar.Item objects and generates the XML.
         """
-        version = self.account.protocol.version
-        timezone = self.account.protocol.timezone
         calendar_items = []
         # Prepare Element objects for CalendarItem creation
         calendar_item = Element('t:%s' % self.item_model.ITEM_TYPE)
@@ -697,13 +694,10 @@ class Calendar(Folder):
         body = self.attr_to_request_xml_elem('body')
         reminder = self.attr_to_request_xml_elem('reminder_is_set')
         start = self.attr_to_request_xml_elem('start')
-        start_timezone = Element('t:StartTimeZone', Id=timezone.ms_id, Name=timezone.name)
         end = self.attr_to_request_xml_elem('end')
-        end_timezone = Element('t:EndTimeZone', Id=timezone.ms_id, Name=timezone.name)
         busystatus = self.attr_to_request_xml_elem('legacy_free_busy_status')
         location = self.attr_to_request_xml_elem('location')
         organizer = self.attr_to_request_xml_elem('organizer')
-        meeting_timezone = Element('t:MeetingTimeZone', TimeZoneName=timezone.ms_id)
         categories = self.attr_to_request_xml_elem('categories')
         extern_id = self.attr_to_request_xml_elem('extern_id')
 
@@ -720,17 +714,20 @@ class Calendar(Folder):
             i.append(set_xml_value(deepcopy(reminder), item.reminder_is_set))
             if item.extern_id is not None:
                 i.append(set_xml_attr(deepcopy(extern_id), 't:Value', item.extern_id))
-            i.append(set_xml_value(deepcopy(start), item.start, timezone=timezone))
-            i.append(set_xml_value(deepcopy(end), item.end, timezone=timezone))
+            i.append(set_xml_value(deepcopy(start), item.start))
+            i.append(set_xml_value(deepcopy(end), item.end))
             i.append(set_xml_value(deepcopy(busystatus), item.legacy_free_busy_status))
             if item.location:
                 i.append(set_xml_value(deepcopy(location), item.location))
             if item.organizer:
                 i.append(set_xml_value(deepcopy(organizer), item.organizer))
-            if version.major_version < 14:
+            if self.account.protocol.version.major_version < 14:
+                meeting_timezone = Element('t:MeetingTimeZone', TimeZoneName=item.start.tzinfo.ms_id)
                 i.append(meeting_timezone)
             else:
+                start_timezone = Element('t:StartTimeZone', Id=item.start.tzinfo.ms_id, Name=item.start.tzinfo.ms_name)
                 i.append(start_timezone)
+                end_timezone = Element('t:EndTimeZone', Id=item.end.tzinfo.ms_id, Name=item.end.tzinfo.ms_name)
                 i.append(end_timezone)
             calendar_items.append(i)
         return calendar_items

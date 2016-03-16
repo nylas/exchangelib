@@ -3,13 +3,12 @@ from datetime import datetime
 import logging
 import os
 
-from pytz import timezone
 from yaml import load
 
 from exchangelib import DELEGATE, services
 from exchangelib.configuration import Configuration
 from exchangelib.account import Account
-from exchangelib.ewsdatetime import EWSDateTime
+from exchangelib.ewsdatetime import EWSDateTime, EWSTimeZone
 from exchangelib.folders import CalendarItem
 
 logging.basicConfig(level=logging.WARNING)
@@ -22,13 +21,11 @@ except FileNotFoundError:
     raise
 
 categories = ['foobar', 'perftest']
-location = 'Europe/Copenhagen'
-tz = timezone(location)
+tz = EWSTimeZone.timezone('Europe/Copenhagen')
 
 t0 = datetime.now()
 
-config = Configuration(server=settings['server'], username=settings['username'], password=settings['password'],
-                       timezone=location)
+config = Configuration(server=settings['server'], username=settings['username'], password=settings['password'])
 print(('Exchange server: %s' % config.protocol.server))
 
 account = Account(config=config, primary_smtp_address=settings['account'], access_type=DELEGATE)
@@ -45,8 +42,8 @@ n = 1000
 
 calitems = []
 for i in range(0, n):
-    start = EWSDateTime(year, month, day, 8, 30, tzinfo=tz)
-    end = EWSDateTime(year, month, day, 9, 15, tzinfo=tz)
+    start = tz.localize(EWSDateTime(year, month, day, 8, 30))
+    end = tz.localize(EWSDateTime(year, month, day, 9, 15))
     calitems.append(CalendarItem(
         item_id='',
         changekey='',
@@ -83,8 +80,8 @@ def perf_test(cbs, dbs, ps):
     avg_create = avg(delta, n)
     print(('Time to create %s items: %s (%s / sec)' % (len(ids), delta, avg_create)))
 
-    start = EWSDateTime(year, month, day, 0, 0, 0, tzinfo=tz)
-    end = EWSDateTime(year, month, day, 23, 59, 59, tzinfo=tz)
+    start = tz.localize(EWSDateTime(year, month, day, 0, 0, 0))
+    end = tz.localize(EWSDateTime(year, month, day, 23, 59, 59))
     ids = cal.find_items(start=start, end=end, categories=categories, shape=services.IdOnly)
     t4 = datetime.now()
     delta = t4 - t3

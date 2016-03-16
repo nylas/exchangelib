@@ -9,11 +9,11 @@ def read(fname):
 
 setup(
     name='exchangelib',
-    version='1.2',
+    version='1.3',
     author='Erik Cederstrand',
     author_email='erik@cederstrand.dk',
     description='Client for Microsoft Exchange Web Services (EWS)',
-    long_description=read('README'),
+    long_description=read('README.rst'),
     license='BSD',
     keywords='Exchange EWS autodiscover',
     install_requires=['requests>=2.7', 'requests-ntlm>=0.2.0', 'dnspython3>=1.12.0', 'pytz', 'lxml'],

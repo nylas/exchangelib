@@ -1,114 +1,66 @@
-from datetime import datetime
-import logging
+import datetime
 
 import pytz
 
-log = logging.getLogger(__name__)
 
-
-class EWSDateTime:
+class EWSDateTime(datetime.datetime):
     """
     Extends the normal datetime implementation to satisfy EWS
     """
 
-    def __init__(self, year, month, day, hour=0, minute=0, second=0, microsecond=0, tzinfo=None):
+    def __new__(cls, *args, **kwargs):
         """
-        EWS expects dates in UTC. To be on the safe side, we require dates to be created with a timezone. Due to
-        datetime() weirdness on DST, we can't inherit from the datetime.datetime class. Instead, emulate it using
-        self.dt and __getattr__(). If a non-UTC timezone is used, the local timezone must be passed to Exchange using
-        the MeetingTimezone, StartTimezone, EndTimezone or TimeZoneContext elements when creating items.
+        Inherits datetime and adds extra formatting required by EWS.
         """
-        if tzinfo is None:
-            raise ValueError('Must specify a timezone on EWSDateTime objects')
-        self.dt = tzinfo.localize(datetime(year, month, day, hour, minute, second, microsecond))
+        if 'tzinfo' in kwargs:
+            # Creating
+            raise ValueError('Do not set tzinfo directly. Use EWSTimeZone.localize() instead')
+        self = super().__new__(cls, *args, **kwargs)
+        return self
 
-    def ewsformat(self, tzinfo=None):
+    def ewsformat(self):
         """
         ISO 8601 format to satisfy xs:datetime as interpreted by EWS. Example: 2009-01-15T13:45:56Z
         """
-        if tzinfo:
-            if tzinfo == pytz.utc:
-                return self.dt.astimezone(tzinfo).strftime('%Y-%m-%dT%H:%M:%SZ')
-            return self.dt.astimezone(tzinfo).strftime('%Y-%m-%dT%H:%M:%S')
-        if self.dt.tzinfo == pytz.utc:
-            return self.dt.strftime('%Y-%m-%dT%H:%M:%SZ')
-        return self.dt.strftime('%Y-%m-%dT%H:%M:%S')
-
-    def __getattr__(self, attr):
-        return getattr(self.dt, attr)
-
-    def to_datetime(self):
-        return self.dt
+        assert self.tzinfo  # EWS datetimes must always be timezone-aware
+        if self.tzinfo.zone == 'UTC':
+            return self.strftime('%Y-%m-%dT%H:%M:%SZ')
+        return self.strftime('%Y-%m-%dT%H:%M:%S')
 
     @classmethod
-    def from_datetime(cls, d, tzinfo=None):
-        if not (d.tzinfo or tzinfo):
-            raise ValueError('Must specify a timezone')
-        return cls(d.year, d.month, d.day, d.hour, d.minute, d.second, d.microsecond, d.tzinfo or tzinfo)
+    def from_datetime(cls, d):
+        dt = cls(d.year, d.month, d.day, d.hour, d.minute, d.second, d.microsecond)
+        if d.tzinfo:
+            if isinstance(d.tzinfo, EWSTimeZone):
+                return d.tzinfo.localize(dt)
+            return EWSTimeZone.from_pytz(d.tzinfo).localize(dt)
+        return dt
+
+    def astimezone(self, tz=None):
+        t = super().astimezone(tz=tz)
+        return self.from_datetime(t)  # We want to return EWSDateTime objects
 
     def __add__(self, other):
-        # Can add timespans to get a new EWSDateTime
-        t = self.dt.__add__(other)
-        return self.__class__.from_datetime(t)
+        t = super().__add__(other)
+        return self.from_datetime(t)  # We want to return EWSDateTime objects
 
     def __sub__(self, other):
-        # Can subtract datetimes to get a timespan, or timespan to get a new EWSDateTime
-        t = self.dt.__sub__(other)
-        if type(t) == datetime:
-            return self.__class__.from_datetime(t)
-        return t
-
-    def __eq__(self, other):
-        return self.dt == (other.dt if isinstance(other, self.__class__) else other)
-
-    def __ne__(self, other):
-        return self.dt != (other.dt if isinstance(other, self.__class__) else other)
-
-    def __lt__(self, other):
-        return self.__cmp__(other) < 0
-
-    def __le__(self, other):
-        return self.__cmp__(other) <= 0
-
-    def __gt__(self, other):
-        return self.__cmp__(other) > 0
-
-    def __ge__(self, other):
-        return self.__cmp__(other) >= 0
-
-    def __cmp__(self, other):
-        a, b = self.dt, other.dt if isinstance(other, self.__class__) else other
-        return (a > b) - (a < b)
-
-    def get_ewstimezone(self):
-        return EWSTimeZone.from_pytz(self.dt.tzinfo)
+        t = super().__sub__(other)
+        if isinstance(t, datetime.timedelta):
+            return t
+        return self.from_datetime(t)  # We want to return EWSDateTime objects
 
     @classmethod
     def from_string(cls, date_string):
-        dt = datetime.strptime(date_string, '%Y-%m-%dT%H:%M:%SZ')
-        return cls.from_datetime(dt, tzinfo=pytz.utc)
+        # Assume UTC and return timezone-aware EWSDateTime objects
+        local_dt = super().strptime(date_string, '%Y-%m-%dT%H:%M:%SZ')
+        return EWSTimeZone.from_pytz(pytz.utc).localize(cls.from_datetime(local_dt))
 
     @classmethod
-    def now(cls, tzinfo=pytz.utc):
-        t = datetime.now(tzinfo)
+    def now(cls, tz=None):
+        # We want to return EWSDateTime objects
+        t = super().now(tz=tz)
         return cls.from_datetime(t)
-
-    def __repr__(self):
-        # Mimic datetime repr behavior
-        attrs = [self.dt.year, self.dt.month, self.dt.day, self.dt.hour, self.dt.minute, self.dt.second,
-                 self.dt.microsecond]
-        for i in (6, 5):
-            if attrs[i]:
-                break
-            del attrs[i]
-        if self.dt.tzinfo:
-            return self.__class__.__name__ + '(%s, tzinfo=%s)' % (', '.join([str(i) for i in attrs]),
-                                                                  repr(self.dt.tzinfo))
-        else:
-            return self.__class__.__name__ + repr(tuple(attrs))
-    
-    def __str__(self):
-        return str(self.dt)
 
 
 class EWSTimeZone:
@@ -116,35 +68,38 @@ class EWSTimeZone:
     Represents a timezone as expected by the EWS TimezoneContext / TimezoneDefinition XML element, and returned by
     services.GetServerTimeZones.
     """
-    def __init__(self, tz, ms_id, name):
-        self.tz = tz  # pytz timezone
-        self.ms_id = ms_id
-        self.name = name
-
     @classmethod
     def from_pytz(cls, tz):
+        # pytz timezones are dynamically generated. Subclass the tz.__class__ and add the extra Microsoft timezone
+        # labels we need.
+        self_cls = type(cls.__name__, (cls, tz.__class__), dict(tz.__class__.__dict__))
         try:
-            ms_id = cls.PYTZ_TO_MS_MAP[str(tz)]
+            self_cls.ms_id = cls.PYTZ_TO_MS_MAP[tz.zone]
         except KeyError as e:
-            raise ValueError('Please add a mapping from "%s" to MS timezone in PYTZ_TO_MS_TZMAP' % tz) from e
-        name = cls.MS_TIMEZONE_DEFINITIONS[ms_id]
-        return cls(tz, ms_id, name)
+            raise ValueError('Please add an entry for "%s" in PYTZ_TO_MS_TZMAP' % tz.zone) from e
+        self_cls.ms_name = cls.MS_TIMEZONE_DEFINITIONS[self_cls.ms_id]
+        self = self_cls()
+        for k, v in tz.__dict__.items():
+            setattr(self, k, v)
+        return self
 
     @classmethod
-    def from_location(cls, location):
+    def timezone(cls, location):
+        # Like pytz.timezone() but returning EWSTimeZone instances
         tz = pytz.timezone(location)
         return cls.from_pytz(tz)
 
-    def localize(self, *args, **kwargs):
-        return self.tz.localize(*args, **kwargs)
+    def normalize(self, dt):
+        # super() returns a dt.tzinfo of class pytz.tzinfo.FooBar. We need to return type EWSTimeZone
+        res = super().normalize(dt)
+        return res.replace(tzinfo=self.from_pytz(res.tzinfo))
 
-    def __str__(self):
-        return '%s (%s)' % (self.ms_id, self.name)
-    
-    def __repr__(self):
-        return self.__class__.__name__ + repr((self.tz, self.ms_id, self.name))
+    def localize(self, dt):
+        # super() returns a dt.tzinfo of class pytz.tzinfo.FooBar. We need to return type EWSTimeZone
+        res = super().localize(dt)
+        return res.replace(tzinfo=self.from_pytz(res.tzinfo))
 
-    # Manually maintained translation between pytz timezone name and MS timezone IDs
+    # Manually maintained translation between pytz location / timezone name and MS timezone IDs
     PYTZ_TO_MS_MAP = {
         'Europe/Copenhagen': 'Romance Standard Time',
         'UTC': 'UTC',
@@ -152,6 +107,7 @@ class EWSTimeZone:
     }
 
     # This is a somewhat authoritative list of the timezones available on an Exchange server. Format is (id, name).
+    # For a full list supported by the target server, call services.GetServerTimeZones.
     MS_TIMEZONE_DEFINITIONS = dict([
         ('Dateline Standard Time', '(UTC-12:00) International Date Line West'),
         ('UTC-11', '(UTC-11:00) Coordinated Universal Time-11'),

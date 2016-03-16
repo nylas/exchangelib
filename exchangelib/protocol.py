@@ -50,7 +50,6 @@ class Protocol:
         self.messages_url = '%s://%s/EWS/messages.xsd' % (scheme, self.server)
         self.types_url = '%s://%s/EWS/types.xsd' % (scheme, self.server)
         self.credentials = credentials
-        self.timezone = EWSTimeZone.from_location(timezone)
         self.timeout = TIMEOUT
 
         # Acquire lock to guard against multiple threads competing to cache information. Having a per-server lock is
