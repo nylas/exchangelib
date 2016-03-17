@@ -55,7 +55,9 @@ API_VERSION_FROM_BUILD_NUMBER = {
     },
 }
 
-API_VERSIONS = list(v[0] for v in VERSIONS.values())
+# Build a list of unique API versions, used when guessing API version supported by the server.  Use reverse order so we
+# get the newest API version supported by the server.
+API_VERSIONS = sorted({v[0] for v in VERSIONS.values()}, reverse=True)
 
 
 class Version:
@@ -133,11 +135,9 @@ class Version:
     def _guess_version_from_service(cls, protocol, ews_url, hint=None):
         # We need to guess the version. If we got a shortname from docs, start guessing that
         if hint:
-            tmp = set(API_VERSIONS)
-            tmp.remove(hint)
-            api_versions = [hint] + list(tmp)
+            api_versions = [hint] + [v for v in API_VERSIONS if v != hint]
         else:
-            api_versions = list(API_VERSIONS)
+            api_versions = API_VERSIONS
         for api_version in api_versions:
             try:
                 return cls._get_version_from_service(protocol=protocol, ews_url=ews_url, api_version=api_version)
