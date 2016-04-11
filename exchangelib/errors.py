@@ -66,12 +66,13 @@ class AutoDiscoverRedirect(AutoDiscoverError):
         return 'AutoDiscover redirects to %s' % self.redirect_email
 
 
-# ResponseCode, see: http://msdn.microsoft.com/en-us/library/aa580757(v=EXCHG.140).aspx
 class ResponseMessageError(TransportError):
     pass
 
 
-# Somewhat-authoritative list of possible response message error types from EWS
+# Somewhat-authoritative list of possible response message error types from EWS. See full list at
+# https://msdn.microsoft.com/en-us/library/office/aa580757(v=exchg.150).aspx
+#
 class ErrorAccessDenied(ResponseMessageError): pass
 class ErrorAccessModeSpecified(ResponseMessageError): pass
 class ErrorAccountDisabled(ResponseMessageError): pass
@@ -232,6 +233,7 @@ class ErrorInvalidItemForOperationExpandDL(ResponseMessageError): pass
 class ErrorInvalidItemForOperationRemoveItem(ResponseMessageError): pass
 class ErrorInvalidItemForOperationSendItem(ResponseMessageError): pass
 class ErrorInvalidItemForOperationTentative(ResponseMessageError): pass
+class ErrorInvalidLicense(ResponseMessageError): pass
 class ErrorInvalidLogonType(ResponseMessageError): pass
 class ErrorInvalidMailbox(ResponseMessageError): pass
 class ErrorInvalidManagedFolderProperty(ResponseMessageError): pass
