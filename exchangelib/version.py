@@ -185,32 +185,46 @@ class Version:
         if info is None:
             raise TransportError('No ServerVersionInfo in response: %s' % r.text)
 
+        version = cls.from_response(requested_api_version=api_version, response=r)
+        log.debug('Service version is: %s', version)
+        return version
+
+    @classmethod
+    def from_response(cls, requested_api_version, response):
+        try:
+            header = to_xml(response.text, encoding=response.encoding).find('{%s}Header' % SOAPNS)
+            if not header:
+                raise ParseError()
+        except ParseError as e:
+            raise EWSWarning('Unknown XML response from %s (response: %s)' % (response, response.text)) from e
+        info = header.find('{%s}ServerVersionInfo' % TNS)
+        if info is None:
+            raise TransportError('No ServerVersionInfo in response: %s' % response.text)
+
         major_version, minor_version, major_build, minor_build = \
             [int(info.get(k)) for k in ['MajorVersion', 'MinorVersion', 'MajorBuildNumber', 'MinorBuildNumber']]
         for k, v in dict(MajorVersion=major_version, MinorVersion=minor_version, MajorBuildNumber=major_build,
                          MinorBuildNumber=minor_build).items():
             if v is None:
-                raise TransportError('No %s in response: %s' % (k, r.text))
+                raise TransportError('No %s in response: %s' % (k, response.text))
         api_version_from_server = info.get('Version')
         if api_version_from_server is None:
             # Not all Exchange servers send the Version element
             api_version_from_server = cls.api_version_from_build_number(major_version, minor_version, major_build)
-        if api_version_from_server != api_version:
+        if api_version_from_server != requested_api_version:
             if api_version_from_server.startswith('V2_') \
                     or api_version_from_server.startswith('V2015_') \
                     or api_version_from_server.startswith('V2016_'):
                 # Office 365 is an expert in sending invalid server versions...
-                log.info('API version "%s" worked but server reports version "%s". Using "%s"', api_version,
-                         api_version_from_server, api_version)
+                log.info('API version "%s" worked but server reports version "%s". Using "%s"', requested_api_version,
+                         api_version_from_server, requested_api_version)
+                api_version_from_server = requested_api_version
             else:
                 # Work around a bug in Exchange that reports a bogus API version in the XML response. Trust server
-                # response except 'V2_nn' or 'V2015_nn_mm' which is bogus
-                log.info('API version "%s" worked but server reports version "%s". Using "%s"', api_version,
+                # response except 'V2_nn' or 'V201[5,6]_nn_mm' which is bogus
+                log.info('API version "%s" worked but server reports version "%s". Using "%s"', requested_api_version,
                          api_version_from_server, api_version_from_server)
-                api_version = api_version_from_server
-        version = cls(major_version, minor_version, major_build, minor_build, api_version)
-        log.debug('Service version is: %s', version)
-        return version
+        return cls(major_version, minor_version, major_build, minor_build, api_version_from_server)
 
     @staticmethod
     def api_version_from_build_number(major_version, minor_version, major_build):

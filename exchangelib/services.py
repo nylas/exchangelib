@@ -22,7 +22,7 @@ from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, 
     ErrorNonExistentMailbox, ErrorMailboxStoreUnavailable, ErrorImpersonateUserDenied, ErrorInternalServerError, \
     ErrorInternalServerTransientError, ErrorNoRespondingCASInDestinationSite, ErrorImpersonationFailed, \
     ErrorMailboxMoveInProgress, ErrorAccessDenied, ErrorConnectionFailed, RateLimitError, ErrorServerBusy, \
-    ErrorTooManyObjectsOpened, ErrorInvalidLicense
+    ErrorTooManyObjectsOpened, ErrorInvalidLicense, ErrorInvalidSchemaVersionForMailboxVersion
 from .transport import wrap, SOAPNS, TNS, MNS, ENS
 from .util import chunkify, set_xml_attr, get_xml_attr, to_xml, post_ratelimited
 
@@ -81,18 +81,44 @@ class EWSService:
     def _get_response_xml(self, payload, account=None):
         # Takes an XML tree and returns SOAP payload as an XML tree
         assert isinstance(payload, ElementType)
-        soap_payload = wrap(content=payload, version=self.protocol.version.api_version, account=account)
-        session = self.protocol.get_session()
-        r, session = post_ratelimited(protocol=self.protocol, session=session, url=self.protocol.ews_url, headers=None,
-                                      data=soap_payload, timeout=self.protocol.timeout, verify=True,
-                                      allow_redirects=False)
-        self.protocol.release_session(session)
-        try:
-            soap_response_payload = to_xml(r.text, encoding=r.encoding or 'utf-8')
-        except ExpatError as e:
-            raise SOAPError('SOAP response is not XML: %s' % e) from e
-        else:
-            return self._get_soap_payload(soap_response=soap_response_payload)
+        # Microsoft really doesn't want to make our lives easy. The server may report one version in our initial version
+        # guessing tango, but then the server may decide that any arbitrary legacy backend server may actually process
+        # the request for an account. Prepare to handle ErrorInvalidSchemaVersionForMailboxVersion errors and set the
+        # server version per-account.
+        from .version import API_VERSIONS, Version
+        hint = account.version.api_version if account else self.protocol.version.api_version
+        api_versions = [hint] + [v for v in API_VERSIONS if v != hint]
+        for api_version in api_versions:
+            session = self.protocol.get_session()
+            soap_payload = wrap(content=payload, version=api_version, account=account)
+            r, session = post_ratelimited(
+                protocol=self.protocol,
+                session=session,
+                url=self.protocol.ews_url,
+                headers=None,
+                data=soap_payload,
+                timeout=self.protocol.timeout,
+                verify=True,
+                allow_redirects=False)
+            self.protocol.release_session(session)
+            try:
+                soap_response_payload = to_xml(r.text, encoding=r.encoding or 'utf-8')
+            except ExpatError as e:
+                raise SOAPError('SOAP response is not XML: %s' % e) from e
+            try:
+                res = self._get_soap_payload(soap_response=soap_response_payload)
+            except ErrorInvalidSchemaVersionForMailboxVersion:
+                assert account # This should never happen for non-account services
+                # The guessed server version is wrong for this account. Try the next version
+                log.warning('API version %s was invalid for account %s', api_version, account)
+                continue
+            if account and account.version.api_version != api_version:
+                # The api_version that worked was different than our hint. Set new version for account
+                log.info('New API version for account %s (%s -> %s)', account, account.version.api_version, api_version)
+                account.version = Version.from_response(requested_api_version=api_version, response=r)
+            return res
+        raise ErrorInvalidSchemaVersionForMailboxVersion('Tried versions %s but all were invalid for account %s' %
+                                                         (api_versions, account))
 
     def _get_soap_payload(self, soap_response):
         log_prefix = 'EWS %s, service %s' % (self.protocol.ews_url, self.SERVICE_NAME)
@@ -252,7 +278,7 @@ class PagingEWSService(EWSService):
         return rootfolder, next_offset
 
 
-class GetServerTimeZones(EWSAccountService):
+class GetServerTimeZones(EWSService):
     SERVICE_NAME = 'GetServerTimeZones'
     element_container_name = '{%s}TimeZoneDefinitions' % MNS
 
@@ -383,7 +409,7 @@ class FindItem(PagingEWSService, EWSFolderService):
         return finditem
 
 
-class FindFolder(PagingEWSService, EWSAccountService):
+class FindFolder(PagingEWSService, EWSFolderService):
     """
     Gets a list of folders belonging to an account.
     """
@@ -401,13 +427,13 @@ class FindFolder(PagingEWSService, EWSAccountService):
         kwargs['element_name'] = '{%s}Folder' % TNS
         super().__init__(*args, **kwargs)
 
-    def call(self, account, **kwargs):
-        return self._paged_call(account=account, **kwargs)
+    def call(self, folder, **kwargs):
+        return self._paged_call(folder=folder, **kwargs)
 
-    def _get_payload(self, account, folder, additional_fields=None, shape=IdOnly, depth=DEEP, offset=0):
+    def _get_payload(self, folder, additional_fields=None, shape=IdOnly, depth=DEEP, offset=0):
         log.debug(
             'Getting folders for %s, root:%s, extra fields:%s, shape:%s',
-            account,
+            folder.account,
             folder.name,
             additional_fields,
             shape
@@ -421,7 +447,7 @@ class FindFolder(PagingEWSService, EWSAccountService):
                 additionalproperties.append(Element('t:FieldURI', FieldURI=field_uri))
             foldershape.append(additionalproperties)
         findfolder.append(foldershape)
-        if folder.protocol.version.major_version >= 14:
+        if folder.account.protocol.version.major_version >= 14:
             indexedpageviewitem = Element('m:IndexedPageFolderView', Offset=str(offset), BasePoint='Beginning')
             findfolder.append(indexedpageviewitem)
         else:

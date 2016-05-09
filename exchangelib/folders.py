@@ -208,10 +208,6 @@ class Folder:
     def is_distinguished(self):
         return self.name.lower() == self.DISTINGUISHED_FOLDER_ID
 
-    @property
-    def protocol(self):
-        return self.account.protocol
-
     @classmethod
     def attr_to_fielduri(cls, fieldname):
         return cls.item_model.fielduri_for_field(fieldname)
@@ -401,7 +397,7 @@ class Folder:
                                  AffectedTaskOccurrences='SpecifiedOccurrenceOnly')
         else:
             deleteitem = Element('m:%s' % DeleteItem.SERVICE_NAME, DeleteType='HardDelete')
-        if self.account.protocol.version.major_version >= 15:
+        if self.account.version.major_version >= 15:
             deleteitem.set('SuppressReadReceipts', 'true')
 
         itemids = Element('m:ItemIds')
@@ -433,7 +429,7 @@ class Folder:
                                  MessageDisposition='SaveOnly')
         else:
             updateitem = Element('m:%s' % UpdateItem.SERVICE_NAME, ConflictResolution='AutoResolve')
-        if self.account.protocol.version.major_version >= 15:
+        if self.account.version.major_version >= 15:
             updateitem.set('SuppressReadReceipts', 'true')
 
         itemchanges = Element('m:ItemChanges')
@@ -485,7 +481,7 @@ class Folder:
 
                     # Always set timezone explicitly when updating date fields. Exchange 2007 wants "MeetingTimeZone"
                     # instead of explicit timezone on each datetime field.
-                    if self.account.protocol.version.major_version < 14:
+                    if self.account.version.major_version < 14:
                         if meeting_timezone_added:
                             # Let's hope that we're not changing timezone, or that both 'start' and 'end' are supplied.
                             # Exchange 2007 doesn't support different timezone on start and end.
@@ -543,17 +539,22 @@ class Folder:
 
     def get_folders(self, shape=IdOnly, depth=DEEP):
         folders = []
-        for elem in FindFolder(self.protocol).call(account=self.account, folder=self,
-                                                   additional_fields=['folder:DisplayName', 'folder:FolderClass'],
-                                                   shape=shape, depth=depth):
+        for elem in FindFolder(self.account.protocol).call(
+                folder=self,
+                additional_fields=['folder:DisplayName', 'folder:FolderClass'],
+                shape=shape,
+                depth=depth
+        ):
             folders.append(self.from_xml(self.account, elem))
         return folders
 
     def get_folder(self, shape=IdOnly):
         folders = []
-        for elem in GetFolder(self.protocol).call(folder=self,
-                                                  additional_fields=['folder:DisplayName', 'folder:FolderClass'],
-                                                  shape=shape):
+        for elem in GetFolder(self.account.protocol).call(
+                folder=self,
+                additional_fields=['folder:DisplayName', 'folder:FolderClass'],
+                shape=shape
+        ):
             folders.append(self.from_xml(self.account, elem))
         assert len(folders) == 1
         return folders[0]
@@ -721,7 +722,7 @@ class Calendar(Folder):
                 i.append(set_xml_value(deepcopy(location), item.location))
             if item.organizer:
                 i.append(set_xml_value(deepcopy(organizer), item.organizer))
-            if self.account.protocol.version.major_version < 14:
+            if self.account.version.major_version < 14:
                 meeting_timezone = Element('t:MeetingTimeZone', TimeZoneName=item.start.tzinfo.ms_id)
                 i.append(meeting_timezone)
             else:

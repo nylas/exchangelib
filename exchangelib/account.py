@@ -34,6 +34,9 @@ class Account:
                 assert isinstance(config, Configuration)
         else:
             self.protocol = config.protocol
+        # We may need to override the default server version on a per-account basis because Microsoft may report one
+        # server version up-front but delegate account requests to an older backend server.
+        self.version = self.protocol.version
         self.root = Root(self)
         self.folders = {}  # TODO Unimplemented - should support Inbox, Tasks, Contacts
         # If the account contains a shared calendar from a different user, that calendar will be in the folder list.
