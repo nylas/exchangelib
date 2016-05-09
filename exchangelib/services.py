@@ -22,7 +22,8 @@ from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, 
     ErrorNonExistentMailbox, ErrorMailboxStoreUnavailable, ErrorImpersonateUserDenied, ErrorInternalServerError, \
     ErrorInternalServerTransientError, ErrorNoRespondingCASInDestinationSite, ErrorImpersonationFailed, \
     ErrorMailboxMoveInProgress, ErrorAccessDenied, ErrorConnectionFailed, RateLimitError, ErrorServerBusy, \
-    ErrorTooManyObjectsOpened, ErrorInvalidLicense, ErrorInvalidSchemaVersionForMailboxVersion
+    ErrorTooManyObjectsOpened, ErrorInvalidLicense, ErrorInvalidSchemaVersionForMailboxVersion, \
+    ErrorInvalidServerVersion
 from .transport import wrap, SOAPNS, TNS, MNS, ENS
 from .util import chunkify, set_xml_attr, get_xml_attr, to_xml, post_ratelimited
 
@@ -101,16 +102,17 @@ class EWSService:
                 verify=True,
                 allow_redirects=False)
             self.protocol.release_session(session)
+            log.debug('Trying API version %s for account %s', api_version, account)
             try:
                 soap_response_payload = to_xml(r.text, encoding=r.encoding or 'utf-8')
             except ExpatError as e:
                 raise SOAPError('SOAP response is not XML: %s' % e) from e
             try:
                 res = self._get_soap_payload(soap_response=soap_response_payload)
-            except ErrorInvalidSchemaVersionForMailboxVersion:
+            except (ErrorInvalidSchemaVersionForMailboxVersion, ErrorInvalidServerVersion):
                 assert account # This should never happen for non-account services
                 # The guessed server version is wrong for this account. Try the next version
-                log.warning('API version %s was invalid for account %s', api_version, account)
+                log.debug('API version %s was invalid for account %s', api_version, account)
                 continue
             if account and account.version.api_version != api_version:
                 # The api_version that worked was different than our hint. Set new version for account
