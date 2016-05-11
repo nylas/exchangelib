@@ -43,6 +43,7 @@ def get_xml_attrs(tree, name):
 
 def set_xml_value(elem, value):
     from .ewsdatetime import EWSDateTime
+    from .folders import XMLElement
     if isinstance(value, str):
         elem.text = safe_xml_value(value)
     elif isinstance(value, (tuple, list)):
@@ -52,8 +53,10 @@ def set_xml_value(elem, value):
         elem.text = '1' if value else '0'
     elif isinstance(value, EWSDateTime):
         elem.text = value.ewsformat()
+    elif isinstance(value, XMLElement):
+        elem.append(value.to_xml())
     else:
-        raise AttributeError('Unsupported type %s for value %s' % (type(value), value))
+        raise AttributeError('Unsupported type %s for value %s on elem %s' % (type(value), value, elem))
     return elem
 
 
@@ -62,6 +65,7 @@ def safe_xml_value(value, replacement='?'):
 
 
 def set_xml_attr(tree, name, value):
+    # TODO: deepcopy() with cache here
     elem = Element(name)
     elem.text = safe_xml_value(value)
     tree.append(elem)
@@ -176,6 +180,8 @@ Response headers: %(response_headers)s'''
             log_vals['request_headers'] = r.request.headers
             log_vals['response_headers'] = r.headers
             log.debug(log_msg, log_vals)
+            # log.debug('Request data: %s', data)
+            # log.debug('Response data: %s', getattr(r, 'text'))
             # The genericerrorpage.htm/internalerror.asp is ridiculous behaviour for random outages. Redirect to
             # '/internalsite/internalerror.asp' or '/internalsite/initparams.aspx' is caused by e.g. SSL certificate
             # f*ckups on the Exchange server.

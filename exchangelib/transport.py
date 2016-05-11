@@ -39,7 +39,7 @@ def test_credentials(protocol):
 
 
 def _test_docs_credentials(protocol):
-    log.debug("Trying auth type '%s' on '%s'", protocol.docs_auth_type)
+    log.debug("Trying auth type '%s' on '%s'", protocol.docs_auth_type, protocol.types_url)
     # Retrieve the result. We allow 401 errors to happen since the authentication type may be wrong, giving a 401
     # response.
     auth = get_auth_instance(credentials=protocol.credentials, auth_type=protocol.docs_auth_type)

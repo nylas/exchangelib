@@ -8,7 +8,7 @@ from exchangelib.account import Account
 from exchangelib.configuration import Configuration
 from exchangelib.credentials import DELEGATE
 from exchangelib.ewsdatetime import EWSDateTime, EWSTimeZone
-from exchangelib.folders import CalendarItem
+from exchangelib.folders import CalendarItem, MailBox
 from exchangelib.services import GetServerTimeZones, AllProperties, IdOnly
 
 
@@ -155,6 +155,9 @@ class EWSTest(unittest.TestCase):
         self.assertEqual(item.body, body)
         self.assertEqual(item.categories, self.categories)
         self.assertEqual(item.extern_id, extern_id)
+        self.assertEqual(item.organizer.email_address, self.account.primary_smtp_address)
+        self.assertEqual(item.organizer.mailbox_type, 'Mailbox')
+        self.assertEqual(item.organizer.item_id, None)
         self.assertEqual(item.reminder_is_set, reminder_is_set)
 
         # Test update
@@ -184,6 +187,9 @@ class EWSTest(unittest.TestCase):
         self.assertEqual(item.body, body)
         self.assertEqual(item.categories, categories)
         self.assertEqual(item.extern_id, extern_id)
+        self.assertEqual(item.organizer.email_address, self.account.primary_smtp_address)
+        self.assertEqual(item.organizer.mailbox_type, 'Mailbox')
+        self.assertEqual(item.organizer.item_id, None)
         self.assertEqual(item.reminder_is_set, reminder_is_set)
 
         # Test wiping fields

@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+"""
+To upload to PyPI:
+   python setup.py sdist upload
+"""
 import os
 from setuptools import setup
 
