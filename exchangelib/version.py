@@ -1,5 +1,5 @@
 import logging
-from xml.etree.cElementTree import ParseError
+from xml.etree.ElementTree import ParseError
 
 import requests.sessions
 import requests.adapters

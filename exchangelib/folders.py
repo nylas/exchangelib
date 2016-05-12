@@ -5,9 +5,7 @@ Exchange is very picky about things like the order of XML elements in SOAP reque
 automatically instead of taking advantage of Python SOAP libraries and the WSDL file.
 """
 
-from copy import deepcopy
 from logging import getLogger
-from xml.etree.cElementTree import Element
 import re
 
 from .credentials import DELEGATE
@@ -15,117 +13,136 @@ from .ewsdatetime import EWSDateTime, EWSTimeZone
 from .restriction import Restriction
 from .services import TNS, FindItem, IdOnly, SHALLOW, DEEP, DeleteItem, CreateItem, UpdateItem, FindFolder, GetFolder, \
     GetItem
-from .util import set_xml_attr, get_xml_attrs, get_xml_attr, set_xml_value
+from .util import create_element, add_xml_child, get_xml_attrs, get_xml_attr, set_xml_value, ElementType
 
 log = getLogger(__name__)
 
-ElementType = type(Element('x'))  # Type is auto-generated inside cElementTree
 
+class EWSElement:
+    ELEMENT_NAME = None
 
-class XMLElement:
-    root = None
+    __slots__ = tuple()
 
-    def to_xml(self):
+    def to_xml(self, version):
         raise NotImplementedError()
 
     @classmethod
     def from_xml(cls, elem):
         raise NotImplementedError()
 
+    @classmethod
+    def request_tag(cls):
+        return 't:%s' % cls.ELEMENT_NAME
 
-class ItemId(XMLElement):
-    root = Element('t:ItemId')
+    @classmethod
+    def response_tag(cls):
+        return '{%s}%s' % (TNS, cls.ELEMENT_NAME)
+
+
+class ItemId(EWSElement):
+    ELEMENT_NAME = 'ItemId'
+
+    __slots__ = ('id', 'changekey')
 
     def __init__(self, id, changekey):
+        assert isinstance(id, str)
+        assert isinstance(changekey, str)
         self.id = id
         self.changekey = changekey
 
-    def to_xml(self):
-        # copy.deepcopy() is an order of magnitude faster than creating a new Element()
-        item_id = deepcopy(self.root)
-        item_id.set('Id', self.id)
-        item_id.set('ChangeKey', self.changekey)
-        return item_id
+    def to_xml(self, version):
+        # Don't use create_element with extra args. It caches results and Id is always unique.
+        elem = create_element(self.request_tag())
+        elem.set('Id', self.id)
+        elem.set('ChangeKey', self.changekey)
+        return elem
 
     @classmethod
     def from_xml(cls, elem):
         if not elem:
             return None
+        assert elem.tag == cls.response_tag()
         return cls(id=elem.get('Id'), changekey=elem.get('ChangeKey'))
 
-    def __repr__(self):
-        return self.__class__.__name__ + repr((self.id, self.changekey))
 
-
-class MailBox(XMLElement):
-    root = Element('t:Mailbox')
+class Mailbox(EWSElement):
+    ELEMENT_NAME = 'Mailbox'
     MAILBOX_TYPES = {'Mailbox', 'PublicDL', 'PrivateDL', 'Contact', 'PublicFolder', 'Unknown', 'OneOff'}
+
+    __slots__ = ('name', 'email_address', 'mailbox_type', 'item_id')
 
     def __init__(self, name=None, email_address=None, mailbox_type=None, item_id=None):
         # There's also the 'RoutingType' element, but it's optional and must have value "SMTP"
-        if mailbox_type:
+        if name is not None:
+            assert isinstance(name, str)
+        if email_address is not None:
+            assert isinstance(email_address, str)
+        if mailbox_type is not None:
             assert mailbox_type in self.MAILBOX_TYPES
+        if item_id is not None:
+            assert isinstance(item_id, ItemId)
         self.name = name
         self.email_address = email_address
         self.mailbox_type = mailbox_type
         self.item_id = item_id
 
-    def to_xml(self):
+    def to_xml(self, version):
         if not self.email_address and not self.item_id:
             # See "Remarks" section of https://msdn.microsoft.com/en-us/library/office/aa565036(v=exchg.150).aspx
             raise AttributeError('Mailbox must have either email_address or item_id')
-        mailbox = deepcopy(self.root)
+        mailbox = create_element(self.request_tag())
         if self.name:
-            set_xml_attr(mailbox, 't:Name', self.name)
+            add_xml_child(mailbox, 't:Name', self.name)
         if self.email_address:
-            set_xml_attr(mailbox, 't:EmailAddress', self.email_address)
+            add_xml_child(mailbox, 't:EmailAddress', self.email_address)
         if self.mailbox_type:
-            set_xml_attr(mailbox, 't:MailboxType', self.mailbox_type)
+            add_xml_child(mailbox, 't:MailboxType', self.mailbox_type)
         if self.item_id:
-            mailbox.append(self.item_id.to_xml())
+            set_xml_value(mailbox, self.item_id, version)
         return mailbox
 
     @classmethod
     def from_xml(cls, elem):
         if not elem:
             return None
-        mailbox = elem.find('{%s}Mailbox' % TNS)
-        if not mailbox:
-            return None
+        assert elem.tag == cls.response_tag()
         return cls(
-            name=get_xml_attr(mailbox, '{%s}Name' % TNS),
-            email_address=get_xml_attr(mailbox, '{%s}EmailAddress' % TNS),
-            mailbox_type=get_xml_attr(mailbox, '{%s}MailboxType' % TNS),
-            item_id=ItemId.from_xml(mailbox.find('{%s}ItemId' % TNS)),
+            name=get_xml_attr(elem, '{%s}Name' % TNS),
+            email_address=get_xml_attr(elem, '{%s}EmailAddress' % TNS),
+            mailbox_type=get_xml_attr(elem, '{%s}MailboxType' % TNS),
+            item_id=ItemId.from_xml(elem.find(ItemId.response_tag())),
         )
 
     def __repr__(self):
         return self.__class__.__name__ + repr((self.name, self.email_address, self.mailbox_type, self.item_id))
 
 
-class ExtendedProperty(XMLElement):
-    root = Element('t:ExtendedProperty')
+class ExtendedProperty(EWSElement):
+    ELEMENT_NAME = 'ExtendedProperty'
+
     property_id = None
     property_name = None
     property_type = None
 
+    __slots__ = ('value',)
+
     def __init__(self, value):
+        assert isinstance(value, str)
         self.value = value
 
     @classmethod
     def field_uri_xml(cls):
-        return Element(
+        return create_element(
             't:ExtendedFieldURI',
             PropertySetId=cls.property_id,
             PropertyName=cls.property_name,
-            PropertyType=cls.property_type,
+            PropertyType=cls.property_type
         )
 
-    def to_xml(self):
-        extended_property = deepcopy(self.root)
-        extended_field_uri = self.field_uri_xml()
-        extended_property.append(extended_field_uri)
-        set_xml_attr(extended_property, 't:Value', self.value)
+    def to_xml(self, version):
+        extended_property = create_element(self.request_tag())
+        set_xml_value(extended_property, self.field_uri_xml(), version)
+        add_xml_child(extended_property, 't:Value', self.value)
         return extended_property
 
     @classmethod
@@ -149,7 +166,7 @@ class ExtendedProperty(XMLElement):
                 break
         return extended_field_value
 
-    def __str__(self):
+    def __repr__(self):
         return self.__class__.__name__ + repr((self.value,))
 
 
@@ -159,12 +176,52 @@ class ExternId(ExtendedProperty):
     property_name = 'External ID'
     property_type = 'String'
 
+    __slots__ = ('value',)
+
     def __init__(self, extern_id):
         super().__init__(value=extern_id)
 
 
-class Item:
-    ITEM_TYPE = 'Item'
+class Attendee(EWSElement):
+    ELEMENT_NAME = 'Attendee'
+    RESPONSE_TYPES = {'Unknown', 'Organizer', 'Tentative', 'Accept', 'Decline', 'NoResponseReceived'}
+
+    __slots__ = ('mailbox', 'response_type', 'last_response_time')
+
+    def __init__(self, mailbox, response_type, last_response_time=None):
+        assert isinstance(mailbox, Mailbox)
+        assert response_type in self.RESPONSE_TYPES
+        if last_response_time is not None:
+            assert isinstance(last_response_time, EWSDateTime)
+        self.mailbox = mailbox
+        self.response_type = response_type
+        self.last_response_time = last_response_time
+
+    def to_xml(self, version):
+        attendee = create_element(self.request_tag())
+        set_xml_value(attendee, self.mailbox, version)
+        add_xml_child(attendee, 't:ResponseType', self.response_type)
+        add_xml_child(attendee, 't:LastResponseTime', self.last_response_time)
+        return attendee
+
+    @classmethod
+    def from_xml(cls, elem):
+        if not elem:
+            return None
+        assert elem.tag == cls.response_tag()
+        last_response_time = get_xml_attr(elem, '{%s}LastResponseTime' % TNS)
+        return cls(
+            mailbox=Mailbox.from_xml(elem.find(Mailbox.response_tag())),
+            response_type=get_xml_attr(elem, '{%s}ResponseType' % TNS),
+            last_response_time=EWSDateTime.from_string(last_response_time) if last_response_time else None,
+        )
+
+    def __repr__(self):
+        return self.__class__.__name__ + repr((self.mailbox, self.response_type, self.last_response_time))
+
+
+class Item(EWSElement):
+    ELEMENT_NAME = 'Item'
     FIELDURI_PREFIX = 'item'
 
     # 'extern_id' is not a native EWS Item field. We use it for identification when item originates in an external
@@ -204,7 +261,7 @@ class Item:
         'subject': str,
         'body': str,
         'reminder_is_set': bool,
-        'categories': list,
+        'categories': [str],
         'datetime_created': EWSDateTime,
         'datetime_sent': EWSDateTime,
         'datetime_recieved': EWSDateTime,
@@ -213,13 +270,24 @@ class Item:
         'extern_id': ExternId,
     }
 
+    __slots__ = ITEM_FIELDS + EXTRA_ITEM_FIELDS
+
     def __init__(self, **kwargs):
         for k in Item.ITEM_FIELDS + Item.EXTRA_ITEM_FIELDS:
             default = False if k == 'reminder_is_set' else None
             v = kwargs.pop(k, default)
             if v is not None:
+                # Test if arguments have same type as specified in FIELD_TYPE_MAP. 'extern_id' is psecial because we
+                # implement it internally as the ExternId class but want to keep the attribute as a simple str.
+                # 'field_type' may be a list with a single type. In that case we want to check all list members
                 field_type = self.type_for_field(k)
-                if k != 'extern_id' and not isinstance(v, field_type):
+                if isinstance(field_type, list):
+                    elem_type = field_type[0]
+                    assert isinstance(v, list)
+                    for item in v:
+                        if not isinstance(item, elem_type):
+                            raise TypeError('Field %s value "%s" must be of type %s' % (k, v, field_type))
+                elif k != 'extern_id' and not isinstance(v, field_type):
                     raise TypeError('Field %s value "%s" must be of type %s' % (k, v, field_type))
             setattr(self, k, v)
         for k, v in kwargs.items():
@@ -243,13 +311,12 @@ class Item:
             raise ValueError("No fielduri defined for fieldname '%s'" % fieldname)
 
     @classmethod
-    def request_xml_elem_for_field(cls, fieldname):
+    def elem_for_field(cls, fieldname):
         assert isinstance(fieldname, str)
         try:
-            elem = Element('t:%s' % cls.ATTR_FIELDURI_MAP[fieldname])
             if fieldname == 'body':
-                elem.set('BodyType', 'Text')
-            return elem
+                return create_element('t:%s' % cls.ATTR_FIELDURI_MAP[fieldname], BodyType='Text')
+            return create_element('t:%s' % cls.ATTR_FIELDURI_MAP[fieldname])
         except KeyError:
             raise ValueError("No fielduri defined for fieldname '%s'" % fieldname)
 
@@ -268,15 +335,12 @@ class Item:
             raise ValueError("No type defined for fieldname '%s'" % fieldname)
 
     @classmethod
-    def additional_property_fields(cls, with_extra=False):
+    def additional_property_elems(cls, with_extra=False):
         fields = []
-        fielduri = Element('t:FieldURI')
         for f in cls.fieldnames(with_extra=with_extra):
             field_uri = cls.fielduri_for_field(f)
             if isinstance(field_uri, str):
-                f = deepcopy(fielduri)
-                f.set('FieldURI', field_uri)
-                fields.append(f)
+                fields.append(create_element('t:FieldURI', FieldURI=field_uri))
             else:
                 # ExtendedProperty
                 fields.append(field_uri.field_uri_xml())
@@ -284,33 +348,50 @@ class Item:
 
     @classmethod
     def id_from_xml(cls, elem):
-        id_elem = elem.find('{%s}ItemId' % TNS)
+        id_elem = elem.find(ItemId.response_tag())
         return id_elem.get('Id'), id_elem.get('ChangeKey')
 
     @classmethod
     def from_xml(cls, elem, with_extra=False):
+        assert elem.tag == cls.response_tag()
         item_id, changekey = cls.id_from_xml(elem)
         kwargs = {}
-        extended_properties = elem.findall('{%s}ExtendedProperty' % TNS)
+        extended_properties = elem.findall(ExtendedProperty.response_tag())
         for fieldname in cls.fieldnames(with_extra=with_extra):
-            t = cls.type_for_field(fieldname)
-            if t == EWSDateTime:
+            field_type = cls.type_for_field(fieldname)
+            if field_type == EWSDateTime:
                 str_val = get_xml_attr(elem, cls.response_xml_elem_for_field(fieldname))
                 kwargs[fieldname] = EWSDateTime.from_string(str_val)
-            elif t == bool:
+            elif field_type == bool:
                 val = get_xml_attr(elem, cls.response_xml_elem_for_field(fieldname))
                 kwargs[fieldname] = True if val == 'true' else False
-            elif t == str:
+            elif field_type == str:
                 kwargs[fieldname] = get_xml_attr(elem, cls.response_xml_elem_for_field(fieldname)) or ''
-            elif t == list:
+            elif isinstance(field_type, list):
+                list_type = field_type[0]
                 iter_elem = elem.find(cls.response_xml_elem_for_field(fieldname))
-                kwargs[fieldname] = get_xml_attrs(iter_elem, '{%s}String' % TNS) if iter_elem is not None else None
-            elif issubclass(t, ExtendedProperty):
-                kwargs[fieldname] = t.get_value(extended_properties)
-            elif issubclass(t, XMLElement):
-                kwargs[fieldname] = t.from_xml(elem.find(cls.response_xml_elem_for_field(fieldname)))
+                if iter_elem is None:
+                    kwargs[fieldname] = None
+                else:
+                    if list_type == str:
+                        kwargs[fieldname] = get_xml_attrs(iter_elem, '{%s}String' % TNS)
+                    else:
+                        kwargs[fieldname] = [list_type.from_xml(elem)
+                                             for elem in iter_elem.findall(list_type.response_tag())]
+            elif issubclass(field_type, ExtendedProperty):
+                kwargs[fieldname] = field_type.get_value(extended_properties)
+            elif issubclass(field_type, EWSElement):
+                if fieldname == 'organizer':
+                    # We want the nested Mailbox, not the Organizer element itself
+                    organizer = elem.find(cls.response_xml_elem_for_field(fieldname))
+                    if organizer is None:
+                        kwargs[fieldname] = None
+                    else:
+                        kwargs[fieldname] = field_type.from_xml(organizer.find(Mailbox.response_tag()))
+                else:
+                    kwargs[fieldname] = field_type.from_xml(elem.find(cls.response_xml_elem_for_field(fieldname)))
             else:
-                assert False, 'Field %s type %s not supported' % (fieldname, t)
+                assert False, 'Field %s type %s not supported' % (fieldname, field_type)
         return cls(item_id=item_id, changekey=changekey, **kwargs)
 
 
@@ -339,10 +420,6 @@ class Folder:
     @classmethod
     def attr_to_fielduri(cls, fieldname):
         return cls.item_model.fielduri_for_field(fieldname)
-
-    @classmethod
-    def attr_to_request_xml_elem(cls, fieldname):
-        return cls.item_model.request_xml_elem_for_field(fieldname)
 
     @classmethod
     def attr_to_response_xml_elem(cls, fieldname):
@@ -431,7 +508,7 @@ class Folder:
     def test_access(self):
         """
         Does a simple FindItem to test (read) access to the mailbox. Maybe the account doesn't exist, maybe the
-        service user doesn't have access to the calendar.
+        service user doesn't have access to the calendar. This will throw the most common errors.
         """
         now = EWSDateTime.now(tz=EWSTimeZone.timezone('UTC'))
         restriction = Restriction.from_params(self.DISTINGUISHED_FOLDER_ID, start=now, end=now)
@@ -441,13 +518,13 @@ class Folder:
     def folderid_xml(self):
         if self.folder_id:
             assert self.changekey
-            return Element('t:FolderId', Id=self.folder_id, ChangeKey=self.changekey)
+            return create_element('t:FolderId', Id=self.folder_id, ChangeKey=self.changekey)
         else:
             # Only use distinguished ID if we don't have the folder ID
-            distinguishedfolderid = Element('t:DistinguishedFolderId', Id=self.DISTINGUISHED_FOLDER_ID)
+            distinguishedfolderid = create_element('t:DistinguishedFolderId', Id=self.DISTINGUISHED_FOLDER_ID)
             if self.account.access_type == DELEGATE:
-                mailbox = MailBox(email_address=self.account.primary_smtp_address)
-                distinguishedfolderid.append(mailbox.to_xml())
+                mailbox = Mailbox(email_address=self.account.primary_smtp_address)
+                set_xml_value(distinguishedfolderid, mailbox, self.account.version)
             return distinguishedfolderid
 
     def get_xml(self, ids):
@@ -462,20 +539,17 @@ class Folder:
             self.DISTINGUISHED_FOLDER_ID,
             self.account
         )
-        getitem = Element('m:%s' % GetItem.SERVICE_NAME)
-        itemshape = Element('m:ItemShape')
-        set_xml_attr(itemshape, 't:BaseShape', IdOnly)
-        additional_properties = self.item_model.additional_property_fields(with_extra=self.with_extra_fields)
+        getitem = create_element('m:%s' % GetItem.SERVICE_NAME)
+        itemshape = create_element('m:ItemShape')
+        add_xml_child(itemshape, 't:BaseShape', IdOnly)
+        additional_properties = self.item_model.additional_property_elems(with_extra=self.with_extra_fields)
         if additional_properties:
-            additionalproperties = Element('t:AdditionalProperties')
-            for p in additional_properties:
-                additionalproperties.append(p)
-            itemshape.append(additionalproperties)
+            add_xml_child(itemshape, 't:AdditionalProperties', additional_properties)
         getitem.append(itemshape)
-        item_ids = Element('m:ItemIds')
+        item_ids = create_element('m:ItemIds')
         for item in ids:
             item_id = ItemId(*item) if isinstance(item, tuple) else ItemId(item.item_id, item.changekey)
-            item_ids.append(item_id.to_xml())
+            set_xml_value(item_ids, item_id, self.account.version)
         getitem.append(item_ids)
         return getitem
 
@@ -484,41 +558,35 @@ class Folder:
         # Takes an account name, a folder name, a list of Calendar.Item obejcts and a function to convert items to XML
         # Elements
         if isinstance(self, Calendar):
-            createitem = Element('m:%s' % CreateItem.SERVICE_NAME, SendMeetingInvitations='SendToNone')
+            createitem = create_element('m:%s' % CreateItem.SERVICE_NAME, SendMeetingInvitations='SendToNone')
         elif isinstance(self, Inbox):
-            createitem = Element('m:%s' % CreateItem.SERVICE_NAME, MessageDisposition='SaveOnly')
+            createitem = create_element('m:%s' % CreateItem.SERVICE_NAME, MessageDisposition='SaveOnly')
         else:
-            createitem = Element('m:%s' % CreateItem.SERVICE_NAME)
-
-        saveditemfolderid = Element('m:SavedItemFolderId')
-        saveditemfolderid.append(self.folderid_xml())
-        createitem.append(saveditemfolderid)
-
-        myitems = Element('m:Items')
-        for item in self._create_item_xml(items):
-            myitems.append(item)
-        createitem.append(myitems)
+            createitem = create_element('m:%s' % CreateItem.SERVICE_NAME)
+        add_xml_child(createitem, 'm:SavedItemFolderId', self.folderid_xml())
+        e = [i.to_xml(self.account.version) for i in items]
+        add_xml_child(createitem, 'm:Items', [i.to_xml(self.account.version) for i in items])
         return createitem
-
-    def _create_item_xml(self, items):
-        raise NotImplementedError()
 
     def delete_xml(self, ids):
         assert len(ids)
         assert isinstance(ids[0], (tuple, Item))
         # Prepare reuseable Element objects
-        deleteitem = Element('m:%s' % DeleteItem.SERVICE_NAME, DeleteType='HardDelete')
         if isinstance(self, Calendar):
-            deleteitem.set('SendMeetingCancellations', 'SendToNone')
+            deleteitem = create_element('m:%s' % DeleteItem.SERVICE_NAME, DeleteType='HardDelete',
+                                        SendMeetingCancellations='SendToNone')
         elif isinstance(self, Tasks):
-            deleteitem.set('AffectedTaskOccurrences', 'SpecifiedOccurrenceOnly')
+            deleteitem = create_element('m:%s' % DeleteItem.SERVICE_NAME, DeleteType='HardDelete',
+                                        AffectedTaskOccurrences='SpecifiedOccurrenceOnly')
+        else:
+            deleteitem = create_element('m:%s' % DeleteItem.SERVICE_NAME, DeleteType='HardDelete')
         if self.account.version.major_version >= 15:
             deleteitem.set('SuppressReadReceipts', 'true')
 
-        item_ids = Element('m:ItemIds')
+        item_ids = create_element('m:ItemIds')
         for item in ids:
             item_id = ItemId(*item) if isinstance(item, tuple) else ItemId(item.item_id, item.changekey)
-            item_ids.append(item_id.to_xml())
+            set_xml_value(item_ids, item_id, self.account.version)
         deleteitem.append(item_ids)
         return deleteitem
 
@@ -528,101 +596,83 @@ class Folder:
         assert isinstance(items[0][0], (tuple, Item))
         assert isinstance(items[0][1], dict)
         # Prepare reuseable Element objects
-        updateitem = Element('m:%s' % UpdateItem.SERVICE_NAME, ConflictResolution='AutoResolve')
         if isinstance(self, Calendar):
-            updateitem.set('SendMeetingInvitationsOrCancellations', 'SendToNone')
+            updateitem = create_element('m:%s' % UpdateItem.SERVICE_NAME, ConflictResolution='AutoResolve',
+                                        SendMeetingInvitationsOrCancellations='SendToNone')
         elif isinstance(self, Inbox):
-            updateitem.set('MessageDisposition', 'SaveOnly')
+            updateitem = create_element('m:%s' % UpdateItem.SERVICE_NAME, ConflictResolution='AutoResolve',
+                                        MessageDisposition='SaveOnly')
+        else:
+            updateitem = create_element('m:%s' % UpdateItem.SERVICE_NAME, ConflictResolution='AutoResolve')
         if self.account.version.major_version >= 15:
             updateitem.set('SuppressReadReceipts', 'true')
 
-        itemchanges = Element('m:ItemChanges')
-        itemchange = Element('t:ItemChange')
-        updates = Element('t:Updates')
-        setitemfield = Element('t:SetItemField')
-        deleteitemfield = Element('t:DeleteItemField')
-        fielduri = Element('t:FieldURI')
-        folderitem = Element('t:%s' % self.item_model.ITEM_TYPE)
-
-        # copy.deepcopy() is an order of magnitude faster than having
-        # Element() inside the loop. It matters because 'ids' may
-        # be a very large list.
+        itemchanges = create_element('m:ItemChanges')
         for item, update_dict in items:
             assert len(update_dict)
-            i_itemchange = deepcopy(itemchange)
+            itemchange = create_element('t:ItemChange')
             item_id = ItemId(*item) if isinstance(item, tuple) else ItemId(item.item_id, item.changekey)
-            i_itemchange.append(item_id.to_xml())
-            i_updates = deepcopy(updates)
+            set_xml_value(itemchange, item_id, self.account.version)
+            updates = create_element('t:Updates')
             meeting_timezone_added = False
             for fieldname, val in update_dict.items():
-                if val is not None and fieldname == 'extern_id':
+                # Skip fields that are read-only in Exchange
+                if fieldname in ('organizer',):
+                    log.warning('%s is a read-only field. Skipping', fieldname)
+                    continue
+                if fieldname == 'extern_id' and val is not None:
                     val = ExternId(val)
                 field_uri = self.attr_to_fielduri(fieldname)
                 if isinstance(field_uri, str):
-                    i_fielduri = deepcopy(fielduri)
-                    i_fielduri.set('FieldURI', field_uri)
+                    fielduri = create_element('t:FieldURI', FieldURI=field_uri)
                 else:
                     # ExtendedProperty
-                    i_fielduri = field_uri.field_uri_xml()
+                    fielduri = field_uri.field_uri_xml()
                 if val is None:
                     # A value of None means we want to remove this field from the item
-                    i_deleteitemfield = deepcopy(deleteitemfield)
-                    i_deleteitemfield.append(i_fielduri)
-                    i_updates.append(i_deleteitemfield)
+                    add_xml_child(updates, 't:DeleteItemField', fielduri)
                     continue
-                i_setitemfield = deepcopy(setitemfield)
-                i_setitemfield.append(i_fielduri)
-                i_folderitem = deepcopy(folderitem)
-                if isinstance(val, EWSDateTime):
-                    i_value = self.attr_to_request_xml_elem(fieldname)
-                    i_folderitem.append(set_xml_value(i_value, val))
-                    i_setitemfield.append(i_folderitem)
-                    i_updates.append(i_setitemfield)
+                setitemfield = create_element('t:SetItemField')
+                setitemfield.append(fielduri)
+                folderitem = create_element(self.item_model.request_tag())
 
+                if isinstance(val, EWSElement):
+                    set_xml_value(folderitem, val, self.account.version)
+                else:
+                    folderitem.append(
+                        set_xml_value(self.item_model.elem_for_field(fieldname), val, self.account.version)
+                    )
+                setitemfield.append(folderitem)
+                updates.append(setitemfield)
+
+                if isinstance(val, EWSDateTime):
                     # Always set timezone explicitly when updating date fields. Exchange 2007 wants "MeetingTimeZone"
                     # instead of explicit timezone on each datetime field.
+                    setitemfield_tz = create_element('t:SetItemField')
+                    folderitem_tz = create_element(self.item_model.request_tag())
                     if self.account.version.major_version < 14:
                         if meeting_timezone_added:
                             # Let's hope that we're not changing timezone, or that both 'start' and 'end' are supplied.
                             # Exchange 2007 doesn't support different timezone on start and end.
                             continue
-                        i_setitemfield_tz = deepcopy(setitemfield)
-                        i_fielduri = deepcopy(fielduri)
-                        i_fielduri.set('FieldURI', 'calendar:MeetingTimeZone')
-                        i_setitemfield_tz.append(i_fielduri)
-                        i_folderitem = deepcopy(folderitem)
-                        meeting_timezone = Element('t:MeetingTimeZone', TimeZoneName=val.tzinfo.ms_id)
-                        i_folderitem.append(meeting_timezone)
-                        i_setitemfield_tz.append(i_folderitem)
-                        i_updates.append(i_setitemfield_tz)
+                        fielduri_tz = create_element('t:FieldURI', FieldURI='calendar:MeetingTimeZone')
+                        timezone = create_element('t:MeetingTimeZone', TimeZoneName=val.tzinfo.ms_id)
                         meeting_timezone_added = True
                     else:
-                        i_setitemfield_tz = deepcopy(setitemfield)
-                        i_fielduri = deepcopy(fielduri)
                         if fieldname == 'start':
-                            field_uri = 'calendar:StartTimeZone'
-                            timezone_element = Element('t:StartTimeZone', Id=val.tzinfo.ms_id, Name=val.tzinfo.ms_name)
+                            fielduri_tz = create_element('t:FieldURI', FieldURI='calendar:StartTimeZone')
+                            timezone = create_element('t:StartTimeZone', Id=val.tzinfo.ms_id, Name=val.tzinfo.ms_name)
                         elif fieldname == 'end':
-                            field_uri = 'calendar:EndTimeZone'
-                            timezone_element = Element('t:EndTimeZone', Id=val.tzinfo.ms_id, Name=val.tzinfo.ms_name)
+                            fielduri_tz = create_element('t:FieldURI', FieldURI='calendar:EndTimeZone')
+                            timezone = create_element('t:EndTimeZone', Id=val.tzinfo.ms_id, Name=val.tzinfo.ms_name)
                         else:
                             assert False, 'Cannot set timezone for field %s' % fieldname
-                        i_fielduri.set('FieldURI', field_uri)
-                        i_setitemfield_tz.append(i_fielduri)
-                        i_folderitem = deepcopy(folderitem)
-                        i_folderitem.append(timezone_element)
-                        i_setitemfield_tz.append(i_folderitem)
-                        i_updates.append(i_setitemfield_tz)
-                else:
-                    if isinstance(val, XMLElement):
-                        i_folderitem.append(val.to_xml())
-                    else:
-                        i_value = self.attr_to_request_xml_elem(fieldname)
-                        i_folderitem.append(set_xml_value(i_value, val))
-                    i_setitemfield.append(i_folderitem)
-                    i_updates.append(i_setitemfield)
-            i_itemchange.append(i_updates)
-            itemchanges.append(i_itemchange)
+                    setitemfield_tz.append(fielduri_tz)
+                    folderitem_tz.append(timezone)
+                    setitemfield_tz.append(folderitem_tz)
+                    updates.append(setitemfield_tz)
+            itemchange.append(updates)
+            itemchanges.append(itemchange)
         updateitem.append(itemchanges)
         return updateitem
 
@@ -677,7 +727,7 @@ class CalendarItem(Item):
     Models a calendar item. Not all attributes are supported. See full list at
     https://msdn.microsoft.com/en-us/library/office/aa564765(v=exchg.150).aspx
     """
-    ITEM_TYPE = 'CalendarItem'
+    ELEMENT_NAME = 'CalendarItem'
     SUBJECT_MAXLENGTH = 255
     LOCATION_MAXLENGTH = 255
     FIELDURI_PREFIX = 'calendar'
@@ -685,8 +735,11 @@ class CalendarItem(Item):
         'start',
         'end',
         'location',
-        'organizer',
+        'organizer',  # Read-only in Exchange
         'legacy_free_busy_status',
+        'required_attendees',
+        'optional_attendees',
+        'resources',
     )
     ATTR_FIELDURI_MAP = {
         'start': 'Start',
@@ -694,14 +747,22 @@ class CalendarItem(Item):
         'location': 'Location',
         'organizer': 'Organizer',
         'legacy_free_busy_status': 'LegacyFreeBusyStatus',
+        'required_attendees': 'RequiredAttendees',
+        'optional_attendees': 'OptionalAttendees',
+        'resources': 'Resources',
     }
     FIELD_TYPE_MAP = {
         'start': EWSDateTime,
         'end': EWSDateTime,
         'location': str,
-        'organizer': MailBox,
+        'organizer': Mailbox,
         'legacy_free_busy_status': str,
+        'required_attendees': [Attendee],
+        'optional_attendees': [Attendee],
+        'resources': [Attendee],
     }
+
+    __slots__ = ITEM_FIELDS + Item.ITEM_FIELDS + Item.EXTRA_ITEM_FIELDS
 
     @classmethod
     def fieldnames(cls, with_extra=False):
@@ -718,12 +779,12 @@ class CalendarItem(Item):
             return Item.fielduri_for_field(fieldname)
 
     @classmethod
-    def request_xml_elem_for_field(cls, fieldname):
+    def elem_for_field(cls, fieldname):
         assert isinstance(fieldname, str)
         try:
-            return Element('t:%s' % cls.ATTR_FIELDURI_MAP[fieldname])
+            return create_element('t:%s' % cls.ATTR_FIELDURI_MAP[fieldname])
         except KeyError:
-            return Item.request_xml_elem_for_field(fieldname)
+            return Item.elem_for_field(fieldname)
 
     @classmethod
     def response_xml_elem_for_field(cls, fieldname):
@@ -738,6 +799,38 @@ class CalendarItem(Item):
             return cls.FIELD_TYPE_MAP[fieldname]
         except KeyError:
             return Item.type_for_field(fieldname)
+
+    def to_xml(self, version):
+        # WARNING: The order of addition of XML elements is VERY important. Exchange expects XML elements in a
+        # specific, non-documented order and will fail with meaningless errors if the order is wrong.
+        i = create_element(self.request_tag())
+        i.append(set_xml_value(self.elem_for_field('subject'), self.subject, version))
+        if self.body:
+            i.append(set_xml_value(self.elem_for_field('body'), self.body, version))
+        if self.categories:
+            i.append(set_xml_value(self.elem_for_field('categories'), self.categories, version))
+        i.append(set_xml_value(self.elem_for_field('reminder_is_set'), self.reminder_is_set, version))
+        if self.extern_id is not None:
+            set_xml_value(i, ExternId(self.extern_id), version)
+        i.append(set_xml_value(self.elem_for_field('start'), self.start, version))
+        i.append(set_xml_value(self.elem_for_field('end'), self.end, version))
+        i.append(set_xml_value(self.elem_for_field('legacy_free_busy_status'), self.legacy_free_busy_status, version))
+        if self.location:
+            i.append(set_xml_value(self.elem_for_field('location'), self.location, version))
+        if self.organizer:
+            log.warning('organizer is a read-only field. Skipping')
+        if self.required_attendees:
+            i.append(set_xml_value(self.elem_for_field('required_attendees'), self.required_attendees, version))
+        if self.optional_attendees:
+            i.append(set_xml_value(self.elem_for_field('optional_attendees'), self.optional_attendees, version))
+        if self.resources:
+            i.append(set_xml_value(self.elem_for_field('resources'), self.resources, version))
+        if version.major_version < 14:
+            i.append(create_element('t:MeetingTimeZone', TimeZoneName=self.start.tzinfo.ms_id))
+        else:
+            i.append(create_element('t:StartTimeZone', Id=self.start.tzinfo.ms_id, Name=self.start.tzinfo.ms_name))
+            i.append(create_element('t:EndTimeZone', Id=self.end.tzinfo.ms_id, Name=self.end.tzinfo.ms_name))
+        return i
 
     def __init__(self, **kwargs):
         for k in self.ITEM_FIELDS:
@@ -779,67 +872,19 @@ class Calendar(Folder):
         'Kalender',
     )
 
-    def _create_item_xml(self, items):
-        """
-        Takes an array of Calendar.Item objects and generates the XML.
-        """
-        calendar_items = []
-        # Prepare Element objects for CalendarItem creation
-        calendar_item = Element('t:%s' % self.item_model.ITEM_TYPE)
-        subject = self.attr_to_request_xml_elem('subject')
-        body = self.attr_to_request_xml_elem('body')
-        reminder = self.attr_to_request_xml_elem('reminder_is_set')
-        start = self.attr_to_request_xml_elem('start')
-        end = self.attr_to_request_xml_elem('end')
-        busystatus = self.attr_to_request_xml_elem('legacy_free_busy_status')
-        location = self.attr_to_request_xml_elem('location')
-        organizer = self.attr_to_request_xml_elem('organizer')
-        categories = self.attr_to_request_xml_elem('categories')
-
-        # Using copy.deepcopy() increases performance drastically on large arrays
-        for item in items:
-            # WARNING: The order of addition of XML elements is VERY important. Exchange expects XML elements in a
-            # specific, non-documented order and will fail with meaningless errors if the order is wrong.
-            i = deepcopy(calendar_item)
-            i.append(set_xml_value(deepcopy(subject), item.subject))
-            if item.body:
-                i.append(set_xml_value(deepcopy(body), item.body))
-            if item.categories:
-                i.append(set_xml_value(deepcopy(categories), item.categories))
-            i.append(set_xml_value(deepcopy(reminder), item.reminder_is_set))
-            if item.extern_id is not None:
-                i.append(ExternId(item.extern_id).to_xml())
-            i.append(set_xml_value(deepcopy(start), item.start))
-            i.append(set_xml_value(deepcopy(end), item.end))
-            i.append(set_xml_value(deepcopy(busystatus), item.legacy_free_busy_status))
-            if item.location:
-                i.append(set_xml_value(deepcopy(location), item.location))
-            if item.organizer:
-                i.append(set_xml_value(deepcopy(organizer), item.organizer))
-            if self.account.version.major_version < 14:
-                meeting_timezone = Element('t:MeetingTimeZone', TimeZoneName=item.start.tzinfo.ms_id)
-                i.append(meeting_timezone)
-            else:
-                start_timezone = Element('t:StartTimeZone', Id=item.start.tzinfo.ms_id, Name=item.start.tzinfo.ms_name)
-                i.append(start_timezone)
-                end_timezone = Element('t:EndTimeZone', Id=item.end.tzinfo.ms_id, Name=item.end.tzinfo.ms_name)
-                i.append(end_timezone)
-            calendar_items.append(i)
-        return calendar_items
-
 
 class Message(Item):
-    ITEM_TYPE = 'Message'
+    ELEMENT_NAME = 'Message'
 
 
 class Inbox(Folder):
-    ITEM_TYPE = 'Message'
+    ELEMENT_NAME = 'Message'
     DISTINGUISHED_FOLDER_ID = 'inbox'
     CONTAINER_CLASS = 'IPF.Note'
 
 
 class Task(Item):
-    ITEM_TYPE = 'Task'
+    ELEMENT_NAME = 'Task'
 
 
 class Tasks(Folder):
@@ -848,7 +893,7 @@ class Tasks(Folder):
 
 
 class Contact(Item):
-    ITEM_TYPE = 'Contact'
+    ELEMENT_NAME = 'Contact'
 
 
 class Contacts(Folder):

@@ -8,8 +8,10 @@ from exchangelib.account import Account
 from exchangelib.configuration import Configuration
 from exchangelib.credentials import DELEGATE
 from exchangelib.ewsdatetime import EWSDateTime, EWSTimeZone
-from exchangelib.folders import CalendarItem, MailBox
+from exchangelib.folders import CalendarItem, Attendee, Mailbox
+from exchangelib.restriction import Restriction
 from exchangelib.services import GetServerTimeZones, AllProperties, IdOnly
+from exchangelib.util import xml_to_str
 
 
 class EWSDateTest(unittest.TestCase):
@@ -40,6 +42,67 @@ class EWSDateTest(unittest.TestCase):
         # Test summertime
         dt = tz.localize(EWSDateTime(2000, 8, 2, 3, 4, 5))
         self.assertEqual(dt.astimezone(utc_tz).ewsformat(), '2000-08-02T01:04:05Z')
+
+
+class RestrictionTest(unittest.TestCase):
+    def test_parse(self):
+        xml = Restriction.parse_source(
+            "calendar:Start > '2016-01-15T13:45:56Z' and (not calendar:Subject == 'EWS Test')"
+        )
+        result = '''\
+<m:Restriction>
+    <t:And>
+        <t:IsGreaterThan>
+            <t:FieldURI FieldURI="calendar:Start" />
+            <t:FieldURIOrConstant>
+                <t:Constant Value="2016-01-15T13:45:56Z" />
+            </t:FieldURIOrConstant>
+        </t:IsGreaterThan>
+        <t:Not>
+            <t:IsEqualTo>
+                <t:FieldURI FieldURI="calendar:Subject" />
+                <t:FieldURIOrConstant>
+                    <t:Constant Value="EWS Test" />
+                </t:FieldURIOrConstant>
+            </t:IsEqualTo>
+        </t:Not>
+    </t:And>
+</m:Restriction>'''
+        self.assertEqual(xml_to_str(xml), ''.join(l.lstrip() for l in result.split('\n')))
+
+    def test_from_params(self):
+        tz = EWSTimeZone.timezone('Europe/Copenhagen')
+        start = tz.localize(EWSDateTime(1900, 9, 26, 8, 0, 0))
+        end = tz.localize(EWSDateTime(2200, 9, 26, 11, 0, 0))
+        xml = Restriction.from_params(folder_id='calendar', start=start, end=end, categories=['FOO', 'BAR'])
+        result = '''\
+<m:Restriction>
+    <t:And>
+        <t:IsGreaterThan>
+            <t:FieldURI FieldURI="calendar:End" />
+            <t:FieldURIOrConstant>
+                <t:Constant Value="1900-09-26T07:10:00Z" />
+            </t:FieldURIOrConstant>
+        </t:IsGreaterThan>
+        <t:IsLessThan>
+            <t:FieldURI FieldURI="calendar:Start" />
+            <t:FieldURIOrConstant>
+                <t:Constant Value="2200-09-26T10:00:00Z" />
+            </t:FieldURIOrConstant>
+        </t:IsLessThan>
+        <t:Or>
+            <t:Contains ContainmentComparison="Exact" ContainmentMode="Substring">
+                <t:FieldURI FieldURI="item:Categories" />
+                <t:Constant Value="FOO" />
+            </t:Contains>
+            <t:Contains ContainmentComparison="Exact" ContainmentMode="Substring">
+                <t:FieldURI FieldURI="item:Categories" />
+                <t:Constant Value="BAR" />
+            </t:Contains>
+        </t:Or>
+    </t:And>
+</m:Restriction>'''
+        self.assertEqual(str(xml), ''.join(l.lstrip() for l in result.split('\n')))
 
 
 class EWSTest(unittest.TestCase):
@@ -136,9 +199,14 @@ class EWSTest(unittest.TestCase):
         location = 'Test Location'
         extern_id = '123'
         reminder_is_set = False
+        required_attendees = [Attendee(mailbox=Mailbox(email_address=self.account.primary_smtp_address),
+                                       response_type='Accept', last_response_time=start)]
+        optional_attendees = None
+        resources = None
         item = CalendarItem(item_id='', changekey='', start=start, end=end, subject=subject, body=body,
                             location=location, reminder_is_set=reminder_is_set, categories=self.categories,
-                            extern_id=extern_id)
+                            extern_id=extern_id, required_attendees=required_attendees,
+                            optional_attendees=optional_attendees, resources=resources)
         return_ids = self.account.calendar.add_items(items=[item])
         self.assertEqual(len(return_ids), 1)
         for item_id in return_ids:
@@ -159,6 +227,9 @@ class EWSTest(unittest.TestCase):
         self.assertEqual(item.organizer.mailbox_type, 'Mailbox')
         self.assertEqual(item.organizer.item_id, None)
         self.assertEqual(item.reminder_is_set, reminder_is_set)
+        self.assertEqual(item.required_attendees[0].mailbox.email_address, self.account.primary_smtp_address)
+        self.assertEqual(item.optional_attendees, None)
+        self.assertEqual(item.resources, None)
 
         # Test update
         start = self.tz.localize(EWSDateTime(2012, 9, 12, 16))
@@ -169,10 +240,14 @@ class EWSTest(unittest.TestCase):
         categories = ['a', 'b']
         extern_id = '456'
         reminder_is_set = True
+        required_attendees = None
+        optional_attendees = [Attendee(mailbox=Mailbox(email_address=self.account.primary_smtp_address),
+                                       response_type='Accept', last_response_time=start)]
         ids = self.account.calendar.update_items(
             [
                 (item, {'start': start, 'end': end, 'subject': subject, 'body': body, 'location': location,
-                        'categories': categories, 'extern_id': extern_id, 'reminder_is_set': reminder_is_set}),
+                        'categories': categories, 'extern_id': extern_id, 'reminder_is_set': reminder_is_set,
+                        'required_attendees': required_attendees, 'optional_attendees': optional_attendees}),
             ]
         )
         self.assertEqual(len(ids[0]), 2, ids)
@@ -191,6 +266,9 @@ class EWSTest(unittest.TestCase):
         self.assertEqual(item.organizer.mailbox_type, 'Mailbox')
         self.assertEqual(item.organizer.item_id, None)
         self.assertEqual(item.reminder_is_set, reminder_is_set)
+        self.assertEqual(item.required_attendees, None)
+        self.assertEqual(item.optional_attendees[0].mailbox.email_address, self.account.primary_smtp_address)
+        self.assertEqual(item.resources, None)
 
         # Test wiping fields
         subject = ''

@@ -17,7 +17,6 @@ from requests import adapters, Session
 
 from .credentials import Credentials
 from .errors import TransportError
-from .ewsdatetime import EWSTimeZone
 from .transport import get_auth_instance, get_service_authtype, get_docs_authtype, test_credentials
 from .version import Version, API_VERSIONS
 

@@ -14,7 +14,6 @@ If you have problems autodiscovering, start by doing an official test at https:/
 # some valuable seconds every time we start a new connection to a known server. In any case, this info would require
 # persistent storage.
 
-from xml.etree.cElementTree import Element, tostring
 import logging
 from threading import Lock
 import queue
@@ -28,7 +27,8 @@ from .version import API_VERSIONS
 from .errors import AutoDiscoverFailed, AutoDiscoverRedirect, TransportError, RedirectError, ErrorNonExistentMailbox
 from .protocol import Protocol
 from . import transport
-from .util import get_xml_attr, set_xml_attr, to_xml, is_xml, post_ratelimited, get_redirect_url
+from .util import create_element, get_xml_attr, add_xml_child, to_xml, is_xml, post_ratelimited, get_redirect_url, \
+    xml_to_str
 
 log = logging.getLogger(__name__)
 
@@ -227,13 +227,13 @@ def _get_autodiscover_auth_type(hostname, url, has_ssl, email, encoding='utf-8')
 
 def _get_autodiscover_payload(email, encoding='utf-8'):
     # Builds a full Autodiscover XML request
-    payload = Element('Autodiscover')
-    payload.set('xmlns', REQUEST_NS)
-    request = Element('Request')
-    set_xml_attr(request, 'EMailAddress', email)
-    set_xml_attr(request, 'AcceptableResponseSchema', RESPONSE_NS)
+    payload = create_element('Autodiscover', xmlns=REQUEST_NS)
+    request = create_element('Request')
+    add_xml_child(request, 'EMailAddress', email)
+    add_xml_child(request, 'AcceptableResponseSchema', RESPONSE_NS)
     payload.append(request)
-    return ('<?xml version="1.0" encoding="%s"?>' % encoding).encode(encoding) + tostring(payload, encoding=encoding)
+    xml_str = '<?xml version="1.0" encoding="%s"?>%s' % (encoding, xml_to_str(payload, encoding=encoding))
+    return xml_str.encode(encoding)
 
 
 def _get_autodiscover_response(protocol, url, email, encoding='utf-8', verify=True):

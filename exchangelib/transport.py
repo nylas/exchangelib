@@ -1,5 +1,5 @@
 import logging
-from xml.etree.cElementTree import Element, tostring
+from xml.etree.ElementTree import tostring
 
 import requests.sessions
 from requests.auth import HTTPBasicAuth, HTTPDigestAuth
@@ -7,7 +7,7 @@ from requests_ntlm import HttpNtlmAuth
 
 from .credentials import IMPERSONATION, EMAIL
 from .errors import UnauthorizedError, TransportError, RedirectError
-from .util import set_xml_attr, is_xml, get_redirect_url
+from .util import create_element, add_xml_child, is_xml, get_redirect_url
 
 log = logging.getLogger(__name__)
 
@@ -93,26 +93,30 @@ def wrap(content, version, account, ewstimezone=None, encoding='utf-8'):
     Generate the necessary boilerplate XML for a raw SOAP request. The XML is specific to the server version.
     ExchangeImpersonation allows to act as the user we want to impersonate.
     """
-    envelope = Element('s:Envelope')
-    envelope.set('xmlns:s', SOAPNS)
-    envelope.set('xmlns:t', TNS)
-    envelope.set('xmlns:m', MNS)
-    header = Element('s:Header')
-    requestserverversion = Element('t:RequestServerVersion', Version=version)
+    envelope = create_element('s:Envelope', **{
+        'xmlns:s': SOAPNS,
+        'xmlns:t': TNS,
+        'xmlns:m': MNS,
+    })
+    # envelope.set('xmlns:s', SOAPNS)
+    # envelope.set('xmlns:t', TNS)
+    # envelope.set('xmlns:m', MNS)
+    header = create_element('s:Header')
+    requestserverversion = create_element('t:RequestServerVersion', Version=version)
     header.append(requestserverversion)
     if account and account.access_type == IMPERSONATION:
-        exchangeimpersonation = Element('t:ExchangeImpersonation')
-        connectingsid = Element('t:ConnectingSID')
-        set_xml_attr(connectingsid, 't:PrimarySmtpAddress', account.primary_smtp_address)
+        exchangeimpersonation = create_element('t:ExchangeImpersonation')
+        connectingsid = create_element('t:ConnectingSID')
+        add_xml_child(connectingsid, 't:PrimarySmtpAddress', account.primary_smtp_address)
         exchangeimpersonation.append(connectingsid)
         header.append(exchangeimpersonation)
     if ewstimezone:
-        timezonecontext = Element('t:TimeZoneContext')
-        timezonedefinition = Element('t:TimeZoneDefinition', Id=ewstimezone.ms_id)
+        timezonecontext = create_element('t:TimeZoneContext')
+        timezonedefinition = create_element('t:TimeZoneDefinition', Id=ewstimezone.ms_id)
         timezonecontext.append(timezonedefinition)
         header.append(timezonecontext)
     envelope.append(header)
-    body = Element('s:Body')
+    body = create_element('s:Body')
     body.append(content)
     envelope.append(body)
     return (b'<?xml version="1.0" encoding="' + encoding.encode(encoding)) + b'"?>' \

@@ -1,7 +1,6 @@
 import logging
 
 from .credentials import Credentials
-from .ewsdatetime import EWSTimeZone
 from .protocol import Protocol
 
 log = logging.getLogger(__name__)

@@ -1,20 +1,16 @@
 import re
-from xml.etree.cElementTree import Element, fromstring, ParseError
+from xml.etree.ElementTree import Element
 import logging
-from io import StringIO
 import time
 from threading import get_ident
 from datetime import datetime
-from socket import timeout as SocketTimeout
-from urllib.parse import urlparse
-
-from lxml.etree import XMLParser, parse, tostring
-from requests.exceptions import ConnectionError, ReadTimeout, ChunkedEncodingError
+from copy import deepcopy
 
 from .errors import TransportError, RateLimitError, RedirectError
 
-
 log = logging.getLogger(__name__)
+ElementType = type(Element('x'))  # Type is auto-generated inside cElementTree
+
 
 # Some control characters are illegal in XML 1.0 (and XML 1.1). Some Exchange serveres will emit XML 1.0
 # containing characters only allowed in XML 1.1
@@ -30,6 +26,14 @@ def chunkify(iterable, chunksize):
         yield iterable[i:i + chunksize]
 
 
+def xml_to_str(tree, encoding='utf-8'):
+    from xml.etree.ElementTree import tostring
+    # tostring returns bytecode unless encoding is 'unicode'. We ALWAYS want bytecode so we can convert to unicode
+    if encoding == 'unicode':
+        encoding = 'utf-8'
+    return tostring(tree, encoding=encoding).decode(encoding)
+
+
 def get_xml_attr(tree, name):
     elem = tree.find(name)
     if elem is not None and elem.text:  # Must compare with None, see XML docs
@@ -41,20 +45,31 @@ def get_xml_attrs(tree, name):
     return [elem.text.strip() for elem in tree.findall(name) if elem.text is not None]
 
 
-def set_xml_value(elem, value):
+def set_xml_value(elem, value, version):
     from .ewsdatetime import EWSDateTime
-    from .folders import XMLElement
+    from .folders import EWSElement
     if isinstance(value, str):
         elem.text = safe_xml_value(value)
     elif isinstance(value, (tuple, list)):
         for v in value:
-            set_xml_attr(elem, 't:String', v)
+            if isinstance(v, EWSElement):
+                assert version
+                elem.append(v.to_xml(version))
+            elif isinstance(v, ElementType):
+                elem.append(v)
+            elif isinstance(v, str):
+                add_xml_child(elem, 't:String', v)
+            else:
+                raise AttributeError('Unsupported type %s for list value %s on elem %s' % (type(v), v, elem))
     elif isinstance(value, bool):
         elem.text = '1' if value else '0'
     elif isinstance(value, EWSDateTime):
         elem.text = value.ewsformat()
-    elif isinstance(value, XMLElement):
-        elem.append(value.to_xml())
+    elif isinstance(value, EWSElement):
+        assert version
+        elem.append(value.to_xml(version))
+    elif isinstance(value, ElementType):
+        elem.append(value)
     else:
         raise AttributeError('Unsupported type %s for value %s on elem %s' % (type(value), value, elem))
     return elem
@@ -64,19 +79,32 @@ def safe_xml_value(value, replacement='?'):
     return str(_illegal_xml_chars_RE.sub(replacement, value))
 
 
-def set_xml_attr(tree, name, value):
-    # TODO: deepcopy() with cache here
-    elem = Element(name)
-    elem.text = safe_xml_value(value)
-    tree.append(elem)
-    return tree
+# Keeps a cache of Element objects to deepcopy
+_deepcopy_cache = dict()
+
+
+def create_element(name, **attrs):
+    # copy.deepcopy() is an order of magnitude faster than creating a new Element() every time
+    key = (name, tuple(attrs.items()))  # dict requires key to be immutable
+    if name not in _deepcopy_cache:
+        _deepcopy_cache[key] = Element(name, **attrs)
+    return deepcopy(_deepcopy_cache[key])
+
+
+def add_xml_child(tree, name, value):
+    # We're calling add_xml_child many places where we don't have the version handy. Don't pass EWSElement or list of
+    # EWSElement to this function!
+    tree.append(set_xml_value(elem=create_element(name), value=value, version=None))
 
 
 def to_xml(text, encoding):
+    from xml.etree.ElementTree import fromstring, ParseError
     processed = text.lstrip(BOM).encode(encoding or 'utf-8')
     try:
         return fromstring(processed)
     except ParseError:
+        from io import StringIO
+        from lxml.etree import XMLParser, parse, tostring
         # Exchange servers may spit out the weirdest XML. lxml is pretty good at recovering from errors
         log.warning('Fallback to lxml processing of faulty XML')
         magical_parser = XMLParser(encoding=encoding or 'utf-8', recover=True)
@@ -112,6 +140,7 @@ class DummyResponse:
 
 
 def get_redirect_url(response, server=None, has_ssl=None):
+    from urllib.parse import urlparse
     redirect_url = response.headers.get('location', None)
     if not redirect_url:
         raise TransportError('302 redirect but no location header')
@@ -135,6 +164,8 @@ def get_redirect_url(response, server=None, has_ssl=None):
 
 
 def post_ratelimited(protocol, session, url, headers, data, timeout=None, verify=True, allow_redirects=False):
+    from socket import timeout as SocketTimeout
+    from requests.exceptions import ConnectionError, ReadTimeout, ChunkedEncodingError
     # The contract on sessions here is to return the session that ends up being used, or retiring the session if we
     # intend to raise an exception. We give up on max_wait timeout, not number of retries
     r = None

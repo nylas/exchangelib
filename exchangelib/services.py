@@ -12,7 +12,6 @@ Exchange EWS references:
 
 import logging
 import itertools
-from xml.etree.cElementTree import Element, tostring
 from xml.parsers.expat import ExpatError
 import traceback
 
@@ -25,7 +24,8 @@ from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, 
     ErrorTooManyObjectsOpened, ErrorInvalidLicense, ErrorInvalidSchemaVersionForMailboxVersion, \
     ErrorInvalidServerVersion
 from .transport import wrap, SOAPNS, TNS, MNS, ENS
-from .util import chunkify, set_xml_attr, get_xml_attr, to_xml, post_ratelimited
+from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, ElementType, \
+    xml_to_str
 
 log = logging.getLogger(__name__)
 
@@ -40,8 +40,6 @@ AllProperties = 'AllProperties'
 SHALLOW = 'Shallow'
 DEEP = 'Deep'
 SOFTDELETED = 'SoftDeleted'
-
-ElementType = type(Element('x'))  # Type is auto-generated inside cElementTree
 
 
 class EWSService:
@@ -132,7 +130,7 @@ class EWSService:
         if response is None:
             fault = body.find('{%s}Fault' % SOAPNS)
             if fault is None:
-                raise SOAPError('Unknown SOAP response: %s' % tostring(body))
+                raise SOAPError('Unknown SOAP response: %s' % xml_to_str(body))
             self._raise_soap_errors(fault=fault)  # Will throw SOAPError
         response_messages = response.find('{%s}ResponseMessages' % MNS)
         if response_messages is None:
@@ -156,7 +154,7 @@ class EWSService:
             try:
                 raise vars(errors)[code](msg)
             except KeyError:
-                detail = '%s: code: %s msg: %s (%s)' % (log_prefix, code, msg, tostring(detail))
+                detail = '%s: code: %s msg: %s (%s)' % (log_prefix, code, msg, xml_to_str(detail))
         try:
             raise vars(errors)[faultcode](faultstring)
         except KeyError:
@@ -177,7 +175,7 @@ class EWSService:
                 return True
             container = message.find(name)
             if container is None:
-                raise TransportError('No %s elements in ResponseMessage (%s)' % (name, tostring(message)))
+                raise TransportError('No %s elements in ResponseMessage (%s)' % (name, xml_to_str(message)))
             return container
         if response_class == 'Warning':
             return self._raise_warnings(code=response_code, text=msg_text, xml=msg_xml)
@@ -257,7 +255,7 @@ class PagingEWSService(EWSService):
                 container = page.find(self.element_container_name)
                 if container is None:
                     raise TransportError('No %s elements in ResponseMessage (%s)' % (self.element_container_name,
-                                                                                     tostring(page)))
+                                                                                     xml_to_str(page)))
                 elements.extend(self._get_elements_in_container(container=container))
             if not offset:
                 break
@@ -294,7 +292,7 @@ class GetServerTimeZones(EWSService):
         return self._get_elements(payload=self._get_payload(**kwargs))
 
     def _get_payload(self, returnfulltimezonedata=False):
-        return Element('m:%s' % self.SERVICE_NAME, ReturnFullTimeZoneData=(
+        return create_element('m:%s' % self.SERVICE_NAME, ReturnFullTimeZoneData=(
             'true' if returnfulltimezonedata else 'false'))
 
     def _get_elements_in_container(self, container):
@@ -327,7 +325,7 @@ class GetItem(EWSPooledService):
     element_container_name = '{%s}Items' % MNS
 
     def call(self, folder, **kwargs):
-        self.element_name = '{%s}%s' % (TNS, folder.item_model.ITEM_TYPE)
+        self.element_name = folder.item_model.response_tag()
         return self._pool_requests(account=folder.account, payload_func=folder.get_xml, items=kwargs['ids'])
 
 
@@ -342,7 +340,7 @@ class CreateItem(EWSPooledService):
     element_container_name = '{%s}Items' % MNS
 
     def call(self, folder, **kwargs):
-        self.element_name = '{%s}%s' % (TNS, folder.item_model.ITEM_TYPE)
+        self.element_name = folder.item_model.response_tag()
         return self._pool_requests(account=folder.account, payload_func=folder.create_xml, items=kwargs['items'])
 
 
@@ -366,7 +364,7 @@ class UpdateItem(EWSPooledService):
     element_container_name = '{%s}Items' % MNS
 
     def call(self, folder, **kwargs):
-        self.element_name = '{%s}%s' % (TNS, folder.item_model.ITEM_TYPE)
+        self.element_name = folder.item_model.response_tag()
         return self._pool_requests(account=folder.account, payload_func=folder.update_xml, items=kwargs['items'])
 
 
@@ -379,7 +377,7 @@ class FindItem(PagingEWSService, EWSFolderService):
     element_container_name = '{%s}Items' % TNS
 
     def call(self, folder, **kwargs):
-        self.element_name = '{%s}%s' % (TNS, folder.item_model.ITEM_TYPE)
+        self.element_name = folder.item_model.response_tag()
         return self._paged_call(folder=folder, **kwargs)
 
     def _get_payload(self, folder, additional_fields=None, restriction=None, shape=IdOnly, depth=SHALLOW, offset=0):
@@ -392,20 +390,20 @@ class FindItem(PagingEWSService, EWSFolderService):
             shape,
             offset,
         )
-        finditem = Element('m:%s' % self.SERVICE_NAME, Traversal=SHALLOW)
-        itemshape = Element('m:ItemShape')
-        set_xml_attr(itemshape, 't:BaseShape', shape)
+        finditem = create_element('m:%s' % self.SERVICE_NAME, Traversal=SHALLOW)
+        itemshape = create_element('m:ItemShape')
+        add_xml_child(itemshape, 't:BaseShape', shape)
         if additional_fields:
-            additionalproperties = Element('t:AdditionalProperties')
+            additionalproperties = create_element('t:AdditionalProperties')
             for field_uri in additional_fields:
-                additionalproperties.append(Element('t:FieldURI', FieldURI=field_uri))
+                additionalproperties.append(create_element('t:FieldURI', FieldURI=field_uri))
             itemshape.append(additionalproperties)
         finditem.append(itemshape)
-        indexedpageviewitem = Element('m:IndexedPageItemView', Offset=str(offset), BasePoint='Beginning')
+        indexedpageviewitem = create_element('m:IndexedPageItemView', Offset=str(offset), BasePoint='Beginning')
         finditem.append(indexedpageviewitem)
         if restriction:
             finditem.append(restriction.xml)
-        parentfolderids = Element('m:ParentFolderIds')
+        parentfolderids = create_element('m:ParentFolderIds')
         parentfolderids.append(folder.folderid_xml())
         finditem.append(parentfolderids)
         return finditem
@@ -440,21 +438,21 @@ class FindFolder(PagingEWSService, EWSFolderService):
             additional_fields,
             shape
         )
-        findfolder = Element('m:%s' % self.SERVICE_NAME, Traversal=depth)
-        foldershape = Element('m:FolderShape')
-        set_xml_attr(foldershape, 't:BaseShape', shape)
+        findfolder = create_element('m:%s' % self.SERVICE_NAME, Traversal=depth)
+        foldershape = create_element('m:FolderShape')
+        add_xml_child(foldershape, 't:BaseShape', shape)
         if additional_fields:
-            additionalproperties = Element('t:AdditionalProperties')
+            additionalproperties = create_element('t:AdditionalProperties')
             for field_uri in additional_fields:
-                additionalproperties.append(Element('t:FieldURI', FieldURI=field_uri))
+                additionalproperties.append(create_element('t:FieldURI', FieldURI=field_uri))
             foldershape.append(additionalproperties)
         findfolder.append(foldershape)
         if folder.account.protocol.version.major_version >= 14:
-            indexedpageviewitem = Element('m:IndexedPageFolderView', Offset=str(offset), BasePoint='Beginning')
+            indexedpageviewitem = create_element('m:IndexedPageFolderView', Offset=str(offset), BasePoint='Beginning')
             findfolder.append(indexedpageviewitem)
         else:
             assert offset == 0, 'Offset is %s' % offset
-        parentfolderids = Element('m:ParentFolderIds')
+        parentfolderids = create_element('m:ParentFolderIds')
         parentfolderids.append(folder.folderid_xml())
         findfolder.append(parentfolderids)
         return findfolder
@@ -486,16 +484,16 @@ class GetFolder(EWSFolderService):
             additional_fields,
             shape
         )
-        getfolder = Element('m:%s' % self.SERVICE_NAME)
-        foldershape = Element('m:FolderShape')
-        set_xml_attr(foldershape, 't:BaseShape', shape)
+        getfolder = create_element('m:%s' % self.SERVICE_NAME)
+        foldershape = create_element('m:FolderShape')
+        add_xml_child(foldershape, 't:BaseShape', shape)
         if additional_fields:
-            additionalproperties = Element('t:AdditionalProperties')
+            additionalproperties = create_element('t:AdditionalProperties')
             for field_uri in additional_fields:
-                additionalproperties.append(Element('t:FieldURI', FieldURI=field_uri))
+                additionalproperties.append(create_element('t:FieldURI', FieldURI=field_uri))
             foldershape.append(additionalproperties)
         getfolder.append(foldershape)
-        folderids = Element('m:FolderIds')
+        folderids = create_element('m:FolderIds')
         folderids.append(folder.folderid_xml())
         getfolder.append(folderids)
         return getfolder
@@ -513,9 +511,9 @@ class ResolveNames(EWSAccountService):
         return self._get_elements(payload=self._get_payload(**kwargs))
 
     def _get_payload(self, unresolvedentries, returnfullcontactdata=False):
-        payload = Element('m:%s' % self.SERVICE_NAME, ReturnFullContactData=(
+        payload = create_element('m:%s' % self.SERVICE_NAME, ReturnFullContactData=(
             'true' if returnfullcontactdata else 'false'))
         assert len(unresolvedentries)
         for entry in unresolvedentries:
-            set_xml_attr(payload, 'm:UnresolvedEntry', entry)
+            add_xml_child(payload, 'm:UnresolvedEntry', entry)
         return payload
