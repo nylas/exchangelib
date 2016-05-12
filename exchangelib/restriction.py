@@ -39,9 +39,10 @@ class Restriction:
         log.debug('Parsing source: %s', source)
 
         # Make the syntax of the expression legal Python syntax by replacing ':' in identifiers with '_'. Play safe and
-        # only do this for known field URI prefixes.
-        for prefix in ('conversation:', 'postitem:', 'distributionlist:', 'contacts:', 'task:', 'calendar:',
-                       'meetingRequest:', 'meeting:', 'message:', 'item:', 'folder:'):
+        # only do this for known property prefixes. See Table 1 and 5 in
+        # https://msdn.microsoft.com/en-us/library/office/dn467898(v=exchg.150).aspx
+        for prefix in ('message:', 'calendar:', 'contacts:', 'conversation:', 'distributionlist:', 'folder:', 'item:',
+                       'meeting:', 'meetingRequest:', 'postitem:', 'task:'):
             new = prefix[:-1] + '_'
             source = source.replace(prefix, new)
 
