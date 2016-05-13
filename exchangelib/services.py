@@ -309,7 +309,7 @@ class EWSPooledService(EWSService):
     CHUNKSIZE = None
 
     def _pool_requests(self, account, payload_func, items):
-        log.debug('Processing %s items in chunks of %s', len(items), self.CHUNKSIZE)
+        log.debug('Processing items in chunks of %s', self.CHUNKSIZE)
         # Chop items list into suitable pieces and let worker threads chew on the work. The order of the output result
         # list must be the same as the input id list, so the caller knows which status message belongs to which ID.
         func = lambda n: self._get_elements(account=account, payload=payload_func(n))
@@ -513,7 +513,10 @@ class ResolveNames(EWSAccountService):
     def _get_payload(self, unresolvedentries, returnfullcontactdata=False):
         payload = create_element('m:%s' % self.SERVICE_NAME, ReturnFullContactData=(
             'true' if returnfullcontactdata else 'false'))
-        assert len(unresolvedentries)
+        n = 0
         for entry in unresolvedentries:
+            n += 1
             add_xml_child(payload, 'm:UnresolvedEntry', entry)
+        if not n:
+            raise AttributeError('"unresolvedentries" must not be empty')
         return payload

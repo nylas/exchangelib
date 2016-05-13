@@ -11,7 +11,7 @@ from exchangelib.ewsdatetime import EWSDateTime, EWSTimeZone
 from exchangelib.folders import CalendarItem, Attendee, Mailbox
 from exchangelib.restriction import Restriction
 from exchangelib.services import GetServerTimeZones, AllProperties, IdOnly
-from exchangelib.util import xml_to_str
+from exchangelib.util import xml_to_str, chunkify, peek
 
 
 class EWSDateTest(unittest.TestCase):
@@ -105,15 +105,68 @@ class RestrictionTest(unittest.TestCase):
         self.assertEqual(str(xml), ''.join(l.lstrip() for l in result.split('\n')))
 
 
+class UtilTest(unittest.TestCase):
+    def test_chunkify(self):
+        # Test list, tuple, set, range and generator
+        seq = [1, 2, 3, 4, 5]
+        self.assertEqual(list(chunkify(seq, chunksize=2)), [[1, 2], [3, 4], [5]])
+        seq = (1, 2, 3, 4, 6, 7, 9)
+        self.assertEqual(list(chunkify(seq, chunksize=3)), [(1, 2, 3), (4, 6, 7), (9,)])
+        seq = {1, 2, 3, 4, 5}
+        self.assertEqual(list(chunkify(seq, chunksize=2)), [[1, 2], [3, 4], [5,]])
+        seq = range(5)
+        self.assertEqual(list(chunkify(seq, chunksize=2)), [range(0, 2), range(2, 4), range(4, 5)])
+        # Test chunkifying a generator where len(fails)
+        seq = range(5)
+        self.assertEqual(list(chunkify((i for i in seq), chunksize=2)), [[0, 1], [2, 3], [4]])
+
+    def test_peek(self):
+        # Test peeking into various sequence types
+
+        # tuple
+        is_empty, seq = peek(tuple())
+        self.assertEqual((is_empty, list(seq)), (True, []))
+        is_empty, seq = peek((1, 2, 3))
+        self.assertEqual((is_empty, list(seq)), (False, [1, 2, 3]))
+
+        # list
+        is_empty, seq = peek([])
+        self.assertEqual((is_empty, list(seq)), (True, []))
+        is_empty, seq = peek([1, 2, 3])
+        self.assertEqual((is_empty, list(seq)), (False, [1, 2, 3]))
+
+        # tuple
+        is_empty, seq = peek(set())
+        self.assertEqual((is_empty, list(seq)), (True, []))
+        is_empty, seq = peek({1, 2, 3})
+        self.assertEqual((is_empty, list(seq)), (False, [1, 2, 3]))
+
+        # range
+        is_empty, seq = peek(range(0))
+        self.assertEqual((is_empty, list(seq)), (True, []))
+        is_empty, seq = peek(range(1, 4))
+        self.assertEqual((is_empty, list(seq)), (False, [1, 2, 3]))
+
+        # generator
+        is_empty, seq = peek((i for i in []))
+        self.assertEqual((is_empty, list(seq)), (True, []))
+
+        is_empty, seq = peek((i for i in [1, 2, 3]))
+        self.assertEqual((is_empty, list(seq)), (False, [1, 2, 3]))
+
+
 class EWSTest(unittest.TestCase):
     def setUp(self):
-        self.tz = EWSTimeZone.timezone('Europe/Copenhagen')
+        # There's no official Exchange server we can test against, and we can't really provide credentials for our
+        # own test server to anyone on the Internet. You need to create your own settings.yml with credentials for
+        # your own test server. 'settings.yml.sample' is provided as a template.
         try:
             with open(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'settings.yml')) as f:
                 settings = load(f)
         except FileNotFoundError:
             print('Copy settings.yml.sample to settings.yml and enter values for your test server')
             raise
+        self.tz = EWSTimeZone.timezone('Europe/Copenhagen')
         self.categories = ['Test']
         self.config = Configuration(server=settings['server'], username=settings['username'],
                                     password=settings['password'])
@@ -123,8 +176,7 @@ class EWSTest(unittest.TestCase):
         start = self.tz.localize(EWSDateTime(1900, 9, 26, 8, 0, 0))
         end = self.tz.localize(EWSDateTime(2200, 9, 26, 11, 0, 0))
         ids = self.account.calendar.find_items(start=start, end=end, categories=self.categories, shape=IdOnly)
-        if ids:
-            self.account.calendar.delete_items(ids)
+        self.account.calendar.delete_items(ids)
 
     def test_credentials(self):
         self.assertEqual(self.account.access_type, DELEGATE)
@@ -190,6 +242,13 @@ class EWSTest(unittest.TestCase):
         self.assertEqual(len(items), 2)
         self.account.calendar.delete_items(items)
 
+    def test_empty_args(self):
+        # We allow empty sequences for these methods
+        self.assertEqual(self.account.calendar.add_items(items=[]), [])
+        self.assertEqual(self.account.calendar.get_items(ids=[]), [])
+        self.assertEqual(self.account.calendar.update_items(items=[]), [])
+        self.assertEqual(self.account.calendar.delete_items(ids=[]), [])
+
     def test_item(self):
         # Test insert
         start = self.tz.localize(EWSDateTime(2011, 10, 12, 8))
@@ -207,7 +266,8 @@ class EWSTest(unittest.TestCase):
                             location=location, reminder_is_set=reminder_is_set, categories=self.categories,
                             extern_id=extern_id, required_attendees=required_attendees,
                             optional_attendees=optional_attendees, resources=resources)
-        return_ids = self.account.calendar.add_items(items=[item])
+        # Test with generator as argument
+        return_ids = self.account.calendar.add_items(items=(i for i in [item]))
         self.assertEqual(len(return_ids), 1)
         for item_id in return_ids:
             assert isinstance(item_id, tuple)
@@ -215,7 +275,8 @@ class EWSTest(unittest.TestCase):
         self.assertEqual(len(ids[0]), 2)
         self.assertEqual(len(ids), 1)
         self.assertEqual(return_ids, ids)
-        item = self.account.calendar.get_items(ids)[0]
+        # Test with generator as argument
+        item = self.account.calendar.get_items(ids=(i for i in ids))[0]
         self.assertEqual(item.start, start)
         self.assertEqual(item.end, end)
         self.assertEqual(item.subject, subject)
@@ -243,13 +304,15 @@ class EWSTest(unittest.TestCase):
         required_attendees = None
         optional_attendees = [Attendee(mailbox=Mailbox(email_address=self.account.primary_smtp_address),
                                        response_type='Accept', last_response_time=start)]
-        ids = self.account.calendar.update_items(
+        # Test with generator as argument
+        ids = self.account.calendar.update_items(items=(
+            i for i in
             [
                 (item, {'start': start, 'end': end, 'subject': subject, 'body': body, 'location': location,
                         'categories': categories, 'extern_id': extern_id, 'reminder_is_set': reminder_is_set,
                         'required_attendees': required_attendees, 'optional_attendees': optional_attendees}),
             ]
-        )
+        ))
         self.assertEqual(len(ids[0]), 2, ids)
         self.assertEqual(len(ids), 1)
         self.assertEqual(return_ids[0][0], ids[0][0])  # ID should be the same
@@ -306,8 +369,8 @@ class EWSTest(unittest.TestCase):
         item = self.account.calendar.get_items(ids)[0]
         self.assertEqual(item.extern_id, extern_id)
 
-        # Remove test item
-        status = self.account.calendar.delete_items(ids)
+        # Remove test item. Test with generator as argument
+        status = self.account.calendar.delete_items(ids=(i for i in ids))
         self.assertEqual(status, [(True, None)])
 
     def test_sessionpool(self):

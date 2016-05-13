@@ -13,7 +13,7 @@ from .ewsdatetime import EWSDateTime, EWSTimeZone
 from .restriction import Restriction
 from .services import TNS, FindItem, IdOnly, SHALLOW, DEEP, DeleteItem, CreateItem, UpdateItem, FindFolder, GetFolder, \
     GetItem
-from .util import create_element, add_xml_child, get_xml_attrs, get_xml_attr, set_xml_value, ElementType
+from .util import create_element, add_xml_child, get_xml_attrs, get_xml_attr, set_xml_value, ElementType, peek
 
 log = getLogger(__name__)
 
@@ -475,15 +475,22 @@ class Folder:
         Creates new items in the folder. 'items' is an iterable of Item objects. Returns a list of (id, changekey)
         tuples in the same order as the input.
         """
-        assert len(items)
-        log.debug('Adding %s calendar items', len(items))
+        is_empty, items = peek(items)
+        if is_empty:
+            # We accept generators, so it's not always convenient for caller to know up-front if 'items' is empty. Allow
+            # empty 'items' and return early.
+            return []
         return list(map(self.item_model.id_from_xml, CreateItem(self.account.protocol).call(folder=self, items=items)))
 
     def delete_items(self, ids):
         """
         Deletes items in the folder. 'ids' is an iterable of either (item_id, changekey) tuples or Item objects.
         """
-        assert len(ids)
+        is_empty, ids = peek(ids)
+        if is_empty:
+            # We accept generators, so it's not always convenient for caller to know up-front if 'items' is empty. Allow
+            # empty 'items' and return early.
+            return []
         return DeleteItem(self.account.protocol).call(folder=self, ids=ids)
 
     def update_items(self, items):
@@ -494,16 +501,24 @@ class Folder:
             2. a dict containing the Item attributes to change
 
         """
-        assert len(items)
+        is_empty, items = peek(items)
+        if is_empty:
+            # We accept generators, so it's not always convenient for caller to know up-front if 'items' is empty. Allow
+            # empty 'items' and return early.
+            return []
         return list(map(self.item_model.id_from_xml, UpdateItem(self.account.protocol).call(folder=self, items=items)))
 
     def get_items(self, ids):
         # get_xml() uses self.with_extra_fields. Pass this to from_xml()
-        assert len(ids)
+        is_empty, ids = peek(ids)
+        if is_empty:
+            # We accept generators, so it's not always convenient for caller to know up-front if 'items' is empty. Allow
+            # empty 'items' and return early.
+            return []
         return list(map(
             lambda i: self.item_model.from_xml(i, self.with_extra_fields),
-            GetItem(self.account.protocol).call(folder=self, ids=ids))
-        )
+            GetItem(self.account.protocol).call(folder=self, ids=ids)
+        ))
 
     def test_access(self):
         """
@@ -528,14 +543,11 @@ class Folder:
             return distinguishedfolderid
 
     def get_xml(self, ids):
-        assert len(ids)
-        assert isinstance(ids[0], (tuple, Item))
         # This list should be configurable. 'body' element can only be fetched with GetItem.
         # CalendarItem.from_xml() specifies the items we currently expect. For full list, see
         # https://msdn.microsoft.com/en-us/library/office/aa494315(v=exchg.150).aspx
         log.debug(
-            'Getting %s %s items for %s',
-            len(ids),
+            'Getting %s items for %s',
             self.DISTINGUISHED_FOLDER_ID,
             self.account
         )
@@ -547,14 +559,17 @@ class Folder:
             add_xml_child(itemshape, 't:AdditionalProperties', additional_properties)
         getitem.append(itemshape)
         item_ids = create_element('m:ItemIds')
+        n = 0
         for item in ids:
+            n += 1
             item_id = ItemId(*item) if isinstance(item, tuple) else ItemId(item.item_id, item.changekey)
             set_xml_value(item_ids, item_id, self.account.version)
+        if not n:
+            raise AttributeError('"ids" must not be empty')
         getitem.append(item_ids)
         return getitem
 
     def create_xml(self, items):
-        assert len(items)
         # Takes an account name, a folder name, a list of Calendar.Item obejcts and a function to convert items to XML
         # Elements
         if isinstance(self, Calendar):
@@ -564,13 +579,13 @@ class Folder:
         else:
             createitem = create_element('m:%s' % CreateItem.SERVICE_NAME)
         add_xml_child(createitem, 'm:SavedItemFolderId', self.folderid_xml())
-        e = [i.to_xml(self.account.version) for i in items]
-        add_xml_child(createitem, 'm:Items', [i.to_xml(self.account.version) for i in items])
+        item_elems = [i.to_xml(self.account.version) for i in items]
+        if not item_elems:
+            raise AttributeError('"items" must not be empty')
+        add_xml_child(createitem, 'm:Items', item_elems)
         return createitem
 
     def delete_xml(self, ids):
-        assert len(ids)
-        assert isinstance(ids[0], (tuple, Item))
         # Prepare reuseable Element objects
         if isinstance(self, Calendar):
             deleteitem = create_element('m:%s' % DeleteItem.SERVICE_NAME, DeleteType='HardDelete',
@@ -584,17 +599,17 @@ class Folder:
             deleteitem.set('SuppressReadReceipts', 'true')
 
         item_ids = create_element('m:ItemIds')
+        n = 0
         for item in ids:
+            n += 1
             item_id = ItemId(*item) if isinstance(item, tuple) else ItemId(item.item_id, item.changekey)
             set_xml_value(item_ids, item_id, self.account.version)
+        if not n:
+            raise AttributeError('"ids" must not be empty')
         deleteitem.append(item_ids)
         return deleteitem
 
     def update_xml(self, items):
-        assert len(items)
-        assert isinstance(items[0], tuple)
-        assert isinstance(items[0][0], (tuple, Item))
-        assert isinstance(items[0][1], dict)
         # Prepare reuseable Element objects
         if isinstance(self, Calendar):
             updateitem = create_element('m:%s' % UpdateItem.SERVICE_NAME, ConflictResolution='AutoResolve',
@@ -608,8 +623,11 @@ class Folder:
             updateitem.set('SuppressReadReceipts', 'true')
 
         itemchanges = create_element('m:ItemChanges')
+        n = 0
         for item, update_dict in items:
-            assert len(update_dict)
+            n += 1
+            if not update_dict:
+                raise AttributeError('"update_dict" must not be empty')
             itemchange = create_element('t:ItemChange')
             item_id = ItemId(*item) if isinstance(item, tuple) else ItemId(item.item_id, item.changekey)
             set_xml_value(itemchange, item_id, self.account.version)
@@ -673,6 +691,8 @@ class Folder:
                     updates.append(setitemfield_tz)
             itemchange.append(updates)
             itemchanges.append(itemchange)
+        if not n:
+            raise AttributeError('"items" must not be empty')
         updateitem.append(itemchanges)
         return updateitem
 

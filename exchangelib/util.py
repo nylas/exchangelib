@@ -5,6 +5,8 @@ import time
 from threading import get_ident
 from datetime import datetime
 from copy import deepcopy
+import itertools
+from types import GeneratorType
 
 from .errors import TransportError, RateLimitError, RedirectError
 
@@ -22,8 +24,35 @@ def chunkify(iterable, chunksize):
     """
     Splits an iterable into chunks of size ``chunksize``. The last chunk may be smaller than ``chunksize``.
     """
-    for i in range(0, len(iterable), chunksize):
-        yield iterable[i:i + chunksize]
+    if hasattr(iterable, '__getitem__'):
+        # lists, tuples
+        for i in range(0, len(iterable), chunksize):
+            yield iterable[i:i + chunksize]
+    else:
+        # generators, sets
+        chunk = []
+        for i in iterable:
+            chunk.append(i)
+            if len(chunk) == chunksize:
+                yield chunk
+                chunk = []
+        if chunk:
+            yield chunk
+
+
+def peek(iterable):
+    """
+    Checks if an iterable is empty and returns status and the rewinded generator
+    """
+    if isinstance(iterable, GeneratorType):
+        try:
+            first = next(iterable)
+        except StopIteration:
+            return True, iterable
+        return False, itertools.chain([first], iterable)
+    else:
+        return len(iterable) == 0, iterable
+
 
 
 def xml_to_str(tree, encoding='utf-8'):
