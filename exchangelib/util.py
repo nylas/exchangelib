@@ -25,11 +25,11 @@ def chunkify(iterable, chunksize):
     Splits an iterable into chunks of size ``chunksize``. The last chunk may be smaller than ``chunksize``.
     """
     if hasattr(iterable, '__getitem__'):
-        # lists, tuples
+        # list, tuple
         for i in range(0, len(iterable), chunksize):
             yield iterable[i:i + chunksize]
     else:
-        # generators, sets
+        # generator, set, map
         chunk = []
         for i in iterable:
             chunk.append(i)
@@ -44,7 +44,7 @@ def peek(iterable):
     """
     Checks if an iterable is empty and returns status and the rewinded generator
     """
-    if isinstance(iterable, GeneratorType):
+    if isinstance(iterable, (GeneratorType, map)):
         try:
             first = next(iterable)
         except StopIteration:
@@ -52,7 +52,6 @@ def peek(iterable):
         return False, itertools.chain([first], iterable)
     else:
         return len(iterable) == 0, iterable
-
 
 
 def xml_to_str(tree, encoding='utf-8'):

@@ -107,18 +107,24 @@ class RestrictionTest(unittest.TestCase):
 
 class UtilTest(unittest.TestCase):
     def test_chunkify(self):
-        # Test list, tuple, set, range and generator
+        # Test list, tuple, set, range, map and generator
         seq = [1, 2, 3, 4, 5]
         self.assertEqual(list(chunkify(seq, chunksize=2)), [[1, 2], [3, 4], [5]])
+
         seq = (1, 2, 3, 4, 6, 7, 9)
         self.assertEqual(list(chunkify(seq, chunksize=3)), [(1, 2, 3), (4, 6, 7), (9,)])
+
         seq = {1, 2, 3, 4, 5}
         self.assertEqual(list(chunkify(seq, chunksize=2)), [[1, 2], [3, 4], [5,]])
+
         seq = range(5)
         self.assertEqual(list(chunkify(seq, chunksize=2)), [range(0, 2), range(2, 4), range(4, 5)])
-        # Test chunkifying a generator where len(fails)
-        seq = range(5)
-        self.assertEqual(list(chunkify((i for i in seq), chunksize=2)), [[0, 1], [2, 3], [4]])
+
+        seq = map(int, range(5))
+        self.assertEqual(list(chunkify(seq, chunksize=2)), [[0, 1], [2, 3], [4]])
+
+        seq = (i for i in range(5))
+        self.assertEqual(list(chunkify(seq, chunksize=2)), [[0, 1], [2, 3], [4]])
 
     def test_peek(self):
         # Test peeking into various sequence types
@@ -147,10 +153,15 @@ class UtilTest(unittest.TestCase):
         is_empty, seq = peek(range(1, 4))
         self.assertEqual((is_empty, list(seq)), (False, [1, 2, 3]))
 
+        # map
+        is_empty, seq = peek(map(int, []))
+        self.assertEqual((is_empty, list(seq)), (True, []))
+        is_empty, seq = peek(map(int, [1, 2, 3]))
+        self.assertEqual((is_empty, list(seq)), (False, [1, 2, 3]))
+
         # generator
         is_empty, seq = peek((i for i in []))
         self.assertEqual((is_empty, list(seq)), (True, []))
-
         is_empty, seq = peek((i for i in [1, 2, 3]))
         self.assertEqual((is_empty, list(seq)), (False, [1, 2, 3]))
 
