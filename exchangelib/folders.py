@@ -394,6 +394,11 @@ class Item(EWSElement):
                 assert False, 'Field %s type %s not supported' % (fieldname, field_type)
         return cls(item_id=item_id, changekey=changekey, **kwargs)
 
+    def __repr__(self):
+        return self.__class__.__name__ + '(%s)' % ', '.join(
+            '%s=%s' % (k, repr(getattr(self, k))) for k in self.fieldnames()
+        )
+
 
 class Folder:
     DISTINGUISHED_FOLDER_ID = None
@@ -860,9 +865,6 @@ class CalendarItem(Item):
                 raise ValueError("'%s' must be timezone aware")
             setattr(self, k, v)
         super().__init__(**kwargs)
-
-    def __repr__(self):
-        return self.__class__.__name__ + repr(getattr(self, k) for k in (Item.ITEM_FIELDS + self.ITEM_FIELDS))
 
     def __str__(self):
         return '''\
