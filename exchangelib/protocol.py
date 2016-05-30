@@ -31,7 +31,8 @@ TIMEOUT = 120
 
 
 def close_connections():
-    for server, cached_values in _server_cache.items():
+    for cached_key, cached_values in _server_cache.items():
+        server = cached_key[0]  # server, username = cached_key
         cached_protocol = Protocol('https://%s/EWS/Exchange.asmx' % server, True, Credentials('', ''))
         cached_protocol.close()
 
@@ -55,10 +56,11 @@ class Protocol:
         # overkill.
         log.debug('Waiting for _server_cache_lock')
         with _server_cache_lock:
-            if self.server in _server_cache:
+            _server_cache_key = self.server, self.credentials.username
+            if _server_cache_key in _server_cache:
                 # Get cached version and auth types and session / thread pools
                 log.debug("Cache hit for server '%s'", self.server)
-                for k, v in _server_cache[self.server].items():
+                for k, v in _server_cache[_server_cache_key].items():
                     setattr(self, k, v)
 
                 if ews_auth_type:
@@ -89,7 +91,7 @@ class Protocol:
                 self.version = Version.guess(self)
 
                 # Cache results
-                _server_cache[self.server] = dict(
+                _server_cache[_server_cache_key] = dict(
                     version=self.version,
                     ews_auth_type=self.ews_auth_type,
                     docs_auth_type=self.docs_auth_type,
