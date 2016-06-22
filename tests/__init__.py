@@ -8,7 +8,7 @@ from exchangelib.account import Account
 from exchangelib.configuration import Configuration
 from exchangelib.credentials import DELEGATE
 from exchangelib.ewsdatetime import EWSDateTime, EWSTimeZone
-from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message
+from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, Item
 from exchangelib.restriction import Restriction
 from exchangelib.services import GetServerTimeZones, AllProperties, IdOnly
 from exchangelib.util import xml_to_str, chunkify, peek
@@ -542,10 +542,36 @@ class InboxTest(EWSTest):
         self.assertEqual(status, [(True, None)])
 
 
+class ContactsTest(EWSTest):
+    def tearDown(self):
+        ids = self.account.contacts.find_items(categories=self.categories, shape=IdOnly)
+        self.account.contacts.delete_items(ids)
+        pass
+
+    def test_get_items(self):
+        ids = self.account.contacts.find_items(shape=IdOnly)
+        items = self.account.contacts.get_items(ids=ids)
+        for i in items:
+            print(i)
+
+
+class TasksTest(EWSTest):
+    def tearDown(self):
+        ids = self.account.tasks.find_items(categories=self.categories, shape=IdOnly)
+        self.account.tasks.delete_items(ids)
+        pass
+
+    def test_get_items(self):
+        ids = self.account.tasks.find_items(shape=IdOnly)
+        items = self.account.tasks.get_items(ids=ids)
+        for i in items:
+            print(i)
+
+
 if __name__ == '__main__':
     import logging
-    # loglevel = logging.DEBUG
-    loglevel = logging.INFO
+    loglevel = logging.DEBUG
+    # loglevel = logging.INFO
     logging.basicConfig(level=loglevel)
     logging.getLogger('exchangelib').setLevel(loglevel)
     unittest.main()

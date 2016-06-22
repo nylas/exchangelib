@@ -3,6 +3,18 @@ import datetime
 import pytz
 
 
+class EWSDate(datetime.date):
+    """
+    Extends the normal date implementation to satisfy EWS
+    """
+
+    def ewsformat(self):
+        """
+        ISO 8601 format to satisfy xs:date as interpreted by EWS. Example: 2009-01-15
+        """
+        return self.strftime('%Y-%m-%d')
+
+
 class EWSDateTime(datetime.datetime):
     """
     Extends the normal datetime implementation to satisfy EWS

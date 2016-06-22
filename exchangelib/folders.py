@@ -64,6 +64,92 @@ class ItemId(EWSElement):
         return cls(id=elem.get('Id'), changekey=elem.get('ChangeKey'))
 
 
+class EmailAddressEntry(EWSElement):
+    # See https://msdn.microsoft.com/en-us/library/office/aa564757(v=exchg.150).aspx
+    ELEMENT_NAME = 'Entry'
+
+    __slots__ = ('email_type', 'email')
+
+    def __init__(self, email, email_type='EmailAddress1'):
+        assert email_type in ('EmailAddress1', 'EmailAddress2','EmailAddress3')
+        assert isinstance(email, str)
+        self.email_type = email_type
+        self.email = email
+
+    def to_xml(self, version):
+        entry = create_element(self.request_tag(), Key=self.email_type)
+        set_xml_value(entry, self.email, version)
+        return entry
+
+
+class PhoneNumberEntry(EWSElement):
+    # See https://msdn.microsoft.com/en-us/library/office/aa565941(v=exchg.150).aspx
+    ELEMENT_NAME = 'Entry'
+
+    __slots__ = ('phone_number_type', 'phone_number')
+
+    def __init__(self, phone_number, phone_number_type='PrimaryPhone'):
+        assert phone_number_type in (
+            'AssistantPhone', 'BusinessFax', 'BusinessPhone', 'BusinessPhone2', 'Callback', 'CarPhone',
+            'CompanyMainPhone', 'HomeFax', 'HomePhone', 'HomePhone2', 'Isdn', 'MobilePhone', 'OtherFax',
+            'OtherTelephone', 'Pager', 'PrimaryPhone', 'RadioPhone', 'Telex', 'TtyTddPhone')
+        assert isinstance(phone_number, str)
+        self.phone_number_type = phone_number_type
+        self.phone_number = phone_number
+
+    def to_xml(self, version):
+        entry = create_element(self.request_tag(), Key=self.phone_number_type)
+        set_xml_value(entry, self.phone_number, version)
+        return entry
+
+
+class PhysicalAddressEntry(EWSElement):
+    ELEMENT_NAME = 'Entry'
+
+    __slots__ = ('street', 'city', 'state', 'country', 'zipcode')
+
+    def __init__(self, address_type, street, city, state, country, zipcode):
+        assert address_type in ('Business', 'Home', 'Other')
+        assert isinstance(street, str)
+        assert isinstance(city, str)
+        assert isinstance(state, str)
+        assert isinstance(country, str)
+        assert isinstance(zipcode, (str, int))
+        self.address_type = address_type
+        self.street = street
+        self.city = city
+        self.state = state
+        self.country = country
+        self.zipcode = zipcode
+
+    def to_xml(self, version):
+        entry = create_element(self.request_tag(), Key=self.address_type)
+        add_xml_child(entry, 't:Street', self.street)
+        add_xml_child(entry, 't:City', self.city)
+        add_xml_child(entry, 't:State', self.state)
+        add_xml_child(entry, 't:Country', self.country)
+        add_xml_child(entry, 't:PostalCode', str(self.zipcode))
+        return entry
+
+    @classmethod
+    def from_xml(cls, elem):
+        if not elem:
+            return None
+        assert elem.tag == cls.response_tag()
+        return cls(
+            address_type=elem.get('Key'),
+            street=get_xml_attr(elem, '{%s}Street' % TNS),
+            city=get_xml_attr(elem, '{%s}City' % TNS),
+            state=get_xml_attr(elem, '{%s}State' % TNS),
+            country=get_xml_attr(elem, '{%s}Country' % TNS),
+            zipcode=get_xml_attr(elem, '{%s}PostalCode' % TNS),
+        )
+
+    def __repr__(self):
+        return self.__class__.__name__ + \
+               repr((self.address_type, self.street, self.city, self.state, self.country, self.zipcode))
+
+
 class Mailbox(EWSElement):
     ELEMENT_NAME = 'Mailbox'
     MAILBOX_TYPES = {'Mailbox', 'PublicDL', 'PrivateDL', 'Contact', 'PublicFolder', 'Unknown', 'OneOff'}
@@ -225,59 +311,33 @@ class Item(EWSElement):
 
     # 'extern_id' is not a native EWS Item field. We use it for identification when item originates in an external
     # system. The field is implemented as an extended property on the Item.
-    ITEM_FIELDS = (
-        'item_id',
-        'changekey',
-        'subject',
-        'body',
-        'reminder_is_set',
-        'categories',
-        'extern_id',
-    )
-    # These are optional
-    EXTRA_ITEM_FIELDS = (
-        'datetime_created',
-        'datetime_sent',
-        'datetime_recieved',
-        'last_modified_name',
-        'last_modified_time',
-    )
-    ATTR_FIELDURI_MAP = {
-        'subject': 'Subject',
-        'body': 'Body',
-        'reminder_is_set': 'ReminderIsSet',
-        'categories': 'Categories',
-        'datetime_created': 'DateTimeCreated',
-        'datetime_sent': 'DateTimeSent',
-        'datetime_recieved': 'DateTimeReceived',
-        'last_modified_name': 'LastModifiedName',
-        'last_modified_time': 'LastModifiedTime',
-        'extern_id': ExternId,
+    ITEM_FIELDS = {
+        'item_id': ('Id', str),
+        'changekey': ('ChangeKey', str),
+        'subject': ('Subject', str),
+        'body': ('Body', str),
+        'reminder_is_set': ('ReminderIsSet', bool),
+        'categories': ('Categories', [str]),
+        'extern_id': (ExternId, ExternId),
     }
-    FIELD_TYPE_MAP = {
-        'item_id': str,
-        'changekey': str,
-        'subject': str,
-        'body': str,
-        'reminder_is_set': bool,
-        'categories': [str],
-        'datetime_created': EWSDateTime,
-        'datetime_sent': EWSDateTime,
-        'datetime_recieved': EWSDateTime,
-        'last_modified_name': str,
-        'last_modified_time': EWSDateTime,
-        'extern_id': ExternId,
+    # These are optional
+    EXTRA_ITEM_FIELDS = {
+        'datetime_created': ('DateTimeCreated', EWSDateTime),
+        'datetime_sent': ('DateTimeSent', EWSDateTime),
+        'datetime_recieved': ('DateTimeReceived', EWSDateTime),
+        'last_modified_name': ('LastModifiedName', str),
+        'last_modified_time': ('LastModifiedTime', EWSDateTime),
     }
 
-    __slots__ = ITEM_FIELDS + EXTRA_ITEM_FIELDS
+    __slots__ = tuple(ITEM_FIELDS) + tuple(EXTRA_ITEM_FIELDS)
 
     def __init__(self, **kwargs):
-        for k in Item.ITEM_FIELDS + Item.EXTRA_ITEM_FIELDS:
+        for k in Item.__slots__:
             default = False if k == 'reminder_is_set' else None
             v = kwargs.pop(k, default)
             if v is not None:
-                # Test if arguments have same type as specified in FIELD_TYPE_MAP. 'extern_id' is psecial because we
-                # implement it internally as the ExternId class but want to keep the attribute as a simple str.
+                # Test if arguments have the correct type. 'extern_id' is psecial because we implement it internally as
+                # the ExternId class but want to keep the attribute as a simple str for simplicity and ease of use.
                 # 'field_type' may be a list with a single type. In that case we want to check all list members
                 field_type = self.type_for_field(k)
                 if isinstance(field_type, list):
@@ -295,14 +355,22 @@ class Item(EWSElement):
     @classmethod
     def fieldnames(cls, with_extra=False):
         # Return non-ID field names
+        base_fields = tuple(f for f in cls.ITEM_FIELDS if f not in ('item_id', 'changekey'))
         if with_extra:
-            return cls.ITEM_FIELDS[2:] + cls.EXTRA_ITEM_FIELDS
-        return cls.ITEM_FIELDS[2:]
+            return base_fields + tuple(cls.EXTRA_ITEM_FIELDS)
+        return base_fields
+
+    @classmethod
+    def uri_for_field(cls, fieldname):
+        try:
+            return cls.ITEM_FIELDS[fieldname][0]
+        except KeyError:
+            return cls.EXTRA_ITEM_FIELDS[fieldname][0]
 
     @classmethod
     def fielduri_for_field(cls, fieldname):
         try:
-            field_uri = cls.ATTR_FIELDURI_MAP[fieldname]
+            field_uri = cls.uri_for_field(fieldname)
             if isinstance(field_uri, str):
                 return '%s:%s' % (cls.FIELDURI_PREFIX, field_uri)
             return field_uri
@@ -314,24 +382,27 @@ class Item(EWSElement):
         assert isinstance(fieldname, str)
         try:
             if fieldname == 'body':
-                return create_element('t:%s' % cls.ATTR_FIELDURI_MAP[fieldname], BodyType='Text')
-            return create_element('t:%s' % cls.ATTR_FIELDURI_MAP[fieldname])
+                return create_element('t:%s' % cls.uri_for_field(fieldname), BodyType='Text')
+            return create_element('t:%s' % cls.uri_for_field(fieldname))
         except KeyError:
             raise ValueError("No fielduri defined for fieldname '%s'" % fieldname)
 
     @classmethod
     def response_xml_elem_for_field(cls, fieldname):
         try:
-            return '{%s}%s' % (TNS, cls.ATTR_FIELDURI_MAP[fieldname])
+            return '{%s}%s' % (TNS, cls.uri_for_field(fieldname))
         except KeyError:
             raise ValueError("No fielduri defined for fieldname '%s'" % fieldname)
 
     @classmethod
     def type_for_field(cls, fieldname):
         try:
-            return cls.FIELD_TYPE_MAP[fieldname]
+            return cls.ITEM_FIELDS[fieldname][1]
         except KeyError:
-            raise ValueError("No type defined for fieldname '%s'" % fieldname)
+            try:
+                return cls.EXTRA_ITEM_FIELDS[fieldname][1]
+            except KeyError:
+                raise ValueError("No type defined for fieldname '%s'" % fieldname)
 
     @classmethod
     def additional_property_elems(cls, with_extra=False):
@@ -359,13 +430,23 @@ class Item(EWSElement):
         for fieldname in cls.fieldnames(with_extra=with_extra):
             field_type = cls.type_for_field(fieldname)
             if field_type == EWSDateTime:
-                str_val = get_xml_attr(elem, cls.response_xml_elem_for_field(fieldname))
-                kwargs[fieldname] = EWSDateTime.from_string(str_val)
+                val = get_xml_attr(elem, cls.response_xml_elem_for_field(fieldname))
+                kwargs[fieldname] = EWSDateTime.from_string(val) if val else None
             elif field_type == bool:
                 val = get_xml_attr(elem, cls.response_xml_elem_for_field(fieldname))
                 kwargs[fieldname] = True if val == 'true' else False
             elif field_type == str:
                 kwargs[fieldname] = get_xml_attr(elem, cls.response_xml_elem_for_field(fieldname)) or ''
+            elif field_type == int:
+                try:
+                    kwargs[fieldname] = int(get_xml_attr(elem, cls.response_xml_elem_for_field(fieldname)))
+                except ValueError:
+                    kwargs[fieldname] = None
+            elif field_type == float:
+                try:
+                    kwargs[fieldname] = float(get_xml_attr(elem, cls.response_xml_elem_for_field(fieldname)))
+                except ValueError:
+                    kwargs[fieldname] = None
             elif isinstance(field_type, list):
                 list_type = field_type[0]
                 iter_elem = elem.find(cls.response_xml_elem_for_field(fieldname))
@@ -741,60 +822,15 @@ class Folder:
         return '%s (%s)' % (self.__class__.__name__, self.name)
 
 
-class Root(Folder):
-    DISTINGUISHED_FOLDER_ID = 'root'
-
-
-class CalendarItem(Item):
-    """
-    Models a calendar item. Not all attributes are supported. See full list at
-    https://msdn.microsoft.com/en-us/library/office/aa564765(v=exchg.150).aspx
-    """
-    ELEMENT_NAME = 'CalendarItem'
-    SUBJECT_MAXLENGTH = 255
-    LOCATION_MAXLENGTH = 255
-    FIELDURI_PREFIX = 'calendar'
-    ITEM_FIELDS = (
-        'start',
-        'end',
-        'location',
-        'organizer',  # Read-only in Exchange
-        'legacy_free_busy_status',
-        'required_attendees',
-        'optional_attendees',
-        'resources',
-    )
-    ATTR_FIELDURI_MAP = {
-        'start': 'Start',
-        'end': 'End',
-        'location': 'Location',
-        'organizer': 'Organizer',
-        'legacy_free_busy_status': 'LegacyFreeBusyStatus',
-        'required_attendees': 'RequiredAttendees',
-        'optional_attendees': 'OptionalAttendees',
-        'resources': 'Resources',
-    }
-    FIELD_TYPE_MAP = {
-        'start': EWSDateTime,
-        'end': EWSDateTime,
-        'location': str,
-        'organizer': Mailbox,
-        'legacy_free_busy_status': str,
-        'required_attendees': [Attendee],
-        'optional_attendees': [Attendee],
-        'resources': [Attendee],
-    }
-
-    __slots__ = ITEM_FIELDS + Item.ITEM_FIELDS + Item.EXTRA_ITEM_FIELDS
-
+class ItemMixIn(Item):
     @classmethod
     def fieldnames(cls, with_extra=False):
-        return cls.ITEM_FIELDS + Item.fieldnames(with_extra=with_extra)
+        return tuple(cls.ITEM_FIELDS) + Item.fieldnames(with_extra=with_extra)
 
     @classmethod
     def fielduri_for_field(cls, fieldname):
         try:
-            field_uri = cls.ATTR_FIELDURI_MAP[fieldname]
+            field_uri = cls.ITEM_FIELDS[fieldname][0]
             if isinstance(field_uri, str):
                 return '%s:%s' % (cls.FIELDURI_PREFIX, field_uri)
             return field_uri
@@ -805,23 +841,59 @@ class CalendarItem(Item):
     def elem_for_field(cls, fieldname):
         assert isinstance(fieldname, str)
         try:
-            return create_element('t:%s' % cls.ATTR_FIELDURI_MAP[fieldname])
+            return create_element('t:%s' % cls.uri_for_field(fieldname))
         except KeyError:
             return Item.elem_for_field(fieldname)
 
     @classmethod
     def response_xml_elem_for_field(cls, fieldname):
         try:
-            return '{%s}%s' % (TNS, cls.ATTR_FIELDURI_MAP[fieldname])
+            return '{%s}%s' % (TNS, cls.uri_for_field(fieldname))
         except KeyError:
             return Item.response_xml_elem_for_field(fieldname)
 
     @classmethod
     def type_for_field(cls, fieldname):
         try:
-            return cls.FIELD_TYPE_MAP[fieldname]
+            return cls.ITEM_FIELDS[fieldname][1]
         except KeyError:
             return Item.type_for_field(fieldname)
+
+
+class Root(Folder):
+    DISTINGUISHED_FOLDER_ID = 'root'
+
+
+class CalendarItem(ItemMixIn):
+    """
+    Models a calendar item. Not all attributes are supported. See full list at
+    https://msdn.microsoft.com/en-us/library/office/aa564765(v=exchg.150).aspx
+    """
+    ELEMENT_NAME = 'CalendarItem'
+    SUBJECT_MAXLENGTH = 255
+    LOCATION_MAXLENGTH = 255
+    FIELDURI_PREFIX = 'calendar'
+    ITEM_FIELDS = {
+        'start': ('Start', EWSDateTime),
+        'end': ('End', EWSDateTime),
+        'location': ('Location', str),
+        'organizer': ('Organizer', Mailbox),   # Read-only in Exchange
+        'legacy_free_busy_status': ('LegacyFreeBusyStatus', str),
+        'required_attendees': ('RequiredAttendees', [Attendee]),
+        'optional_attendees': ('OptionalAttendees', [Attendee]),
+        'resources': ('Resources', [Attendee]),
+    }
+
+    __slots__ = tuple(ITEM_FIELDS) + tuple(Item.ITEM_FIELDS) + tuple(Item.EXTRA_ITEM_FIELDS)
+
+    def __init__(self, **kwargs):
+        for k in self.ITEM_FIELDS:
+            default = 'Busy' if k == 'legacy_free_busy_status' else None
+            v = kwargs.pop(k, default)
+            if k in ('start', 'end') and v and not getattr(v, 'tzinfo'):
+                raise ValueError("'%s' must be timezone aware")
+            setattr(self, k, v)
+        super().__init__(**kwargs)
 
     def to_xml(self, version):
         # WARNING: The order of addition of XML elements is VERY important. Exchange expects XML elements in a
@@ -855,15 +927,6 @@ class CalendarItem(Item):
             i.append(create_element('t:EndTimeZone', Id=self.end.tzinfo.ms_id, Name=self.end.tzinfo.ms_name))
         return i
 
-    def __init__(self, **kwargs):
-        for k in self.ITEM_FIELDS:
-            default = 'Busy' if k == 'legacy_free_busy_status' else None
-            v = kwargs.pop(k, default)
-            if k in ('start', 'end') and v and not getattr(v, 'tzinfo'):
-                raise ValueError("'%s' must be timezone aware")
-            setattr(self, k, v)
-        super().__init__(**kwargs)
-
     def __str__(self):
         return '''\
 ItemId: %(item_id)s
@@ -892,59 +955,34 @@ class Calendar(Folder):
     }
 
 
-class Message(Item):
+class Message(ItemMixIn):
+    # Supported attrs: see https://msdn.microsoft.com/en-us/library/office/aa494306(v=exchg.150).aspx
     ELEMENT_NAME = 'Message'
-
-    ITEM_FIELDS = (
-        'sensitivity',
-        'importance',
-        'mime_content',
-        'is_draft',
-        'is_read',
-        'is_delivery_receipt_requested',
-        'is_read_receipt_requested',
-        'is_response_requested',
-        'from',
-        'sender',
-        'reply_to',
-        'to_recipients',
-        'cc_recipients',
-        'bcc_recipients',
-    )
-    ATTR_FIELDURI_MAP = {
-        'sensitivity': 'Sensitivity',
-        'importance': 'Importance',
-        'mime_content': 'MimeContent',
-        'is_draft': 'IsDraft',
-        'is_read': 'IsRead',
-        'is_delivery_receipt_requested': 'IsDeliveryReceiptRequested',
-        'is_read_receipt_requested': 'IsReadReceiptRequested',
-        'is_response_requested': 'IsResponseRequested',
-        'from': 'From',
-        'sender': 'Sender',
-        'reply_to': 'ReplyTo',
-        'to_recipients': 'ToRecipients',
-        'cc_recipients': 'CcRecipients',
-        'bcc_recipients': 'CcRecipients',
-    }
-    FIELD_TYPE_MAP = {
-        'sensitivity': str,  # Possible values: Normal, Personal, Private, Confidential
-        'importance': str,  # Possible values: Low, Normal, High
-        'mime_content': str,
-        'is_read': bool,
-        'is_draft': bool,
-        'is_delivery_receipt_requested': bool,
-        'is_read_receipt_requested': bool,
-        'is_response_requested': bool,
-        'from': Mailbox,
-        'sender': Mailbox,
-        'reply_to': [Mailbox],
-        'to_recipients': [Mailbox],
-        'cc_recipients': [Mailbox],
-        'bcc_recipients': [Mailbox],
+    FIELDURI_PREFIX = 'message'
+    ITEM_FIELDS = {
+        # 'sensitivity': ('Sensitivity', str),  # Possible values: Normal, Personal, Private, Confidential
+        # 'importance': ('Importance', str),  # Possible values: Low, Normal, High
+        # 'mime_content': ('MimeContent', str),
+        # 'is_draft': ('IsDraft', bool),
+        'is_read': ('IsRead', bool),
+        'is_delivery_receipt_requested': ('IsDeliveryReceiptRequested', bool),
+        'is_read_receipt_requested': ('IsReadReceiptRequested', bool),
+        'is_response_requested': ('IsResponseRequested', bool),
+        'from': ('From', Mailbox),
+        'sender': ('Sender', Mailbox),
+        'reply_to': ('ReplyTo', [Mailbox]),
+        'to_recipients': ('ToRecipients', [Mailbox]),
+        'cc_recipients': ('CcRecipients', [Mailbox]),
+        'bcc_recipients': ('CcRecipients', [Mailbox]),
     }
 
-    __slots__ = ITEM_FIELDS + Item.ITEM_FIELDS + Item.EXTRA_ITEM_FIELDS
+    __slots__ = tuple(ITEM_FIELDS) + tuple(Item.ITEM_FIELDS) + tuple(Item.EXTRA_ITEM_FIELDS)
+
+    def __init__(self, **kwargs):
+        for k in self.ITEM_FIELDS:
+            v = kwargs.pop(k, None)
+            setattr(self, k, v)
+        super().__init__(**kwargs)
 
     def to_xml(self, version):
         # TODO: Expand the fields we support. See Calendaritem.to_xml()
@@ -973,8 +1011,57 @@ class Messages(Folder):
     }
 
 
-class Task(Item):
+class Task(ItemMixIn):
+    # Supported attrs: see https://msdn.microsoft.com/en-us/library/office/aa563930(v=exchg.150).aspx
     ELEMENT_NAME = 'Task'
+    FIELDURI_PREFIX = 'task'
+    ITEM_FIELDS = {
+        # 'sensitivity': ('Sensitivity', str),  # Possible values: Normal, Personal, Private, Confidential
+        # 'importance': ('Importance', str),  # Possible values: Low, Normal, High
+        #  'is_draft': ('IsDraft', bool),
+        'actual_work': ('ActualWork', int),
+        'assigned_time': ('AssignedTime', EWSDateTime),
+        'billing_information': ('BillingInformation', str),
+        'change_count': ('ChangeCount', int),
+        'companies': ('Companies', [str]),
+        'contacts': ('Contacts', [str]),
+        'is_complete': ('IsComplete', bool),
+        'due_date': ('DueDate', EWSDateTime),
+        'delegator': ('Delegator', str),
+        'delegation_state': ('DelegationState', str),  # Read-only in Exchange
+        'is_recurring': ('IsRecurring', bool),  # Read-only in Exchange
+        'is_team_task': ('IsTeamTask', bool),
+        'mileage': ('Mileage', str),
+        'owner': ('Owner', str),
+        'percent_complete': ('PercentComplete', float),
+        'start_date': ('StartDate', EWSDateTime),
+        'status': ('Status', str),  # Possible values: NotStarted, InProgress, Completed, WaitingOnOthers, Deferred
+        'status_description': ('StatusDescription', str),
+        'total_work': ('TotalWork', int),
+    }
+
+    __slots__ = tuple(ITEM_FIELDS) + tuple(Item.ITEM_FIELDS) + tuple(Item.EXTRA_ITEM_FIELDS)
+
+    def __init__(self, **kwargs):
+        for k in self.ITEM_FIELDS:
+            v = kwargs.pop(k, None)
+            setattr(self, k, v)
+        super().__init__(**kwargs)
+
+    def to_xml(self, version):
+        # TODO: Expand the fields we support. See Calendaritem.to_xml()
+        # WARNING: The order of addition of XML elements is VERY important. Exchange expects XML elements in a
+        # specific, non-documented order and will fail with meaningless errors if the order is wrong.
+        i = create_element(self.request_tag())
+        i.append(set_xml_value(self.elem_for_field('subject'), self.subject, version))
+        if self.body:
+            i.append(set_xml_value(self.elem_for_field('body'), self.body, version))
+        if self.categories:
+            i.append(set_xml_value(self.elem_for_field('categories'), self.categories, version))
+        i.append(set_xml_value(self.elem_for_field('reminder_is_set'), self.reminder_is_set, version))
+        if self.extern_id is not None:
+            set_xml_value(i, ExternId(self.extern_id), version)
+        return i
 
 
 class Tasks(Folder):
@@ -988,8 +1075,61 @@ class Tasks(Folder):
     }
 
 
-class Contact(Item):
+class Contact(ItemMixIn):
+    # Supported attrs: see https://msdn.microsoft.com/en-us/library/office/aa581315(v=exchg.150).aspx
     ELEMENT_NAME = 'Contact'
+    FIELDURI_PREFIX = 'contacts'
+    ITEM_FIELDS = {
+        # 'sensitivity': ('Sensitivity', str),  # Possible values: Normal, Personal, Private, Confidential
+        # 'importance': ('Importance', str),  # Possible values: Low, Normal, High
+        # 'is_draft': ('IsDraft', bool),
+        'file_as': ('FileAs', str),
+        'file_as_mapping': ('FileAsMapping', str),  # Possible values: None, LastCommaFirst, FirstSpaceLast, Company, LastCommaFirstCompany, CompanyLastFirst, LastFirst, LastFirstCompany, CompanyLastCommaFirst, LastFirstSuffix, LastSpaceFirstCompany, CompanyLastSpaceFirst, LastSpaceFirst, DisplayName, FirstName, LastFirstMiddleSuffix, LastName, Empty
+        'display_name': ('DisplayName', str),
+        'given_name': ('GivenName', str),
+        'initials': ('Initials', str),
+        'middle_name': ('MiddleName', str),
+        'nickname': ('Nickname', str),
+        'company_name': ('CompanyName', str),
+        'email_addresses': ('EmailAddresses', [EmailAddressEntry]),
+        'physical_addresses': ('PhysicalAddresses', [PhysicalAddressEntry]),
+        'phone_numbers': ('PhoneNumbers', [PhoneNumberEntry]),
+        'assistant_name': ('AssistantName', str),
+        'birthday': ('Birthday', EWSDateTime),
+        'business_homepage': ('BusinessHomePage', str),
+        'companies': ('Companies', [str]),
+        'department': ('Department', str),
+        'generation': ('Generation', str),
+        # 'im_addresses': ('ImAddresses', [ImAddressEntry]),
+        'job_title': ('JobTitle', str),
+        'profession': ('Profession', str),
+        'surname': ('Surname', str),
+        'email_alias': ('Alias', str),
+        'notes': ('Notes', str),
+    }
+
+    __slots__ = tuple(ITEM_FIELDS) + tuple(Item.ITEM_FIELDS) + tuple(Item.EXTRA_ITEM_FIELDS)
+
+    def __init__(self, **kwargs):
+        for k in self.ITEM_FIELDS:
+            v = kwargs.pop(k, None)
+            setattr(self, k, v)
+        super().__init__(**kwargs)
+
+    def to_xml(self, version):
+        # TODO: Expand the fields we support. See Calendaritem.to_xml()
+        # WARNING: The order of addition of XML elements is VERY important. Exchange expects XML elements in a
+        # specific, non-documented order and will fail with meaningless errors if the order is wrong.
+        i = create_element(self.request_tag())
+        i.append(set_xml_value(self.elem_for_field('subject'), self.subject, version))
+        if self.body:
+            i.append(set_xml_value(self.elem_for_field('body'), self.body, version))
+        if self.categories:
+            i.append(set_xml_value(self.elem_for_field('categories'), self.categories, version))
+        i.append(set_xml_value(self.elem_for_field('reminder_is_set'), self.reminder_is_set, version))
+        if self.extern_id is not None:
+            set_xml_value(i, ExternId(self.extern_id), version)
+        return i
 
 
 class Contacts(Folder):
