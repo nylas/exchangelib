@@ -6,10 +6,9 @@ automatically instead of taking advantage of Python SOAP libraries and the WSDL 
 """
 
 from logging import getLogger
-import re
 
 from .credentials import DELEGATE
-from .ewsdatetime import EWSDateTime, UTC_NOW
+from .ewsdatetime import EWSDateTime
 from .restriction import Restriction
 from .services import TNS, FindItem, IdOnly, SHALLOW, DEEP, DeleteItem, CreateItem, UpdateItem, FindFolder, GetFolder, \
     GetItem
@@ -430,7 +429,7 @@ class Folder:
     def attr_to_response_xml_elem(cls, fieldname):
         return cls.item_model.response_xml_elem_for_field(fieldname)
 
-    def find_items(self, start=None, end=None, categories=None, shape=IdOnly, depth=SHALLOW):
+    def find_items(self, start=None, end=None, categories=None, subject=None, shape=IdOnly, depth=SHALLOW):
         """
         Finds all items in the folder, optionally restricted by start- and enddates and a list of categories
         """
@@ -450,7 +449,7 @@ class Folder:
         # TODO Filtering by category doesn't work on Exchange 2010, returning "ErrorContainsFilterWrongType:
         # The Contains filter can only be used for string properties." Fall back to filtering after getting all items
         # instead. This may be a legal problem because we get ALL items, including private appointments.
-        restriction = Restriction.from_params(self.DISTINGUISHED_FOLDER_ID, start=start, end=end)
+        restriction = Restriction.from_params(start=start, end=end, subject=subject)
         items = FindItem(self.account.protocol).call(folder=self, additional_fields=additional_fields,
                                                      restriction=restriction, shape=shape, depth=depth)
         if not categories:
@@ -527,11 +526,10 @@ class Folder:
 
     def test_access(self):
         """
-        Does a simple FindItem to test (read) access to the mailbox. Maybe the account doesn't exist, maybe the
+        Does a simple FindItem to test (read) access to the folder. Maybe the account doesn't exist, maybe the
         service user doesn't have access to the calendar. This will throw the most common errors.
         """
-        now = UTC_NOW()
-        restriction = Restriction.from_params(self.DISTINGUISHED_FOLDER_ID, start=now, end=now)
+        restriction = Restriction.from_params(subject='DUMMY')
         FindItem(self.account.protocol).call(folder=self, restriction=restriction, shape=IdOnly)
         return True
 
@@ -579,7 +577,7 @@ class Folder:
         # Elements
         if isinstance(self, Calendar):
             createitem = create_element('m:%s' % CreateItem.SERVICE_NAME, SendMeetingInvitations='SendToNone')
-        elif isinstance(self, Inbox):
+        elif isinstance(self, Messages):
             createitem = create_element('m:%s' % CreateItem.SERVICE_NAME, MessageDisposition='SaveOnly')
         else:
             createitem = create_element('m:%s' % CreateItem.SERVICE_NAME)
@@ -619,7 +617,7 @@ class Folder:
         if isinstance(self, Calendar):
             updateitem = create_element('m:%s' % UpdateItem.SERVICE_NAME, ConflictResolution='AutoResolve',
                                         SendMeetingInvitationsOrCancellations='SendToNone')
-        elif isinstance(self, Inbox):
+        elif isinstance(self, Messages):
             updateitem = create_element('m:%s' % UpdateItem.SERVICE_NAME, ConflictResolution='AutoResolve',
                                         MessageDisposition='SaveOnly')
         else:
@@ -703,13 +701,13 @@ class Folder:
 
     @classmethod
     def from_xml(cls, account, elem):
-        fld_type = re.sub('{.*}', '', elem.tag)
-        fld_class = FOLDER_TYPE_MAP[fld_type]
+        # fld_type = re.sub('{.*}', '', elem.tag)
         fld_id_elem = elem.find('{%s}FolderId' % TNS)
         fld_id = fld_id_elem.get('Id')
         changekey = fld_id_elem.get('ChangeKey')
         display_name = get_xml_attr(elem, '{%s}DisplayName' % TNS)
         folder_class = get_xml_attr(elem, '{%s}FolderClass' % TNS)
+        fld_class = FOLDER_CLASS_MAP.get(folder_class, GenericFolder)
         return fld_class(account=account, name=display_name, folder_class=folder_class, folder_id=fld_id,
                          changekey=changekey)
 
@@ -898,10 +896,14 @@ class Message(Item):
     ELEMENT_NAME = 'Message'
 
 
-class Inbox(Folder):
-    ELEMENT_NAME = 'Message'
+class Messages(Folder):
     DISTINGUISHED_FOLDER_ID = 'inbox'
     CONTAINER_CLASS = 'IPF.Note'
+
+    # These must be capitalized
+    LOCALIZED_NAMES = (
+        'Indbakke',
+    )
 
 
 class Task(Item):
@@ -912,6 +914,11 @@ class Tasks(Folder):
     DISTINGUISHED_FOLDER_ID = 'tasks'
     CONTAINER_CLASS = 'IPF.Task'
 
+    # These must be capitalized
+    LOCALIZED_NAMES = (
+        'Opgaver',
+    )
+
 
 class Contact(Item):
     ELEMENT_NAME = 'Contact'
@@ -920,6 +927,11 @@ class Contact(Item):
 class Contacts(Folder):
     DISTINGUISHED_FOLDER_ID = 'contacts'
     CONTAINER_CLASS = 'IPF.Contact'
+
+    # These must be capitalized
+    LOCALIZED_NAMES = (
+        'Kontaktpersoner',
+    )
 
 
 class GenericFolder(Folder):
@@ -935,18 +947,18 @@ class WellknownFolder(Folder):
 WELLKNOWN_FOLDERS = dict([
     ('Calendar', Calendar),
     ('Contacts', Contacts),
-    ('DeletedItems', WellknownFolder),
-    ('Drafts', WellknownFolder),
-    ('Inbox', Inbox),
+    ('DeletedItems', Messages),
+    ('Drafts', Messages),
+    ('Inbox', Messages),
     ('Journal', WellknownFolder),
     ('Notes', WellknownFolder),
-    ('Outbox', WellknownFolder),
-    ('SentItems', WellknownFolder),
+    ('Outbox', Messages),
+    ('SentItems', Messages),
     ('Tasks', Tasks),
     ('MsgFolderRoot', WellknownFolder),
     ('PublicFoldersRoot', WellknownFolder),
     ('Root', Root),
-    ('JunkEmail', WellknownFolder),
+    ('JunkEmail', Messages),
     ('Search', WellknownFolder),
     ('VoiceMail', WellknownFolder),
     ('RecoverableItemsRoot', WellknownFolder),
@@ -971,7 +983,7 @@ WELLKNOWN_FOLDERS = dict([
     ('', GenericFolder),
 ])
 
-FOLDER_TYPE_MAP = dict()
-for folder_name, folder_model in WELLKNOWN_FOLDERS.items():
-    folder_type = '%sFolder' % folder_name
-    FOLDER_TYPE_MAP[folder_type] = folder_model
+FOLDER_CLASS_MAP = dict()
+for folder_model in WELLKNOWN_FOLDERS.values():
+    if folder_model.CONTAINER_CLASS:
+        FOLDER_CLASS_MAP[folder_model.CONTAINER_CLASS] = folder_model

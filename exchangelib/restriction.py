@@ -137,15 +137,17 @@ class Restriction:
             raise ValueError('Unknown token type: %s %s' % (key, val))
 
     @classmethod
-    def from_params(cls, folder_id, start=None, end=None, categories=None):
+    def from_params(cls, start=None, end=None, categories=None, subject=None):
         # Builds a search expression string using the most common criteria and returns a Restriction object
         if not (start or end or categories):
             return None
         search_expr = []
         if start:
-            search_expr.append('%s:End > "%s"' % (folder_id, start.astimezone(UTC).ewsformat()))
+            search_expr.append('calendar:End > "%s"' % start.astimezone(UTC).ewsformat())
         if end:
-            search_expr.append('%s:Start < "%s"' % (folder_id, end.astimezone(UTC).ewsformat()))
+            search_expr.append('calendar:Start < "%s"' % end.astimezone(UTC).ewsformat())
+        if subject:
+            search_expr.append('item:Subject = "%s"' % subject)
         if categories:
             if len(categories) == 1:
                 search_expr.append('item:Categories in "%s"' % categories[0])

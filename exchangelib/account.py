@@ -4,9 +4,8 @@ from .autodiscover import discover
 from .configuration import Configuration
 from .credentials import Credentials, DELEGATE, IMPERSONATION
 from .errors import ErrorFolderNotFound, ErrorAccessDenied
-from .folders import Root, Calendar, Inbox, Tasks, Contacts, SHALLOW, DEEP
+from .folders import Root, Calendar, Messages, Tasks, Contacts, SHALLOW, DEEP, WELLKNOWN_FOLDERS
 from .protocol import Protocol
-from .ewsdatetime import EWSDateTime, UTC
 
 log = getLogger(__name__)
 
@@ -49,17 +48,52 @@ class Account:
             return self._folders
         # 'Top of Information Store' is a folder available in some Exchange accounts. It only contains folders
         # owned by the account.
-        self._folders = self.root.get_folders(depth=SHALLOW)  # Start by searching top-level folders.
+        folders = self.root.get_folders(depth=SHALLOW)  # Start by searching top-level folders.
         has_tois = False
-        for folder in self._folders:
+        for folder in folders:
             if folder.name == 'Top of Information Store':
                 has_tois = True
-                self._folders = folder.get_folders(depth=SHALLOW)
+                folders = folder.get_folders(depth=SHALLOW)
                 break
         if not has_tois:
             # We need to dig deeper. Get everything.
-            self._folders = self.root.get_folders(depth=DEEP)
+            folders = self.root.get_folders(depth=DEEP)
+        self._folders = dict((m, []) for m in WELLKNOWN_FOLDERS.values())
+        for f in folders:
+            self._folders[f.__class__].append(f)
         return self._folders
+
+    def _get_default_folder(self, fld_class):
+        try:
+            # Get the default folder
+            log.debug('Testing default %s folder with GetFolder', fld_class.__name__)
+            return fld_class(self).get_folder()
+        except ErrorAccessDenied:
+            # Maybe we just don't have GetFolder access? Try FindItems instead
+            log.debug('Testing default %s folder with FindItem', fld_class.__name__)
+            fld = fld_class(self)
+            fld.find_items(subject='DUMMY')
+            return fld
+        except ErrorFolderNotFound as e:
+            # There's no folder named fld_class.DISTINGUISHED_FOLDER_ID. Try to guess which folder is the default.
+            # Exchange makes this unnecessarily difficult.
+            log.debug('Searching default %s folder in full folder list', fld_class.__name__)
+            flds = []
+            for folder in self.folders[fld_class]:
+                # Search for a folder wth a localized name
+                # TODO: fld_class.LOCALIZED_NAMES is most definitely neither complete nor authoritative
+                if folder.name.title() in fld_class.LOCALIZED_NAMES:
+                    flds.append(folder)
+            if not flds:
+                # There was no folder with a localized name. Use the distinguished folder instead.
+                for folder in self.folders[fld_class]:
+                    if folder.is_distinguished:
+                        flds.append(folder)
+            if not flds:
+                raise ErrorFolderNotFound('No useable default %s folders' % fld_class.__name__) from e
+            assert len(flds) == 1, 'Multiple possible default %s folders: %s' % (
+                fld_class.__name__, [str(f) for f in flds])
+            return flds[0]
 
     @property
     def calendar(self):
@@ -68,68 +102,28 @@ class Account:
         # If the account contains a shared calendar from a different user, that calendar will be in the folder list.
         # Attempt not to return one of those. An account may not always have a calendar called "Calendar", but a
         # Calendar folder with a localized name instead. Return that, if it's available.
-        try:
-            # Get the default calendar
-            self._calendar = Calendar(self).get_folder()
-        except ErrorAccessDenied:
-            # Maybe we just don't have GetFolder access? Try FindItems instead
-            self._calendar = Calendar(self)
-            dt = UTC.localize(EWSDateTime(2000, 1, 1))
-            self._calendar.find_items(start=dt, end=dt, categories=['DUMMY'])
-        except ErrorFolderNotFound as e:
-            # There's no folder called 'calendar'. Try to guess which calendar folder is the default. Exchange makes
-            # this unnecessarily difficult.
-            calendars = []
-            for folder in self.folders:
-                # Search for a calendar wth a localized name
-                # TODO: Calendar.LOCALIZED_NAMES is most definitely neither complete nor authoritative
-                if folder.folder_class != folder.CONTAINER_CLASS:
-                    # This is a pseudo-folder
-                    continue
-                if folder.name.title() in Calendar.LOCALIZED_NAMES:
-                    calendars.append(folder)
-            if not calendars:
-                # There was no calendar folder with a localized name. Use the distinguished folder instead.
-                for folder in self.folders:
-                    if folder.folder_class != folder.CONTAINER_CLASS and folder.is_distinguished:
-                        calendars.append(folder)
-            if not calendars:
-                raise ErrorFolderNotFound('No useable calendar folders') from e
-            assert len(calendars) == 1, 'Multiple calendars could be default: %s' % [str(f) for f in calendars]
-            self._calendar = calendars[0]
+        self._calendar = self._get_default_folder(Calendar)
         return self._calendar
 
     @property
     def inbox(self):
         if hasattr(self, '_inbox'):
             return self._inbox
-        self._inbox = None
-        for folder in self.folders[Inbox]:
-            if folder.is_distinguished:
-                self._inbox = folder
-                break
+        self._inbox = self._get_default_folder(Messages)
         return self._inbox
 
     @property
     def tasks(self):
         if hasattr(self, '_tasks'):
             return self._tasks
-        self._tasks = None
-        for folder in self.folders[Tasks]:
-            if folder.is_distinguished:
-                self._tasks = folder
-                break
+        self._tasks = self._get_default_folder(Tasks)
         return self._tasks
 
     @property
     def contacts(self):
         if hasattr(self, '_contacts'):
             return self._contacts
-        self._contacts = None
-        for folder in self.folders[Contacts]:
-            if folder.is_distinguished:
-                self._contacts = folder
-                break
+        self._contacts = self._get_default_folder(Contacts)
         return self._contacts
 
     def get_domain(self):
