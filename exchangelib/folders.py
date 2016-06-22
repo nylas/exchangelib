@@ -887,9 +887,9 @@ class Calendar(Folder):
     item_model = CalendarItem
 
     # These must be capitalized
-    LOCALIZED_NAMES = (
-        'Kalender',
-    )
+    LOCALIZED_NAMES = {
+        'da_DK': ('Kalender',)
+    }
 
 
 class Message(Item):
@@ -901,9 +901,9 @@ class Messages(Folder):
     CONTAINER_CLASS = 'IPF.Note'
 
     # These must be capitalized
-    LOCALIZED_NAMES = (
-        'Indbakke',
-    )
+    LOCALIZED_NAMES = {
+        'da_DK': ('Indbakke',)
+    }
 
 
 class Task(Item):
@@ -915,9 +915,9 @@ class Tasks(Folder):
     CONTAINER_CLASS = 'IPF.Task'
 
     # These must be capitalized
-    LOCALIZED_NAMES = (
-        'Opgaver',
-    )
+    LOCALIZED_NAMES = {
+        'da_DK': ('Opgaver',)
+    }
 
 
 class Contact(Item):
@@ -929,9 +929,9 @@ class Contacts(Folder):
     CONTAINER_CLASS = 'IPF.Contact'
 
     # These must be capitalized
-    LOCALIZED_NAMES = (
-        'Kontaktpersoner',
-    )
+    LOCALIZED_NAMES = {
+        'da_DK': ('Kontaktpersoner',)
+    }
 
 
 class GenericFolder(Folder):

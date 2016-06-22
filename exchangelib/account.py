@@ -15,11 +15,12 @@ class Account:
     Models an Exchange server user account. The primary key for accounts is their PrimarySMTPAddress
     """
     def __init__(self, primary_smtp_address, fullname=None, credentials=None, access_type=None, autodiscover=False,
-                 config=None):
+                 config=None, locale='da_DK'):
         if '@' not in primary_smtp_address:
             raise ValueError("primary_smtp_address '%s' is not an email address" % primary_smtp_address)
         self.primary_smtp_address = primary_smtp_address
         self.fullname = fullname
+        self.locale = locale
         if not (credentials or config):
             raise AttributeError('Either config or credentials must be supplied')
         self.credentials = credentials or config.credentials
@@ -80,9 +81,10 @@ class Account:
             log.debug('Searching default %s folder in full folder list', fld_class.__name__)
             flds = []
             for folder in self.folders[fld_class]:
-                # Search for a folder wth a localized name
+                # Search for a folder wth a localized name. This is a hack because I can't find a way to get the
+                # default Calendar, Inbox, etc. folders without looking at the folder name which could be localized.
                 # TODO: fld_class.LOCALIZED_NAMES is most definitely neither complete nor authoritative
-                if folder.name.title() in fld_class.LOCALIZED_NAMES:
+                if folder.name.title() in fld_class.LOCALIZED_NAMES.get(self.locale, []):
                     flds.append(folder)
             if not flds:
                 # There was no folder with a localized name. Use the distinguished folder instead.
