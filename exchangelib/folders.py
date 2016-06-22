@@ -889,7 +889,6 @@ class Calendar(Folder):
     item_model = CalendarItem
 
     # These must be capitalized
-    # TODO: This is most definitely not either complete or authoritative
     LOCALIZED_NAMES = (
         'Kalender',
     )
