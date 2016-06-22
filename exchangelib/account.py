@@ -6,7 +6,7 @@ from .credentials import Credentials, DELEGATE, IMPERSONATION
 from .errors import ErrorFolderNotFound, ErrorAccessDenied
 from .folders import Root, Calendar, Inbox, Tasks, Contacts, SHALLOW, DEEP
 from .protocol import Protocol
-from .ewsdatetime import EWSDateTime, EWSTimeZone
+from .ewsdatetime import EWSDateTime, UTC
 
 log = getLogger(__name__)
 
@@ -38,7 +38,7 @@ class Account:
         # server version up-front but delegate account requests to an older backend server.
         self.version = self.protocol.version
         self.root = Root(self)
-        self.folders = {}  # TODO Unimplemented - should support Inbox, Tasks, Contacts
+        self.folders = self.root.get_folders(depth=SHALLOW)
 
         assert isinstance(self.credentials, Credentials)
         assert isinstance(self.protocol, Protocol)
@@ -55,15 +55,16 @@ class Account:
             # Get the default calendar
             self._calendar = Calendar(self).get_folder()
         except ErrorAccessDenied:
-            # Maybe we just don't have GetFolder access. Try FindItems instead
+            # Maybe we just don't have GetFolder access? Try FindItems instead
             self._calendar = Calendar(self)
-            dt = EWSTimeZone.timezone('UTC').localize(EWSDateTime(2000, 1, 1))
-            self.calendar.find_items(start=dt, end=dt, categories=['DUMMY'])
+            dt = UTC.localize(EWSDateTime(2000, 1, 1))
+            self._calendar.find_items(start=dt, end=dt, categories=['DUMMY'])
         except ErrorFolderNotFound as e:
-            # Try to guess which calendar folder is the default. Exchange tries hard to make this difficult.
-            folders = self.root.get_folders(depth=SHALLOW)
+            # There's no folder called 'calendar'. Try to guess which calendar folder is the default. Exchange makes
+            # this unnecessarily difficult.
             # 'Top of Information Store' is a folder available in some Exchange accounts. It only contains folders
             # owned by the account.
+            folders = self.folders  # Start by searching top-level folders.
             has_tois = False
             for folder in folders:
                 if folder.name == 'Top of Information Store':
@@ -71,11 +72,12 @@ class Account:
                     folders = folder.get_folders(depth=SHALLOW)
                     break
             if not has_tois:
+                # We need to dig deeper
                 folders = self.root.get_folders(depth=DEEP)
             calendars = []
             for folder in folders:
-                # Use the calendar wth a localized name
-                # TODO: This is most definitely not either complete or authoritative
+                # Search for a calendar wth a localized name
+                # TODO: Calendar.LOCALIZED_NAMES is most definitely neither complete nor authoritative
                 if folder.folder_class != folder.CONTAINER_CLASS:
                     # This is a pseudo-folder
                     continue

@@ -1,7 +1,7 @@
 import logging
 from threading import Lock
 
-from .ewsdatetime import EWSTimeZone
+from .ewsdatetime import UTC
 from .util import create_element, xml_to_str
 
 log = logging.getLogger(__name__)
@@ -142,11 +142,10 @@ class Restriction:
         if not (start or end or categories):
             return None
         search_expr = []
-        tz = EWSTimeZone.timezone('UTC')
         if start:
-            search_expr.append('%s:End > "%s"' % (folder_id, start.astimezone(tz).ewsformat()))
+            search_expr.append('%s:End > "%s"' % (folder_id, start.astimezone(UTC).ewsformat()))
         if end:
-            search_expr.append('%s:Start < "%s"' % (folder_id, end.astimezone(tz).ewsformat()))
+            search_expr.append('%s:Start < "%s"' % (folder_id, end.astimezone(UTC).ewsformat()))
         if categories:
             if len(categories) == 1:
                 search_expr.append('item:Categories in "%s"' % categories[0])

@@ -9,7 +9,7 @@ from logging import getLogger
 import re
 
 from .credentials import DELEGATE
-from .ewsdatetime import EWSDateTime, EWSTimeZone
+from .ewsdatetime import EWSDateTime, UTC_NOW
 from .restriction import Restriction
 from .services import TNS, FindItem, IdOnly, SHALLOW, DEEP, DeleteItem, CreateItem, UpdateItem, FindFolder, GetFolder, \
     GetItem
@@ -530,7 +530,7 @@ class Folder:
         Does a simple FindItem to test (read) access to the mailbox. Maybe the account doesn't exist, maybe the
         service user doesn't have access to the calendar. This will throw the most common errors.
         """
-        now = EWSDateTime.now(tz=EWSTimeZone.timezone('UTC'))
+        now = UTC_NOW()
         restriction = Restriction.from_params(self.DISTINGUISHED_FOLDER_ID, start=now, end=now)
         FindItem(self.account.protocol).call(folder=self, restriction=restriction, shape=IdOnly)
         return True

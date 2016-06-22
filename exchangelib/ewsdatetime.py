@@ -208,3 +208,7 @@ class EWSTimeZone:
         ('Kamchatka Standard Time', '(UTC+12:00) Petropavlovsk-Kamchatsky'),
         ('Tonga Standard Time', "(UTC+13:00) Nuku'alofa"),
     ])
+
+UTC = EWSTimeZone.timezone('UTC')
+
+UTC_NOW = lambda: EWSDateTime.now(tz=UTC)
