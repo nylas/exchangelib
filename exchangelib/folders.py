@@ -895,7 +895,59 @@ class Calendar(Folder):
 class Message(Item):
     ELEMENT_NAME = 'Message'
 
+    ITEM_FIELDS = (
+        'sensitivity',
+        'importance',
+        'mime_content',
+        'is_draft',
+        'is_read',
+        'is_delivery_receipt_requested',
+        'is_read_receipt_requested',
+        'is_response_requested',
+        'from',
+        'sender',
+        'reply_to',
+        'to_recipients',
+        'cc_recipients',
+        'bcc_recipients',
+    )
+    ATTR_FIELDURI_MAP = {
+        'sensitivity': 'Sensitivity',
+        'importance': 'Importance',
+        'mime_content': 'MimeContent',
+        'is_draft': 'IsDraft',
+        'is_read': 'IsRead',
+        'is_delivery_receipt_requested': 'IsDeliveryReceiptRequested',
+        'is_read_receipt_requested': 'IsReadReceiptRequested',
+        'is_response_requested': 'IsResponseRequested',
+        'from': 'From',
+        'sender': 'Sender',
+        'reply_to': 'ReplyTo',
+        'to_recipients': 'ToRecipients',
+        'cc_recipients': 'CcRecipients',
+        'bcc_recipients': 'CcRecipients',
+    }
+    FIELD_TYPE_MAP = {
+        'sensitivity': str,  # Possible values: Normal, Personal, Private, Confidential
+        'importance': str,  # Possible values: Low, Normal, High
+        'mime_content': str,
+        'is_read': bool,
+        'is_draft': bool,
+        'is_delivery_receipt_requested': bool,
+        'is_read_receipt_requested': bool,
+        'is_response_requested': bool,
+        'from': Mailbox,
+        'sender': Mailbox,
+        'reply_to': [Mailbox],
+        'to_recipients': [Mailbox],
+        'cc_recipients': [Mailbox],
+        'bcc_recipients': [Mailbox],
+    }
+
+    __slots__ = ITEM_FIELDS + Item.ITEM_FIELDS + Item.EXTRA_ITEM_FIELDS
+
     def to_xml(self, version):
+        # TODO: Expand the fields we support. See Calendaritem.to_xml()
         # WARNING: The order of addition of XML elements is VERY important. Exchange expects XML elements in a
         # specific, non-documented order and will fail with meaningless errors if the order is wrong.
         i = create_element(self.request_tag())
