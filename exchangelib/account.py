@@ -38,11 +38,28 @@ class Account:
         # server version up-front but delegate account requests to an older backend server.
         self.version = self.protocol.version
         self.root = Root(self)
-        self.folders = self.root.get_folders(depth=SHALLOW)
 
         assert isinstance(self.credentials, Credentials)
         assert isinstance(self.protocol, Protocol)
         log.debug('Added account: %s', self)
+
+    @property
+    def folders(self):
+        if hasattr(self, '_folders'):
+            return self._folders
+        # 'Top of Information Store' is a folder available in some Exchange accounts. It only contains folders
+        # owned by the account.
+        self._folders = self.root.get_folders(depth=SHALLOW)  # Start by searching top-level folders.
+        has_tois = False
+        for folder in self._folders:
+            if folder.name == 'Top of Information Store':
+                has_tois = True
+                self._folders = folder.get_folders(depth=SHALLOW)
+                break
+        if not has_tois:
+            # We need to dig deeper. Get everything.
+            self._folders = self.root.get_folders(depth=DEEP)
+        return self._folders
 
     @property
     def calendar(self):
@@ -62,20 +79,8 @@ class Account:
         except ErrorFolderNotFound as e:
             # There's no folder called 'calendar'. Try to guess which calendar folder is the default. Exchange makes
             # this unnecessarily difficult.
-            # 'Top of Information Store' is a folder available in some Exchange accounts. It only contains folders
-            # owned by the account.
-            folders = self.folders  # Start by searching top-level folders.
-            has_tois = False
-            for folder in folders:
-                if folder.name == 'Top of Information Store':
-                    has_tois = True
-                    folders = folder.get_folders(depth=SHALLOW)
-                    break
-            if not has_tois:
-                # We need to dig deeper
-                folders = self.root.get_folders(depth=DEEP)
             calendars = []
-            for folder in folders:
+            for folder in self.folders:
                 # Search for a calendar wth a localized name
                 # TODO: Calendar.LOCALIZED_NAMES is most definitely neither complete nor authoritative
                 if folder.folder_class != folder.CONTAINER_CLASS:
@@ -85,7 +90,7 @@ class Account:
                     calendars.append(folder)
             if not calendars:
                 # There was no calendar folder with a localized name. Use the distinguished folder instead.
-                for folder in folders:
+                for folder in self.folders:
                     if folder.folder_class != folder.CONTAINER_CLASS and folder.is_distinguished:
                         calendars.append(folder)
             if not calendars:
@@ -94,30 +99,38 @@ class Account:
             self._calendar = calendars[0]
         return self._calendar
 
-
     @property
     def inbox(self):
-        folder = None
+        if hasattr(self, '_inbox'):
+            return self._inbox
+        self._inbox = None
         for folder in self.folders[Inbox]:
             if folder.is_distinguished:
-                return folder
-        return folder
+                self._inbox = folder
+                break
+        return self._inbox
 
     @property
     def tasks(self):
-        folder = None
+        if hasattr(self, '_tasks'):
+            return self._tasks
+        self._tasks = None
         for folder in self.folders[Tasks]:
             if folder.is_distinguished:
-                return folder
-        return folder
+                self._tasks = folder
+                break
+        return self._tasks
 
     @property
     def contacts(self):
-        folder = None
+        if hasattr(self, '_contacts'):
+            return self._contacts
+        self._contacts = None
         for folder in self.folders[Contacts]:
             if folder.is_distinguished:
-                return folder
-        return folder
+                self._contacts = folder
+                break
+        return self._contacts
 
     def get_domain(self):
         return self.primary_smtp_address.split('@')[1].lower().strip()
