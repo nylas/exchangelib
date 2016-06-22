@@ -183,12 +183,6 @@ class EWSTest(unittest.TestCase):
                                     password=settings['password'])
         self.account = Account(primary_smtp_address=settings['account'], access_type=DELEGATE, config=self.config)
 
-    def tearDown(self):
-        start = self.tz.localize(EWSDateTime(1900, 9, 26, 8, 0, 0))
-        end = self.tz.localize(EWSDateTime(2200, 9, 26, 11, 0, 0))
-        ids = self.account.calendar.find_items(start=start, end=end, categories=self.categories, shape=IdOnly)
-        self.account.calendar.delete_items(ids)
-
 
 class CommonTest(EWSTest):
     def test_credentials(self):
@@ -235,6 +229,12 @@ class CommonTest(EWSTest):
 
 
 class CalendarTest(EWSTest):
+    def tearDown(self):
+        start = self.tz.localize(EWSDateTime(1900, 9, 26, 8, 0, 0))
+        end = self.tz.localize(EWSDateTime(2200, 9, 26, 11, 0, 0))
+        ids = self.account.calendar.find_items(start=start, end=end, categories=self.categories, shape=IdOnly)
+        self.account.calendar.delete_items(ids)
+
     def test_empty_args(self):
         # We allow empty sequences for these methods
         self.assertEqual(self.account.calendar.add_items(items=[]), [])
@@ -419,6 +419,10 @@ class CalendarTest(EWSTest):
 
 
 class InboxTest(EWSTest):
+    def tearDown(self):
+        ids = self.account.inbox.find_items(categories=self.categories, shape=IdOnly)
+        self.account.inbox.delete_items(ids)
+
     def test_empty_args(self):
         # We allow empty sequences for these methods
         self.assertEqual(self.account.inbox.add_items(items=[]), [])
@@ -454,7 +458,7 @@ class InboxTest(EWSTest):
         body = 'Test Body'
         item = Message(item_id='', changekey='', subject=subject, body=body, categories=self.categories)
         self.account.inbox.add_items(items=[item, item])
-        ids = self.account.inbox.find_items(start=start, end=end, categories=self.categories, shape=IdOnly)
+        ids = self.account.inbox.find_items(categories=self.categories, shape=IdOnly)
         self.account.inbox.with_extra_fields = True
         items = self.account.inbox.get_items(ids=ids)
         self.account.inbox.with_extra_fields = False

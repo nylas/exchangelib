@@ -895,10 +895,25 @@ class Calendar(Folder):
 class Message(Item):
     ELEMENT_NAME = 'Message'
 
+    def to_xml(self, version):
+        # WARNING: The order of addition of XML elements is VERY important. Exchange expects XML elements in a
+        # specific, non-documented order and will fail with meaningless errors if the order is wrong.
+        i = create_element(self.request_tag())
+        i.append(set_xml_value(self.elem_for_field('subject'), self.subject, version))
+        if self.body:
+            i.append(set_xml_value(self.elem_for_field('body'), self.body, version))
+        if self.categories:
+            i.append(set_xml_value(self.elem_for_field('categories'), self.categories, version))
+        i.append(set_xml_value(self.elem_for_field('reminder_is_set'), self.reminder_is_set, version))
+        if self.extern_id is not None:
+            set_xml_value(i, ExternId(self.extern_id), version)
+        return i
+
 
 class Messages(Folder):
     DISTINGUISHED_FOLDER_ID = 'inbox'
     CONTAINER_CLASS = 'IPF.Note'
+    item_model = Message
 
     # These must be capitalized
     LOCALIZED_NAMES = {
@@ -913,6 +928,7 @@ class Task(Item):
 class Tasks(Folder):
     DISTINGUISHED_FOLDER_ID = 'tasks'
     CONTAINER_CLASS = 'IPF.Task'
+    item_model = Task
 
     # These must be capitalized
     LOCALIZED_NAMES = {
@@ -927,6 +943,7 @@ class Contact(Item):
 class Contacts(Folder):
     DISTINGUISHED_FOLDER_ID = 'contacts'
     CONTAINER_CLASS = 'IPF.Contact'
+    item_model = Contact
 
     # These must be capitalized
     LOCALIZED_NAMES = {
