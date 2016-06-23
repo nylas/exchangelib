@@ -251,66 +251,65 @@ class CommonTest(EWSTest):
         self.assertEqual(set(status), {(True, None)})
 
 
-class CalendarTest(EWSTest):
+class BaseItemMixIn:
+    TEST_FOLDER = None
+    ITEM_CLASS = None
+
+    def setUp(self):
+        super().setUp()
+        self.test_folder = getattr(self.account, self.TEST_FOLDER)
+
     def tearDown(self):
-        start = self.tz.localize(EWSDateTime(1900, 9, 26, 8, 0, 0))
-        end = self.tz.localize(EWSDateTime(2200, 9, 26, 11, 0, 0))
-        ids = self.account.calendar.find_items(start=start, end=end, categories=self.categories, shape=IdOnly)
-        self.account.calendar.delete_items(ids)
+        ids = self.test_folder.find_items(categories=self.categories, shape=IdOnly)
+        self.test_folder.delete_items(ids)
+
+    def get_test_item(self):
+        raise NotImplementedError()
 
     def test_empty_args(self):
         # We allow empty sequences for these methods
-        self.assertEqual(self.account.calendar.add_items(items=[]), [])
-        self.assertEqual(self.account.calendar.get_items(ids=[]), [])
-        self.assertEqual(self.account.calendar.update_items(items=[]), [])
-        self.assertEqual(self.account.calendar.delete_items(ids=[]), [])
+        self.assertEqual(self.test_folder.add_items(items=[]), [])
+        self.assertEqual(self.test_folder.get_items(ids=[]), [])
+        self.assertEqual(self.test_folder.update_items(items=[]), [])
+        self.assertEqual(self.test_folder.delete_items(ids=[]), [])
 
     def test_finditems(self):
-        start = self.tz.localize(EWSDateTime(2009, 9, 26, 8, 0, 0))
-        end = self.tz.localize(EWSDateTime(2009, 9, 26, 11, 0, 0))
-        subject = 'Test Subject'
-        item = CalendarItem(item_id='', changekey='', start=start, end=end, subject=subject, categories=self.categories)
-        self.account.calendar.add_items(items=[item, item])
-        items = self.account.calendar.find_items(start=start, end=end, categories=self.categories, shape=AllProperties)
+        item = self.get_test_item()
+        self.test_folder.add_items(items=[item, item])
+        items = self.test_folder.find_items(categories=self.categories, shape=AllProperties)
         for item in items:
-            assert isinstance(item, CalendarItem)
+            assert isinstance(item, self.ITEM_CLASS)
         self.assertEqual(len(items), 2)
-        self.account.calendar.delete_items(items)
+        self.test_folder.delete_items(items)
 
     def test_getitems(self):
-        start = self.tz.localize(EWSDateTime(2009, 9, 26, 8, 0, 0))
-        end = self.tz.localize(EWSDateTime(2009, 9, 26, 11, 0, 0))
-        subject = 'Test Subject'
-        item = CalendarItem(item_id='', changekey='', start=start, end=end, subject=subject, categories=self.categories)
-        self.account.calendar.add_items(items=[item, item])
-        ids = self.account.calendar.find_items(start=start, end=end, categories=self.categories, shape=IdOnly)
-        items = self.account.calendar.get_items(ids=ids)
+        item = self.get_test_item()
+        self.test_folder.add_items(items=[item, item])
+        ids = self.test_folder.find_items(categories=self.categories, shape=IdOnly)
+        items = self.test_folder.get_items(ids=ids)
         for item in items:
-            assert isinstance(item, CalendarItem)
+            assert isinstance(item, self.ITEM_CLASS)
         self.assertEqual(len(items), 2)
-        self.account.calendar.delete_items(items)
+        self.test_folder.delete_items(items)
 
     def test_extra_fields(self):
-        start = self.tz.localize(EWSDateTime(2009, 9, 26, 8, 0, 0))
-        end = self.tz.localize(EWSDateTime(2009, 9, 26, 11, 0, 0))
-        subject = 'Test Subject'
-        item = CalendarItem(item_id='', changekey='', start=start, end=end, subject=subject, categories=self.categories)
-        self.account.calendar.add_items(items=[item, item])
-        ids = self.account.calendar.find_items(start=start, end=end, categories=self.categories, shape=IdOnly)
-        self.account.calendar.with_extra_fields = True
-        items = self.account.calendar.get_items(ids=ids)
-        self.account.calendar.with_extra_fields = False
+        item = self.get_test_item()
+        self.test_folder.add_items(items=[item, item])
+        ids = self.test_folder.find_items(categories=self.categories, shape=IdOnly)
+        self.test_folder.with_extra_fields = True
+        items = self.test_folder.get_items(ids=ids)
+        self.test_folder.with_extra_fields = False
         for item in items:
-            assert isinstance(item, CalendarItem)
-            for f in CalendarItem.fieldnames(with_extra=True):
+            assert isinstance(item, self.ITEM_CLASS)
+            for f in self.ITEM_CLASS.fieldnames(with_extra=True):
                 self.assertTrue(hasattr(item, f))
         self.assertEqual(len(items), 2)
-        self.account.calendar.delete_items(items)
+        self.test_folder.delete_items(items)
 
     def test_item(self):
         # Test insert
         insert_kwargs = {}
-        for f in CalendarItem.fieldnames():
+        for f in self.ITEM_CLASS.fieldnames():
             if f == 'resources':
                 # We don't have any resources available on the server
                 continue
@@ -323,44 +322,44 @@ class CalendarTest(EWSTest):
                 continue
             if f == 'end':
                 continue
-            field_type = CalendarItem.type_for_field(f)
+            field_type = self.ITEM_CLASS.type_for_field(f)
             if field_type == Choice:
-                insert_kwargs[f] = random.sample(CalendarItem.CHOICES[f], 1)[0]
+                insert_kwargs[f] = random.sample(self.ITEM_CLASS.CHOICES[f], 1)[0]
                 continue
             insert_kwargs[f] = self.random_val(field_type)
-        item = CalendarItem(item_id='', changekey='', **insert_kwargs)
+        item = self.ITEM_CLASS(item_id='', changekey='', **insert_kwargs)
         # Test with generator as argument
-        insert_ids = self.account.calendar.add_items(items=(i for i in [item]))
+        insert_ids = self.test_folder.add_items(items=(i for i in [item]))
         self.assertEqual(len(insert_ids), 1)
         assert isinstance(insert_ids[0], tuple)
-        find_ids = self.account.calendar.find_items(categories=insert_kwargs['categories'], shape=IdOnly)
+        find_ids = self.test_folder.find_items(categories=insert_kwargs['categories'], shape=IdOnly)
         self.assertEqual(len(find_ids), 1)
         self.assertEqual(len(find_ids[0]), 2)
         self.assertEqual(insert_ids, find_ids)
         # Test with generator as argument
-        item = self.account.calendar.get_items(ids=(i for i in find_ids))[0]
-        for f in CalendarItem.fieldnames():
+        item = self.test_folder.get_items(ids=(i for i in find_ids))[0]
+        for f in self.ITEM_CLASS.fieldnames():
             if f == 'resources':
                 continue
             self.assertEqual(getattr(item, f), insert_kwargs[f], (f, getattr(item, f), insert_kwargs[f]))
 
         # Test update
         update_kwargs = {}
-        for f in CalendarItem.fieldnames():
-            if f in ('resources', 'organizer'):
-                # The test server doesn't have any resources. Organizer can't be deleted - it's always the originator.
+        for f in self.ITEM_CLASS.fieldnames():
+            if f in ('resources', 'organizer', 'sender'):
+                # The test server doesn't have any resources. Organizer and sender are added automatically by Exchange.
                 continue
             if f == 'start':
                 update_kwargs['start'], update_kwargs['end'] = get_random_datetime_range()
                 continue
             if f == 'end':
                 continue
-            field_type = CalendarItem.type_for_field(f)
+            field_type = self.ITEM_CLASS.type_for_field(f)
             if field_type == bool:
                 update_kwargs[f] = not(insert_kwargs[f])
                 continue
             if field_type == Choice:
-                update_kwargs[f] = random.sample(CalendarItem.CHOICES[f] - {insert_kwargs[f]}, 1)[0]
+                update_kwargs[f] = random.sample(self.ITEM_CLASS.CHOICES[f] - {insert_kwargs[f]}, 1)[0]
                 continue
             if field_type in (Mailbox, [Mailbox], Attendee, [Attendee]):
                 if insert_kwargs[f] is None:
@@ -370,176 +369,79 @@ class CalendarTest(EWSTest):
                 continue
             update_kwargs[f] = self.random_val(field_type)
         # Test with generator as argument
-        update_ids = self.account.calendar.update_items(items=(i for i in [(item, update_kwargs),]))
+        update_ids = self.test_folder.update_items(items=(i for i in [(item, update_kwargs), ]))
         self.assertEqual(len(update_ids), 1)
         self.assertEqual(len(update_ids[0]), 2, update_ids)
         self.assertEqual(insert_ids[0][0], update_ids[0][0])  # ID should be the same
         self.assertNotEqual(insert_ids[0][1], update_ids[0][1])  # Changekey should not be the same when item is updated
-        item = self.account.calendar.get_items(update_ids)[0]
-        for f in CalendarItem.fieldnames():
-            if f in ('resources', 'organizer'):
+        item = self.test_folder.get_items(update_ids)[0]
+        for f in self.ITEM_CLASS.fieldnames():
+            if f in ('resources', 'organizer', 'sender'):
                 continue
             self.assertEqual(getattr(item, f), update_kwargs[f], (f, getattr(item, f), update_kwargs[f]))
 
         # Test wiping or removing string, int, Choice and bool fields
         wipe_kwargs = {}
-        for f in CalendarItem.fieldnames():
-            if f in ('legacy_free_busy_status', 'reminder_is_set'):
+        for f in self.ITEM_CLASS.fieldnames():
+            if f in self.ITEM_CLASS.REQUIRED_FIELDS:
                 # These cannot be deleted
                 continue
-            field_type = CalendarItem.type_for_field(f)
+            field_type = self.ITEM_CLASS.type_for_field(f)
             if field_type in (str, ExternId):
                 wipe_kwargs[f] = ''
             elif field_type in (bool, int, Choice):
                 wipe_kwargs[f] = None
-        wipe_ids = self.account.calendar.update_items([(item, wipe_kwargs),])
+        wipe_ids = self.test_folder.update_items([(item, wipe_kwargs), ])
         self.assertEqual(len(wipe_ids), 1)
         self.assertEqual(len(wipe_ids[0]), 2, wipe_ids)
         self.assertEqual(insert_ids[0][0], wipe_ids[0][0])  # ID should be the same
         self.assertNotEqual(insert_ids[0][1], wipe_ids[0][1])  # Changekey should not be the same when item is updated
-        item = self.account.calendar.get_items(wipe_ids)[0]
-        for f in CalendarItem.fieldnames():
-            field_type = CalendarItem.type_for_field(f)
-            if field_type == str:
+        item = self.test_folder.get_items(wipe_ids)[0]
+        for f in self.ITEM_CLASS.fieldnames():
+            if f in self.ITEM_CLASS.REQUIRED_FIELDS:
+                continue
+            field_type = self.ITEM_CLASS.type_for_field(f)
+            if field_type in (str, ExternId, bool, int, Choice):
                 self.assertEqual(getattr(item, f), wipe_kwargs[f], (f, getattr(item, f), wipe_kwargs[f]))
 
         # Test extern_id = None, which deletes the extended property entirely
         extern_id = None
-        wipe2_ids = self.account.calendar.update_items([(item, {'extern_id': extern_id}),])
+        wipe2_ids = self.test_folder.update_items([(item, {'extern_id': extern_id}), ])
         self.assertEqual(len(wipe2_ids), 1)
         self.assertEqual(len(wipe2_ids[0]), 2, wipe2_ids)
         self.assertEqual(insert_ids[0][0], wipe2_ids[0][0])  # ID should be the same
         self.assertNotEqual(insert_ids[0][1], wipe2_ids[0][1])  # Changekey should not be the same when item is updated
-        item = self.account.calendar.get_items(wipe2_ids)[0]
+        item = self.test_folder.get_items(wipe2_ids)[0]
         self.assertEqual(item.extern_id, extern_id)
 
         # Remove test item. Test with generator as argument
-        status = self.account.calendar.delete_items(ids=(i for i in wipe2_ids))
+        status = self.test_folder.delete_items(ids=(i for i in wipe2_ids))
         self.assertEqual(status, [(True, None)])
 
 
-class InboxTest(EWSTest):
-    def tearDown(self):
-        ids = self.account.inbox.find_items(categories=self.categories, shape=IdOnly)
-        self.account.inbox.delete_items(ids)
+class CalendarTest(BaseItemMixIn, EWSTest):
+    TEST_FOLDER = 'calendar'
+    ITEM_CLASS = CalendarItem
 
-    def test_empty_args(self):
-        # We allow empty sequences for these methods
-        self.assertEqual(self.account.inbox.add_items(items=[]), [])
-        self.assertEqual(self.account.inbox.get_items(ids=[]), [])
-        self.assertEqual(self.account.inbox.update_items(items=[]), [])
-        self.assertEqual(self.account.inbox.delete_items(ids=[]), [])
-
-    def test_finditems(self):
+    def get_test_item(self):
+        start = self.tz.localize(EWSDateTime(2009, 9, 26, 8, 0, 0))
+        end = self.tz.localize(EWSDateTime(2009, 9, 26, 11, 0, 0))
         subject = 'Test Subject'
-        body = 'Test Body'
-        item = Message(item_id='', changekey='', subject=subject, body=body, categories=self.categories)
-        self.account.inbox.add_items(items=[item, item])
-        items = self.account.inbox.find_items(categories=self.categories, shape=AllProperties)
-        for item in items:
-            assert isinstance(item, Message)
-        self.assertEqual(len(items), 2)
-        self.account.inbox.delete_items(items)
+        return self.ITEM_CLASS(
+            item_id='', changekey='', start=start, end=end, subject=subject, categories=self.categories
+        )
 
-    def test_getitems(self):
+
+class InboxTest(BaseItemMixIn, EWSTest):
+    TEST_FOLDER = 'inbox'
+    ITEM_CLASS = Message
+
+    def get_test_item(self):
         subject = 'Test Subject'
-        body = 'Test Body'
-        item = Message(item_id='', changekey='', subject=subject, body=body, categories=self.categories)
-        self.account.inbox.add_items(items=[item, item])
-        ids = self.account.inbox.find_items(categories=self.categories, shape=IdOnly)
-        items = self.account.inbox.get_items(ids=ids)
-        for item in items:
-            assert isinstance(item, Message)
-        self.assertEqual(len(items), 2)
-        self.account.inbox.delete_items(items)
-
-    def test_extra_fields(self):
-        subject = 'Test Subject'
-        body = 'Test Body'
-        item = Message(item_id='', changekey='', subject=subject, body=body, categories=self.categories)
-        self.account.inbox.add_items(items=[item, item])
-        ids = self.account.inbox.find_items(categories=self.categories, shape=IdOnly)
-        self.account.inbox.with_extra_fields = True
-        items = self.account.inbox.get_items(ids=ids)
-        self.account.inbox.with_extra_fields = False
-        for item in items:
-            assert isinstance(item, Message)
-            for f in Message.fieldnames(with_extra=True):
-                self.assertTrue(hasattr(item, f))
-        self.assertEqual(len(items), 2)
-        self.account.inbox.delete_items(items)
-
-    def test_item(self):
-        # Test insert
-        subject = 'Test Subject'
-        body = 'Test Body'
-        extern_id = '123'
-        item = Message(item_id='', changekey='', subject=subject, body=body, categories=self.categories,
-                            extern_id=extern_id)
-        # Test with generator as argument
-        return_ids = self.account.inbox.add_items(items=(i for i in [item]))
-        self.assertEqual(len(return_ids), 1)
-        for item_id in return_ids:
-            assert isinstance(item_id, tuple)
-        ids = self.account.inbox.find_items(categories=self.categories, shape=IdOnly)
-        self.assertEqual(len(ids[0]), 2)
-        self.assertEqual(len(ids), 1)
-        self.assertEqual(return_ids, ids)
-        # Test with generator as argument
-        item = self.account.inbox.get_items(ids=(i for i in ids))[0]
-        self.assertEqual(item.subject, subject)
-        self.assertEqual(item.body, body)
-        self.assertEqual(item.categories, self.categories)
-        self.assertEqual(item.extern_id, extern_id)
-
-        # Test update
-        subject = 'New Subject'
-        body = 'New Body'
-        categories = ['a', 'b']
-        extern_id = '456'
-        # Test with generator as argument
-        ids = self.account.inbox.update_items(items=(
-            i for i in [(item, {'subject': subject, 'body': body, 'categories': categories, 'extern_id': extern_id}),]
-        ))
-        self.assertEqual(len(ids[0]), 2, ids)
-        self.assertEqual(len(ids), 1)
-        self.assertEqual(return_ids[0][0], ids[0][0])  # ID should be the same
-        self.assertNotEqual(return_ids[0][1], ids[0][1])  # Changekey should not be the same when item is updated
-        item = self.account.inbox.get_items(ids)[0]
-        self.assertEqual(item.subject, subject)
-        self.assertEqual(item.body, body)
-        self.assertEqual(item.categories, categories)
-        self.assertEqual(item.extern_id, extern_id)
-
-        # Test wiping fields
-        subject = ''
-        body = ''
-        extern_id = None
-        # reminder_is_set = None  # reminder_is_set cannot be deleted
-        ids = self.account.inbox.update_items([(item, {'subject': subject, 'body': body, 'extern_id': extern_id}),])
-        self.assertEqual(len(ids[0]), 2, ids)
-        self.assertEqual(len(ids), 1)
-        self.assertEqual(return_ids[0][0], ids[0][0])  # ID should be the same
-        self.assertNotEqual(return_ids[0][1], ids[0][1])  # Changekey should not be the same when item is updated
-        item = self.account.inbox.get_items(ids)[0]
-        self.assertEqual(item.subject, subject)
-        self.assertEqual(item.body, body)
-        self.assertEqual(item.extern_id, extern_id)
-
-        # Test extern_id = None vs extern_id = ''
-        extern_id = ''
-        # reminder_is_set = None  # reminder_is_set cannot be deleted
-        ids = self.account.inbox.update_items([(item, {'extern_id': extern_id}),])
-        self.assertEqual(len(ids[0]), 2, ids)
-        self.assertEqual(len(ids), 1)
-        self.assertEqual(return_ids[0][0], ids[0][0])  # ID should be the same
-        self.assertNotEqual(return_ids[0][1], ids[0][1])  # Changekey should not be the same when item is updated
-        item = self.account.inbox.get_items(ids)[0]
-        self.assertEqual(item.extern_id, extern_id)
-
-        # Remove test item. Test with generator as argument
-        status = self.account.inbox.delete_items(ids=(i for i in ids))
-        self.assertEqual(status, [(True, None)])
+        to_recipients = self.random_val([Mailbox])
+        return self.ITEM_CLASS(
+            item_id='', changekey='', subject=subject, to_recipients=to_recipients, categories=self.categories
+        )
 
 
 class ContactsTest(EWSTest):

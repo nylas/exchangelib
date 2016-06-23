@@ -211,7 +211,7 @@ class Mailbox(EWSElement):
     def from_xml(cls, elem):
         if not elem:
             return None
-        assert elem.tag == cls.response_tag()
+        assert elem.tag == cls.response_tag(), (elem.tag, cls.response_tag())
         return cls(
             name=get_xml_attr(elem, '{%s}Name' % TNS),
             email_address=get_xml_attr(elem, '{%s}EmailAddress' % TNS),
@@ -370,6 +370,9 @@ class Item(EWSElement):
     CHOICES = {
         # 'some_fieldname': {'foo', 'bar'}
     }
+    ORDERED_FIELDS = ()  # The order in which fields must be added to the XML output
+    REQUIRED_FIELDS = {}  # Item fields that are necessary to create an item
+    READONLY_FIELDS = {}  # Fields that are read-only in Exchange
 
     __slots__ = tuple(ITEM_FIELDS) + tuple(EXTRA_ITEM_FIELDS)
 
@@ -507,13 +510,13 @@ class Item(EWSElement):
             elif issubclass(field_type, ExtendedProperty):
                 kwargs[fieldname] = field_type.get_value(extended_properties)
             elif issubclass(field_type, EWSElement):
-                if fieldname == 'organizer':
-                    # We want the nested Mailbox, not the Organizer element itself
-                    organizer = elem.find(cls.response_xml_elem_for_field(fieldname))
-                    if organizer is None:
+                if fieldname in ('organizer', 'sender', 'from'):
+                    # We want the nested Mailbox, not the wrapper element
+                    sub_elem = elem.find(cls.response_xml_elem_for_field(fieldname))
+                    if sub_elem is None:
                         kwargs[fieldname] = None
                     else:
-                        kwargs[fieldname] = field_type.from_xml(organizer.find(Mailbox.response_tag()))
+                        kwargs[fieldname] = field_type.from_xml(sub_elem.find(Mailbox.response_tag()))
                 else:
                     kwargs[fieldname] = field_type.from_xml(elem.find(cls.response_xml_elem_for_field(fieldname)))
             else:
@@ -764,8 +767,7 @@ class Folder:
             updates = create_element('t:Updates')
             meeting_timezone_added = False
             for fieldname, val in update_dict.items():
-                # Skip fields that are read-only in Exchange
-                if fieldname in ('organizer',):
+                if fieldname in self.item_model.READONLY_FIELDS:
                     log.warning('%s is a read-only field. Skipping', fieldname)
                     continue
                 if fieldname == 'extern_id' and val is not None:
@@ -778,6 +780,9 @@ class Folder:
                     fielduri = field_uri.field_uri_xml()
                 if val is None:
                     # A value of None means we want to remove this field from the item
+                    if fieldname in self.item_model.REQUIRED_FIELDS:
+                        log.warning('%s is a required field and may not be deleted. Skipping', fieldname)
+                        continue
                     add_xml_child(updates, 't:DeleteItemField', fielduri)
                     continue
                 setitemfield = create_element('t:SetItemField')
@@ -869,6 +874,22 @@ class Folder:
 
 
 class ItemMixIn(Item):
+    def to_xml(self, version):
+        # WARNING: The order of addition of XML elements is VERY important. Exchange expects XML elements in a
+        # specific, non-documented order and will fail with meaningless errors if the order is wrong.
+        assert self.ORDERED_FIELDS
+        i = create_element(self.request_tag())
+        for f in self.ORDERED_FIELDS:
+            v = getattr(self, f)
+            if f in self.REQUIRED_FIELDS:
+                i.append(set_xml_value(self.elem_for_field(f), v, version))
+            elif v is not None:
+                if f == 'extern_id':
+                    set_xml_value(i, ExternId(getattr(self, f)), version)
+                else:
+                    i.append(set_xml_value(self.elem_for_field(f), v, version))
+        return i
+
     @classmethod
     def fieldnames(cls, with_extra=False):
         return tuple(cls.ITEM_FIELDS) + Item.fieldnames(with_extra=with_extra)
@@ -927,18 +948,24 @@ class CalendarItem(ItemMixIn):
         'start': ('Start', EWSDateTime),
         'end': ('End', EWSDateTime),
         'location': ('Location', str),
-        'organizer': ('Organizer', Mailbox),   # Read-only in Exchange
+        'organizer': ('Organizer', Mailbox),
         'legacy_free_busy_status': ('LegacyFreeBusyStatus', Choice),
         'required_attendees': ('RequiredAttendees', [Attendee]),
         'optional_attendees': ('OptionalAttendees', [Attendee]),
         'resources': ('Resources', [Attendee]),
     }
+    ORDERED_FIELDS = ('subject', 'body', 'categories', 'reminder_is_set', 'extern_id', 'start', 'end',
+                      'legacy_free_busy_status', 'location', 'required_attendees', 'optional_attendees', 'resources')
+    REQUIRED_FIELDS = {'subject', 'start', 'end', 'legacy_free_busy_status', 'reminder_is_set'}
+    READONLY_FIELDS = {'organizer'}
 
     __slots__ = tuple(ITEM_FIELDS) + tuple(Item.ITEM_FIELDS) + tuple(Item.EXTRA_ITEM_FIELDS)
 
     def __init__(self, **kwargs):
         for k in self.ITEM_FIELDS:
-            default = 'Busy' if k == 'legacy_free_busy_status' else None
+            default = 'Busy' if k == 'legacy_free_busy_status' \
+                else False if (k in self.REQUIRED_FIELDS and self.ITEM_FIELDS[k][1] == bool) \
+                else None
             v = kwargs.pop(k, default)
             if k in self.CHOICES and v is not None:
                 assert v in self.CHOICES[k]
@@ -950,28 +977,7 @@ class CalendarItem(ItemMixIn):
     def to_xml(self, version):
         # WARNING: The order of addition of XML elements is VERY important. Exchange expects XML elements in a
         # specific, non-documented order and will fail with meaningless errors if the order is wrong.
-        i = create_element(self.request_tag())
-        i.append(set_xml_value(self.elem_for_field('subject'), self.subject, version))
-        if self.body:
-            i.append(set_xml_value(self.elem_for_field('body'), self.body, version))
-        if self.categories:
-            i.append(set_xml_value(self.elem_for_field('categories'), self.categories, version))
-        i.append(set_xml_value(self.elem_for_field('reminder_is_set'), self.reminder_is_set, version))
-        if self.extern_id is not None:
-            set_xml_value(i, ExternId(self.extern_id), version)
-        i.append(set_xml_value(self.elem_for_field('start'), self.start, version))
-        i.append(set_xml_value(self.elem_for_field('end'), self.end, version))
-        i.append(set_xml_value(self.elem_for_field('legacy_free_busy_status'), self.legacy_free_busy_status, version))
-        if self.location:
-            i.append(set_xml_value(self.elem_for_field('location'), self.location, version))
-        if self.organizer:
-            log.warning('organizer is a read-only field. Skipping')
-        if self.required_attendees:
-            i.append(set_xml_value(self.elem_for_field('required_attendees'), self.required_attendees, version))
-        if self.optional_attendees:
-            i.append(set_xml_value(self.elem_for_field('optional_attendees'), self.optional_attendees, version))
-        if self.resources:
-            i.append(set_xml_value(self.elem_for_field('resources'), self.resources, version))
+        i = super().to_xml(version=version)
         if version.major_version < 14:
             i.append(create_element('t:MeetingTimeZone', TimeZoneName=self.start.tzinfo.ms_id))
         else:
@@ -1015,6 +1021,7 @@ class Message(ItemMixIn):
         'sensitivity': {'Normal', 'Personal', 'Private', 'Confidential'},
         'importance': {'Low', 'Normal', 'High'},
     }
+    # TODO: This is incomplete
     ITEM_FIELDS = {
         # 'sensitivity': ('Sensitivity', Choice),
         # 'importance': ('Importance', Choice),
@@ -1029,33 +1036,27 @@ class Message(ItemMixIn):
         'reply_to': ('ReplyTo', [Mailbox]),
         'to_recipients': ('ToRecipients', [Mailbox]),
         'cc_recipients': ('CcRecipients', [Mailbox]),
-        'bcc_recipients': ('CcRecipients', [Mailbox]),
+        'bcc_recipients': ('BccRecipients', [Mailbox]),
     }
+    ORDERED_FIELDS = (
+        'subject', 'body', 'categories', 'reminder_is_set', 'extern_id',
+        'sender', 'to_recipients', 'cc_recipients', 'bcc_recipients',
+        'is_read_receipt_requested', 'is_delivery_receipt_requested',
+        'from', 'is_read', 'is_response_requested', 'reply_to',
+    )
+    REQUIRED_FIELDS = {'subject', 'reminder_is_set', 'is_read', 'is_delivery_receipt_requested',
+                       'is_read_receipt_requested', 'is_response_requested'}
 
     __slots__ = tuple(ITEM_FIELDS) + tuple(Item.ITEM_FIELDS) + tuple(Item.EXTRA_ITEM_FIELDS)
 
     def __init__(self, **kwargs):
         for k in self.ITEM_FIELDS:
-            v = kwargs.pop(k, None)
+            default =  False if (k in self.REQUIRED_FIELDS and self.ITEM_FIELDS[k][1] == bool) else None
+            v = kwargs.pop(k, default)
             if k in self.CHOICES and v is not None:
                 assert v in self.CHOICES[k]
             setattr(self, k, v)
         super().__init__(**kwargs)
-
-    def to_xml(self, version):
-        # TODO: Expand the fields we support. See Calendaritem.to_xml()
-        # WARNING: The order of addition of XML elements is VERY important. Exchange expects XML elements in a
-        # specific, non-documented order and will fail with meaningless errors if the order is wrong.
-        i = create_element(self.request_tag())
-        i.append(set_xml_value(self.elem_for_field('subject'), self.subject, version))
-        if self.body:
-            i.append(set_xml_value(self.elem_for_field('body'), self.body, version))
-        if self.categories:
-            i.append(set_xml_value(self.elem_for_field('categories'), self.categories, version))
-        i.append(set_xml_value(self.elem_for_field('reminder_is_set'), self.reminder_is_set, version))
-        if self.extern_id is not None:
-            set_xml_value(i, ExternId(self.extern_id), version)
-        return i
 
 
 class Messages(Folder):
@@ -1078,6 +1079,7 @@ class Task(ItemMixIn):
         'importance': {'Low', 'Normal', 'High'},
         'status': {'NotStarted', 'InProgress', 'Completed', 'WaitingOnOthers', 'Deferred'}
     }
+    # TODO: This is incomplete
     ITEM_FIELDS = {
         # 'sensitivity': ('Sensitivity', Choice),
         # 'importance': ('Importance', Choice),
@@ -1091,8 +1093,8 @@ class Task(ItemMixIn):
         'is_complete': ('IsComplete', bool),
         'due_date': ('DueDate', EWSDateTime),
         'delegator': ('Delegator', str),
-        'delegation_state': ('DelegationState', str),  # Read-only in Exchange
-        'is_recurring': ('IsRecurring', bool),  # Read-only in Exchange
+        'delegation_state': ('DelegationState', str),
+        'is_recurring': ('IsRecurring', bool),
         'is_team_task': ('IsTeamTask', bool),
         'mileage': ('Mileage', str),
         'owner': ('Owner', str),
@@ -1102,31 +1104,25 @@ class Task(ItemMixIn):
         'status_description': ('StatusDescription', str),
         'total_work': ('TotalWork', int),
     }
+    REQUIRED_FIELDS = {'subject', 'reminder_is_set', 'is_complete', 'is_recurring', 'is_team_task'}
+    ORDERED_FIELDS = (
+        'mileage', 'percent_complete', 'status', 'billing_information', 'delegation_state', 'total_work', 'delegator',
+        'due_date', 'contacts', 'actual_work', 'change_count', 'start_date', 'is_recurring', 'is_team_task',
+        'is_complete', 'status_description', 'assigned_time', 'owner', 'companies', 'categories', 'reminder_is_set',
+        'subject', 'body', 'extern_id',
+    )
+    READONLY_FIELDS = {'delegation_state', 'is_recurring'}
 
     __slots__ = tuple(ITEM_FIELDS) + tuple(Item.ITEM_FIELDS) + tuple(Item.EXTRA_ITEM_FIELDS)
 
     def __init__(self, **kwargs):
         for k in self.ITEM_FIELDS:
-            v = kwargs.pop(k, None)
+            default =  False if (k in self.REQUIRED_FIELDS and self.ITEM_FIELDS[k][1] == bool) else None
+            v = kwargs.pop(k, default)
             if k in self.CHOICES and v is not None:
                 assert v in self.CHOICES[k]
             setattr(self, k, v)
         super().__init__(**kwargs)
-
-    def to_xml(self, version):
-        # TODO: Expand the fields we support. See Calendaritem.to_xml()
-        # WARNING: The order of addition of XML elements is VERY important. Exchange expects XML elements in a
-        # specific, non-documented order and will fail with meaningless errors if the order is wrong.
-        i = create_element(self.request_tag())
-        i.append(set_xml_value(self.elem_for_field('subject'), self.subject, version))
-        if self.body:
-            i.append(set_xml_value(self.elem_for_field('body'), self.body, version))
-        if self.categories:
-            i.append(set_xml_value(self.elem_for_field('categories'), self.categories, version))
-        i.append(set_xml_value(self.elem_for_field('reminder_is_set'), self.reminder_is_set, version))
-        if self.extern_id is not None:
-            set_xml_value(i, ExternId(self.extern_id), version)
-        return i
 
 
 class Tasks(Folder):
@@ -1154,6 +1150,7 @@ class Contact(ItemMixIn):
             'Empty',
         }
     }
+    # TODO: This is incomplete
     ITEM_FIELDS = {
         # 'sensitivity': ('Sensitivity', Choice),
         # 'importance': ('Importance', Choice),
@@ -1182,31 +1179,24 @@ class Contact(ItemMixIn):
         'email_alias': ('Alias', str),
         'notes': ('Notes', str),
     }
+    REQUIRED_FIELDS = {'display_name', 'reminder_is_set'}
+    ORDERED_FIELDS = (
+        'physical_addresses', 'job_title', 'generation', 'given_name', 'business_homepage', 'file_as',
+        'email_addresses', 'phone_numbers', 'middle_name', 'surname', 'companies', 'assistant_name', 'profession',
+        'nickname', 'display_name', 'department', 'notes', 'file_as_mapping', 'email_alias', 'birthday', 'company_name',
+        'initials', 'categories', 'reminder_is_set', 'subject', 'body', 'extern_id',
+    )
 
     __slots__ = tuple(ITEM_FIELDS) + tuple(Item.ITEM_FIELDS) + tuple(Item.EXTRA_ITEM_FIELDS)
 
     def __init__(self, **kwargs):
         for k in self.ITEM_FIELDS:
-            v = kwargs.pop(k, None)
+            default =  False if (k in self.REQUIRED_FIELDS and self.ITEM_FIELDS[k][1] == bool) else None
+            v = kwargs.pop(k, default)
             if k in self.CHOICES and v is not None:
                 assert v in self.CHOICES[k]
             setattr(self, k, v)
         super().__init__(**kwargs)
-
-    def to_xml(self, version):
-        # TODO: Expand the fields we support. See Calendaritem.to_xml()
-        # WARNING: The order of addition of XML elements is VERY important. Exchange expects XML elements in a
-        # specific, non-documented order and will fail with meaningless errors if the order is wrong.
-        i = create_element(self.request_tag())
-        i.append(set_xml_value(self.elem_for_field('subject'), self.subject, version))
-        if self.body:
-            i.append(set_xml_value(self.elem_for_field('body'), self.body, version))
-        if self.categories:
-            i.append(set_xml_value(self.elem_for_field('categories'), self.categories, version))
-        i.append(set_xml_value(self.elem_for_field('reminder_is_set'), self.reminder_is_set, version))
-        if self.extern_id is not None:
-            set_xml_value(i, ExternId(self.extern_id), version)
-        return i
 
 
 class Contacts(Folder):

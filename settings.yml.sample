@@ -1,4 +1,4 @@
 server: 'example.com'
 username: 'MYWINDOMAIN\myusername'
 password: 'topsecret'
-account: 'johndoe@example.com'
+account: 'john.doe@example.com'  # Don't use an account containing valuable data! We're polite, but things may go wrong.
