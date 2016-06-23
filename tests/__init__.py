@@ -10,7 +10,7 @@ from exchangelib.account import Account
 from exchangelib.configuration import Configuration
 from exchangelib.credentials import DELEGATE
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC
-from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, ExternId
+from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, ExternId, Choice
 from exchangelib.restriction import Restriction
 from exchangelib.services import GetServerTimeZones, AllProperties, IdOnly
 from exchangelib.util import xml_to_str, chunkify, peek
@@ -184,16 +184,15 @@ class EWSTest(unittest.TestCase):
         self.config = Configuration(server=settings['server'], username=settings['username'],
                                     password=settings['password'])
         self.account = Account(primary_smtp_address=settings['account'], access_type=DELEGATE, config=self.config)
+        self.maxDiff = None
 
     def random_val(self, field_type):
         if field_type == ExternId:
             return get_random_string(255)
         if field_type == str:
             return get_random_string(255)
-        if field_type == str:
-            return get_random_string(255)
         if field_type == [str]:
-            return [self.random_val(str) for _ in range(random.randint(1, 16))]
+            return [get_random_string(16) for _ in range(random.randint(1, 4))]
         if field_type == int:
             return get_random_int()
         if field_type == bool:
@@ -207,8 +206,8 @@ class EWSTest(unittest.TestCase):
             # Mailbox must be a real mailbox on the server(?). We're only sure to have one
             return [self.random_val(Mailbox)]
         if field_type == Attendee:
-            Attendee(mailbox=self.random_val(Mailbox), response_type='Accept',
-                     last_response_time=self.random_val(EWSDateTime))
+            return Attendee(mailbox=self.random_val(Mailbox), response_type='Accept',
+                            last_response_time=self.random_val(EWSDateTime))
         if field_type == [Attendee]:
             # Attendee must refer to a real mailbox on the server(?). We're only sure to have one
             return [self.random_val(Attendee)]
@@ -310,126 +309,112 @@ class CalendarTest(EWSTest):
 
     def test_item(self):
         # Test insert
-        start = self.tz.localize(EWSDateTime(2011, 10, 12, 8))
-        end = self.tz.localize(EWSDateTime(2011, 10, 12, 10))
-        subject = 'Test Subject'
-        body = 'Test Body'
-        location = 'Test Location'
-        extern_id = '123'
-        reminder_is_set = False
-        required_attendees = [Attendee(mailbox=Mailbox(email_address=self.account.primary_smtp_address),
-                                       response_type='Accept', last_response_time=start)]
-        optional_attendees = None
-        resources = None
-        item = CalendarItem(item_id='', changekey='', start=start, end=end, subject=subject, body=body,
-                            location=location, reminder_is_set=reminder_is_set, categories=self.categories,
-                            extern_id=extern_id, required_attendees=required_attendees,
-                            optional_attendees=optional_attendees, resources=resources)
+        insert_kwargs = {}
+        for f in CalendarItem.fieldnames():
+            if f == 'resources':
+                # We don't have any resources available on the server
+                continue
+            if f == 'optional_attendees':
+                # 'optional_attendees' and 'required_attendees' are mutually exclusive
+                insert_kwargs[f] = None
+                continue
+            if f == 'start':
+                insert_kwargs['start'], insert_kwargs['end'] = get_random_datetime_range()
+                continue
+            if f == 'end':
+                continue
+            field_type = CalendarItem.type_for_field(f)
+            if field_type == Choice:
+                insert_kwargs[f] = random.sample(CalendarItem.CHOICES[f], 1)[0]
+                continue
+            insert_kwargs[f] = self.random_val(field_type)
+        item = CalendarItem(item_id='', changekey='', **insert_kwargs)
         # Test with generator as argument
-        return_ids = self.account.calendar.add_items(items=(i for i in [item]))
-        self.assertEqual(len(return_ids), 1)
-        for item_id in return_ids:
-            assert isinstance(item_id, tuple)
-        ids = self.account.calendar.find_items(start=start, end=end, categories=self.categories, shape=IdOnly)
-        self.assertEqual(len(ids[0]), 2)
-        self.assertEqual(len(ids), 1)
-        self.assertEqual(return_ids, ids)
+        insert_ids = self.account.calendar.add_items(items=(i for i in [item]))
+        self.assertEqual(len(insert_ids), 1)
+        assert isinstance(insert_ids[0], tuple)
+        find_ids = self.account.calendar.find_items(categories=insert_kwargs['categories'], shape=IdOnly)
+        self.assertEqual(len(find_ids), 1)
+        self.assertEqual(len(find_ids[0]), 2)
+        self.assertEqual(insert_ids, find_ids)
         # Test with generator as argument
-        item = self.account.calendar.get_items(ids=(i for i in ids))[0]
-        self.assertEqual(item.start, start)
-        self.assertEqual(item.end, end)
-        self.assertEqual(item.subject, subject)
-        self.assertEqual(item.location, location)
-        self.assertEqual(item.body, body)
-        self.assertEqual(item.categories, self.categories)
-        self.assertEqual(item.extern_id, extern_id)
-        self.assertEqual(item.organizer.email_address, self.account.primary_smtp_address)
-        self.assertEqual(item.organizer.mailbox_type, 'Mailbox')
-        self.assertEqual(item.organizer.item_id, None)
-        self.assertEqual(item.reminder_is_set, reminder_is_set)
-        self.assertEqual(item.required_attendees[0].mailbox.email_address, self.account.primary_smtp_address)
-        self.assertEqual(item.optional_attendees, None)
-        self.assertEqual(item.resources, None)
+        item = self.account.calendar.get_items(ids=(i for i in find_ids))[0]
+        for f in CalendarItem.fieldnames():
+            if f == 'resources':
+                continue
+            self.assertEqual(getattr(item, f), insert_kwargs[f], (f, getattr(item, f), insert_kwargs[f]))
 
         # Test update
-        start = self.tz.localize(EWSDateTime(2012, 9, 12, 16))
-        end = self.tz.localize(EWSDateTime(2012, 9, 12, 17))
-        subject = 'New Subject'
-        body = 'New Body'
-        location = 'New Location'
-        categories = ['a', 'b']
-        extern_id = '456'
-        reminder_is_set = True
-        required_attendees = None
-        optional_attendees = [Attendee(mailbox=Mailbox(email_address=self.account.primary_smtp_address),
-                                       response_type='Accept', last_response_time=start)]
+        update_kwargs = {}
+        for f in CalendarItem.fieldnames():
+            if f in ('resources', 'organizer'):
+                # The test server doesn't have any resources. Organizer can't be deleted - it's always the originator.
+                continue
+            if f == 'start':
+                update_kwargs['start'], update_kwargs['end'] = get_random_datetime_range()
+                continue
+            if f == 'end':
+                continue
+            field_type = CalendarItem.type_for_field(f)
+            if field_type == bool:
+                update_kwargs[f] = not(insert_kwargs[f])
+                continue
+            if field_type == Choice:
+                update_kwargs[f] = random.sample(CalendarItem.CHOICES[f] - {insert_kwargs[f]}, 1)[0]
+                continue
+            if field_type in (Mailbox, [Mailbox], Attendee, [Attendee]):
+                if insert_kwargs[f] is None:
+                    update_kwargs[f] = self.random_val(field_type)
+                else:
+                    update_kwargs[f] = None
+                continue
+            update_kwargs[f] = self.random_val(field_type)
         # Test with generator as argument
-        ids = self.account.calendar.update_items(items=(
-            i for i in
-            [
-                (item, {'start': start, 'end': end, 'subject': subject, 'body': body, 'location': location,
-                        'categories': categories, 'extern_id': extern_id, 'reminder_is_set': reminder_is_set,
-                        'required_attendees': required_attendees, 'optional_attendees': optional_attendees}),
-            ]
-        ))
-        self.assertEqual(len(ids[0]), 2, ids)
-        self.assertEqual(len(ids), 1)
-        self.assertEqual(return_ids[0][0], ids[0][0])  # ID should be the same
-        self.assertNotEqual(return_ids[0][1], ids[0][1])  # Changekey should not be the same when item is updated
-        item = self.account.calendar.get_items(ids)[0]
-        self.assertEqual(item.start, start)
-        self.assertEqual(item.end, end)
-        self.assertEqual(item.subject, subject)
-        self.assertEqual(item.location, location)
-        self.assertEqual(item.body, body)
-        self.assertEqual(item.categories, categories)
-        self.assertEqual(item.extern_id, extern_id)
-        self.assertEqual(item.organizer.email_address, self.account.primary_smtp_address)
-        self.assertEqual(item.organizer.mailbox_type, 'Mailbox')
-        self.assertEqual(item.organizer.item_id, None)
-        self.assertEqual(item.reminder_is_set, reminder_is_set)
-        self.assertEqual(item.required_attendees, None)
-        self.assertEqual(item.optional_attendees[0].mailbox.email_address, self.account.primary_smtp_address)
-        self.assertEqual(item.resources, None)
+        update_ids = self.account.calendar.update_items(items=(i for i in [(item, update_kwargs),]))
+        self.assertEqual(len(update_ids), 1)
+        self.assertEqual(len(update_ids[0]), 2, update_ids)
+        self.assertEqual(insert_ids[0][0], update_ids[0][0])  # ID should be the same
+        self.assertNotEqual(insert_ids[0][1], update_ids[0][1])  # Changekey should not be the same when item is updated
+        item = self.account.calendar.get_items(update_ids)[0]
+        for f in CalendarItem.fieldnames():
+            if f in ('resources', 'organizer'):
+                continue
+            self.assertEqual(getattr(item, f), update_kwargs[f], (f, getattr(item, f), update_kwargs[f]))
 
-        # Test wiping fields
-        subject = ''
-        body = ''
-        location = ''
+        # Test wiping or removing string, int, Choice and bool fields
+        wipe_kwargs = {}
+        for f in CalendarItem.fieldnames():
+            if f in ('legacy_free_busy_status', 'reminder_is_set'):
+                # These cannot be deleted
+                continue
+            field_type = CalendarItem.type_for_field(f)
+            if field_type in (str, ExternId):
+                wipe_kwargs[f] = ''
+            elif field_type in (bool, int, Choice):
+                wipe_kwargs[f] = None
+        wipe_ids = self.account.calendar.update_items([(item, wipe_kwargs),])
+        self.assertEqual(len(wipe_ids), 1)
+        self.assertEqual(len(wipe_ids[0]), 2, wipe_ids)
+        self.assertEqual(insert_ids[0][0], wipe_ids[0][0])  # ID should be the same
+        self.assertNotEqual(insert_ids[0][1], wipe_ids[0][1])  # Changekey should not be the same when item is updated
+        item = self.account.calendar.get_items(wipe_ids)[0]
+        for f in CalendarItem.fieldnames():
+            field_type = CalendarItem.type_for_field(f)
+            if field_type == str:
+                self.assertEqual(getattr(item, f), wipe_kwargs[f], (f, getattr(item, f), wipe_kwargs[f]))
+
+        # Test extern_id = None, which deletes the extended property entirely
         extern_id = None
-        # reminder_is_set = None  # reminder_is_set cannot be deleted
-        ids = self.account.calendar.update_items(
-            [
-                (item, {'subject': subject, 'body': body, 'location': location, 'extern_id': extern_id}),
-            ]
-        )
-        self.assertEqual(len(ids[0]), 2, ids)
-        self.assertEqual(len(ids), 1)
-        self.assertEqual(return_ids[0][0], ids[0][0])  # ID should be the same
-        self.assertNotEqual(return_ids[0][1], ids[0][1])  # Changekey should not be the same when item is updated
-        item = self.account.calendar.get_items(ids)[0]
-        self.assertEqual(item.subject, subject)
-        self.assertEqual(item.location, location)
-        self.assertEqual(item.body, body)
-        self.assertEqual(item.extern_id, extern_id)
-
-        # Test extern_id = None vs extern_id = ''
-        extern_id = ''
-        # reminder_is_set = None  # reminder_is_set cannot be deleted
-        ids = self.account.calendar.update_items(
-            [
-                (item, {'extern_id': extern_id}),
-            ]
-        )
-        self.assertEqual(len(ids[0]), 2, ids)
-        self.assertEqual(len(ids), 1)
-        self.assertEqual(return_ids[0][0], ids[0][0])  # ID should be the same
-        self.assertNotEqual(return_ids[0][1], ids[0][1])  # Changekey should not be the same when item is updated
-        item = self.account.calendar.get_items(ids)[0]
+        wipe2_ids = self.account.calendar.update_items([(item, {'extern_id': extern_id}),])
+        self.assertEqual(len(wipe2_ids), 1)
+        self.assertEqual(len(wipe2_ids[0]), 2, wipe2_ids)
+        self.assertEqual(insert_ids[0][0], wipe2_ids[0][0])  # ID should be the same
+        self.assertNotEqual(insert_ids[0][1], wipe2_ids[0][1])  # Changekey should not be the same when item is updated
+        item = self.account.calendar.get_items(wipe2_ids)[0]
         self.assertEqual(item.extern_id, extern_id)
 
         # Remove test item. Test with generator as argument
-        status = self.account.calendar.delete_items(ids=(i for i in ids))
+        status = self.account.calendar.delete_items(ids=(i for i in wipe2_ids))
         self.assertEqual(status, [(True, None)])
 
 
@@ -587,19 +572,20 @@ def get_random_bool():
     return bool(random.randint(0, 1))
 
 
-def get_random_int():
-    return random.randint(0, 2147483647)
+def get_random_int(min=0, max=2147483647):
+    return random.randint(min, max)
 
 
-def get_random_float():
-    return random.uniform(0, 2147483647)
+def get_random_float(min=0, max=2147483647):
+    return random.uniform(min, max)
 
 
-def get_random_string(length, spaces=True):
+def get_random_string(max_length, spaces=True):
     chars = string.ascii_letters + string.digits + ':.-_'
     if spaces:
         chars += ' '
-    return ''.join(map(lambda s: random.choice(chars), list(range(length))))
+    # We want random strings that don't end in spaces - Exchange strips these
+    return ''.join(map(lambda i: random.choice(chars), range(get_random_int(min=1, max=max_length)))).strip()
 
 
 def get_random_email():
@@ -619,19 +605,14 @@ def get_random_date(start_date=date(1900, 1, 1), end_date=date(2100, 1, 1)):
 def get_random_datetime():
     # Create a random datetime with minute precision
     return UTC.localize(EWSDateTime.from_datetime(datetime.combine(get_random_date(), time.min))
-                        + timedelta(minutes=random.randint(0, 1440)))
+                        + timedelta(minutes=random.randint(0, 60*24)))
 
 
 def get_random_datetime_range():
-    # Create two random datetimes
+    # Create two random datetimes. Calendar items raise ErrorCalendarDurationIsTooLong if duration is > 5 years.
     dt1 = get_random_datetime()
-    dt2 = None
-    while True:
-        dt2 = get_random_datetime()
-        # We could be unlucky that get_random_datetime() returned exactly the same value twice. Empty ranges cause problems.
-        if dt1 != dt2:
-            break
-    return sorted([dt1, dt2])
+    dt2 = dt1 + timedelta(minutes=random.randint(0, 60*24*365*5))
+    return dt1, dt2
 
 
 if __name__ == '__main__':
