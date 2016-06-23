@@ -1,14 +1,16 @@
 import os
 import unittest
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, date, time
+import random
+import string
 
 from yaml import load
 
 from exchangelib.account import Account
 from exchangelib.configuration import Configuration
 from exchangelib.credentials import DELEGATE
-from exchangelib.ewsdatetime import EWSDateTime, EWSTimeZone
-from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, Item
+from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC
+from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, ExternId
 from exchangelib.restriction import Restriction
 from exchangelib.services import GetServerTimeZones, AllProperties, IdOnly
 from exchangelib.util import xml_to_str, chunkify, peek
@@ -141,7 +143,7 @@ class UtilTest(unittest.TestCase):
         is_empty, seq = peek([1, 2, 3])
         self.assertEqual((is_empty, list(seq)), (False, [1, 2, 3]))
 
-        # tuple
+        # set
         is_empty, seq = peek(set())
         self.assertEqual((is_empty, list(seq)), (True, []))
         is_empty, seq = peek({1, 2, 3})
@@ -183,6 +185,35 @@ class EWSTest(unittest.TestCase):
                                     password=settings['password'])
         self.account = Account(primary_smtp_address=settings['account'], access_type=DELEGATE, config=self.config)
 
+    def random_val(self, field_type):
+        if field_type == ExternId:
+            return get_random_string(255)
+        if field_type == str:
+            return get_random_string(255)
+        if field_type == str:
+            return get_random_string(255)
+        if field_type == [str]:
+            return [self.random_val(str) for _ in range(random.randint(1, 16))]
+        if field_type == int:
+            return get_random_int()
+        if field_type == bool:
+            return get_random_bool()
+        if field_type == EWSDateTime:
+            return get_random_datetime()
+        if field_type == Mailbox:
+            # email_address must be a real address on the server(?)
+            return Mailbox(email_address=self.account.primary_smtp_address)
+        if field_type == [Mailbox]:
+            # Mailbox must be a real mailbox on the server(?). We're only sure to have one
+            return [self.random_val(Mailbox)]
+        if field_type == Attendee:
+            Attendee(mailbox=self.random_val(Mailbox), response_type='Accept',
+                     last_response_time=self.random_val(EWSDateTime))
+        if field_type == [Attendee]:
+            # Attendee must refer to a real mailbox on the server(?). We're only sure to have one
+            return [self.random_val(Attendee)]
+        assert False, 'Unknown field type %s' % field_type
+
 
 class CommonTest(EWSTest):
     def test_credentials(self):
@@ -204,10 +235,7 @@ class CommonTest(EWSTest):
         items = []
         for i in range(150):
             subject = 'Test Subject %s' % i
-            body = 'Test Body %s' % i
-            location = 'Test Location %s' % i
-            item = CalendarItem(item_id='', changekey='', start=start, end=end, subject=subject, body=body,
-                                location=location, reminder_is_set=False, categories=self.categories)
+            item = CalendarItem(item_id='', changekey='', start=start, end=end, subject=subject, categories=self.categories)
             items.append(item)
         return_ids = self.account.calendar.add_items(items=items)
         self.assertEqual(len(return_ids), len(items))
@@ -216,13 +244,9 @@ class CommonTest(EWSTest):
         items = self.account.calendar.get_items(return_ids)
         for i, item in enumerate(items):
             subject = 'Test Subject %s' % i
-            body = 'Test Body %s' % i
-            location = 'Test Location %s' % i
             self.assertEqual(item.start, start)
             self.assertEqual(item.end, end)
             self.assertEqual(item.subject, subject)
-            self.assertEqual(item.location, location)
-            self.assertEqual(item.body, body)
             self.assertEqual(item.categories, self.categories)
         status = self.account.calendar.delete_items(ids)
         self.assertEqual(set(status), {(True, None)})
@@ -246,10 +270,7 @@ class CalendarTest(EWSTest):
         start = self.tz.localize(EWSDateTime(2009, 9, 26, 8, 0, 0))
         end = self.tz.localize(EWSDateTime(2009, 9, 26, 11, 0, 0))
         subject = 'Test Subject'
-        body = 'Test Body'
-        location = 'Test Location'
-        item = CalendarItem(item_id='', changekey='', start=start, end=end, subject=subject, body=body,
-                            location=location, reminder_is_set=False, categories=self.categories)
+        item = CalendarItem(item_id='', changekey='', start=start, end=end, subject=subject, categories=self.categories)
         self.account.calendar.add_items(items=[item, item])
         items = self.account.calendar.find_items(start=start, end=end, categories=self.categories, shape=AllProperties)
         for item in items:
@@ -261,10 +282,7 @@ class CalendarTest(EWSTest):
         start = self.tz.localize(EWSDateTime(2009, 9, 26, 8, 0, 0))
         end = self.tz.localize(EWSDateTime(2009, 9, 26, 11, 0, 0))
         subject = 'Test Subject'
-        body = 'Test Body'
-        location = 'Test Location'
-        item = CalendarItem(item_id='', changekey='', start=start, end=end, subject=subject, body=body,
-                            location=location, reminder_is_set=False, categories=self.categories)
+        item = CalendarItem(item_id='', changekey='', start=start, end=end, subject=subject, categories=self.categories)
         self.account.calendar.add_items(items=[item, item])
         ids = self.account.calendar.find_items(start=start, end=end, categories=self.categories, shape=IdOnly)
         items = self.account.calendar.get_items(ids=ids)
@@ -277,10 +295,7 @@ class CalendarTest(EWSTest):
         start = self.tz.localize(EWSDateTime(2009, 9, 26, 8, 0, 0))
         end = self.tz.localize(EWSDateTime(2009, 9, 26, 11, 0, 0))
         subject = 'Test Subject'
-        body = 'Test Body'
-        location = 'Test Location'
-        item = CalendarItem(item_id='', changekey='', start=start, end=end, subject=subject, body=body,
-                            location=location, reminder_is_set=False, categories=self.categories)
+        item = CalendarItem(item_id='', changekey='', start=start, end=end, subject=subject, categories=self.categories)
         self.account.calendar.add_items(items=[item, item])
         ids = self.account.calendar.find_items(start=start, end=end, categories=self.categories, shape=IdOnly)
         self.account.calendar.with_extra_fields = True
@@ -568,10 +583,61 @@ class TasksTest(EWSTest):
             print(i)
 
 
+def get_random_bool():
+    return bool(random.randint(0, 1))
+
+
+def get_random_int():
+    return random.randint(0, 2147483647)
+
+
+def get_random_float():
+    return random.uniform(0, 2147483647)
+
+
+def get_random_string(length, spaces=True):
+    chars = string.ascii_letters + string.digits + ':.-_'
+    if spaces:
+        chars += ' '
+    return ''.join(map(lambda s: random.choice(chars), list(range(length))))
+
+
+def get_random_email():
+    account_len = random.randint(1, 6)
+    domain_len = random.randint(1, 30)
+    tld_len = random.randint(2, 4)
+    return '%s@%s.%s' % tuple(map(
+        lambda i: get_random_string(i, spaces=False).lower(),
+        (account_len, domain_len, tld_len)
+    ))
+
+
+def get_random_date(start_date=date(1900, 1, 1), end_date=date(2100, 1, 1)):
+    return EWSDate.fromordinal(random.randint(start_date.toordinal(), end_date.toordinal()))
+
+
+def get_random_datetime():
+    # Create a random datetime with minute precision
+    return UTC.localize(EWSDateTime.from_datetime(datetime.combine(get_random_date(), time.min))
+                        + timedelta(minutes=random.randint(0, 1440)))
+
+
+def get_random_datetime_range():
+    # Create two random datetimes
+    dt1 = get_random_datetime()
+    dt2 = None
+    while True:
+        dt2 = get_random_datetime()
+        # We could be unlucky that get_random_datetime() returned exactly the same value twice. Empty ranges cause problems.
+        if dt1 != dt2:
+            break
+    return sorted([dt1, dt2])
+
+
 if __name__ == '__main__':
     import logging
-    loglevel = logging.DEBUG
-    # loglevel = logging.INFO
+    # loglevel = logging.DEBUG
+    loglevel = logging.INFO
     logging.basicConfig(level=loglevel)
     logging.getLogger('exchangelib').setLevel(loglevel)
     unittest.main()

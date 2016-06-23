@@ -67,17 +67,18 @@ class ItemId(EWSElement):
 class EmailAddressEntry(EWSElement):
     # See https://msdn.microsoft.com/en-us/library/office/aa564757(v=exchg.150).aspx
     ELEMENT_NAME = 'Entry'
+    LABELS = {'EmailAddress1', 'EmailAddress2','EmailAddress3'}
 
     __slots__ = ('email_type', 'email')
 
-    def __init__(self, email, email_type='EmailAddress1'):
-        assert email_type in ('EmailAddress1', 'EmailAddress2','EmailAddress3')
+    def __init__(self, email, label='EmailAddress1'):
+        assert label in self.LABELS
         assert isinstance(email, str)
-        self.email_type = email_type
+        self.label = label
         self.email = email
 
     def to_xml(self, version):
-        entry = create_element(self.request_tag(), Key=self.email_type)
+        entry = create_element(self.request_tag(), Key=self.label)
         set_xml_value(entry, self.email, version)
         return entry
 
@@ -85,45 +86,48 @@ class EmailAddressEntry(EWSElement):
 class PhoneNumberEntry(EWSElement):
     # See https://msdn.microsoft.com/en-us/library/office/aa565941(v=exchg.150).aspx
     ELEMENT_NAME = 'Entry'
+    LABELS = {
+        'AssistantPhone', 'BusinessFax', 'BusinessPhone', 'BusinessPhone2', 'Callback', 'CarPhone', 'CompanyMainPhone',
+        'HomeFax', 'HomePhone', 'HomePhone2', 'Isdn', 'MobilePhone', 'OtherFax', 'OtherTelephone', 'Pager',
+        'PrimaryPhone', 'RadioPhone', 'Telex', 'TtyTddPhone',
+    }
 
     __slots__ = ('phone_number_type', 'phone_number')
 
-    def __init__(self, phone_number, phone_number_type='PrimaryPhone'):
-        assert phone_number_type in (
-            'AssistantPhone', 'BusinessFax', 'BusinessPhone', 'BusinessPhone2', 'Callback', 'CarPhone',
-            'CompanyMainPhone', 'HomeFax', 'HomePhone', 'HomePhone2', 'Isdn', 'MobilePhone', 'OtherFax',
-            'OtherTelephone', 'Pager', 'PrimaryPhone', 'RadioPhone', 'Telex', 'TtyTddPhone')
-        assert isinstance(phone_number, str)
-        self.phone_number_type = phone_number_type
+    def __init__(self, phone_number, label='PrimaryPhone'):
+        assert label in self.LABELS
+        assert isinstance(phone_number, (int, str))
+        self.label = label
         self.phone_number = phone_number
 
     def to_xml(self, version):
-        entry = create_element(self.request_tag(), Key=self.phone_number_type)
-        set_xml_value(entry, self.phone_number, version)
+        entry = create_element(self.request_tag(), Key=self.label)
+        set_xml_value(entry, str(self.phone_number), version)
         return entry
 
 
 class PhysicalAddressEntry(EWSElement):
     ELEMENT_NAME = 'Entry'
+    LABELS = {'Business', 'Home', 'Other'}
 
     __slots__ = ('street', 'city', 'state', 'country', 'zipcode')
 
-    def __init__(self, address_type, street, city, state, country, zipcode):
-        assert address_type in ('Business', 'Home', 'Other')
+    def __init__(self, label, street, city, state, country, zipcode):
+        assert label in self.LABELS
         assert isinstance(street, str)
         assert isinstance(city, str)
         assert isinstance(state, str)
         assert isinstance(country, str)
         assert isinstance(zipcode, (str, int))
-        self.address_type = address_type
-        self.street = street
+        self.label = label
+        self.street = street  # Street *and* house number (and other labels)
         self.city = city
         self.state = state
         self.country = country
         self.zipcode = zipcode
 
     def to_xml(self, version):
-        entry = create_element(self.request_tag(), Key=self.address_type)
+        entry = create_element(self.request_tag(), Key=self.label)
         add_xml_child(entry, 't:Street', self.street)
         add_xml_child(entry, 't:City', self.city)
         add_xml_child(entry, 't:State', self.state)
