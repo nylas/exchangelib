@@ -40,7 +40,7 @@ def close_connections():
 class Protocol:
     SESSION_POOLSIZE = 1
 
-    def __init__(self, ews_url, has_ssl, credentials, ews_auth_type=None, timezone='GMT'):
+    def __init__(self, ews_url, has_ssl, credentials, ews_auth_type=None):
         assert isinstance(credentials, Credentials)
         self.server = parse.urlparse(ews_url).hostname.lower()
         self.has_ssl = has_ssl

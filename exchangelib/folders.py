@@ -100,7 +100,7 @@ class EmailAddress(IndexedField):
     # See https://msdn.microsoft.com/en-us/library/office/aa564757(v=exchg.150).aspx
     PARENT_ELEMENT_NAME = 'EmailAddresses'
     ELEMENT_NAME = 'Entry'
-    LABELS = {'EmailAddress1', 'EmailAddress2','EmailAddress3'}
+    LABELS = {'EmailAddress1', 'EmailAddress2', 'EmailAddress3'}
     FIELD_URI = 'contacts:EmailAddress'
 
     __slots__ = ('label', 'email')
@@ -862,9 +862,10 @@ class Folder:
                 if isinstance(field_uri, str):
                     fielduri = create_element('t:FieldURI', FieldURI=field_uri)
                 elif issubclass(field_uri, IndexedField):
-                    # TODO: we need to create a SetItemField for every item in the list, and possibly DeleteItemField for every label not on the list
+                    log.warning("Skipping update on fieldname '%s' (not supported yet)", fieldname)
                     continue
-                    fielduri = field_uri.field_uri_xml(label=val.label)
+                    # TODO: we need to create a SetItemField for every item in the list, and possibly DeleteItemField for every label not on the list
+                    # fielduri = field_uri.field_uri_xml(label=val.label)
                 elif issubclass(field_uri, ExtendedProperty):
                     fielduri = field_uri.field_uri_xml()
                 else:
@@ -1222,7 +1223,7 @@ class Task(ItemMixIn):
         'subject', 'sensitivity', 'body', 'categories', 'importance', 'reminder_is_set', 'extern_id',
         'actual_work',  # 'assigned_time',
         'billing_information',  # 'change_count',
-        'companies', # 'complete_date',
+        'companies',  # 'complete_date',
         'contacts',  # 'delegation_state', 'delegator',
         'due_date',  # 'is_complete', 'is_team_task',
         'mileage',  # 'owner',
@@ -1334,7 +1335,7 @@ class Contact(ItemMixIn):
         'subject', 'sensitivity', 'body', 'categories', 'importance', 'reminder_is_set', 'extern_id',
         'file_as', 'file_as_mapping',
         'display_name', 'given_name',  'initials', 'middle_name', 'nickname', 'company_name',
-        'email_addresses', #'physical_addresses',
+        'email_addresses',  # 'physical_addresses',
         'phone_numbers',
         'assistant_name', 'birthday', 'business_homepage', 'companies', 'department',
         'generation', 'job_title', 'manager', 'mileage', 'office', 'profession', 'surname',  # 'email_alias', 'notes',

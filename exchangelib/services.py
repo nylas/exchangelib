@@ -108,7 +108,7 @@ class EWSService:
             try:
                 res = self._get_soap_payload(soap_response=soap_response_payload)
             except (ErrorInvalidSchemaVersionForMailboxVersion, ErrorInvalidServerVersion):
-                assert account # This should never happen for non-account services
+                assert account  # This should never happen for non-account services
                 # The guessed server version is wrong for this account. Try the next version
                 log.debug('API version %s was invalid for account %s', api_version, account)
                 continue
