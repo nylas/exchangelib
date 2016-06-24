@@ -308,11 +308,11 @@ class GetServerTimeZones(EWSService):
 class EWSPooledService(EWSService):
     CHUNKSIZE = None
 
-    def _pool_requests(self, account, payload_func, items):
+    def _pool_requests(self, account, payload_func, items, **kwargs):
         log.debug('Processing items in chunks of %s', self.CHUNKSIZE)
         # Chop items list into suitable pieces and let worker threads chew on the work. The order of the output result
         # list must be the same as the input id list, so the caller knows which status message belongs to which ID.
-        func = lambda n: self._get_elements(account=account, payload=payload_func(n))
+        func = lambda n: self._get_elements(account=account, payload=payload_func(n, **kwargs))
         return list(itertools.chain(*account.protocol.thread_pool.map(func, chunkify(items, self.CHUNKSIZE))))
 
 
@@ -355,7 +355,8 @@ class DeleteItem(EWSPooledService):
     element_container_name = None  # DeleteItem doesn't return a response object, just status in XML attrs
 
     def call(self, folder, **kwargs):
-        return self._pool_requests(account=folder.account, payload_func=folder.delete_xml, items=kwargs['ids'])
+        return self._pool_requests(account=folder.account, payload_func=folder.delete_xml, items=kwargs['ids'],
+                                   all_occurrences=kwargs['all_occurrences'])
 
 
 class UpdateItem(EWSPooledService):

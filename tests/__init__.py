@@ -9,8 +9,9 @@ from yaml import load
 from exchangelib.account import Account
 from exchangelib.configuration import Configuration
 from exchangelib.credentials import DELEGATE
-from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC
-from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, ExternId, Choice
+from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
+from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, ExternId, Choice, Email, Contact, Task, \
+    EmailAddress, PhysicalAddress, PhoneNumber, IndexedField
 from exchangelib.restriction import Restriction
 from exchangelib.services import GetServerTimeZones, AllProperties, IdOnly
 from exchangelib.util import xml_to_str, chunkify, peek
@@ -194,20 +195,33 @@ class EWSTest(unittest.TestCase):
         if field_type == [str]:
             return [get_random_string(16) for _ in range(random.randint(1, 4))]
         if field_type == int:
-            return get_random_int()
+            return get_random_int(0, 256)
+        if field_type == float:
+            return get_random_float(0, 100)
         if field_type == bool:
             return get_random_bool()
         if field_type == EWSDateTime:
             return get_random_datetime()
+        if field_type == Email:
+            return get_random_email()
         if field_type == Mailbox:
             # email_address must be a real address on the server(?)
             return Mailbox(email_address=self.account.primary_smtp_address)
-        if field_type == [Mailbox]:
-            # Mailbox must be a real mailbox on the server(?). We're only sure to have one
-            return [self.random_val(Mailbox)]
         if field_type == Attendee:
             return Attendee(mailbox=self.random_val(Mailbox), response_type='Accept',
                             last_response_time=self.random_val(EWSDateTime))
+        if field_type == [EmailAddress]:
+            return [EmailAddress(email=get_random_email(), label=label) for label in EmailAddress.LABELS]
+        if field_type == [PhysicalAddress]:
+            return [PhysicalAddress(
+                street=get_random_string(32), city=get_random_string(32), state=get_random_string(32),
+                country=get_random_string(32), zipcode=get_random_string(8), label=label
+            ) for label in PhysicalAddress.LABELS]
+        if field_type == [PhoneNumber]:
+            return [PhoneNumber(phone_number=get_random_string(16), label=label) for label in PhoneNumber.LABELS]
+        if field_type == [Mailbox]:
+            # Mailbox must be a real mailbox on the server(?). We're only sure to have one
+            return [self.random_val(Mailbox)]
         if field_type == [Attendee]:
             # Attendee must refer to a real mailbox on the server(?). We're only sure to have one
             return [self.random_val(Attendee)]
@@ -261,10 +275,22 @@ class BaseItemMixIn:
 
     def tearDown(self):
         ids = self.test_folder.find_items(categories=self.categories, shape=IdOnly)
-        self.test_folder.delete_items(ids)
+        self.test_folder.delete_items(ids, all_occurrences=True)
 
     def get_test_item(self):
-        raise NotImplementedError()
+        item_kwargs = {}
+        for f in self.ITEM_CLASS.required_fields():
+            if f == 'start':
+                item_kwargs['start'], item_kwargs['end'] = get_random_datetime_range()
+                continue
+            if f == 'end':
+                continue
+            field_type = self.ITEM_CLASS.type_for_field(f)
+            if field_type == Choice:
+                # ITEM_CLASS.__init__ should select a default choice for us
+                continue
+            item_kwargs[f] = self.random_val(field_type)
+        return self.ITEM_CLASS(item_id='', changekey='', categories=self.categories, **item_kwargs)
 
     def test_empty_args(self):
         # We allow empty sequences for these methods
@@ -280,7 +306,7 @@ class BaseItemMixIn:
         for item in items:
             assert isinstance(item, self.ITEM_CLASS)
         self.assertEqual(len(items), 2)
-        self.test_folder.delete_items(items)
+        self.test_folder.delete_items(items, all_occurrences=True)
 
     def test_getitems(self):
         item = self.get_test_item()
@@ -290,7 +316,7 @@ class BaseItemMixIn:
         for item in items:
             assert isinstance(item, self.ITEM_CLASS)
         self.assertEqual(len(items), 2)
-        self.test_folder.delete_items(items)
+        self.test_folder.delete_items(items, all_occurrences=True)
 
     def test_extra_fields(self):
         item = self.get_test_item()
@@ -304,12 +330,14 @@ class BaseItemMixIn:
             for f in self.ITEM_CLASS.fieldnames(with_extra=True):
                 self.assertTrue(hasattr(item, f))
         self.assertEqual(len(items), 2)
-        self.test_folder.delete_items(items)
+        self.test_folder.delete_items(items, all_occurrences=True)
 
     def test_item(self):
         # Test insert
         insert_kwargs = {}
         for f in self.ITEM_CLASS.fieldnames():
+            if f in self.ITEM_CLASS.readonly_fields():
+                continue
             if f == 'resources':
                 # We don't have any resources available on the server
                 continue
@@ -322,9 +350,13 @@ class BaseItemMixIn:
                 continue
             if f == 'end':
                 continue
+            if f == 'complete_date':
+                # Set to null for now
+                insert_kwargs['complete_date'] = None
+                continue
             field_type = self.ITEM_CLASS.type_for_field(f)
             if field_type == Choice:
-                insert_kwargs[f] = random.sample(self.ITEM_CLASS.CHOICES[f], 1)[0]
+                insert_kwargs[f] = get_random_choice(self.ITEM_CLASS.choices_for_field(f))
                 continue
             insert_kwargs[f] = self.random_val(field_type)
         item = self.ITEM_CLASS(item_id='', changekey='', **insert_kwargs)
@@ -339,13 +371,21 @@ class BaseItemMixIn:
         # Test with generator as argument
         item = self.test_folder.get_items(ids=(i for i in find_ids))[0]
         for f in self.ITEM_CLASS.fieldnames():
+            if f in self.ITEM_CLASS.readonly_fields():
+                continue
             if f == 'resources':
                 continue
-            self.assertEqual(getattr(item, f), insert_kwargs[f], (f, getattr(item, f), insert_kwargs[f]))
+            if isinstance(self.ITEM_CLASS.type_for_field(f), list):
+                if not (getattr(item, f) is None and insert_kwargs[f] is None):
+                    self.assertSetEqual(set(getattr(item, f)), set(insert_kwargs[f]), (f, getattr(item, f), insert_kwargs[f]))
+            else:
+                self.assertEqual(getattr(item, f), insert_kwargs[f], (f, getattr(item, f), insert_kwargs[f]))
 
         # Test update
         update_kwargs = {}
         for f in self.ITEM_CLASS.fieldnames():
+            if f in self.ITEM_CLASS.readonly_fields():
+                continue
             if f in ('resources', 'organizer', 'sender'):
                 # The test server doesn't have any resources. Organizer and sender are added automatically by Exchange.
                 continue
@@ -354,12 +394,19 @@ class BaseItemMixIn:
                 continue
             if f == 'end':
                 continue
+            if f == 'complete_date':
+                # Must be a date in the past
+                update_kwargs['complete_date'] = get_random_datetime(end_date=UTC_NOW())
+                update_kwargs['status'] = 'Completed'
+                continue
+            if f == 'status':
+                continue
             field_type = self.ITEM_CLASS.type_for_field(f)
             if field_type == bool:
                 update_kwargs[f] = not(insert_kwargs[f])
                 continue
             if field_type == Choice:
-                update_kwargs[f] = random.sample(self.ITEM_CLASS.CHOICES[f] - {insert_kwargs[f]}, 1)[0]
+                update_kwargs[f] = get_random_choice(self.ITEM_CLASS.choices_for_field(f))
                 continue
             if field_type in (Mailbox, [Mailbox], Attendee, [Attendee]):
                 if insert_kwargs[f] is None:
@@ -376,20 +423,30 @@ class BaseItemMixIn:
         self.assertNotEqual(insert_ids[0][1], update_ids[0][1])  # Changekey should not be the same when item is updated
         item = self.test_folder.get_items(update_ids)[0]
         for f in self.ITEM_CLASS.fieldnames():
+            if f in self.ITEM_CLASS.readonly_fields():
+                continue
             if f in ('resources', 'organizer', 'sender'):
                 continue
-            self.assertEqual(getattr(item, f), update_kwargs[f], (f, getattr(item, f), update_kwargs[f]))
+            field_type = self.ITEM_CLASS.type_for_field(f)
+            if isinstance(field_type, list):
+                if issubclass(field_type[0], IndexedField):
+                    # TODO: We don't know how to update IndexedField types yet
+                    continue
+                if not (getattr(item, f) is None and update_kwargs[f] is None):
+                    self.assertSetEqual(set(getattr(item, f)), set(update_kwargs[f]), (f, getattr(item, f), update_kwargs[f]))
+            else:
+                self.assertEqual(getattr(item, f), update_kwargs[f], (f, getattr(item, f), update_kwargs[f]))
 
         # Test wiping or removing string, int, Choice and bool fields
         wipe_kwargs = {}
         for f in self.ITEM_CLASS.fieldnames():
-            if f in self.ITEM_CLASS.REQUIRED_FIELDS:
+            if f in self.ITEM_CLASS.required_fields():
                 # These cannot be deleted
                 continue
             field_type = self.ITEM_CLASS.type_for_field(f)
-            if field_type in (str, ExternId):
+            if field_type == ExternId:
                 wipe_kwargs[f] = ''
-            elif field_type in (bool, int, Choice):
+            elif field_type in (bool, str, int, Choice, Email):
                 wipe_kwargs[f] = None
         wipe_ids = self.test_folder.update_items([(item, wipe_kwargs), ])
         self.assertEqual(len(wipe_ids), 1)
@@ -398,10 +455,12 @@ class BaseItemMixIn:
         self.assertNotEqual(insert_ids[0][1], wipe_ids[0][1])  # Changekey should not be the same when item is updated
         item = self.test_folder.get_items(wipe_ids)[0]
         for f in self.ITEM_CLASS.fieldnames():
-            if f in self.ITEM_CLASS.REQUIRED_FIELDS:
+            if f in self.ITEM_CLASS.required_fields():
+                continue
+            if f in self.ITEM_CLASS.readonly_fields():
                 continue
             field_type = self.ITEM_CLASS.type_for_field(f)
-            if field_type in (str, ExternId, bool, int, Choice):
+            if field_type in (str, ExternId, bool, int, Choice, Email):
                 self.assertEqual(getattr(item, f), wipe_kwargs[f], (f, getattr(item, f), wipe_kwargs[f]))
 
         # Test extern_id = None, which deletes the extended property entirely
@@ -415,7 +474,7 @@ class BaseItemMixIn:
         self.assertEqual(item.extern_id, extern_id)
 
         # Remove test item. Test with generator as argument
-        status = self.test_folder.delete_items(ids=(i for i in wipe2_ids))
+        status = self.test_folder.delete_items(ids=(i for i in wipe2_ids), all_occurrences=True)
         self.assertEqual(status, [(True, None)])
 
 
@@ -423,51 +482,20 @@ class CalendarTest(BaseItemMixIn, EWSTest):
     TEST_FOLDER = 'calendar'
     ITEM_CLASS = CalendarItem
 
-    def get_test_item(self):
-        start = self.tz.localize(EWSDateTime(2009, 9, 26, 8, 0, 0))
-        end = self.tz.localize(EWSDateTime(2009, 9, 26, 11, 0, 0))
-        subject = 'Test Subject'
-        return self.ITEM_CLASS(
-            item_id='', changekey='', start=start, end=end, subject=subject, categories=self.categories
-        )
-
 
 class InboxTest(BaseItemMixIn, EWSTest):
     TEST_FOLDER = 'inbox'
     ITEM_CLASS = Message
 
-    def get_test_item(self):
-        subject = 'Test Subject'
-        to_recipients = self.random_val([Mailbox])
-        return self.ITEM_CLASS(
-            item_id='', changekey='', subject=subject, to_recipients=to_recipients, categories=self.categories
-        )
+
+class TasksTest(BaseItemMixIn, EWSTest):
+    TEST_FOLDER = 'tasks'
+    ITEM_CLASS = Task
 
 
-class ContactsTest(EWSTest):
-    def tearDown(self):
-        ids = self.account.contacts.find_items(categories=self.categories, shape=IdOnly)
-        self.account.contacts.delete_items(ids)
-        pass
-
-    def test_get_items(self):
-        ids = self.account.contacts.find_items(shape=IdOnly)
-        items = self.account.contacts.get_items(ids=ids)
-        for i in items:
-            print(i)
-
-
-class TasksTest(EWSTest):
-    def tearDown(self):
-        ids = self.account.tasks.find_items(categories=self.categories, shape=IdOnly)
-        self.account.tasks.delete_items(ids)
-        pass
-
-    def test_get_items(self):
-        ids = self.account.tasks.find_items(shape=IdOnly)
-        items = self.account.tasks.get_items(ids=ids)
-        for i in items:
-            print(i)
+class ContactsTest(BaseItemMixIn, EWSTest):
+    TEST_FOLDER = 'contacts'
+    ITEM_CLASS = Contact
 
 
 def get_random_bool():
@@ -482,12 +510,20 @@ def get_random_float(min=0, max=2147483647):
     return random.uniform(min, max)
 
 
-def get_random_string(max_length, spaces=True):
+def get_random_choice(choices):
+    return random.sample(choices, 1)[0]
+
+
+def get_random_string(length, spaces=True):
     chars = string.ascii_letters + string.digits + ':.-_'
     if spaces:
         chars += ' '
     # We want random strings that don't end in spaces - Exchange strips these
-    return ''.join(map(lambda i: random.choice(chars), range(get_random_int(min=1, max=max_length)))).strip()
+    res = ''.join(map(lambda i: random.choice(chars), range(length))).strip()
+    if len(res) < length:
+        # If strip() made the string shorter, make sure to fill it up
+        res += get_random_string(length - len(res), spaces=False)
+    return res
 
 
 def get_random_email():
@@ -504,10 +540,11 @@ def get_random_date(start_date=date(1900, 1, 1), end_date=date(2100, 1, 1)):
     return EWSDate.fromordinal(random.randint(start_date.toordinal(), end_date.toordinal()))
 
 
-def get_random_datetime():
+def get_random_datetime(start_date=date(1900, 1, 1), end_date=date(2100, 1, 1)):
     # Create a random datetime with minute precision
-    return UTC.localize(EWSDateTime.from_datetime(datetime.combine(get_random_date(), time.min))
-                        + timedelta(minutes=random.randint(0, 60*24)))
+    random_date = get_random_date(start_date=start_date, end_date=end_date)
+    random_datetime = datetime.combine(random_date, time.min) + timedelta(minutes=random.randint(0, 60*24))
+    return UTC.localize(EWSDateTime.from_datetime(random_datetime))
 
 
 def get_random_datetime_range():

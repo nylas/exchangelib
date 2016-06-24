@@ -22,6 +22,11 @@ class Choice(str):
     pass
 
 
+class Email(str):
+    # A helper class used for email address string
+    pass
+
+
 class EWSElement:
     ELEMENT_NAME = None
 
@@ -64,7 +69,7 @@ class ItemId(EWSElement):
 
     @classmethod
     def from_xml(cls, elem):
-        if not elem:
+        if elem is None:
             return None
         assert elem.tag == cls.response_tag()
         return cls(id=elem.get('Id'), changekey=elem.get('ChangeKey'))
@@ -75,16 +80,33 @@ class ItemId(EWSElement):
         return self.id == other.id and self.changekey == other.changekey
 
 
-class EmailAddressEntry(EWSElement):
+class IndexedField(EWSElement):
+    PARENT_ELEMENT_NAME = None
+    ELEMENT_NAME = None
+    LABELS = ()
+    FIELD_URI = None
+
+    @classmethod
+    def field_uri_xml(cls, label):
+        return create_element(
+            't:IndexedFieldURI',
+            FieldURI=cls.FIELD_URI,
+            FieldIndex=label,
+        )
+
+
+class EmailAddress(IndexedField):
     # See https://msdn.microsoft.com/en-us/library/office/aa564757(v=exchg.150).aspx
+    PARENT_ELEMENT_NAME = 'EmailAddresses'
     ELEMENT_NAME = 'Entry'
     LABELS = {'EmailAddress1', 'EmailAddress2','EmailAddress3'}
+    FIELD_URI = 'contacts:EmailAddress'
 
     __slots__ = ('label', 'email')
 
     def __init__(self, email, label='EmailAddress1'):
-        assert label in self.LABELS
-        assert isinstance(email, str)
+        assert label in self.LABELS, label
+        assert isinstance(email, str), email
         self.label = label
         self.email = email
 
@@ -93,24 +115,42 @@ class EmailAddressEntry(EWSElement):
         set_xml_value(entry, self.email, version)
         return entry
 
+    @classmethod
+    def from_xml(cls, elem):
+        if elem is None:
+            return None
+        assert elem.tag == cls.response_tag()
+        return cls(
+            label=elem.get('Key'),
+            email=elem.text or elem.get('Name'),  # Sometimes elem.text is empty. Exchange saves the same in 'Name' attr
+        )
+
+    def __eq__(self, other):
+        return hash(self) == hash(other)
+
+    def __hash__(self):
+        return hash((self.label, self.email))
+
     def __repr__(self):
         return self.__class__.__name__ + repr((self.label, self.email))
 
 
-class PhoneNumberEntry(EWSElement):
+class PhoneNumber(IndexedField):
     # See https://msdn.microsoft.com/en-us/library/office/aa565941(v=exchg.150).aspx
+    PARENT_ELEMENT_NAME = 'PhoneNumbers'
     ELEMENT_NAME = 'Entry'
     LABELS = {
         'AssistantPhone', 'BusinessFax', 'BusinessPhone', 'BusinessPhone2', 'Callback', 'CarPhone', 'CompanyMainPhone',
         'HomeFax', 'HomePhone', 'HomePhone2', 'Isdn', 'MobilePhone', 'OtherFax', 'OtherTelephone', 'Pager',
         'PrimaryPhone', 'RadioPhone', 'Telex', 'TtyTddPhone',
     }
+    FIELD_URI = 'contacts:PhoneNumber'
 
     __slots__ = ('label', 'phone_number')
 
     def __init__(self, phone_number, label='PrimaryPhone'):
-        assert label in self.LABELS
-        assert isinstance(phone_number, (int, str))
+        assert label in self.LABELS, label
+        assert isinstance(phone_number, (int, str)), phone_number
         self.label = label
         self.phone_number = phone_number
 
@@ -119,23 +159,41 @@ class PhoneNumberEntry(EWSElement):
         set_xml_value(entry, str(self.phone_number), version)
         return entry
 
+    @classmethod
+    def from_xml(cls, elem):
+        if elem is None:
+            return None
+        assert elem.tag == cls.response_tag()
+        return cls(
+            label=elem.get('Key'),
+            phone_number=elem.text,
+        )
+
+    def __eq__(self, other):
+        return hash(self) == hash(other)
+
+    def __hash__(self):
+        return hash((self.label, self.phone_number))
+
     def __repr__(self):
         return self.__class__.__name__ + repr((self.label, self.phone_number))
 
 
-class PhysicalAddressEntry(EWSElement):
+class PhysicalAddress(IndexedField):
+    PARENT_ELEMENT_NAME = 'PhysicalAddresses'
     ELEMENT_NAME = 'Entry'
     LABELS = {'Business', 'Home', 'Other'}
+    FIELD_URI = 'contacts:PhysicalAddress'
 
     __slots__ = ('label', 'street', 'city', 'state', 'country', 'zipcode')
 
     def __init__(self, street, city, state, country, zipcode, label='Business'):
-        assert label in self.LABELS
-        assert isinstance(street, str)
-        assert isinstance(city, str)
-        assert isinstance(state, str)
-        assert isinstance(country, str)
-        assert isinstance(zipcode, (str, int))
+        assert label in self.LABELS, label
+        assert isinstance(street, str), street
+        assert isinstance(city, str), city
+        assert isinstance(state, str), state
+        assert isinstance(country, str), country
+        assert isinstance(zipcode, (str, int)), zipcode
         self.label = label
         self.street = street  # Street *and* house number (and other labels)
         self.city = city
@@ -148,23 +206,29 @@ class PhysicalAddressEntry(EWSElement):
         add_xml_child(entry, 't:Street', self.street)
         add_xml_child(entry, 't:City', self.city)
         add_xml_child(entry, 't:State', self.state)
-        add_xml_child(entry, 't:Country', self.country)
+        add_xml_child(entry, 't:CountryOrRegion', self.country)
         add_xml_child(entry, 't:PostalCode', str(self.zipcode))
         return entry
 
     @classmethod
     def from_xml(cls, elem):
-        if not elem:
+        if elem is None:
             return None
         assert elem.tag == cls.response_tag()
         return cls(
-            address_type=elem.get('Key'),
+            label=elem.get('Key'),
             street=get_xml_attr(elem, '{%s}Street' % TNS),
             city=get_xml_attr(elem, '{%s}City' % TNS),
             state=get_xml_attr(elem, '{%s}State' % TNS),
-            country=get_xml_attr(elem, '{%s}Country' % TNS),
+            country=get_xml_attr(elem, '{%s}CountryOrRegion' % TNS),
             zipcode=get_xml_attr(elem, '{%s}PostalCode' % TNS),
         )
+
+    def __eq__(self, other):
+        return hash(self) == hash(other)
+
+    def __hash__(self):
+        return hash((self.label, self.street, self.city, self.state, self.country, self.zipcode))
 
     def __repr__(self):
         return self.__class__.__name__ + \
@@ -209,7 +273,7 @@ class Mailbox(EWSElement):
 
     @classmethod
     def from_xml(cls, elem):
-        if not elem:
+        if elem is None:
             return None
         assert elem.tag == cls.response_tag(), (elem.tag, cls.response_tag())
         return cls(
@@ -220,14 +284,13 @@ class Mailbox(EWSElement):
         )
 
     def __eq__(self, other):
+        return hash(self) == hash(other)
+
+    def __hash__(self):
         # Exchange may add 'mailbox_type' and 'name' on insert. We're satisfied if the item_id or email address matches.
-        if other is None:
-            return False
-        if self.item_id and other.item_id:
-            return self.item_id == other.item_id
-        if self.email_address is None or other.email_address is None:
-            return False
-        return self.email_address.lower() == other.email_address.lower()
+        if self.item_id:
+            return hash(self.item_id)
+        return hash(self.email_address.lower())
 
     def __repr__(self):
         return self.__class__.__name__ + repr((self.name, self.email_address, self.mailbox_type, self.item_id))
@@ -322,7 +385,7 @@ class Attendee(EWSElement):
 
     @classmethod
     def from_xml(cls, elem):
-        if not elem:
+        if elem is None:
             return None
         assert elem.tag == cls.response_tag()
         last_response_time = get_xml_attr(elem, '{%s}LastResponseTime' % TNS)
@@ -333,10 +396,11 @@ class Attendee(EWSElement):
         )
 
     def __eq__(self, other):
+        return hash(self) == hash(other)
+
+    def __hash__(self):
         # TODO: maybe take 'response_type' and 'last_response_time' into account?
-        if other is None:
-            return False
-        return self.mailbox == other.mailbox
+        return hash(self.mailbox)
 
     def __repr__(self):
         return self.__class__.__name__ + repr((self.mailbox, self.response_type, self.last_response_time))
@@ -352,6 +416,10 @@ class Item(EWSElement):
     ITEM_FIELDS = {
         'item_id': ('Id', str),
         'changekey': ('ChangeKey', str),
+        'mime_content': ('MimeContent', str),
+        'sensitivity': ('Sensitivity', Choice),
+        'importance': ('Importance', Choice),
+        'is_draft': ('IsDraft', bool),
         'subject': ('Subject', str),
         'body': ('Body', str),
         'reminder_is_set': ('ReminderIsSet', bool),
@@ -368,11 +436,15 @@ class Item(EWSElement):
     }
     # Possible values for string enums
     CHOICES = {
-        # 'some_fieldname': {'foo', 'bar'}
+        'sensitivity': {'Normal', 'Personal', 'Private', 'Confidential'},
+        'importance': {'Low', 'Normal', 'High'},
     }
-    ORDERED_FIELDS = ()  # The order in which fields must be added to the XML output
-    REQUIRED_FIELDS = {}  # Item fields that are necessary to create an item
-    READONLY_FIELDS = {}  # Fields that are read-only in Exchange
+    # The order in which fields must be added to the XML output
+    ORDERED_FIELDS = ()
+    # Item fields that are necessary to create an item
+    REQUIRED_FIELDS = {'sensitivity', 'importance', 'reminder_is_set'}
+    # Fields that are read-only in Exchange. Put mime_content here until it's properly supported
+    READONLY_FIELDS = {'is_draft', 'mime_content'}
 
     __slots__ = tuple(ITEM_FIELDS) + tuple(EXTRA_ITEM_FIELDS)
 
@@ -384,8 +456,6 @@ class Item(EWSElement):
                 # Test if arguments have the correct type. 'extern_id' is special because we implement it internally as
                 # the ExternId class but want to keep the attribute as a simple str for simplicity and ease of use.
                 # 'field_type' may be a list with a single type. In that case we want to check all list members
-                if k in Item.CHOICES:
-                    assert v in Item.CHOICES[k]
                 field_type = self.type_for_field(k)
                 if isinstance(field_type, list):
                     elem_type = field_type[0]
@@ -393,7 +463,7 @@ class Item(EWSElement):
                     for item in v:
                         if not isinstance(item, elem_type):
                             raise TypeError('Field %s value "%s" must be of type %s' % (k, v, field_type))
-                elif k != 'extern_id' and not isinstance(v, field_type):
+                elif k != 'extern_id' and field_type != Choice and not isinstance(v, field_type):
                     raise TypeError('Field %s value "%s" must be of type %s' % (k, v, field_type))
             setattr(self, k, v)
         for k, v in kwargs.items():
@@ -437,9 +507,14 @@ class Item(EWSElement):
     @classmethod
     def response_xml_elem_for_field(cls, fieldname):
         try:
-            return '{%s}%s' % (TNS, cls.uri_for_field(fieldname))
+            uri = cls.uri_for_field(fieldname)
         except KeyError:
             raise ValueError("No fielduri defined for fieldname '%s'" % fieldname)
+        if isinstance(uri, str):
+            return '{%s}%s' % (TNS, uri)
+        if issubclass(uri, IndexedField):
+            return '{%s}%s' % (TNS, uri.PARENT_ELEMENT_NAME)
+        assert False, 'Unknown uri for fieldname %s: %s' % (fieldname, uri)
 
     @classmethod
     def type_for_field(cls, fieldname):
@@ -458,9 +533,13 @@ class Item(EWSElement):
             field_uri = cls.fielduri_for_field(f)
             if isinstance(field_uri, str):
                 fields.append(create_element('t:FieldURI', FieldURI=field_uri))
-            else:
-                # ExtendedProperty
+            elif issubclass(field_uri, IndexedField):
+                for l in field_uri.LABELS:
+                    fields.append(field_uri.field_uri_xml(label=l))
+            elif issubclass(field_uri, ExtendedProperty):
                 fields.append(field_uri.field_uri_xml())
+            else:
+                assert False, 'Unknown field_uri type: %s' % field_uri
         return fields
 
     @classmethod
@@ -478,47 +557,52 @@ class Item(EWSElement):
             field_type = cls.type_for_field(fieldname)
             if field_type == EWSDateTime:
                 val = get_xml_attr(elem, cls.response_xml_elem_for_field(fieldname))
-                kwargs[fieldname] = EWSDateTime.from_string(val) if val else None
+                if val is not None:
+                    kwargs[fieldname] = EWSDateTime.from_string(val)
             elif field_type == bool:
                 val = get_xml_attr(elem, cls.response_xml_elem_for_field(fieldname))
-                kwargs[fieldname] = True if val == 'true' else False
-            elif field_type == str:
-                kwargs[fieldname] = get_xml_attr(elem, cls.response_xml_elem_for_field(fieldname)) or ''
-            elif field_type == Choice:
-                kwargs[fieldname] = get_xml_attr(elem, cls.response_xml_elem_for_field(fieldname)) or None
+                if val is not None:
+                    kwargs[fieldname] = True if val == 'true' else False
+            elif field_type in (str, Choice, Email):
+                val = get_xml_attr(elem, cls.response_xml_elem_for_field(fieldname))
+                if val is not None:
+                    kwargs[fieldname] = val
             elif field_type == int:
-                try:
-                    kwargs[fieldname] = int(get_xml_attr(elem, cls.response_xml_elem_for_field(fieldname)))
-                except ValueError:
-                    kwargs[fieldname] = None
+                val = get_xml_attr(elem, cls.response_xml_elem_for_field(fieldname))
+                if val:
+                    try:
+                        kwargs[fieldname] = int(val)
+                    except ValueError:
+                        pass
             elif field_type == float:
-                try:
-                    kwargs[fieldname] = float(get_xml_attr(elem, cls.response_xml_elem_for_field(fieldname)))
-                except ValueError:
-                    kwargs[fieldname] = None
+                val = get_xml_attr(elem, cls.response_xml_elem_for_field(fieldname))
+                if val is not None:
+                    try:
+                        kwargs[fieldname] = float(val)
+                    except ValueError:
+                        pass
             elif isinstance(field_type, list):
                 list_type = field_type[0]
-                iter_elem = elem.find(cls.response_xml_elem_for_field(fieldname))
-                if iter_elem is None:
-                    kwargs[fieldname] = None
-                else:
-                    if list_type == str:
+                if list_type == str:
+                    iter_elem = elem.find(cls.response_xml_elem_for_field(fieldname))
+                    if iter_elem is not None:
                         kwargs[fieldname] = get_xml_attrs(iter_elem, '{%s}String' % TNS)
-                    else:
-                        kwargs[fieldname] = [list_type.from_xml(elem)
-                                             for elem in iter_elem.findall(list_type.response_tag())]
+                elif issubclass(list_type, EWSElement):
+                    iter_elem = elem.find(cls.response_xml_elem_for_field(fieldname))
+                    if iter_elem is not None:
+                        kwargs[fieldname] = [list_type.from_xml(e) for e in iter_elem.findall(list_type.response_tag())]
+                else:
+                    assert False, 'Field %s type %s not supported' % (fieldname, field_type)
             elif issubclass(field_type, ExtendedProperty):
                 kwargs[fieldname] = field_type.get_value(extended_properties)
             elif issubclass(field_type, EWSElement):
-                if fieldname in ('organizer', 'sender', 'from'):
-                    # We want the nested Mailbox, not the wrapper element
-                    sub_elem = elem.find(cls.response_xml_elem_for_field(fieldname))
-                    if sub_elem is None:
-                        kwargs[fieldname] = None
-                    else:
+                sub_elem = elem.find(cls.response_xml_elem_for_field(fieldname))
+                if sub_elem is not None:
+                    if fieldname in ('organizer', 'sender', 'from'):
+                        # We want the nested Mailbox, not the wrapper element
                         kwargs[fieldname] = field_type.from_xml(sub_elem.find(Mailbox.response_tag()))
-                else:
-                    kwargs[fieldname] = field_type.from_xml(elem.find(cls.response_xml_elem_for_field(fieldname)))
+                    else:
+                        kwargs[fieldname] = field_type.from_xml(sub_elem)
             else:
                 assert False, 'Field %s type %s not supported' % (fieldname, field_type)
         return cls(item_id=item_id, changekey=changekey, **kwargs)
@@ -616,7 +700,7 @@ class Folder:
             return []
         return list(map(self.item_model.id_from_xml, CreateItem(self.account.protocol).call(folder=self, items=items)))
 
-    def delete_items(self, ids):
+    def delete_items(self, ids, all_occurrences=False):
         """
         Deletes items in the folder. 'ids' is an iterable of either (item_id, changekey) tuples or Item objects.
         """
@@ -625,7 +709,7 @@ class Folder:
             # We accept generators, so it's not always convenient for caller to know up-front if 'items' is empty. Allow
             # empty 'items' and return early.
             return []
-        return DeleteItem(self.account.protocol).call(folder=self, ids=ids)
+        return DeleteItem(self.account.protocol).call(folder=self, ids=ids, all_occurrences=all_occurrences)
 
     def update_items(self, items):
         """
@@ -718,14 +802,15 @@ class Folder:
         add_xml_child(createitem, 'm:Items', item_elems)
         return createitem
 
-    def delete_xml(self, ids):
-        # Prepare reuseable Element objects
+    def delete_xml(self, ids, all_occurrences=True):
+        # Prepare reuseable Element objects. # TODO: Make it possible to set all_occurrences from somewhere
         if isinstance(self, Calendar):
-            deleteitem = create_element('m:%s' % DeleteItem.SERVICE_NAME, DeleteType='HardDelete',
-                                        SendMeetingCancellations='SendToNone')
+            deleteitem = create_element(
+                'm:%s' % DeleteItem.SERVICE_NAME, DeleteType='HardDelete', SendMeetingCancellations='SendToNone')
         elif isinstance(self, Tasks):
-            deleteitem = create_element('m:%s' % DeleteItem.SERVICE_NAME, DeleteType='HardDelete',
-                                        AffectedTaskOccurrences='SpecifiedOccurrenceOnly')
+            deleteitem = create_element(
+                'm:%s' % DeleteItem.SERVICE_NAME, DeleteType='HardDelete',
+                AffectedTaskOccurrences='AllOccurrences' if all_occurrences else 'SpecifiedOccurrenceOnly')
         else:
             deleteitem = create_element('m:%s' % DeleteItem.SERVICE_NAME, DeleteType='HardDelete')
         if self.account.version.major_version >= 15:
@@ -767,7 +852,7 @@ class Folder:
             updates = create_element('t:Updates')
             meeting_timezone_added = False
             for fieldname, val in update_dict.items():
-                if fieldname in self.item_model.READONLY_FIELDS:
+                if fieldname in self.item_model.readonly_fields():
                     log.warning('%s is a read-only field. Skipping', fieldname)
                     continue
                 if fieldname == 'extern_id' and val is not None:
@@ -775,12 +860,17 @@ class Folder:
                 field_uri = self.attr_to_fielduri(fieldname)
                 if isinstance(field_uri, str):
                     fielduri = create_element('t:FieldURI', FieldURI=field_uri)
-                else:
-                    # ExtendedProperty
+                elif issubclass(field_uri, IndexedField):
+                    # TODO: we need to create a SetItemField for every item in the list, and possibly DeleteItemField for every label not on the list
+                    continue
+                    fielduri = field_uri.field_uri_xml(label=val.label)
+                elif issubclass(field_uri, ExtendedProperty):
                     fielduri = field_uri.field_uri_xml()
+                else:
+                    assert False, 'Unknown field_uri type: %s' % field_uri
                 if val is None:
                     # A value of None means we want to remove this field from the item
-                    if fieldname in self.item_model.REQUIRED_FIELDS:
+                    if fieldname in self.item_model.required_fields():
                         log.warning('%s is a required field and may not be deleted. Skipping', fieldname)
                         continue
                     add_xml_child(updates, 't:DeleteItemField', fielduri)
@@ -819,7 +909,8 @@ class Folder:
                             fielduri_tz = create_element('t:FieldURI', FieldURI='calendar:EndTimeZone')
                             timezone = create_element('t:EndTimeZone', Id=val.tzinfo.ms_id, Name=val.tzinfo.ms_name)
                         else:
-                            assert False, 'Cannot set timezone for field %s' % fieldname
+                            log.warning('Skipping timezone for field %s', fieldname)
+                            continue
                     setitemfield_tz.append(fielduri_tz)
                     folderitem_tz.append(timezone)
                     setitemfield_tz.append(folderitem_tz)
@@ -880,14 +971,18 @@ class ItemMixIn(Item):
         assert self.ORDERED_FIELDS
         i = create_element(self.request_tag())
         for f in self.ORDERED_FIELDS:
+            assert f not in self.readonly_fields(), (f, self.readonly_fields())
+            field_uri = self.fielduri_for_field(f)
             v = getattr(self, f)
-            if f in self.REQUIRED_FIELDS:
-                i.append(set_xml_value(self.elem_for_field(f), v, version))
-            elif v is not None:
-                if f == 'extern_id':
+            if v is not None:
+                if isinstance(field_uri, str):
+                    i.append(set_xml_value(self.elem_for_field(f), v, version))
+                elif issubclass(field_uri, IndexedField):
+                    i.append(set_xml_value(create_element('t:%s' % field_uri.PARENT_ELEMENT_NAME), v, version))
+                elif issubclass(field_uri, ExtendedProperty):
                     set_xml_value(i, ExternId(getattr(self, f)), version)
                 else:
-                    i.append(set_xml_value(self.elem_for_field(f), v, version))
+                    assert False, 'Unknown field_uri type: %s' % field_uri
         return i
 
     @classmethod
@@ -915,9 +1010,29 @@ class ItemMixIn(Item):
     @classmethod
     def response_xml_elem_for_field(cls, fieldname):
         try:
-            return '{%s}%s' % (TNS, cls.uri_for_field(fieldname))
+            uri = cls.uri_for_field(fieldname)
         except KeyError:
             return Item.response_xml_elem_for_field(fieldname)
+        if isinstance(uri, str):
+            return '{%s}%s' % (TNS, uri)
+        if issubclass(uri, IndexedField):
+            return '{%s}%s' % (TNS, uri.PARENT_ELEMENT_NAME)
+        assert False, 'Unknown uri for fieldname %s: %s' % (fieldname, uri)
+
+    @classmethod
+    def required_fields(cls):
+        return cls.REQUIRED_FIELDS | Item.REQUIRED_FIELDS
+
+    @classmethod
+    def readonly_fields(cls):
+        return cls.READONLY_FIELDS | Item.READONLY_FIELDS
+
+    @classmethod
+    def choices_for_field(cls, fieldname):
+        try:
+            return cls.CHOICES[fieldname]
+        except KeyError:
+            return Item.CHOICES[fieldname]
 
     @classmethod
     def type_for_field(cls, fieldname):
@@ -954,23 +1069,26 @@ class CalendarItem(ItemMixIn):
         'optional_attendees': ('OptionalAttendees', [Attendee]),
         'resources': ('Resources', [Attendee]),
     }
-    ORDERED_FIELDS = ('subject', 'body', 'categories', 'reminder_is_set', 'extern_id', 'start', 'end',
-                      'legacy_free_busy_status', 'location', 'required_attendees', 'optional_attendees', 'resources')
-    REQUIRED_FIELDS = {'subject', 'start', 'end', 'legacy_free_busy_status', 'reminder_is_set'}
+    ORDERED_FIELDS = (
+        'subject', 'sensitivity', 'body', 'categories', 'importance', 'reminder_is_set', 'extern_id',
+        'start', 'end',
+        'legacy_free_busy_status', 'location', 'required_attendees', 'optional_attendees', 'resources'
+    )
+    REQUIRED_FIELDS = {'subject', 'start', 'end', 'legacy_free_busy_status'}
     READONLY_FIELDS = {'organizer'}
 
     __slots__ = tuple(ITEM_FIELDS) + tuple(Item.ITEM_FIELDS) + tuple(Item.EXTRA_ITEM_FIELDS)
 
     def __init__(self, **kwargs):
         for k in self.ITEM_FIELDS:
+            field_type = self.ITEM_FIELDS[k][1]
             default = 'Busy' if k == 'legacy_free_busy_status' \
-                else False if (k in self.REQUIRED_FIELDS and self.ITEM_FIELDS[k][1] == bool) \
-                else None
+                else False if (k in self.required_fields() and field_type == bool) else None
             v = kwargs.pop(k, default)
-            if k in self.CHOICES and v is not None:
-                assert v in self.CHOICES[k]
             if k in ('start', 'end') and v and not getattr(v, 'tzinfo'):
                 raise ValueError("'%s' must be timezone aware")
+            if field_type == Choice:
+                assert v is None or v in self.choices_for_field(k), (v, self.choices_for_field(k))
             setattr(self, k, v)
         super().__init__(**kwargs)
 
@@ -1017,16 +1135,8 @@ class Message(ItemMixIn):
     # Supported attrs: see https://msdn.microsoft.com/en-us/library/office/aa494306(v=exchg.150).aspx
     ELEMENT_NAME = 'Message'
     FIELDURI_PREFIX = 'message'
-    CHOICES = {
-        'sensitivity': {'Normal', 'Personal', 'Private', 'Confidential'},
-        'importance': {'Low', 'Normal', 'High'},
-    }
-    # TODO: This is incomplete
+    # TODO: This list is incomplete
     ITEM_FIELDS = {
-        # 'sensitivity': ('Sensitivity', Choice),
-        # 'importance': ('Importance', Choice),
-        # 'mime_content': ('MimeContent', str),
-        # 'is_draft': ('IsDraft', bool),
         'is_read': ('IsRead', bool),
         'is_delivery_receipt_requested': ('IsDeliveryReceiptRequested', bool),
         'is_read_receipt_requested': ('IsReadReceiptRequested', bool),
@@ -1039,22 +1149,23 @@ class Message(ItemMixIn):
         'bcc_recipients': ('BccRecipients', [Mailbox]),
     }
     ORDERED_FIELDS = (
-        'subject', 'body', 'categories', 'reminder_is_set', 'extern_id',
+        'subject', 'sensitivity', 'body', 'categories', 'importance', 'reminder_is_set', 'extern_id',
         'sender', 'to_recipients', 'cc_recipients', 'bcc_recipients',
         'is_read_receipt_requested', 'is_delivery_receipt_requested',
         'from', 'is_read', 'is_response_requested', 'reply_to',
     )
-    REQUIRED_FIELDS = {'subject', 'reminder_is_set', 'is_read', 'is_delivery_receipt_requested',
-                       'is_read_receipt_requested', 'is_response_requested'}
+    REQUIRED_FIELDS = {'subject', 'is_read', 'is_delivery_receipt_requested', 'is_read_receipt_requested',
+                       'is_response_requested'}
 
     __slots__ = tuple(ITEM_FIELDS) + tuple(Item.ITEM_FIELDS) + tuple(Item.EXTRA_ITEM_FIELDS)
 
     def __init__(self, **kwargs):
         for k in self.ITEM_FIELDS:
-            default =  False if (k in self.REQUIRED_FIELDS and self.ITEM_FIELDS[k][1] == bool) else None
+            field_type = self.ITEM_FIELDS[k][1]
+            default = False if (k in self.required_fields() and field_type == bool) else None
             v = kwargs.pop(k, default)
-            if k in self.CHOICES and v is not None:
-                assert v in self.CHOICES[k]
+            if field_type == Choice:
+                assert v is None or v in self.choices_for_field(k), (v, self.choices_for_field(k))
             setattr(self, k, v)
         super().__init__(**kwargs)
 
@@ -1075,25 +1186,22 @@ class Task(ItemMixIn):
     ELEMENT_NAME = 'Task'
     FIELDURI_PREFIX = 'task'
     CHOICES = {
-        'sensitivity': {'Normal', 'Personal', 'Private', 'Confidential'},
-        'importance': {'Low', 'Normal', 'High'},
-        'status': {'NotStarted', 'InProgress', 'Completed', 'WaitingOnOthers', 'Deferred'}
+        'status': {'NotStarted', 'InProgress', 'Completed', 'WaitingOnOthers', 'Deferred'},
+        'delegation_state': {'NoMatch', 'OwnNew', 'Owned', 'Accepted', 'Declined', 'Max'},
     }
-    # TODO: This is incomplete
+    # TODO: This list is incomplete
     ITEM_FIELDS = {
-        # 'sensitivity': ('Sensitivity', Choice),
-        # 'importance': ('Importance', Choice),
-        # 'is_draft': ('IsDraft', bool),
         'actual_work': ('ActualWork', int),
         'assigned_time': ('AssignedTime', EWSDateTime),
         'billing_information': ('BillingInformation', str),
         'change_count': ('ChangeCount', int),
         'companies': ('Companies', [str]),
         'contacts': ('Contacts', [str]),
+        'complete_date': ('CompleteDate', EWSDateTime),
         'is_complete': ('IsComplete', bool),
         'due_date': ('DueDate', EWSDateTime),
         'delegator': ('Delegator', str),
-        'delegation_state': ('DelegationState', str),
+        'delegation_state': ('DelegationState', Choice),
         'is_recurring': ('IsRecurring', bool),
         'is_team_task': ('IsTeamTask', bool),
         'mileage': ('Mileage', str),
@@ -1104,23 +1212,30 @@ class Task(ItemMixIn):
         'status_description': ('StatusDescription', str),
         'total_work': ('TotalWork', int),
     }
-    REQUIRED_FIELDS = {'subject', 'reminder_is_set', 'is_complete', 'is_recurring', 'is_team_task'}
+    REQUIRED_FIELDS = {'subject'}
     ORDERED_FIELDS = (
-        'mileage', 'percent_complete', 'status', 'billing_information', 'delegation_state', 'total_work', 'delegator',
-        'due_date', 'contacts', 'actual_work', 'change_count', 'start_date', 'is_recurring', 'is_team_task',
-        'is_complete', 'status_description', 'assigned_time', 'owner', 'companies', 'categories', 'reminder_is_set',
-        'subject', 'body', 'extern_id',
+        'subject', 'sensitivity', 'body', 'categories', 'importance', 'reminder_is_set', 'extern_id',
+        'actual_work',  # 'assigned_time',
+        'billing_information',  # 'change_count',
+        'companies', 'complete_date',
+        'contacts',  # 'delegation_state', 'delegator',
+        'due_date',  # 'is_complete', 'is_team_task',
+        'mileage',  # 'owner',
+        'percent_complete', 'start_date', 'status',  # 'status_description',
+        'total_work',
     )
-    READONLY_FIELDS = {'delegation_state', 'is_recurring'}
+    READONLY_FIELDS = {'is_recurring', 'is_complete', 'is_team_task', 'assigned_time', 'change_count',
+                       'delegation_state', 'delegator', 'owner', 'status_description'}
 
     __slots__ = tuple(ITEM_FIELDS) + tuple(Item.ITEM_FIELDS) + tuple(Item.EXTRA_ITEM_FIELDS)
 
     def __init__(self, **kwargs):
         for k in self.ITEM_FIELDS:
-            default =  False if (k in self.REQUIRED_FIELDS and self.ITEM_FIELDS[k][1] == bool) else None
+            field_type = self.ITEM_FIELDS[k][1]
+            default = False if (k in self.required_fields() and field_type == bool) else None
             v = kwargs.pop(k, default)
-            if k in self.CHOICES and v is not None:
-                assert v in self.CHOICES[k]
+            if field_type == Choice:
+                assert v is None or v in self.choices_for_field(k), (v, self.choices_for_field(k))
             setattr(self, k, v)
         super().__init__(**kwargs)
 
@@ -1141,8 +1256,6 @@ class Contact(ItemMixIn):
     ELEMENT_NAME = 'Contact'
     FIELDURI_PREFIX = 'contacts'
     CHOICES = {
-        'sensitivity': {'Normal', 'Personal', 'Private', 'Confidential'},
-        'importance': {'Low', 'Normal', 'High'},
         'file_as_mapping': {
             'None', 'LastCommaFirst', 'FirstSpaceLast', 'Company', 'LastCommaFirstCompany', 'CompanyLastFirst',
             'LastFirst', 'LastFirstCompany', 'CompanyLastCommaFirst', 'LastFirstSuffix', 'LastSpaceFirstCompany',
@@ -1150,11 +1263,8 @@ class Contact(ItemMixIn):
             'Empty',
         }
     }
-    # TODO: This is incomplete
+    # TODO: This list is incomplete
     ITEM_FIELDS = {
-        # 'sensitivity': ('Sensitivity', Choice),
-        # 'importance': ('Importance', Choice),
-        # 'is_draft': ('IsDraft', bool),
         'file_as': ('FileAs', str),
         'file_as_mapping': ('FileAsMapping', Choice),
         'display_name': ('DisplayName', str),
@@ -1163,38 +1273,45 @@ class Contact(ItemMixIn):
         'middle_name': ('MiddleName', str),
         'nickname': ('Nickname', str),
         'company_name': ('CompanyName', str),
-        'email_addresses': ('EmailAddresses', [EmailAddressEntry]),
-        'physical_addresses': ('PhysicalAddresses', [PhysicalAddressEntry]),
-        'phone_numbers': ('PhoneNumbers', [PhoneNumberEntry]),
+        'email_addresses': (EmailAddress, [EmailAddress]),
+        # 'physical_addresses': (PhysicalAddress, [PhysicalAddress]),
+        'phone_numbers': (PhoneNumber, [PhoneNumber]),
         'assistant_name': ('AssistantName', str),
         'birthday': ('Birthday', EWSDateTime),
         'business_homepage': ('BusinessHomePage', str),
         'companies': ('Companies', [str]),
         'department': ('Department', str),
         'generation': ('Generation', str),
-        # 'im_addresses': ('ImAddresses', [ImAddressEntry]),
+        # 'im_addresses': ('ImAddresses', [ImAddress]),
         'job_title': ('JobTitle', str),
+        'manager': ('Manager', str),
+        'mileage': ('Mileage', str),
+        'office': ('OfficeLocation', str),
         'profession': ('Profession', str),
         'surname': ('Surname', str),
-        'email_alias': ('Alias', str),
-        'notes': ('Notes', str),
+        # 'email_alias': ('Alias', Email),
+        # 'notes': ('Notes', str),  # Only available from Exchange 2010 SP2
     }
-    REQUIRED_FIELDS = {'display_name', 'reminder_is_set'}
+    REQUIRED_FIELDS = {'display_name'}
     ORDERED_FIELDS = (
-        'physical_addresses', 'job_title', 'generation', 'given_name', 'business_homepage', 'file_as',
-        'email_addresses', 'phone_numbers', 'middle_name', 'surname', 'companies', 'assistant_name', 'profession',
-        'nickname', 'display_name', 'department', 'notes', 'file_as_mapping', 'email_alias', 'birthday', 'company_name',
-        'initials', 'categories', 'reminder_is_set', 'subject', 'body', 'extern_id',
+        'subject', 'sensitivity', 'body', 'categories', 'importance', 'reminder_is_set', 'extern_id',
+        'file_as', 'file_as_mapping',
+        'display_name', 'given_name',  'initials', 'middle_name', 'nickname', 'company_name',
+        'email_addresses', #'physical_addresses',
+        'phone_numbers',
+        'assistant_name', 'birthday', 'business_homepage', 'companies', 'department',
+        'generation', 'job_title', 'manager', 'mileage', 'office', 'profession', 'surname',  # 'email_alias', 'notes',
     )
 
     __slots__ = tuple(ITEM_FIELDS) + tuple(Item.ITEM_FIELDS) + tuple(Item.EXTRA_ITEM_FIELDS)
 
     def __init__(self, **kwargs):
         for k in self.ITEM_FIELDS:
-            default =  False if (k in self.REQUIRED_FIELDS and self.ITEM_FIELDS[k][1] == bool) else None
+            field_type = self.ITEM_FIELDS[k][1]
+            default = False if (k in self.required_fields() and field_type == bool) else None
             v = kwargs.pop(k, default)
-            if k in self.CHOICES and v is not None:
-                assert v in self.CHOICES[k]
+            if field_type == Choice:
+                assert v is None or v in self.choices_for_field(k), (v, self.choices_for_field(k))
             setattr(self, k, v)
         super().__init__(**kwargs)
 

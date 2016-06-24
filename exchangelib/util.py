@@ -91,6 +91,8 @@ def set_xml_value(elem, value, version):
                 raise AttributeError('Unsupported type %s for list value %s on elem %s' % (type(v), v, elem))
     elif isinstance(value, bool):
         elem.text = '1' if value else '0'
+    elif isinstance(value, (int, float)):
+        elem.text = str(value)
     elif isinstance(value, EWSDateTime):
         elem.text = value.ewsformat()
     elif isinstance(value, EWSElement):
