@@ -417,7 +417,7 @@ class Item(EWSElement):
     ITEM_FIELDS = {
         'item_id': ('Id', str),
         'changekey': ('ChangeKey', str),
-        'mime_content': ('MimeContent', str),
+        # 'mime_content': ('MimeContent', str),
         'sensitivity': ('Sensitivity', Choice),
         'importance': ('Importance', Choice),
         'is_draft': ('IsDraft', bool),
@@ -445,7 +445,7 @@ class Item(EWSElement):
     # Item fields that are necessary to create an item
     REQUIRED_FIELDS = {'sensitivity', 'importance', 'reminder_is_set'}
     # Fields that are read-only in Exchange. Put mime_content here until it's properly supported
-    READONLY_FIELDS = {'is_draft', 'mime_content'}
+    READONLY_FIELDS = {'is_draft'}
 
     __slots__ = tuple(ITEM_FIELDS) + tuple(EXTRA_ITEM_FIELDS)
 
