@@ -6,9 +6,10 @@ automatically instead of taking advantage of Python SOAP libraries and the WSDL 
 """
 
 from logging import getLogger
+from decimal import Decimal
 
 from .credentials import DELEGATE
-from .ewsdatetime import EWSDateTime
+from .ewsdatetime import EWSDateTime, UTC_NOW
 from .restriction import Restriction
 from .services import TNS, FindItem, IdOnly, SHALLOW, DEEP, DeleteItem, CreateItem, UpdateItem, FindFolder, GetFolder, \
     GetItem
@@ -574,11 +575,11 @@ class Item(EWSElement):
                         kwargs[fieldname] = int(val)
                     except ValueError:
                         pass
-            elif field_type == float:
+            elif field_type == Decimal:
                 val = get_xml_attr(elem, cls.response_xml_elem_for_field(fieldname))
                 if val is not None:
                     try:
-                        kwargs[fieldname] = float(val)
+                        kwargs[fieldname] = Decimal(val)
                     except ValueError:
                         pass
             elif isinstance(field_type, list):
@@ -909,7 +910,7 @@ class Folder:
                             fielduri_tz = create_element('t:FieldURI', FieldURI='calendar:EndTimeZone')
                             timezone = create_element('t:EndTimeZone', Id=val.tzinfo.ms_id, Name=val.tzinfo.ms_name)
                         else:
-                            log.warning('Skipping timezone for field %s', fieldname)
+                            log.warning("Skipping timezone for field '%s'", fieldname)
                             continue
                     setitemfield_tz.append(fielduri_tz)
                     folderitem_tz.append(timezone)
@@ -1150,12 +1151,14 @@ class Message(ItemMixIn):
     }
     ORDERED_FIELDS = (
         'subject', 'sensitivity', 'body', 'categories', 'importance', 'reminder_is_set', 'extern_id',
-        'sender', 'to_recipients', 'cc_recipients', 'bcc_recipients',
+        # 'sender',
+        'to_recipients', 'cc_recipients', 'bcc_recipients',
         'is_read_receipt_requested', 'is_delivery_receipt_requested',
         'from', 'is_read', 'is_response_requested', 'reply_to',
     )
     REQUIRED_FIELDS = {'subject', 'is_read', 'is_delivery_receipt_requested', 'is_read_receipt_requested',
                        'is_response_requested'}
+    READONLY_FIELDS = {'sender'}
 
     __slots__ = tuple(ITEM_FIELDS) + tuple(Item.ITEM_FIELDS) + tuple(Item.EXTRA_ITEM_FIELDS)
 
@@ -1185,8 +1188,10 @@ class Task(ItemMixIn):
     # Supported attrs: see https://msdn.microsoft.com/en-us/library/office/aa563930(v=exchg.150).aspx
     ELEMENT_NAME = 'Task'
     FIELDURI_PREFIX = 'task'
+    NOT_STARTED = 'NotStarted'
+    COMPLETED = 'Completed'
     CHOICES = {
-        'status': {'NotStarted', 'InProgress', 'Completed', 'WaitingOnOthers', 'Deferred'},
+        'status': {NOT_STARTED, 'InProgress', COMPLETED, 'WaitingOnOthers', 'Deferred'},
         'delegation_state': {'NoMatch', 'OwnNew', 'Owned', 'Accepted', 'Declined', 'Max'},
     }
     # TODO: This list is incomplete
@@ -1206,26 +1211,27 @@ class Task(ItemMixIn):
         'is_team_task': ('IsTeamTask', bool),
         'mileage': ('Mileage', str),
         'owner': ('Owner', str),
-        'percent_complete': ('PercentComplete', float),
+        'percent_complete': ('PercentComplete', Decimal),
         'start_date': ('StartDate', EWSDateTime),
         'status': ('Status', Choice),
         'status_description': ('StatusDescription', str),
         'total_work': ('TotalWork', int),
     }
-    REQUIRED_FIELDS = {'subject'}
+    REQUIRED_FIELDS = {'subject', 'status'}
     ORDERED_FIELDS = (
         'subject', 'sensitivity', 'body', 'categories', 'importance', 'reminder_is_set', 'extern_id',
         'actual_work',  # 'assigned_time',
         'billing_information',  # 'change_count',
-        'companies', 'complete_date',
+        'companies', # 'complete_date',
         'contacts',  # 'delegation_state', 'delegator',
         'due_date',  # 'is_complete', 'is_team_task',
         'mileage',  # 'owner',
         'percent_complete', 'start_date', 'status',  # 'status_description',
         'total_work',
     )
+    # 'complete_date' can be set, but is ignored by the server, which sets it to now()
     READONLY_FIELDS = {'is_recurring', 'is_complete', 'is_team_task', 'assigned_time', 'change_count',
-                       'delegation_state', 'delegator', 'owner', 'status_description'}
+                       'delegation_state', 'delegator', 'owner', 'status_description', 'complete_date'}
 
     __slots__ = tuple(ITEM_FIELDS) + tuple(Item.ITEM_FIELDS) + tuple(Item.EXTRA_ITEM_FIELDS)
 
@@ -1237,6 +1243,37 @@ class Task(ItemMixIn):
             if field_type == Choice:
                 assert v is None or v in self.choices_for_field(k), (v, self.choices_for_field(k))
             setattr(self, k, v)
+        if self.due_date and self.start_date and self.due_date < self.start_date:
+            log.warning("'due_date' must be greater than 'start_date' (%s vs %s). Resetting 'due_date'",
+                        self.due_date, self.start_date)
+            self.due_date = self.start_date
+        if self.complete_date:
+            if self.status != self.COMPLETED:
+                log.warning("'status' must be '%s' when 'complete_date' is set (%s). Resetting",
+                            self.COMPLETED, self.status)
+                self.status = self.COMPLETED
+            now = UTC_NOW()
+            if (self.complete_date - now).total_seconds() > 120:
+                # 'complete_date' can be set automatically by the server. Allow some grace between local and server time
+                log.warning("'complete_date' must be in the past (%s vs %s). Resetting", self.complete_date, now)
+                self.complete_date = now
+            if self.start_date and self.complete_date < self.start_date:
+                log.warning("'complete_date' must be greater than 'start_date' (%s vs %s). Resetting",
+                            self.complete_date, self.start_date)
+                self.complete_date = self.start_date
+        if self.percent_complete is not None:
+            assert isinstance(self.percent_complete, Decimal)
+            assert Decimal(0) <= self.percent_complete <= Decimal(100), self.percent_complete
+            if self.status == self.COMPLETED and self.percent_complete != Decimal(100):
+                # percent_complete must be 100% if task is complete
+                log.warning("'percent_complete' must be 100 when 'status' is '%s' (%s). Resetting",
+                            self.COMPLETED, self.percent_complete)
+                self.percent_complete = Decimal(100)
+            elif self.status == self.NOT_STARTED and self.percent_complete != Decimal(0):
+                # percent_complete must be 0% if task is not started
+                log.warning("'percent_complete' must be 0 when 'status' is '%s' (%s). Resetting",
+                            self.NOT_STARTED, self.percent_complete)
+                self.percent_complete = Decimal(0)
         super().__init__(**kwargs)
 
 

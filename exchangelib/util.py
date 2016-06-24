@@ -7,6 +7,7 @@ from datetime import datetime
 from copy import deepcopy
 import itertools
 from types import GeneratorType
+from decimal import Decimal
 
 from .errors import TransportError, RateLimitError, RedirectError
 
@@ -91,7 +92,7 @@ def set_xml_value(elem, value, version):
                 raise AttributeError('Unsupported type %s for list value %s on elem %s' % (type(v), v, elem))
     elif isinstance(value, bool):
         elem.text = '1' if value else '0'
-    elif isinstance(value, (int, float)):
+    elif isinstance(value, (int, Decimal)):
         elem.text = str(value)
     elif isinstance(value, EWSDateTime):
         elem.text = value.ewsformat()

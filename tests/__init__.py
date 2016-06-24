@@ -3,6 +3,7 @@ import unittest
 from datetime import timedelta, datetime, date, time
 import random
 import string
+from decimal import Decimal
 
 from yaml import load
 
@@ -196,8 +197,8 @@ class EWSTest(unittest.TestCase):
             return [get_random_string(16) for _ in range(random.randint(1, 4))]
         if field_type == int:
             return get_random_int(0, 256)
-        if field_type == float:
-            return get_random_float(0, 100)
+        if field_type == Decimal:
+            return get_random_decimal(0, 100)
         if field_type == bool:
             return get_random_bool()
         if field_type == EWSDateTime:
@@ -337,9 +338,10 @@ class BaseItemMixIn:
         insert_kwargs = {}
         for f in self.ITEM_CLASS.fieldnames():
             if f in self.ITEM_CLASS.readonly_fields():
+                # These cannot be created
                 continue
             if f == 'resources':
-                # We don't have any resources available on the server
+                # The test server doesn't have any resources
                 continue
             if f == 'optional_attendees':
                 # 'optional_attendees' and 'required_attendees' are mutually exclusive
@@ -350,9 +352,19 @@ class BaseItemMixIn:
                 continue
             if f == 'end':
                 continue
-            if f == 'complete_date':
-                # Set to null for now
-                insert_kwargs['complete_date'] = None
+            if f == 'due_date':
+                # start_date must be before due_date
+                insert_kwargs['start_date'], insert_kwargs['due_date'] = get_random_datetime_range()
+                continue
+            if f == 'start_date':
+                continue
+            if f == 'status':
+                # Start with an incomplete task
+                status = get_random_choice(Task.choices_for_field(f) - {Task.COMPLETED})
+                insert_kwargs[f] = status
+                insert_kwargs['percent_complete'] = Decimal(0) if status == Task.NOT_STARTED else get_random_decimal(0, 100)
+                continue
+            if f == 'percent_complete':
                 continue
             field_type = self.ITEM_CLASS.type_for_field(f)
             if field_type == Choice:
@@ -377,29 +389,42 @@ class BaseItemMixIn:
                 continue
             if isinstance(self.ITEM_CLASS.type_for_field(f), list):
                 if not (getattr(item, f) is None and insert_kwargs[f] is None):
-                    self.assertSetEqual(set(getattr(item, f)), set(insert_kwargs[f]), (f, getattr(item, f), insert_kwargs[f]))
+                    self.assertSetEqual(set(getattr(item, f)), set(insert_kwargs[f]), (f, repr(item), insert_kwargs))
             else:
-                self.assertEqual(getattr(item, f), insert_kwargs[f], (f, getattr(item, f), insert_kwargs[f]))
+                self.assertEqual(getattr(item, f), insert_kwargs[f], (f, repr(item), insert_kwargs))
 
         # Test update
         update_kwargs = {}
+        now = UTC_NOW()
         for f in self.ITEM_CLASS.fieldnames():
             if f in self.ITEM_CLASS.readonly_fields():
+                # These cannot be changed
                 continue
-            if f in ('resources', 'organizer', 'sender'):
-                # The test server doesn't have any resources. Organizer and sender are added automatically by Exchange.
+            if f == 'resources':
+                # The test server doesn't have any resources
                 continue
             if f == 'start':
                 update_kwargs['start'], update_kwargs['end'] = get_random_datetime_range()
                 continue
             if f == 'end':
                 continue
-            if f == 'complete_date':
-                # Must be a date in the past
-                update_kwargs['complete_date'] = get_random_datetime(end_date=UTC_NOW())
-                update_kwargs['status'] = 'Completed'
+            if f == 'due_date':
+                # start_date must be before due_date, and before complete_date which must be in the past
+                d1, d2 = get_random_datetime(end_date=now), get_random_datetime(end_date=now)
+                update_kwargs['start_date'], update_kwargs['due_date'] = sorted([d1, d2])
+                continue
+            if f == 'start_date':
                 continue
             if f == 'status':
+                # Update task to a completed state. complete_date must be a date in the past, and < than start_date
+                update_kwargs[f] = Task.COMPLETED
+                update_kwargs['percent_complete'] = Decimal(100)
+                continue
+            if f == 'percent_complete':
+                continue
+            if f == 'reminder_is_set' and self.ITEM_CLASS == Task:
+                # Task type doesn't allow updating 'reminder_is_set' to True. TODO: Really?
+                update_kwargs[f] = False
                 continue
             field_type = self.ITEM_CLASS.type_for_field(f)
             if field_type == bool:
@@ -425,7 +450,8 @@ class BaseItemMixIn:
         for f in self.ITEM_CLASS.fieldnames():
             if f in self.ITEM_CLASS.readonly_fields():
                 continue
-            if f in ('resources', 'organizer', 'sender'):
+            if f == 'resources':
+                # The test server doesn't have any resources
                 continue
             field_type = self.ITEM_CLASS.type_for_field(f)
             if isinstance(field_type, list):
@@ -433,15 +459,18 @@ class BaseItemMixIn:
                     # TODO: We don't know how to update IndexedField types yet
                     continue
                 if not (getattr(item, f) is None and update_kwargs[f] is None):
-                    self.assertSetEqual(set(getattr(item, f)), set(update_kwargs[f]), (f, getattr(item, f), update_kwargs[f]))
+                    self.assertSetEqual(set(getattr(item, f)), set(update_kwargs[f]), (f, repr(item), update_kwargs))
             else:
-                self.assertEqual(getattr(item, f), update_kwargs[f], (f, getattr(item, f), update_kwargs[f]))
+                self.assertEqual(getattr(item, f), update_kwargs[f], (f, repr(item), update_kwargs))
 
         # Test wiping or removing string, int, Choice and bool fields
         wipe_kwargs = {}
         for f in self.ITEM_CLASS.fieldnames():
             if f in self.ITEM_CLASS.required_fields():
                 # These cannot be deleted
+                continue
+            if f in self.ITEM_CLASS.readonly_fields():
+                # These cannot be changed
                 continue
             field_type = self.ITEM_CLASS.type_for_field(f)
             if field_type == ExternId:
@@ -461,7 +490,7 @@ class BaseItemMixIn:
                 continue
             field_type = self.ITEM_CLASS.type_for_field(f)
             if field_type in (str, ExternId, bool, int, Choice, Email):
-                self.assertEqual(getattr(item, f), wipe_kwargs[f], (f, getattr(item, f), wipe_kwargs[f]))
+                self.assertEqual(getattr(item, f), wipe_kwargs[f], (f, repr(item), insert_kwargs))
 
         # Test extern_id = None, which deletes the extended property entirely
         extern_id = None
@@ -506,8 +535,11 @@ def get_random_int(min=0, max=2147483647):
     return random.randint(min, max)
 
 
-def get_random_float(min=0, max=2147483647):
-    return random.uniform(min, max)
+def get_random_decimal(min=0, max=100):
+    # Return a random decimal with 6-digit precision
+    major = get_random_int(min, max)
+    minor = 0 if major == max else get_random_int(0, 999999)
+    return Decimal('%s.%s' % (major, minor))
 
 
 def get_random_choice(choices):
