@@ -1,8 +1,8 @@
 Exchange Web Services client library
 ====================================
 This module provides an well-performing interface for communicating with a Microsoft Exchange 2007-2016 Server or
-Office365 using Exchange Web Services (EWS). It currently only implements autodiscover and functions for manipulating
-calendar and mailbox items (tasks and contacts may work but are somewhat untested).
+Office365 using Exchange Web Services (EWS). It currently implements autodiscover, and functions for searching,
+creating, updating and deleting calendar, mailbox, task and contact items.
 
 Usage
 ~~~~~
