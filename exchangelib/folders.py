@@ -1116,7 +1116,7 @@ Location: %(location)s
 Body: %(body)s
 Has reminder: %(reminder_is_set)s
 Categories: %(categories)s
-Extern ID: %(extern_id)s''' % self.__dict__
+Extern ID: %(extern_id)s''' % {k: getattr(self, k) for k in self.__slots__}
 
 
 class Calendar(Folder):

@@ -293,6 +293,14 @@ class BaseItemMixIn:
             item_kwargs[f] = self.random_val(field_type)
         return self.ITEM_CLASS(item_id='', changekey='', categories=self.categories, **item_kwargs)
 
+    def test_builtin(self):
+        item = self.get_test_item()
+        if self.ITEM_CLASS == CalendarItem:
+            self.assertIn('ItemId', str(item))
+        else:
+            self.assertIn(item.__class__.__name__, str(item))
+        self.assertIn(item.__class__.__name__, repr(item))
+
     def test_empty_args(self):
         # We allow empty sequences for these methods
         self.assertEqual(self.test_folder.add_items(items=[]), [])
