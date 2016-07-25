@@ -206,26 +206,51 @@ class EWSTest(unittest.TestCase):
         if field_type == Email:
             return get_random_email()
         if field_type == Mailbox:
-            # email_address must be a real address on the server(?)
+            # email_address must be a real account on the server(?)
+            # TODO: Mailbox has multiple optional args, but they must match the server account, so we can't easily test.
             return Mailbox(email_address=self.account.primary_smtp_address)
-        if field_type == Attendee:
-            return Attendee(mailbox=self.random_val(Mailbox), response_type='Accept',
-                            last_response_time=self.random_val(EWSDateTime))
-        if field_type == [EmailAddress]:
-            return [EmailAddress(email=get_random_email(), label=label) for label in EmailAddress.LABELS]
-        if field_type == [PhysicalAddress]:
-            return [PhysicalAddress(
-                street=get_random_string(32), city=get_random_string(32), state=get_random_string(32),
-                country=get_random_string(32), zipcode=get_random_string(8), label=label
-            ) for label in PhysicalAddress.LABELS]
-        if field_type == [PhoneNumber]:
-            return [PhoneNumber(phone_number=get_random_string(16), label=label) for label in PhoneNumber.LABELS]
         if field_type == [Mailbox]:
             # Mailbox must be a real mailbox on the server(?). We're only sure to have one
             return [self.random_val(Mailbox)]
+        if field_type == Attendee:
+            with_last_response_time = get_random_bool()
+            if with_last_response_time:
+                return Attendee(mailbox=self.random_val(Mailbox), response_type='Accept',
+                                last_response_time=self.random_val(EWSDateTime))
+            else:
+                return Attendee(mailbox=self.random_val(Mailbox), response_type='Accept')
         if field_type == [Attendee]:
             # Attendee must refer to a real mailbox on the server(?). We're only sure to have one
             return [self.random_val(Attendee)]
+        if field_type == EmailAddress:
+            return EmailAddress(email=get_random_email())
+        if field_type == [EmailAddress]:
+            addrs = []
+            for label in EmailAddress.LABELS:
+                addr = self.random_val(EmailAddress)
+                addr.label = label
+                addrs.append(addr)
+            return addrs
+        if field_type == PhysicalAddress:
+            return PhysicalAddress(
+                street=get_random_string(32), city=get_random_string(32), state=get_random_string(32),
+                country=get_random_string(32), zipcode=get_random_string(8))
+        if field_type == [PhysicalAddress]:
+            addrs = []
+            for label in PhysicalAddress.LABELS:
+                addr = self.random_val(PhysicalAddress)
+                addr.label = label
+                addrs.append(addr)
+            return addrs
+        if field_type == PhoneNumber:
+            return PhoneNumber(phone_number=get_random_string(16))
+        if field_type == [PhoneNumber]:
+            pns = []
+            for label in PhoneNumber.LABELS:
+                pn = self.random_val(PhoneNumber)
+                pn.label = label
+                pns.append(pn)
+            return pns
         assert False, 'Unknown field type %s' % field_type
 
 

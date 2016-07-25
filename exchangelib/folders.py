@@ -381,7 +381,8 @@ class Attendee(EWSElement):
         attendee = create_element(self.request_tag())
         set_xml_value(attendee, self.mailbox, version)
         add_xml_child(attendee, 't:ResponseType', self.response_type)
-        add_xml_child(attendee, 't:LastResponseTime', self.last_response_time)
+        if self.last_response_time:
+            add_xml_child(attendee, 't:LastResponseTime', self.last_response_time)
         return attendee
 
     @classmethod
