@@ -290,6 +290,11 @@ class CommonTest(EWSTest):
         status = self.account.calendar.delete_items(ids)
         self.assertEqual(set(status), {(True, None)})
 
+    def test_magic(self):
+        self.assertIn(self.config.protocol.version.api_version, str(self.config.protocol))
+        self.assertIn(self.config.credentials.username, str(self.config.credentials))
+        self.assertIn(self.account.primary_smtp_address, str(self.account))
+
 
 class BaseItemMixIn:
     TEST_FOLDER = None

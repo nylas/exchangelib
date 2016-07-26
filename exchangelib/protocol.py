@@ -153,16 +153,14 @@ class Protocol:
     def __str__(self):
         return '''\
 EWS url: %s
-Product version (according to XSD): %s
-API version (according to SOAP headers): %s
-Full name: %s
-Build numbers: %s
+Product name: %s
+EWS API version: %s
+Build number: %s
 EWS auth: %s
 XSD auth: %s''' % (
             self.ews_url,
-            self.version.shortname,
+            self.version.fullname,
             self.version.api_version,
-            self.version.name,
             self.version.build,
             self.ews_auth_type,
             self.docs_auth_type,
