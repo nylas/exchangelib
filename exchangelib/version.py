@@ -16,7 +16,7 @@ log = logging.getLogger(__name__)
 
 # 'shortname' comes from types.xsd and is the official version of the server, corresponding to the version numbers
 # supplied in SOAP headers. 'API version' is the version name supplied in the RequestServerVersion element in SOAP
-# headers and describes the EWS API version the server accepts. Valid values for this element are described here:
+# headers and describes the EWS API version the server implements. Valid values for this element are described here:
 #    http://msdn.microsoft.com/en-us/library/bb891876(v=exchg.150).aspx
 
 VERSIONS = {
@@ -85,12 +85,21 @@ class Version:
     @classmethod
     def guess(cls, protocol):
         """
-        Tries to ask the server which version it has. We haven't set up an Account object yet, so generate a request
-        by hand. We only need a response header containing a ServerVersionInfo element. Apparently, EWS has no problem
-        supplying one version in its types.xsd and reporting another in its SOAP headers. Trust the SOAP version.
+        Tries to ask the server which version it has. We haven't set up an Account object yet, so we generate requests
+        by hand. We only need a response header containing a ServerVersionInfo element.
+
+        The types.xsd document contains a 'shortname' value that we can use as a key for VERSIONS to get the API version
+        that we need in SOAP headers to generate valid requests. Unfortunately, the Exchagne server may be misconfigured
+        to either block access to types.xsd or serve up a wrong version of the document. Therefore, we only use
+        'shortname' as a hint, but trust the SOAP version returned in response headers.
+
+        To get API version and build numbers from the server, we need to send a valid SOAP request. We can't do that
+        without a valid API version. To solve this chicken-and-egg problem, we try all possible API versions that this
+        package supports, until we get a valid response. If we managed to get a 'shortname' previously, we try the
+        corresponding API version first.
         """
         log.debug('Asking server for version info')
-        # Can't use a session object from the protocol pool for docs because sessions are created with service auth.
+        # We can't use a session object from the protocol pool for docs because sessions are created with service auth.
         try:
             auth = get_auth_instance(credentials=protocol.credentials, auth_type=protocol.docs_auth_type)
             shortname = cls._get_shortname_from_docs(auth=auth, types_url=protocol.types_url)
@@ -103,8 +112,8 @@ class Version:
 
     @staticmethod
     def _get_shortname_from_docs(auth, types_url):
-        # Get the server version from types.xsd. A server response provides the build numbers. We can't necessarily use
-        # the service auth type since it may not be the same as the auth type for docs.
+        # Get the server version from types.xsd. We can't necessarily use the service auth type since it may not be the
+        # same as the auth type for docs.
         log.debug('Getting %s with auth type %s', types_url, auth.__class__.__name__)
         # Some servers send an empty response if we send 'Connection': 'close' header
         with requests.sessions.Session() as s:
@@ -133,7 +142,7 @@ class Version:
 
     @classmethod
     def _guess_version_from_service(cls, protocol, ews_url, hint=None):
-        # We need to guess the version. If we got a shortname from docs, start guessing that
+        # Keep sending requests until we get a valid response. If we have a hint, start guessing that.
         if hint:
             api_versions = [hint] + [v for v in API_VERSIONS if v != hint]
         else:
