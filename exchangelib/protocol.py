@@ -17,7 +17,7 @@ from requests import adapters, Session
 
 from .credentials import Credentials
 from .errors import TransportError
-from .transport import get_auth_instance, get_service_authtype, get_docs_authtype, test_credentials
+from .transport import get_auth_instance, get_service_authtype, get_docs_authtype, test_credentials, AUTH_TYPE_MAP
 from .version import Version, API_VERSIONS
 
 log = logging.getLogger(__name__)
@@ -34,7 +34,7 @@ def close_connections():
     for cached_key, cached_values in _server_cache.items():
         server = cached_key[0]  # cached_key = server, username
         # Create a simple Protocol that we can close TCP connections on
-        cached_protocol = Protocol('https://%s/EWS/Exchange.asmx' % server, True, Credentials('', ''))
+        cached_protocol = Protocol(ews_url='https://%s/EWS/Exchange.asmx' % server, credentials=Credentials('', ''))
         cached_protocol.close()
 
 
@@ -53,6 +53,8 @@ class Protocol:
         self.types_url = '%s://%s/EWS/types.xsd' % (parsed_url.scheme, self.server)
         self.credentials = credentials
         self.timeout = TIMEOUT
+        if ews_auth_type is not None:
+            assert ews_auth_type in AUTH_TYPE_MAP, 'Unsupported auth type %s' % ews_auth_type
 
         # Acquire lock to guard against multiple threads competing to cache information. Having a per-server lock is
         # overkill.
