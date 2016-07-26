@@ -10,6 +10,17 @@ class Configuration:
     """
     Stores default credentials when connecting via a system account, and default connection protocol when autodiscover
     is not activated for an Account.
+
+    If we want to use autodiscover, the following should be sufficient:
+
+        config = Configuration(username='MYWINDOMAIN\myusername', password='topsecret')
+        account = Account(primary_smtp_address='john@example.com', config=config, autodiscover=True)
+
+    If the server is not configured with autodiscover, use this instead:
+
+        config = Configuration(server='exchange.example.com', username='MYWINDOMAIN\myusername', password='topsecret')
+        account = Account(primary_smtp_address='john@example.com', config=config)
+
     """
     def __init__(self, server=None, username=None, password=None, has_ssl=True, verify=True,
                  ews_auth_type=None, ews_url=None):
@@ -19,6 +30,9 @@ class Configuration:
             self.credentials = Credentials(username, password)
         else:
             self.credentials = None
+        if ews_auth_type is not None:
+            from .transport import AUTH_TYPE_MAP
+            assert ews_auth_type in AUTH_TYPE_MAP, 'Unsupported auth type %s' % ews_auth_type
         if server or ews_url:
             if not self.credentials:
                 raise AttributeError('Credentials must be provided when server is provided')
