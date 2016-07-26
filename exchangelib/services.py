@@ -47,9 +47,9 @@ class EWSService:
     element_container_name = None  # The name of the XML element wrapping the collection of returned items
     extra_element_names = []  # Some services may return multiple item types. List them here.
 
-    def __init__(self, protocol, element_name=None):
+    def __init__(self, protocol):
         self.protocol = protocol
-        self.element_name = element_name
+        self.element_name = None
 
     def payload(self, version, account, *args, **kwargs):
         return wrap(content=self._get_payload(*args, **kwargs), version=version, account=account)
@@ -222,6 +222,7 @@ class EWSService:
         return elements
 
     def _get_elements_in_container(self, container):
+        assert self.element_name
         elems = container.findall(self.element_name)
         for element_name in self.extra_element_names:
             elems.extend(container.findall(element_name))
@@ -283,8 +284,8 @@ class GetServerTimeZones(EWSService):
     element_container_name = '{%s}TimeZoneDefinitions' % MNS
 
     def __init__(self, *args, **kwargs):
-        kwargs['element_name'] = '{%s}TimeZoneDefinition' % TNS
         super().__init__(*args, **kwargs)
+        self.element_name = '{%s}TimeZoneDefinition' % TNS
 
     def call(self, **kwargs):
         if self.protocol.version.major_version < 14:
@@ -310,8 +311,9 @@ class GetRoomLists(EWSService):
     element_container_name = '{%s}RoomLists' % MNS
 
     def __init__(self, *args, **kwargs):
-        kwargs['element_name'] = '{%s}RoomList' % TNS
         super().__init__(*args, **kwargs)
+        from .folders import RoomList
+        self.element_name = RoomList.response_tag()
 
     def call(self, **kwargs):
         if self.protocol.version.major_version < 14:
@@ -329,8 +331,9 @@ class GetRooms(EWSService):
     element_container_name = '{%s}Rooms' % MNS
 
     def __init__(self, *args, **kwargs):
-        kwargs['element_name'] = '{%s}Room' % TNS
         super().__init__(*args, **kwargs)
+        from .folders import Room
+        self.element_name = Room.response_tag()
 
     def call(self, roomlist, **kwargs):
         if self.protocol.version.major_version < 14:
@@ -465,8 +468,8 @@ class FindFolder(PagingEWSService, EWSFolderService):
     ]
 
     def __init__(self, *args, **kwargs):
-        kwargs['element_name'] = '{%s}Folder' % TNS
         super().__init__(*args, **kwargs)
+        self.element_name = '{%s}Folder' % TNS
 
     def call(self, folder, **kwargs):
         return self._paged_call(folder=folder, **kwargs)
@@ -511,8 +514,8 @@ class GetFolder(EWSFolderService):
     ]
 
     def __init__(self, *args, **kwargs):
-        kwargs['element_name'] = '{%s}Folder' % TNS
         super().__init__(*args, **kwargs)
+        self.element_name = '{%s}Folder' % TNS
 
     def call(self, folder, **kwargs):
         return self._get_elements(payload=self._get_payload(folder, **kwargs), account=folder.account)
@@ -545,8 +548,8 @@ class ResolveNames(EWSAccountService):
     element_container_name = '{%s}ResolutionSet' % MNS
 
     def __init__(self, *args, **kwargs):
-        kwargs['element_name'] = '{%s}Resolution' % TNS
         super().__init__(*args, **kwargs)
+        self.element_name = '{%s}Resolution' % TNS
 
     def call(self, **kwargs):
         return self._get_elements(payload=self._get_payload(**kwargs))
