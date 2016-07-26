@@ -22,7 +22,7 @@ class Configuration:
         account = Account(primary_smtp_address='john@example.com', config=config)
 
     """
-    def __init__(self, server=None, username=None, password=None, has_ssl=True, verify=True,
+    def __init__(self, server=None, username=None, password=None, has_ssl=True, verify_ssl=True,
                  ews_auth_type=None, ews_url=None):
         if username:
             if not password:
@@ -42,7 +42,7 @@ class Configuration:
             self.protocol = Protocol(
                 ews_url=ews_url,
                 ews_auth_type=ews_auth_type,
-                verify=verify,
+                verify_ssl=verify_ssl,
                 credentials=self.credentials,
             )
         else:

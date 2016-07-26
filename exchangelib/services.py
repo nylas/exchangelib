@@ -97,7 +97,7 @@ class EWSService:
                 headers=None,
                 data=soap_payload,
                 timeout=self.protocol.timeout,
-                verify=self.protocol.verify,
+                verify=self.protocol.verify_ssl,
                 allow_redirects=False)
             self.protocol.release_session(session)
             log.debug('Trying API version %s for account %s', api_version, account)

@@ -15,7 +15,7 @@ class Account:
     Models an Exchange server user account. The primary key for accounts is their PrimarySMTPAddress
     """
     def __init__(self, primary_smtp_address, fullname=None, credentials=None, access_type=None, autodiscover=False,
-                 verify=True, config=None, locale='da_DK'):
+                 verify_ssl=True, config=None, locale='da_DK'):
         if '@' not in primary_smtp_address:
             raise ValueError("primary_smtp_address '%s' is not an email address" % primary_smtp_address)
         self.primary_smtp_address = primary_smtp_address
@@ -29,7 +29,7 @@ class Account:
         assert self.access_type in (DELEGATE, IMPERSONATION)
         if autodiscover:
             self.primary_smtp_address, self.protocol = discover(email=self.primary_smtp_address,
-                                                                credentials=self.credentials, verify=verify)
+                                                                credentials=self.credentials, verify_ssl=verify_ssl)
             if config:
                 assert isinstance(config, Configuration)
         else:

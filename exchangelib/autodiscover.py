@@ -50,7 +50,7 @@ def close_connections():
         protocol.close()
 
 
-def discover(email, credentials, verify=True):
+def discover(email, credentials, verify_ssl=True):
     """
     Performs the autodiscover dance and returns the primary SMTP address of the account and a Protocol on success. The
     autodiscover and EWS server might not be the same, so we use a different Protocol to do the autodiscover request,
@@ -77,7 +77,7 @@ def discover(email, credentials, verify=True):
             if email.lower() == e.redirect_email.lower():
                 raise AutoDiscoverFailed('Redirect to same email address: %s' % email) from e
             # Start over with the new email address
-            return discover(email=e.redirect_email, credentials=credentials, verify=verify)
+            return discover(email=e.redirect_email, credentials=credentials, verify_ssl=verify_ssl)
         # This is unreachable
 
     log.debug('Waiting for _autodiscover_cache_lock')
@@ -93,7 +93,7 @@ def discover(email, credentials, verify=True):
             try:
                 # This eventually fills the cache in _autodiscover_hostname
                 primary_smtp_address, protocol = _try_autodiscover(hostname=domain, credentials=credentials,
-                                                                   email=email, verify=verify)
+                                                                   email=email, verify=verify_ssl)
                 assert primary_smtp_address
                 assert isinstance(protocol, Protocol)
                 return primary_smtp_address, protocol
@@ -106,7 +106,7 @@ def discover(email, credentials, verify=True):
                 log.debug('Releasing_autodiscover_cache_lock')
     # We fell out of the with statement, so either cache was filled by someone else, or autodiscover redirected us to
     # another email address. Start over.
-    return discover(email=email, credentials=credentials, verify=verify)
+    return discover(email=email, credentials=credentials, verify_ssl=verify_ssl)
 
 
 def _try_autodiscover(hostname, credentials, email, verify):
@@ -170,7 +170,7 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl, verify, auth_t
                 raise AutoDiscoverFailed('We were redirected to the same host') from e
             raise RedirectError(url=None, server=redirect_hostname, has_ssl=redirect_has_ssl) from e
 
-    protocol = AutodiscoverProtocol(url=url, verify=verify, credentials=credentials, auth_type=auth_type)
+    protocol = AutodiscoverProtocol(url=url, verify_ssl=verify, credentials=credentials, auth_type=auth_type)
     r = _get_autodiscover_response(protocol=protocol, email=email)
     if r.status_code == 302:
         redirect_url, redirect_hostname, has_ssl = get_redirect_url(r, hostname, has_ssl)
@@ -202,7 +202,7 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl, verify, auth_t
     _autodiscover_cache[domain] = protocol
     # If we didn't want to verify SSL on the autodiscover server, we probably don't want to on the Exchange server,
     # either.
-    return primary_smtp_address, Protocol(ews_url=ews_url, credentials=credentials, verify=verify,
+    return primary_smtp_address, Protocol(ews_url=ews_url, credentials=credentials, verify_ssl=verify,
                                           ews_auth_type=ews_auth_type)
 
 
@@ -214,7 +214,7 @@ def _autodiscover_quick(credentials, email, protocol):
     log.debug('Autodiscover success: %s may connect to %s as primary email %s', email, ews_url, primary_smtp_address)
     # If we didn't want to verify SSL on the autodiscover server, we probably don't want to on the Exchange server,
     # either.
-    return primary_smtp_address, Protocol(ews_url=ews_url, credentials=credentials, verify=protocol.verify,
+    return primary_smtp_address, Protocol(ews_url=ews_url, credentials=credentials, verify_ssl=protocol.verify_ssl,
                                           ews_auth_type=ews_auth_type)
 
 
@@ -251,7 +251,8 @@ def _get_autodiscover_response(protocol, email, encoding='utf-8'):
         # redirects depending on the POST data content.
         session = protocol.get_session()
         r, session = post_ratelimited(protocol=protocol, session=session, url=protocol.ews_url, headers=headers,
-                                      data=data, timeout=protocol.timeout, verify=protocol.verify, allow_redirects=True)
+                                      data=data, timeout=protocol.timeout, verify=protocol.verify_ssl,
+                                      allow_redirects=True)
         protocol.release_session(session)
         log.debug('Response headers: %s', r.headers)
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
@@ -385,7 +386,7 @@ class AutodiscoverProtocol(Protocol):
     # Dummy class for post_ratelimited which implements the bare essentials
     SESSION_POOLSIZE = 1
 
-    def __init__(self, url, credentials, verify, auth_type):
+    def __init__(self, url, credentials, verify_ssl, auth_type):
         assert isinstance(credentials, Credentials)
         parsed_url = parse.urlparse(url)
         self.server = parsed_url.hostname.lower()
@@ -395,7 +396,7 @@ class AutodiscoverProtocol(Protocol):
         self.ews_url = url
         self.ews_auth_type = auth_type
         self.has_ssl = parsed_url.scheme == 'https'
-        self.verify = verify
+        self.verify_ssl = verify_ssl
         self.timeout = REQUEST_TIMEOUT
         self._session_pool = queue.LifoQueue(maxsize=POOLSIZE)
         for i in range(POOLSIZE):

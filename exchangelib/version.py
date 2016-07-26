@@ -163,7 +163,7 @@ class Version:
         session = protocol.get_session()
         log.debug('Test if service API version is %s using auth %s', api_version, session.auth.__class__.__name__)
         r, session = post_ratelimited(protocol=protocol, session=session, url=ews_url, headers=None, data=xml,
-                                      timeout=protocol.timeout, verify=protocol.verify, allow_redirects=False)
+                                      timeout=protocol.timeout, verify=protocol.verify_ssl, allow_redirects=False)
         protocol.release_session(session)
 
         if r.status_code == 401:
