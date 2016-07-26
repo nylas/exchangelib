@@ -101,8 +101,8 @@ class Version:
         api_version = VERSIONS[shortname][0] if shortname else None
         return cls._guess_version_from_service(protocol=protocol, ews_url=protocol.ews_url, hint=api_version)
 
-    @classmethod
-    def _get_shortname_from_docs(cls, auth, types_url):
+    @staticmethod
+    def _get_shortname_from_docs(auth, types_url):
         # Get the server version from types.xsd. A server response provides the build numbers. We can't necessarily use
         # the service auth type since it may not be the same as the auth type for docs.
         log.debug('Getting %s with auth type %s', types_url, auth.__class__.__name__)
