@@ -25,7 +25,7 @@ from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, 
     ErrorInvalidServerVersion
 from .transport import wrap, SOAPNS, TNS, MNS, ENS
 from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, ElementType, \
-    xml_to_str
+    xml_to_str, set_xml_value
 
 log = logging.getLogger(__name__)
 
@@ -43,9 +43,9 @@ SOFTDELETED = 'SoftDeleted'
 
 
 class EWSService:
-    SERVICE_NAME = None
-    element_container_name = None
-    extra_element_names = []
+    SERVICE_NAME = None  # The name of the SOAP service
+    element_container_name = None  # The name of the XML element wrapping the collection of returned items
+    extra_element_names = []  # Some services may return multiple item types. List them here.
 
     def __init__(self, protocol, element_name=None):
         self.protocol = protocol
@@ -134,7 +134,7 @@ class EWSService:
             self._raise_soap_errors(fault=fault)  # Will throw SOAPError
         response_messages = response.find('{%s}ResponseMessages' % MNS)
         if response_messages is None:
-            raise TransportError('%s: No ResponseMessages element in response' % log_prefix)
+            return response.findall('{%s}%sResponse' % (MNS, self.SERVICE_NAME))
         return response_messages.findall('{%s}%sResponseMessage' % (MNS, self.SERVICE_NAME))
 
     def _raise_soap_errors(self, fault):
@@ -303,6 +303,46 @@ class GetServerTimeZones(EWSService):
             name = timezonedef.get('Name')
             timezones.append((tz_id, name))
         return timezones
+
+
+class GetRoomLists(EWSService):
+    SERVICE_NAME = 'GetRoomLists'
+    element_container_name = '{%s}RoomLists' % MNS
+
+    def __init__(self, *args, **kwargs):
+        kwargs['element_name'] = '{%s}RoomList' % TNS
+        super().__init__(*args, **kwargs)
+
+    def call(self, **kwargs):
+        if self.protocol.version.major_version < 14:
+            raise NotImplementedError('%s is only supported for Exchange 2010 servers and later' % self.SERVICE_NAME)
+        elements = self._get_elements(payload=self._get_payload(**kwargs))
+        from .folders import RoomList
+        return [RoomList.from_xml(elem) for elem in elements]
+
+    def _get_payload(self, *args, **kwargs):
+        return create_element('m:%s' % self.SERVICE_NAME)
+
+
+class GetRooms(EWSService):
+    SERVICE_NAME = 'GetRooms'
+    element_container_name = '{%s}Rooms' % MNS
+
+    def __init__(self, *args, **kwargs):
+        kwargs['element_name'] = '{%s}Room' % TNS
+        super().__init__(*args, **kwargs)
+
+    def call(self, roomlist, **kwargs):
+        if self.protocol.version.major_version < 14:
+            raise NotImplementedError('%s is only supported for Exchange 2010 servers and later' % self.SERVICE_NAME)
+        elements = self._get_elements(payload=self._get_payload(roomlist, **kwargs))
+        from .folders import Room
+        return [Room.from_xml(elem) for elem in elements]
+
+    def _get_payload(self, roomlist, *args, **kwargs):
+        getrooms = create_element('m:%s' % self.SERVICE_NAME)
+        set_xml_value(getrooms, roomlist, self.protocol.version)
+        return getrooms
 
 
 class EWSPooledService(EWSService):

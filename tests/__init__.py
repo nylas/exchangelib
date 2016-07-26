@@ -13,9 +13,9 @@ from exchangelib.configuration import Configuration
 from exchangelib.credentials import DELEGATE
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, ExternId, Choice, Email, Contact, Task, \
-    EmailAddress, PhysicalAddress, PhoneNumber, IndexedField
+    EmailAddress, PhysicalAddress, PhoneNumber, IndexedField, RoomList
 from exchangelib.restriction import Restriction
-from exchangelib.services import GetServerTimeZones, AllProperties, IdOnly
+from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, AllProperties, IdOnly
 from exchangelib.util import xml_to_str, chunkify, peek
 
 
@@ -264,6 +264,19 @@ class CommonTest(EWSTest):
         ws = GetServerTimeZones(self.config.protocol)
         data = ws.call()
         self.assertAlmostEqual(len(data), 100, delta=10, msg=data)
+
+    def test_get_roomlists(self):
+        # The test server is not guaranteed to have any room lists which makes this test less useful
+        ws = GetRoomLists(self.config.protocol)
+        roomlists = ws.call()
+        self.assertEqual(roomlists, [])
+
+    def test_get_rooms(self):
+        # The test server is not guaranteed to have any rooms or room lists which makes this test less useful
+        roomlist = RoomList(email_address='my.roomlist@example.com')
+        ws = GetRooms(self.config.protocol)
+        roomlists = ws.call(roomlist=roomlist)
+        self.assertEqual(roomlists, [])
 
     def test_getfolders(self):
         folders = self.account.root.get_folders()

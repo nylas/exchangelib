@@ -12,7 +12,7 @@ from .credentials import DELEGATE
 from .ewsdatetime import EWSDateTime, UTC_NOW
 from .restriction import Restriction
 from .services import TNS, FindItem, IdOnly, SHALLOW, DEEP, DeleteItem, CreateItem, UpdateItem, FindFolder, GetFolder, \
-    GetItem
+    GetItem, MNS
 from .util import create_element, add_xml_child, get_xml_attrs, get_xml_attr, set_xml_value, ElementType, peek
 
 log = getLogger(__name__)
@@ -295,6 +295,36 @@ class Mailbox(EWSElement):
 
     def __repr__(self):
         return self.__class__.__name__ + repr((self.name, self.email_address, self.mailbox_type, self.item_id))
+
+
+class RoomList(Mailbox):
+    ELEMENT_NAME = 'RoomList'
+
+    @classmethod
+    def request_tag(cls):
+        return 'm:%s' % cls.ELEMENT_NAME
+
+
+    @classmethod
+    def response_tag(cls):
+        return '{%s}%s' % (MNS, cls.ELEMENT_NAME)
+
+
+class Room(Mailbox):
+    ELEMENT_NAME = 'Room'
+
+    @classmethod
+    def from_xml(cls, elem):
+        if elem is None:
+            return None
+        assert elem.tag == cls.response_tag(), (elem.tag, cls.response_tag())
+        id_elem = elem.find('{%s}Id' % TNS)
+        return cls(
+            name=get_xml_attr(id_elem, '{%s}Name' % TNS),
+            email_address=get_xml_attr(id_elem, '{%s}EmailAddress' % TNS),
+            mailbox_type=get_xml_attr(id_elem, '{%s}MailboxType' % TNS),
+            item_id=ItemId.from_xml(id_elem.find(ItemId.response_tag())),
+        )
 
 
 class ExtendedProperty(EWSElement):
