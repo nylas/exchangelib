@@ -11,7 +11,8 @@ class Configuration:
     Stores default credentials when connecting via a system account, and default connection protocol when autodiscover
     is not activated for an Account.
     """
-    def __init__(self, server=None, username=None, password=None, has_ssl=True, ews_auth_type=None, ews_url=None):
+    def __init__(self, server=None, username=None, password=None, has_ssl=True, verify=True,
+                 ews_auth_type=None, ews_url=None):
         if username:
             if not password:
                 raise AttributeError('Password must be provided when username is provided')
@@ -28,6 +29,7 @@ class Configuration:
                 ews_url=ews_url,
                 ews_auth_type=ews_auth_type,
                 has_ssl=has_ssl,
+                verify=verify,
                 credentials=self.credentials,
             )
         else:

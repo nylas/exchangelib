@@ -39,19 +39,18 @@ RESPONSE_NS = 'http://schemas.microsoft.com/exchange/autodiscover/outlook/respon
 
 REQUEST_TIMEOUT = 10  # Seconds
 
-# Used to cache the autoconfigure URL for a specific hostname
+# Used to cache the autoconfigure URL for a specific email domain
 _autodiscover_cache = {}
 _autodiscover_cache_lock = Lock()
 
 
 def close_connections():
-    for domain, cached_values in _autodiscover_cache.items():
+    for domain, protocol in _autodiscover_cache.items():
         log.debug('Domain %s: Closing sessions', domain)
-        autodiscover_protocol = cached_values[2]
-        autodiscover_protocol.close()
+        protocol.close()
 
 
-def discover(email, credentials):
+def discover(email, credentials, verify=True):
     """
     Performs the autodiscover dance and returns a Protocol on success. The autodiscover and EWs server might not be
     the same, so we use a different Protocol to do the autodiscover request, and return a hopefully-cached Protocol
@@ -63,14 +62,13 @@ def discover(email, credentials):
     # Use lock to guard against multiple threads competing to cache information
     if domain in _autodiscover_cache:
         # Python dict() is thread safe, so accessing _autodiscover_cache without a lock should be OK
-        hostname, has_ssl, protocol = _autodiscover_cache[domain]
+        protocol = _autodiscover_cache[domain]
         assert isinstance(protocol, AutodiscoverProtocol)
-        log.debug('Cache hit for domain %s: %s', domain, hostname)
+        log.debug('Cache hit for domain %s: %s', domain, protocol.server)
         try:
             # This is the main path when the cache is primed
-            primary_smtp_address, protocol = _autodiscover_quick(hostname=hostname, credentials=credentials,
-                                                                 email=email, has_ssl=has_ssl,
-                                                                 autodiscover_protocol=protocol)
+            primary_smtp_address, protocol = _autodiscover_quick(credentials=credentials, email=email,
+                                                                 protocol=protocol)
             assert primary_smtp_address
             assert isinstance(protocol, Protocol)
             return primary_smtp_address, protocol
@@ -79,7 +77,7 @@ def discover(email, credentials):
             if email.lower() == e.redirect_email.lower():
                 raise AutoDiscoverFailed('Redirect to same email address: %s' % email) from e
             # Start over with the new email address
-            return discover(e.redirect_email, credentials)
+            return discover(email=e.redirect_email, credentials=credentials, verify=verify)
         # This is unreachable
 
     log.debug('Waiting for _autodiscover_cache_lock')
@@ -95,7 +93,7 @@ def discover(email, credentials):
             try:
                 # This eventually fills the cache in _autodiscover_hostname
                 primary_smtp_address, protocol = _try_autodiscover(hostname=domain, credentials=credentials,
-                                                                   email=email)
+                                                                   email=email, verify=verify)
                 assert primary_smtp_address
                 assert isinstance(protocol, Protocol)
                 return primary_smtp_address, protocol
@@ -108,41 +106,45 @@ def discover(email, credentials):
                 log.debug('Releasing_autodiscover_cache_lock')
     # We fell out of the with statement, so either cache was filled by someone else, or autodiscover redirected us to
     # another email address. Start over.
-    return discover(email, credentials)
+    return discover(email=email, credentials=credentials, verify=verify)
 
 
-def _try_autodiscover(hostname, credentials, email):
+def _try_autodiscover(hostname, credentials, email, verify):
     # Implements the full chain of autodiscover server discovery attempts. Tries to return autodiscover data from the
     # final host.
     try:
-        return _autodiscover_hostname(hostname=hostname, credentials=credentials, email=email)
+        return _autodiscover_hostname(hostname=hostname, credentials=credentials, email=email, has_ssl=True,
+                                      verify=verify)
     except RedirectError as e:
-        return _try_autodiscover(e.server, credentials, email)
+        return _try_autodiscover(e.server, credentials, email, verify=verify)
     except AutoDiscoverFailed:
         try:
-            return _autodiscover_hostname(hostname='autodiscover.%s' % hostname, credentials=credentials, email=email)
+            return _autodiscover_hostname(hostname='autodiscover.%s' % hostname, credentials=credentials, email=email,
+                                          has_ssl=True, verify=verify)
         except RedirectError as e:
-            return _try_autodiscover(e.server, credentials, email)
+            return _try_autodiscover(e.server, credentials, email, verify=verify)
         except AutoDiscoverFailed:
             try:
                 return _autodiscover_hostname(hostname='autodiscover.%s' % hostname, credentials=credentials,
-                                              email=email, has_ssl=False)
+                                              email=email, has_ssl=False, verify=verify)
             except RedirectError as e:
-                return _try_autodiscover(e.server, credentials, email)
+                return _try_autodiscover(e.server, credentials, email, verify=verify)
             except AutoDiscoverFailed:
                 try:
                     hostname_from_dns = _get_canonical_name(hostname='autodiscover.%s' % hostname)
                     if not hostname_from_dns:
                         hostname_from_dns = _get_hostname_from_srv(hostname='autodiscover.%s' % hostname)
                     # Start over with new hostname
-                    return _try_autodiscover(hostname=hostname_from_dns, credentials=credentials, email=email)
+                    return _try_autodiscover(hostname=hostname_from_dns, credentials=credentials, email=email,
+                                             verify=verify)
                 except AutoDiscoverFailed:
                     hostname_from_dns = _get_hostname_from_srv(hostname='_autodiscover._tcp.%s' % hostname)
                     # Start over with new hostname
-                    return _try_autodiscover(hostname=hostname_from_dns, credentials=credentials, email=email)
+                    return _try_autodiscover(hostname=hostname_from_dns, credentials=credentials, email=email,
+                                             verify=verify)
 
 
-def _autodiscover_hostname(hostname, credentials, email, has_ssl=True, auth_type=None):
+def _autodiscover_hostname(hostname, credentials, email, has_ssl, verify, auth_type=None):
     # Tries to get autodiscover data on a specific host. If we are HTTP redirected, we restart the autodiscover dance on
     # the new host.
     scheme = 'https' if has_ssl else 'http'
@@ -150,7 +152,8 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl=True, auth_type
     log.debug('Trying autodiscover on %s', url)
     if not auth_type:
         try:
-            auth_type = _get_autodiscover_auth_type(hostname=hostname, url=url, has_ssl=has_ssl, email=email)
+            auth_type = _get_autodiscover_auth_type(hostname=hostname, url=url, has_ssl=has_ssl, verify=verify,
+                                                    email=email)
         except RedirectError as e:
             log.debug(e)
             redirect_url, redirect_hostname, redirect_has_ssl = e.url, e.server, e.has_ssl
@@ -167,13 +170,14 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl=True, auth_type
                 raise AutoDiscoverFailed('We were redirected to the same host') from e
             raise RedirectError(url=None, server=redirect_hostname, has_ssl=redirect_has_ssl) from e
 
-    autodiscover_protocol = AutodiscoverProtocol(url=url, has_ssl=has_ssl, credentials=credentials, auth_type=auth_type)
-    r = _get_autodiscover_response(protocol=autodiscover_protocol, url=url, email=email, verify=True)
+    protocol = AutodiscoverProtocol(url=url, has_ssl=has_ssl, verify=verify, credentials=credentials,
+                                    auth_type=auth_type)
+    r = _get_autodiscover_response(protocol=protocol, email=email)
     if r.status_code == 302:
-        redirect_url, server, has_ssl = get_redirect_url(r, hostname, has_ssl)
+        redirect_url, redirect_hostname, has_ssl = get_redirect_url(r, hostname, has_ssl)
         log.debug('We were redirected to %s', redirect_url)
         # Don't raise RedirectError here because we need to pass the ssl and auth_type data
-        return _autodiscover_hostname(server, credentials, email, has_ssl=has_ssl, auth_type=None)
+        return _autodiscover_hostname(redirect_hostname, credentials, email, has_ssl=has_ssl, verify=verify, auth_type=None)
     domain = get_domain(email)
     try:
         server, has_ssl, ews_url, ews_auth_type, primary_smtp_address = _parse_response(r.text)
@@ -183,10 +187,10 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl=True, auth_type
         # These are both valid responses from an autodiscover server, showing that we have found the correct
         # server for the original domain. Fill cache before re-raising
         log.debug('Adding cache entry for %s (hostname %s, has_ssl %s)' % (domain, hostname, has_ssl))
-        _autodiscover_cache[domain] = hostname, has_ssl, autodiscover_protocol
+        _autodiscover_cache[domain] = protocol
         raise
 
-    real_ews_auth_type = transport.get_service_authtype(server=server, has_ssl=has_ssl, ews_url=ews_url,
+    real_ews_auth_type = transport.get_service_authtype(server=server, has_ssl=has_ssl, verify=verify, ews_url=ews_url,
                                                         versions=API_VERSIONS)
     if ews_auth_type != real_ews_auth_type:
         log.debug('Autodiscover and real server disagree on auth method for %s (%s vs %s). Using server version',
@@ -195,27 +199,31 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl=True, auth_type
 
     # Cache the final hostname of the autodiscover service so we don't need to autodiscover the same domain again
     log.debug('Adding cache entry for %s (hostname %s, has_ssl %s)' % (domain, hostname, has_ssl))
-    _autodiscover_cache[domain] = hostname, has_ssl, autodiscover_protocol
-    protocol = Protocol(has_ssl=has_ssl, ews_url=ews_url, credentials=credentials, ews_auth_type=ews_auth_type)
+    _autodiscover_cache[domain] = protocol
+    # If we didn't want to verify SSL on the autodiscover server, we probably don't want to on the Exchange server,
+    # either.
+    protocol = Protocol(has_ssl=has_ssl, verify=verify, ews_url=ews_url, credentials=credentials,
+                        ews_auth_type=ews_auth_type)
     return primary_smtp_address, protocol
 
 
-def _autodiscover_quick(hostname, credentials, email, has_ssl, autodiscover_protocol):
-    scheme = 'https' if has_ssl else 'http'
-    url = '%s://%s/autodiscover/autodiscover.xml' % (scheme, hostname)
-    r = _get_autodiscover_response(protocol=autodiscover_protocol, url=url, email=email, verify=True)
+def _autodiscover_quick(credentials, email, protocol):
+    r = _get_autodiscover_response(protocol=protocol, email=email)
     server, has_ssl, ews_url, ews_auth_type, primary_smtp_address = _parse_response(r.text)
     if not primary_smtp_address:
         primary_smtp_address = email
     log.debug('Autodiscover success: %s may connect to %s as primary email %s', email, ews_url, primary_smtp_address)
-    protocol = Protocol(has_ssl=has_ssl, ews_url=ews_url, credentials=credentials, ews_auth_type=ews_auth_type)
+    # If we didn't want to verify SSL on the autodiscover server, we probably don't want to on the Exchange server,
+    # either.
+    protocol = Protocol(has_ssl=has_ssl, verify=protocol.verify, ews_url=ews_url, credentials=credentials,
+                        ews_auth_type=ews_auth_type)
     return primary_smtp_address, protocol
 
 
-def _get_autodiscover_auth_type(hostname, url, has_ssl, email, encoding='utf-8'):
+def _get_autodiscover_auth_type(hostname, url, has_ssl, verify, email, encoding='utf-8'):
     try:
         data = _get_autodiscover_payload(email=email, encoding=encoding)
-        return transport.get_autodiscover_authtype(server=hostname, has_ssl=has_ssl, url=url, data=data,
+        return transport.get_autodiscover_authtype(server=hostname, has_ssl=has_ssl, verify=verify, url=url, data=data,
                                                    timeout=REQUEST_TIMEOUT)
     except (TransportError, requests.exceptions.ConnectionError, requests.exceptions.Timeout,
             requests.exceptions.SSLError) as e:
@@ -236,7 +244,7 @@ def _get_autodiscover_payload(email, encoding='utf-8'):
     return xml_str.encode(encoding)
 
 
-def _get_autodiscover_response(protocol, url, email, encoding='utf-8', verify=True):
+def _get_autodiscover_response(protocol, email, encoding='utf-8'):
     data = _get_autodiscover_payload(email=email, encoding=encoding)
     headers = {'Content-Type': 'text/xml; charset=%s' % encoding}
     try:
@@ -245,29 +253,29 @@ def _get_autodiscover_response(protocol, url, email, encoding='utf-8', verify=Tr
         # redirects depending on the POST data content.
         session = protocol.get_session()
         r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=headers, data=data,
-                                      timeout=protocol.timeout, verify=verify, allow_redirects=True)
+                                      timeout=protocol.timeout, verify=protocol.verify, allow_redirects=True)
         protocol.release_session(session)
         log.debug('Response headers: %s', r.headers)
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
-        log.debug('Connection error on %s: %s', url, e)
+        log.debug('Connection error on %s: %s', protocol.ews_url, e)
         # Don't raise AutoDiscoverFailed here. Connection errors could just as well be a valid but misbehaving server.
         raise
     except RedirectError:
         raise
     except TransportError:
-        log.debug('No access to %s using %s', url, protocol.ews_auth_type)
-        raise AutoDiscoverFailed('No access to %s using %s' % (url, protocol.ews_auth_type))
+        log.debug('No access to %s using %s', protocol.ews_url, protocol.ews_auth_type)
+        raise AutoDiscoverFailed('No access to %s using %s' % (protocol.ews_url, protocol.ews_auth_type))
     if r.status_code == 302:
         # Give caller a chance to re-do the request
         return r
     if r.status_code != 200:
-        log.debug('%s returned HTTP %s', url, r.status_code)
+        log.debug('%s returned HTTP %s', protocol.ews_url, r.status_code)
         # raise an uncatched error for now, until we understand this failure case
-        raise TransportError('%s returned HTTP %s' % (url, r.status_code))
+        raise TransportError('%s returned HTTP %s' % (protocol.ews_url, r.status_code))
     if not is_xml(r.text):
         # This is normal - e.g. a greedy webserver serving custom HTTP 404's as 200 OK
-        log.debug('URL %s: This is not XML: %s', url, r.text[:1000])
-        raise AutoDiscoverFailed('URL %s: This is not XML: %s' % (url, r.text[:1000]))
+        log.debug('URL %s: This is not XML: %s', protocol.ews_url, r.text[:1000])
+        raise AutoDiscoverFailed('URL %s: This is not XML: %s' % (protocol.ews_url, r.text[:1000]))
     return r
 
 
@@ -379,13 +387,16 @@ class AutodiscoverProtocol(Protocol):
     # Dummy class for post_ratelimited which implements the bare essentials
     SESSION_POOLSIZE = 1
 
-    def __init__(self, url, has_ssl, credentials, auth_type):
+    def __init__(self, url, has_ssl, credentials, verify, auth_type):
         assert isinstance(credentials, Credentials)
         self.server = parse.urlparse(url).hostname.lower()
         self.credentials = credentials
+        # TODO: The following two are mis-named (it's the auth type and URL for the autodiscover service) but we need to
+        # keep the naming because we inherit from Protocol. Ewww.
         self.ews_url = url
         self.ews_auth_type = auth_type
         self.has_ssl = has_ssl
+        self.verify = verify
         self.timeout = REQUEST_TIMEOUT
         self._session_pool = queue.LifoQueue(maxsize=POOLSIZE)
         for i in range(POOLSIZE):
