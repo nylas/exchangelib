@@ -202,8 +202,8 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl, verify, auth_t
     _autodiscover_cache[domain] = protocol
     # If we didn't want to verify SSL on the autodiscover server, we probably don't want to on the Exchange server,
     # either.
-    protocol = Protocol(ews_url=ews_url, credentials=credentials, verify=verify, ews_auth_type=ews_auth_type)
-    return primary_smtp_address, protocol
+    return primary_smtp_address, Protocol(ews_url=ews_url, credentials=credentials, verify=verify,
+                                          ews_auth_type=ews_auth_type)
 
 
 def _autodiscover_quick(credentials, email, protocol):
@@ -214,8 +214,8 @@ def _autodiscover_quick(credentials, email, protocol):
     log.debug('Autodiscover success: %s may connect to %s as primary email %s', email, ews_url, primary_smtp_address)
     # If we didn't want to verify SSL on the autodiscover server, we probably don't want to on the Exchange server,
     # either.
-    protocol = Protocol(ews_url=ews_url, credentials=credentials, verify=protocol.verify, ews_auth_type=ews_auth_type)
-    return primary_smtp_address, protocol
+    return primary_smtp_address, Protocol(ews_url=ews_url, credentials=credentials, verify=protocol.verify,
+                                          ews_auth_type=ews_auth_type)
 
 
 def _get_autodiscover_auth_type(hostname, url, has_ssl, verify, email, encoding='utf-8'):
