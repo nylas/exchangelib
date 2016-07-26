@@ -28,7 +28,6 @@ class Configuration:
             self.protocol = Protocol(
                 ews_url=ews_url,
                 ews_auth_type=ews_auth_type,
-                has_ssl=has_ssl,
                 verify=verify,
                 credentials=self.credentials,
             )

@@ -41,16 +41,16 @@ def close_connections():
 class Protocol:
     SESSION_POOLSIZE = 1
 
-    def __init__(self, ews_url, has_ssl, credentials, verify=True, ews_auth_type=None):
+    def __init__(self, ews_url, credentials, verify=True, ews_auth_type=None):
         assert isinstance(credentials, Credentials)
-        self.server = parse.urlparse(ews_url).hostname.lower()
-        self.has_ssl = has_ssl
-        self.verify=verify
+        parsed_url = parse.urlparse(ews_url)
+        self.server = parsed_url.hostname.lower()
+        self.has_ssl = parsed_url.scheme == 'https'
+        self.verify = verify
         self.ews_url = ews_url
-        scheme = 'https' if self.has_ssl else 'http'
-        self.wsdl_url = '%s://%s/EWS/Services.wsdl' % (scheme, self.server)
-        self.messages_url = '%s://%s/EWS/messages.xsd' % (scheme, self.server)
-        self.types_url = '%s://%s/EWS/types.xsd' % (scheme, self.server)
+        self.wsdl_url = '%s://%s/EWS/Services.wsdl' % (parsed_url.scheme, self.server)
+        self.messages_url = '%s://%s/EWS/messages.xsd' % (parsed_url.scheme, self.server)
+        self.types_url = '%s://%s/EWS/types.xsd' % (parsed_url.scheme, self.server)
         self.credentials = credentials
         self.timeout = TIMEOUT
 

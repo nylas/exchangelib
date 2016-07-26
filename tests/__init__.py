@@ -8,6 +8,7 @@ from decimal import Decimal
 from yaml import load
 
 from exchangelib.account import Account
+from exchangelib.autodiscover import discover
 from exchangelib.configuration import Configuration
 from exchangelib.credentials import DELEGATE
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
@@ -295,6 +296,12 @@ class CommonTest(EWSTest):
         self.assertIn(self.config.credentials.username, str(self.config.credentials))
         self.assertIn(self.account.primary_smtp_address, str(self.account))
 
+    def test_autodiscover(self):
+        primary_smtp_address, protocol = discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
+        self.assertEqual(primary_smtp_address, self.account.primary_smtp_address)
+        self.assertEqual(protocol.ews_url, self.config.protocol.ews_url)
+        self.assertEqual(protocol.version, self.config.protocol.version)
+
 
 class BaseItemMixIn:
     TEST_FOLDER = None
@@ -323,7 +330,7 @@ class BaseItemMixIn:
             item_kwargs[f] = self.random_val(field_type)
         return self.ITEM_CLASS(item_id='', changekey='', categories=self.categories, **item_kwargs)
 
-    def test_builtin(self):
+    def test_magic(self):
         item = self.get_test_item()
         if self.ITEM_CLASS == CalendarItem:
             self.assertIn('ItemId', str(item))
