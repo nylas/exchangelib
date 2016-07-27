@@ -9,12 +9,8 @@ Usage
 
 Here is a simple example that inserts, retrieves and deletes calendar items in an Exchange calendar::
 
-    from exchangelib import DELEGATE
-    from exchangelib.account import Account
-    from exchangelib.configuration import Configuration
-    from exchangelib.ewsdatetime import EWSDateTime, EWSTimeZone
+    from exchangelib import DELEGATE, IdOnly, Account, Configuration, EWSDateTime, EWSTimeZone
     from exchangelib.folders import CalendarItem
-    from exchangelib.services import IdOnly
 
     year, month, day = 2016, 3, 20
     tz = EWSTimeZone.timezone('Europe/Copenhagen')
