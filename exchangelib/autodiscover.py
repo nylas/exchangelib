@@ -162,21 +162,23 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl, verify, auth_t
             if canonical_hostname:
                 log.debug('Canonical hostname is %s', canonical_hostname)
                 redirect_hostname = canonical_hostname
-            # Try the process on the new host, without 'www'. This is beyond the autodiscover protocol
+            # Try the process on the new host, without 'www'. This is beyond the autodiscover protocol and an attempt to
+            # work around seriously misconfigured Exchange servers. It's probably better to just show the Exchange
+            # admins the report from https://testconnectivity.microsoft.com
             if redirect_hostname.startswith('www.'):
                 redirect_hostname = redirect_hostname[4:]
             if redirect_hostname == hostname:
                 log.debug('We were redirected to the same host')
                 raise AutoDiscoverFailed('We were redirected to the same host') from e
-            raise RedirectError(url=None, server=redirect_hostname, has_ssl=redirect_has_ssl) from e
+            raise RedirectError(url='%s://%s' % ('https' if redirect_has_ssl else 'http', redirect_hostname)) from e
 
     protocol = AutodiscoverProtocol(url=url, verify_ssl=verify, credentials=credentials, auth_type=auth_type)
     r = _get_autodiscover_response(protocol=protocol, email=email)
     if r.status_code == 302:
-        redirect_url, redirect_hostname, has_ssl = get_redirect_url(r, hostname, has_ssl)
+        redirect_url, redirect_hostname, redirect_has_ssl = get_redirect_url(r, hostname, has_ssl)
         log.debug('We were redirected to %s', redirect_url)
         # Don't raise RedirectError here because we need to pass the ssl and auth_type data
-        return _autodiscover_hostname(redirect_hostname, credentials, email, has_ssl=has_ssl, verify=verify,
+        return _autodiscover_hostname(redirect_hostname, credentials, email, has_ssl=redirect_has_ssl, verify=verify,
                                       auth_type=None)
     domain = get_domain(email)
     try:

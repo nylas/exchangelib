@@ -39,14 +39,16 @@ class UnauthorizedError(EWSError):
 
 
 class RedirectError(TransportError):
-    def __init__(self, url, server, has_ssl):
+    def __init__(self, url):
+        from urllib import parse
+        parsed_url = parse.urlparse(url)
         self.url = url
-        self.server = server
-        self.has_ssl = has_ssl
+        self.server = parsed_url.hostname.lower()
+        self.has_ssl = parsed_url.scheme == 'https'
         super().__init__(str(self))
 
     def __str__(self):
-        return 'We were redirected to %s, server %s, has_ssl %s' % (self.url, self.server, self.has_ssl)
+        return 'We were redirected to %s' % self.url
 
 
 class AutoDiscoverError(TransportError):

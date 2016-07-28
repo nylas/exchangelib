@@ -158,7 +158,7 @@ def get_autodiscover_authtype(server, has_ssl, verify, url, data, timeout):
             redirect_url, redirect_server, redirect_has_ssl = get_redirect_url(r, server, has_ssl)
             log.debug('Autodiscover HTTP redirect to %s', redirect_url)
             if not (server == redirect_server and has_ssl == redirect_has_ssl):
-                raise RedirectError(url=redirect_url, server=redirect_server, has_ssl=redirect_has_ssl)
+                raise RedirectError(url=redirect_url)
             # Some MS servers are masters of fucking up HTTP, issuing 302 to an error page with zero content. Give this
             # URL a chance with a POST request.
             # raise TransportError('Circular redirect')
@@ -205,7 +205,7 @@ def _get_auth_method_from_response(server, response, has_ssl):
         redirect_url, redirect_server, redirect_has_ssl = get_redirect_url(response, server, has_ssl)
         if server == redirect_server and has_ssl == redirect_has_ssl:
             raise TransportError('Circular redirect')
-        raise RedirectError(url=redirect_url, server=redirect_server, has_ssl=redirect_has_ssl)
+        raise RedirectError(url=redirect_url)
     if response.status_code != 401:
         raise TransportError('Unexpected response: %s %s' % (response.status_code, response.reason))
 

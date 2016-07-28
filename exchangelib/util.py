@@ -279,7 +279,7 @@ Response headers: %(response_headers)s'''
                     raise TransportError('Redirect not allowed but we were redirected (%s -> %s)' % (url, redirect_url))
                 if has_ssl != protocol.has_ssl or server != protocol.server:
                     log.debug("'allow_redirects' only supports relative redirects (%s -> %s)", url, redirect_url)
-                    raise RedirectError(url=redirect_url, server=server, has_ssl=has_ssl)
+                    raise RedirectError(url=redirect_url)
                 url = redirect_url
                 log_vals['url'] = url
                 log.debug('302 Redirected to %s', url)
