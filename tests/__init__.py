@@ -316,9 +316,15 @@ class CommonTest(EWSTest):
         self.assertEqual(protocol.version, self.config.protocol.version)
 
 
-class BaseItemMixIn:
+class BaseItemTest(EWSTest):
     TEST_FOLDER = None
     ITEM_CLASS = None
+
+    @classmethod
+    def setUpClass(cls):
+        if cls is BaseItemTest:
+            raise unittest.SkipTest("Skip BaseItemTest, it's only for inheritance")
+        super().setUpClass()
 
     def setUp(self):
         super().setUp()
@@ -565,22 +571,22 @@ class BaseItemMixIn:
         self.assertEqual(status, [(True, None)])
 
 
-class CalendarTest(BaseItemMixIn, EWSTest):
+class CalendarTest(BaseItemTest):
     TEST_FOLDER = 'calendar'
     ITEM_CLASS = CalendarItem
 
 
-class InboxTest(BaseItemMixIn, EWSTest):
+class InboxTest(BaseItemTest):
     TEST_FOLDER = 'inbox'
     ITEM_CLASS = Message
 
 
-class TasksTest(BaseItemMixIn, EWSTest):
+class TasksTest(BaseItemTest):
     TEST_FOLDER = 'tasks'
     ITEM_CLASS = Task
 
 
-class ContactsTest(BaseItemMixIn, EWSTest):
+class ContactsTest(BaseItemTest):
     TEST_FOLDER = 'contacts'
     ITEM_CLASS = Contact
 
