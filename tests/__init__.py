@@ -17,6 +17,40 @@ from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, Extern
 from exchangelib.restriction import Restriction
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, AllProperties, IdOnly
 from exchangelib.util import xml_to_str, chunkify, peek
+from exchangelib.version import Build
+
+
+class BuildTest(unittest.TestCase):
+    def test_magic(self):
+        with self.assertRaises(ValueError):
+            Build(7, 0)
+        self.assertEqual(str(Build(9, 8, 7, 6)), '9.8.7.6')
+
+    def test_compare(self):
+        self.assertEqual(Build(15, 0, 1, 2), Build(15, 0, 1, 2))
+        self.assertLess(Build(15, 0, 1, 2), Build(15, 0, 1, 3))
+        self.assertLess(Build(15, 0, 1, 2), Build(15, 0, 2, 2))
+        self.assertLess(Build(15, 0, 1, 2), Build(15, 1, 1, 2))
+        self.assertLess(Build(15, 0, 1, 2), Build(16, 0, 1, 2))
+        self.assertLessEqual(Build(15, 0, 1, 2), Build(15, 0, 1, 2))
+        self.assertGreater(Build(15, 0, 1, 2), Build(15, 0, 1, 1))
+        self.assertGreater(Build(15, 0, 1, 2), Build(15, 0, 0, 2))
+        self.assertGreater(Build(15, 1, 1, 2), Build(15, 0, 1, 2))
+        self.assertGreater(Build(15, 0, 1, 2), Build(14, 0, 1, 2))
+        self.assertGreaterEqual(Build(15, 0, 1, 2), Build(15, 0, 1, 2))
+
+    def test_api_version(self):
+        self.assertEqual(Build(8, 0).api_version(), 'Exchange2007')
+        self.assertEqual(Build(8, 1).api_version(), 'Exchange2007_SP1')
+        self.assertEqual(Build(8, 2).api_version(), 'Exchange2007_SP1')
+        self.assertEqual(Build(8, 3).api_version(), 'Exchange2007_SP1')
+        self.assertEqual(Build(15, 0, 1, 1).api_version(), 'Exchange2013')
+        self.assertEqual(Build(15, 0, 1, 1).api_version(), 'Exchange2013')
+        self.assertEqual(Build(15, 0, 847, 0).api_version(), 'Exchange2013_SP1')
+        with self.assertRaises(KeyError):
+            Build(16, 0).api_version()
+        with self.assertRaises(KeyError):
+            Build(15, 4).api_version()
 
 
 class EWSDateTest(unittest.TestCase):
@@ -312,8 +346,8 @@ class CommonTest(EWSTest):
     def test_autodiscover(self):
         primary_smtp_address, protocol = discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
         self.assertEqual(primary_smtp_address, self.account.primary_smtp_address)
-        self.assertEqual(protocol.ews_url, self.config.protocol.ews_url)
-        self.assertEqual(protocol.version, self.config.protocol.version)
+        self.assertEqual(protocol.ews_url.lower(), self.config.protocol.ews_url.lower())
+        self.assertEqual(protocol.version.build, self.config.protocol.version.build)
 
 
 class BaseItemTest(EWSTest):

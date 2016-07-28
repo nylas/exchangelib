@@ -26,6 +26,7 @@ from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, 
 from .transport import wrap, SOAPNS, TNS, MNS, ENS
 from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, ElementType, \
     xml_to_str, set_xml_value
+from .version import EXCHANGE_2010
 
 log = logging.getLogger(__name__)
 
@@ -288,7 +289,7 @@ class GetServerTimeZones(EWSService):
         self.element_name = '{%s}TimeZoneDefinition' % TNS
 
     def call(self, **kwargs):
-        if self.protocol.version.major_version < 14:
+        if self.protocol.version.build < EXCHANGE_2010:
             raise NotImplementedError('%s is only supported for Exchange 2010 servers and later' % self.SERVICE_NAME)
         return self._get_elements(payload=self._get_payload(**kwargs))
 
@@ -316,7 +317,7 @@ class GetRoomLists(EWSService):
         self.element_name = RoomList.response_tag()
 
     def call(self, **kwargs):
-        if self.protocol.version.major_version < 14:
+        if self.protocol.version.build < EXCHANGE_2010:
             raise NotImplementedError('%s is only supported for Exchange 2010 servers and later' % self.SERVICE_NAME)
         elements = self._get_elements(payload=self._get_payload(**kwargs))
         from .folders import RoomList
@@ -336,7 +337,7 @@ class GetRooms(EWSService):
         self.element_name = Room.response_tag()
 
     def call(self, roomlist, **kwargs):
-        if self.protocol.version.major_version < 14:
+        if self.protocol.version.build < EXCHANGE_2010:
             raise NotImplementedError('%s is only supported for Exchange 2010 servers and later' % self.SERVICE_NAME)
         elements = self._get_elements(payload=self._get_payload(roomlist, **kwargs))
         from .folders import Room
@@ -491,7 +492,7 @@ class FindFolder(PagingEWSService, EWSFolderService):
                 additionalproperties.append(create_element('t:FieldURI', FieldURI=field_uri))
             foldershape.append(additionalproperties)
         findfolder.append(foldershape)
-        if folder.account.protocol.version.major_version >= 14:
+        if folder.account.protocol.version.build >= EXCHANGE_2010:
             indexedpageviewitem = create_element('m:IndexedPageFolderView', Offset=str(offset), BasePoint='Beginning')
             findfolder.append(indexedpageviewitem)
         else:

@@ -14,6 +14,7 @@ from .restriction import Restriction
 from .services import TNS, FindItem, IdOnly, SHALLOW, DEEP, DeleteItem, CreateItem, UpdateItem, FindFolder, GetFolder, \
     GetItem, MNS
 from .util import create_element, add_xml_child, get_xml_attrs, get_xml_attr, set_xml_value, ElementType, peek
+from .version import EXCHANGE_2010, EXCHANGE_2013
 
 log = getLogger(__name__)
 
@@ -646,7 +647,7 @@ class Item(EWSElement):
 
 
 class Folder:
-    DISTINGUISHED_FOLDER_ID = None
+    DISTINGUISHED_FOLDER_ID = None  # Must be lowercase
     CONTAINER_CLASS = None  # See http://msdn.microsoft.com/en-us/library/hh354773(v=exchg.80).aspx
     item_model = Item
 
@@ -845,7 +846,7 @@ class Folder:
                 AffectedTaskOccurrences='AllOccurrences' if all_occurrences else 'SpecifiedOccurrenceOnly')
         else:
             deleteitem = create_element('m:%s' % DeleteItem.SERVICE_NAME, DeleteType='HardDelete')
-        if self.account.version.major_version >= 15:
+        if self.account.version.build >= EXCHANGE_2013:
             deleteitem.set('SuppressReadReceipts', 'true')
 
         item_ids = create_element('m:ItemIds')
@@ -869,7 +870,7 @@ class Folder:
                                         MessageDisposition='SaveOnly')
         else:
             updateitem = create_element('m:%s' % UpdateItem.SERVICE_NAME, ConflictResolution='AutoResolve')
-        if self.account.version.major_version >= 15:
+        if self.account.version.build >= EXCHANGE_2013:
             updateitem.set('SuppressReadReceipts', 'true')
 
         itemchanges = create_element('m:ItemChanges')
@@ -926,7 +927,7 @@ class Folder:
                     # instead of explicit timezone on each datetime field.
                     setitemfield_tz = create_element('t:SetItemField')
                     folderitem_tz = create_element(self.item_model.request_tag())
-                    if self.account.version.major_version < 14:
+                    if self.account.version.build < EXCHANGE_2010:
                         if meeting_timezone_added:
                             # Let's hope that we're not changing timezone, or that both 'start' and 'end' are supplied.
                             # Exchange 2007 doesn't support different timezone on start and end.
@@ -1129,7 +1130,7 @@ class CalendarItem(ItemMixIn):
         # WARNING: The order of addition of XML elements is VERY important. Exchange expects XML elements in a
         # specific, non-documented order and will fail with meaningless errors if the order is wrong.
         i = super().to_xml(version=version)
-        if version.major_version < 14:
+        if version.build < EXCHANGE_2010:
             i.append(create_element('t:MeetingTimeZone', TimeZoneName=self.start.tzinfo.ms_id))
         else:
             i.append(create_element('t:StartTimeZone', Id=self.start.tzinfo.ms_id, Name=self.start.tzinfo.ms_name))

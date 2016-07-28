@@ -35,29 +35,105 @@ VERSIONS = {
     'Exchange2016': ('Exchange2016', 'Microsoft Exchange Server 2016'),
 }
 
-# List of build numbers here: https://technet.microsoft.com/en-gb/library/hh135098(v=exchg.150).aspx
-API_VERSION_FROM_BUILD_NUMBER = {
-    8: {
-        0: 'Exchange2007',
-        1: 'Exchange2007_SP1',
-        2: 'Exchange2007_SP1',
-        3: 'Exchange2007_SP1',
-    },
-    14: {
-        0: 'Exchange2010',
-        1: 'Exchange2010_SP1',
-        2: 'Exchange2010_SP2',
-        3: 'Exchange2010_SP2',
-    },
-    15: {
-        0: 'Exchange2013',  # Minor builds above 847 are Exchange2013_SP1
-        1: 'Exchange2016',
-    },
-}
-
 # Build a list of unique API versions, used when guessing API version supported by the server.  Use reverse order so we
 # get the newest API version supported by the server.
 API_VERSIONS = sorted({v[0] for v in VERSIONS.values()}, reverse=True)
+
+
+class Build:
+    """
+    Holds methods for working with build numbers
+    """
+
+    # List of build numbers here: https://technet.microsoft.com/en-gb/library/hh135098(v=exchg.150).aspx
+    API_VERSION_MAP = {
+        8: {
+            0: 'Exchange2007',
+            1: 'Exchange2007_SP1',
+            2: 'Exchange2007_SP1',
+            3: 'Exchange2007_SP1',
+        },
+        14: {
+            0: 'Exchange2010',
+            1: 'Exchange2010_SP1',
+            2: 'Exchange2010_SP2',
+            3: 'Exchange2010_SP2',
+        },
+        15: {
+            0: 'Exchange2013',  # Minor builds starting from 847 are Exchange2013_SP1, see api_version()
+            1: 'Exchange2016',
+        },
+    }
+
+    __slots__ = ('major_version', 'minor_version', 'major_build', 'minor_build')
+
+    def __init__(self, major_version, minor_version, major_build=0, minor_build=0):
+        self.major_version = major_version
+        self.minor_version = minor_version
+        self.major_build = major_build
+        self.minor_build = minor_build
+        if major_version < 8:
+            raise ValueError("Exchange major versions below 8 don't support EWS (%s)", str(self))
+
+    @classmethod
+    def from_xml(cls, elem):
+        keys = 'MajorVersion', 'MinorVersion', 'MajorBuildNumber', 'MinorBuildNumber'
+        vals = []
+        for k in keys:
+            v = elem.get(k)
+            if v is None:
+                raise ValueError()
+            vals.append(int(v))  # Also raises ValueError
+        return cls(*vals)
+
+    def api_version(self):
+        if self.major_version == 15 and self.minor_version == 0 and self.major_build >= 847:
+            return 'Exchange2013_SP1'
+        return self.API_VERSION_MAP[self.major_version][self.minor_version]
+
+    def __cmp__(self, other):
+        # __cmp__ is not a magic method in Python3. We'll just use it here to implement comparison operators
+        c = (self.major_version > other.major_version) - (self.major_version < other.major_version)
+        if c != 0:
+            return c
+        c = (self.minor_version > other.minor_version) - (self.minor_version < other.minor_version)
+        if c != 0:
+            return c
+        c = (self.major_build > other.major_build) - (self.major_build < other.major_build)
+        if c != 0:
+            return c
+        return (self.minor_build > other.minor_build) - (self.minor_build < other.minor_build)
+
+    def __eq__(self, other):
+        return self.__cmp__(other) == 0
+
+    def __ne__(self, other):
+        return self.__cmp__(other) != 0
+
+    def __lt__(self, other):
+        return self.__cmp__(other) < 0
+
+    def __le__(self, other):
+        return self.__cmp__(other) <= 0
+
+    def __gt__(self, other):
+        return self.__cmp__(other) > 0
+
+    def __ge__(self, other):
+        return self.__cmp__(other) >= 0
+
+    def __str__(self):
+        return '%s.%s.%s.%s' % (self.major_version, self.minor_version, self.major_build, self.minor_build)
+
+    def __repr__(self):
+        return self.__class__.__name__ \
+               + repr((self.major_version, self.minor_version, self.major_build, self.minor_build))
+
+
+# Helpers for comparison operations elsewhere in this package
+EXCHANGE_2007 = Build(8, 0)
+EXCHANGE_2010 = Build(14, 0)
+EXCHANGE_2013 = Build(15, 0)
 
 
 class Version:
@@ -65,18 +141,9 @@ class Version:
     Holds information about the server version
     """
 
-    def __init__(self, major_version, minor_version, major_build, minor_build, api_version):
-        self.major_version = major_version
-        self.minor_version = minor_version
-        self.major_build = major_build
-        self.minor_build = minor_build
+    def __init__(self, build, api_version):
+        self.build = build
         self.api_version = api_version
-        if major_version < 8:
-            raise ValueError("Exchange major versions below 8 don't support EWS (%s)", str(self))
-
-    @property
-    def build(self):
-        return '%s.%s.%s.%s' % (self.major_version, self.minor_version, self.major_build, self.minor_build)
 
     @property
     def fullname(self):
@@ -124,10 +191,10 @@ class Version:
         if r.status_code == 401:
             raise UnauthorizedError('Wrong username or password for %s' % types_url)
         if r.status_code == 302:
-            log.debug('We were redirected. Cant get version info from docs')
+            log.debug('We were redirected. Unable to get version info from docs')
             return None
         if r.status_code == 503:
-            log.debug('Service is unavailable. Cant get version info from docs')
+            log.debug('Service is unavailable. Unable to get version info from docs')
             return None
         if r.status_code != 200:
             if 'The referenced account is currently locked out' in r.text:
@@ -169,10 +236,10 @@ class Version:
         if r.status_code == 401:
             raise UnauthorizedError('Wrong username or password for %s' % ews_url)
         elif r.status_code == 302:
-            log.debug('We were redirected. Cant get version info from docs')
+            log.debug('We were redirected. Unable to get version info from service')
             return None
         elif r.status_code == 503:
-            log.debug('Service is unavailable. Cant get version info from docs')
+            log.debug('Service is unavailable. Unable to get version info from service')
             return None
         if r.status_code == 400:
             raise EWSWarning('Bad request')
@@ -210,21 +277,17 @@ class Version:
         if info is None:
             raise TransportError('No ServerVersionInfo in response: %s' % response.text)
 
-        major_version, minor_version, major_build, minor_build = \
-            [int(info.get(k)) for k in ['MajorVersion', 'MinorVersion', 'MajorBuildNumber', 'MinorBuildNumber']]
-        for k, v in dict(MajorVersion=major_version, MinorVersion=minor_version, MajorBuildNumber=major_build,
-                         MinorBuildNumber=minor_build).items():
-            if v is None:
-                raise TransportError('No %s in response: %s' % (k, response.text))
-        api_version_from_server = info.get('Version')
-        if api_version_from_server is None:
-            # Not all Exchange servers send the Version element
-            api_version_from_server = cls.api_version_from_build_number(major_version, minor_version, major_build)
+        try:
+            build = Build.from_xml(info)
+        except ValueError:
+            raise TransportError('Bad ServerVersionInfo in response: %s' % response.text)
+        # Not all Exchange servers send the Version element
+        api_version_from_server = info.get('Version') or build.api_version()
         if api_version_from_server != requested_api_version:
             if api_version_from_server.startswith('V2_') \
                     or api_version_from_server.startswith('V2015_') \
                     or api_version_from_server.startswith('V2016_'):
-                # Office 365 is an expert in sending invalid server versions...
+                # Office 365 is an expert in sending invalid API version strings...
                 log.info('API version "%s" worked but server reports version "%s". Using "%s"', requested_api_version,
                          api_version_from_server, requested_api_version)
                 api_version_from_server = requested_api_version
@@ -233,14 +296,7 @@ class Version:
                 # response except 'V2_nn' or 'V201[5,6]_nn_mm' which is bogus
                 log.info('API version "%s" worked but server reports version "%s". Using "%s"', requested_api_version,
                          api_version_from_server, api_version_from_server)
-        return cls(major_version, minor_version, major_build, minor_build, api_version_from_server)
-
-    @staticmethod
-    def api_version_from_build_number(major_version, minor_version, major_build):
-        api_version = API_VERSION_FROM_BUILD_NUMBER[major_version][minor_version]
-        if major_version == 15 and major_version == 0 and major_build >= 847:
-            api_version = 'Exchange2013_SP1'
-        return api_version
+        return cls(build, api_version_from_server)
 
     def __str__(self):
         return 'Build=%s, API=%s, Fullname=%s' % (self.build, self.api_version, self.fullname)
