@@ -47,3 +47,6 @@ class Configuration:
             )
         else:
             self.protocol = None
+
+    def __repr__(self):
+        return self.__class__.__name__ + repr((self.credentials, self.protocol))

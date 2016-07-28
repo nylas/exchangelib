@@ -148,6 +148,20 @@ class Protocol:
         del session
         return self.create_session()
 
+    def create_session(self):
+        session = EWSSession(self)
+        session.auth = get_auth_instance(credentials=self.credentials, auth_type=self.ews_auth_type)
+        # Leave this inside the loop because headers are mutable
+        headers = {'Content-Type': 'text/xml; charset=utf-8', 'Accept-Encoding': 'compress, gzip'}
+        session.headers.update(headers)
+        scheme = 'https' if self.has_ssl else 'http'
+        # We want just one connection per session. No retries, since we wrap all requests in our own retry handler
+        assert self.SESSION_POOLSIZE > 0
+        session.mount('%s://' % scheme, adapters.HTTPAdapter(pool_block=True, pool_connections=self.SESSION_POOLSIZE,
+                                                             pool_maxsize=self.SESSION_POOLSIZE, max_retries=0))
+        log.debug('Server %s: Created session %s', self.server, session.session_id)
+        return session
+
     def test(self):
         # We need the version for this
         try:
@@ -155,6 +169,9 @@ class Protocol:
         except socket.gaierror as e:
             raise TransportError("Server '%s' does not exist" % self.server) from e
         return test_credentials(protocol=self)
+
+    def __repr__(self):
+        return self.__class__.__name__ + repr((self.ews_url, self.credentials, self.verify_ssl, self.ews_auth_type))
 
     def __str__(self):
         return '''\
@@ -171,20 +188,6 @@ XSD auth: %s''' % (
             self.ews_auth_type,
             self.docs_auth_type,
         )
-
-    def create_session(self):
-        session = EWSSession(self)
-        session.auth = get_auth_instance(credentials=self.credentials, auth_type=self.ews_auth_type)
-        # Leave this inside the loop because headers are mutable
-        headers = {'Content-Type': 'text/xml; charset=utf-8', 'Accept-Encoding': 'compress, gzip'}
-        session.headers.update(headers)
-        scheme = 'https' if self.has_ssl else 'http'
-        # We want just one connection per session. No retries, since we wrap all requests in our own retry handler
-        assert self.SESSION_POOLSIZE > 0
-        session.mount('%s://' % scheme, adapters.HTTPAdapter(pool_block=True, pool_connections=self.SESSION_POOLSIZE,
-                                                             pool_maxsize=self.SESSION_POOLSIZE, max_retries=0))
-        log.debug('Server %s: Created session %s', self.server, session.session_id)
-        return session
 
 
 class EWSSession(Session):

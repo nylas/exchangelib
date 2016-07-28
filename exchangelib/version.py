@@ -298,5 +298,8 @@ class Version:
                          api_version_from_server, api_version_from_server)
         return cls(build, api_version_from_server)
 
+    def __repr__(self):
+        return self.__class__.__name__ + repr((self.build, self.api_version))
+
     def __str__(self):
         return 'Build=%s, API=%s, Fullname=%s' % (self.build, self.api_version, self.fullname)
