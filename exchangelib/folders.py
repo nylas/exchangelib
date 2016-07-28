@@ -693,9 +693,10 @@ class Folder:
         # Define the extra properties we want on the return objects. 'body' field can only be fetched with GetItem.
         additional_fields = ['item:Categories'] if categories else None
         # Define any search restrictions we want to set on the search.
-        # TODO Filtering by category doesn't work on Exchange 2010, returning "ErrorContainsFilterWrongType:
-        # The Contains filter can only be used for string properties." Fall back to filtering after getting all items
-        # instead. This may be a legal problem because we get ALL items, including private appointments.
+        # TODO Filtering by category doesn't work on Exchange 2010 (and others?), returning
+        # "ErrorContainsFilterWrongType: The Contains filter can only be used for string properties." Fall back to
+        # filtering after getting all items instead. This may be a legal and a performance problem because we get ALL
+        # items, including private appointments.
         restriction = Restriction.from_params(start=start, end=end, subject=subject)
         items = FindItem(self.account.protocol).call(folder=self, additional_fields=additional_fields,
                                                      restriction=restriction, shape=shape, depth=depth)
@@ -836,7 +837,7 @@ class Folder:
         return createitem
 
     def delete_xml(self, ids, all_occurrences=True):
-        # Prepare reuseable Element objects. # TODO: Make it possible to set all_occurrences from somewhere
+        # Prepare reuseable Element objects. # TODO: Make it possible to set all_occurrences in higher-level code
         if isinstance(self, Calendar):
             deleteitem = create_element(
                 'm:%s' % DeleteItem.SERVICE_NAME, DeleteType='HardDelete', SendMeetingCancellations='SendToNone')
@@ -1090,7 +1091,7 @@ class CalendarItem(ItemMixIn):
     LOCATION_MAXLENGTH = 255
     FIELDURI_PREFIX = 'calendar'
     CHOICES = {
-        # TODO: 'WorkingElsewhere' was added in Exchange2015 but we don't support versioned choices yet
+        # TODO: The 'WorkingElsewhere' status was added in Exchange2015 but we don't support versioned choices yet
         'legacy_free_busy_status': {'Free', 'Tentative', 'Busy', 'OOF', 'NoData'},
     }
     ITEM_FIELDS = {

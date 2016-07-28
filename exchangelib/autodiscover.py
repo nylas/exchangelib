@@ -9,10 +9,10 @@ WARNING: We are taking many shortcuts here, like assuming SSL and following 302 
 If you have problems autodiscovering, start by doing an official test at https://testconnectivity.microsoft.com
 """
 
-# TODO: According to Microsoft, we may cache the URL of the autodiscover service forever, or until it stops responding.
-# My previous experience with Exchange products in mind, I'm not sure if I should trust that advice. But it could save
-# some valuable seconds every time we start a new connection to a known server. In any case, this info would require
-# persistent storage.
+# TODO: According to Microsoft, we may forever cache the URL of the autodiscover service for a certain domain, or until
+# it stops responding. My previous experience with Exchange products in mind, I'm not sure if I should trust that
+# advice. But it could save some valuable seconds every time we start a new connection to a known server. In any case,
+# this info would require persistent storage.
 
 import logging
 from threading import Lock
@@ -393,8 +393,8 @@ class AutodiscoverProtocol(Protocol):
         parsed_url = parse.urlparse(url)
         self.server = parsed_url.hostname.lower()
         self.credentials = credentials
-        # TODO: The following two are mis-named (it's the auth type and URL for the autodiscover service) but we need to
-        # keep the naming because we inherit from Protocol. Ewww.
+        # TODO: The following two are mis-named (it's the auth type and URL for the autodiscover service, not the EWS
+        # service) but we need to keep the naming because we inherit from Protocol. Ewww.
         self.ews_url = url
         self.ews_auth_type = auth_type
         self.has_ssl = parsed_url.scheme == 'https'

@@ -180,7 +180,7 @@ def get_service_authtype(server, has_ssl, verify, ews_url, versions):
     # are set up to redirect to OWA on all requests except POST to /EWS/Exchange.asmx
     log.debug('Getting service auth type for %s', ews_url)
     headers = {'Content-Type': 'text/xml; charset=utf-8'}
-    # TODO We don't know the version yet, but we need it to create a valid request because some Exchange servers
+    # TODO We don't know the API version yet, but we need it to create a valid request because some Exchange servers
     # only respond when given a valid request. Try all known versions. Gross.
     with requests.sessions.Session() as s:
         for version in versions:
