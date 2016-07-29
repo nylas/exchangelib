@@ -17,7 +17,6 @@ If you have problems autodiscovering, start by doing an official test at https:/
 import logging
 from threading import Lock
 import queue
-from urllib import parse
 
 import requests.exceptions
 import dns.resolver
@@ -25,7 +24,7 @@ import dns.resolver
 from .credentials import Credentials
 from .version import API_VERSIONS
 from .errors import AutoDiscoverFailed, AutoDiscoverRedirect, TransportError, RedirectError, ErrorNonExistentMailbox
-from .protocol import Protocol
+from .protocol import BaseProtocol, Protocol
 from . import transport
 from .util import create_element, get_xml_attr, add_xml_child, to_xml, is_xml, post_ratelimited, get_redirect_url, \
     xml_to_str, split_url
@@ -37,7 +36,7 @@ AUTODISCOVER_NS = 'http://schemas.microsoft.com/exchange/autodiscover/outlook/re
 ERROR_NS = 'http://schemas.microsoft.com/exchange/autodiscover/responseschema/2006'
 RESPONSE_NS = 'http://schemas.microsoft.com/exchange/autodiscover/outlook/responseschema/2006a'
 
-REQUEST_TIMEOUT = 10  # Seconds
+TIMEOUT = 10  # Seconds
 
 # Used to cache the autoconfigure URL for a specific email domain
 _autodiscover_cache = {}
@@ -222,7 +221,7 @@ def _autodiscover_quick(credentials, email, protocol):
 def _get_autodiscover_auth_type(url, email, verify, encoding='utf-8'):
     try:
         data = _get_autodiscover_payload(email=email, encoding=encoding)
-        return transport.get_autodiscover_authtype(service_endpoint=url, data=data, timeout=REQUEST_TIMEOUT,
+        return transport.get_autodiscover_authtype(service_endpoint=url, data=data, timeout=TIMEOUT,
                                                    verify=verify)
     except (TransportError, requests.exceptions.ConnectionError, requests.exceptions.Timeout,
             requests.exceptions.SSLError) as e:
@@ -252,7 +251,7 @@ def _get_autodiscover_response(protocol, email, encoding='utf-8'):
         # redirects depending on the POST data content.
         session = protocol.get_session()
         r, session = post_ratelimited(protocol=protocol, session=session, url=protocol.service_endpoint,
-                                      headers=headers, data=data, timeout=protocol.timeout, verify=protocol.verify_ssl,
+                                      headers=headers, data=data, timeout=protocol.TIMEOUT, verify=protocol.verify_ssl,
                                       allow_redirects=True)
         protocol.release_session(session)
         log.debug('Response headers: %s', r.headers)
@@ -336,7 +335,7 @@ def _parse_response(response, encoding='utf-8'):
 def _get_canonical_name(hostname):
     log.debug('Attempting to get canonical name for %s', hostname)
     resolver = dns.resolver.Resolver()
-    resolver.timeout = REQUEST_TIMEOUT
+    resolver.timeout = TIMEOUT
     try:
         canonical_name = resolver.query(hostname).canonical_name.to_unicode().rstrip('.')
     except dns.resolver.NXDOMAIN:
@@ -355,7 +354,7 @@ def _get_hostname_from_srv(hostname):
     # or throw dns.resolver.NoAnswer
     log.debug('Attempting to get SRV record on %s', hostname)
     resolver = dns.resolver.Resolver()
-    resolver.timeout = REQUEST_TIMEOUT
+    resolver.timeout = TIMEOUT
     try:
         answers = resolver.query(hostname, 'SRV')
         for rdata in answers:
@@ -380,22 +379,21 @@ def get_domain(email):
     except (IndexError, AttributeError) as e:
         raise ValueError("'%s' is not a valid email" % email) from e
 
-POOLSIZE = 4
 
+class AutodiscoverProtocol(BaseProtocol):
+    # Protocol which implements the bare essentials for autodiscover
+    TIMEOUT = TIMEOUT
 
-class AutodiscoverProtocol(Protocol):
-    # Dummy class for post_ratelimited which implements the bare essentials
-    SESSION_POOLSIZE = 1
-
-    def __init__(self, service_endpoint, credentials, verify_ssl, auth_type):
-        # The Protocol __init__ is more complicated. We just need the bare essentials
-        assert isinstance(credentials, Credentials)
-        self.has_ssl, self.server, _ = split_url(service_endpoint)
-        self.credentials = credentials
-        self.service_endpoint = service_endpoint
-        self.auth_type = auth_type
-        self.verify_ssl = verify_ssl
-        self.timeout = REQUEST_TIMEOUT
-        self._session_pool = queue.LifoQueue(maxsize=POOLSIZE)
-        for i in range(POOLSIZE):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._session_pool = queue.LifoQueue(maxsize=self.SESSION_POOLSIZE)
+        for i in range(self.SESSION_POOLSIZE):
             self._session_pool.put(self.create_session(), block=False)
+
+    def __str__(self):
+        return '''\
+Autodiscover endpoint: %s
+Auth type: %s''' % (
+            self.service_endpoint,
+            self.auth_type,
+        )

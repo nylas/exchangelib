@@ -230,7 +230,7 @@ class Version:
         session = protocol.get_session()
         log.debug('Test if service API version is %s using auth %s', api_version, session.auth.__class__.__name__)
         r, session = post_ratelimited(protocol=protocol, session=session, url=protocol.service_endpoint, headers=None,
-                                      data=xml, timeout=protocol.timeout, verify=protocol.verify_ssl,
+                                      data=xml, timeout=protocol.TIMEOUT, verify=protocol.verify_ssl,
                                       allow_redirects=False)
         protocol.release_session(session)
 
