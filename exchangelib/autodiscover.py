@@ -9,10 +9,12 @@ WARNING: We are taking many shortcuts here, like assuming SSL and following 302 
 If you have problems autodiscovering, start by doing an official test at https://testconnectivity.microsoft.com
 """
 
-# TODO: According to Microsoft, we may forever cache the URL of the autodiscover service for a certain domain, or until
+# TODO: According to Microsoft, we may forever cache the (email domain -> autodiscover endpoint URL) mapping, or until
 # it stops responding. My previous experience with Exchange products in mind, I'm not sure if I should trust that
 # advice. But it could save some valuable seconds every time we start a new connection to a known server. In any case,
-# this info would require persistent storage.
+# this info would require persistent storage. Additionally, stored data would contains credentials and other sensitive
+# data that cold be accessible by non-privileged users. Don't attempt a persistent autodiscover cache implementation
+# without considering the security implications carefully.
 
 import logging
 from threading import Lock
@@ -27,7 +29,7 @@ from .errors import AutoDiscoverFailed, AutoDiscoverRedirect, TransportError, Re
 from .protocol import BaseProtocol, Protocol
 from . import transport
 from .util import create_element, get_xml_attr, add_xml_child, to_xml, is_xml, post_ratelimited, get_redirect_url, \
-    xml_to_str, split_url
+    xml_to_str
 
 log = logging.getLogger(__name__)
 
@@ -38,7 +40,7 @@ RESPONSE_NS = 'http://schemas.microsoft.com/exchange/autodiscover/outlook/respon
 
 TIMEOUT = 10  # Seconds
 
-# Used to cache the autoconfigure URL for a specific email domain
+# Contains a mapping from (email domain, credentials) -> AutodiscoverProtocol object
 _autodiscover_cache = {}
 _autodiscover_cache_lock = Lock()
 
@@ -59,11 +61,12 @@ def discover(email, credentials, verify_ssl=True):
     assert isinstance(credentials, Credentials)
     domain = get_domain(email)
     # Use lock to guard against multiple threads competing to cache information
-    if domain in _autodiscover_cache:
+    if (domain, credentials) in _autodiscover_cache:
         # Python dict() is thread safe, so accessing _autodiscover_cache without a lock should be OK
-        protocol = _autodiscover_cache[domain]
+        protocol = _autodiscover_cache[(domain, credentials)]
+        protocol.verify_ssl = verify_ssl
         assert isinstance(protocol, AutodiscoverProtocol)
-        log.debug('Cache hit for domain %s: %s', domain, protocol.server)
+        log.debug('Cache hit for domain %s credentials %s: %s', domain, protocol.server, credentials)
         try:
             # This is the main path when the cache is primed
             primary_smtp_address, protocol = _autodiscover_quick(credentials=credentials, email=email,
@@ -83,11 +86,11 @@ def discover(email, credentials, verify_ssl=True):
     with _autodiscover_cache_lock:
         log.debug('_autodiscover_cache_lock acquired')
         # Don't recurse while holding the lock!
-        if domain in _autodiscover_cache:
+        if (domain, credentials) in _autodiscover_cache:
             # Cache was primed by some other thread while we were waiting for the lock.
             log.debug('Cache filled for domain %s while we were waiting', domain)
         else:
-            log.debug('Cache miss for domain %s', domain)
+            log.debug('Cache miss for domain %s credentials %s', domain, credentials)
             log.debug('Cache contents: %s', _autodiscover_cache)
             try:
                 # This eventually fills the cache in _autodiscover_hostname
@@ -188,7 +191,7 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl, verify, auth_t
         # These are both valid responses from an autodiscover server, showing that we have found the correct
         # server for the original domain. Fill cache before re-raising
         log.debug('Adding cache entry for %s (hostname %s, has_ssl %s)' % (domain, hostname, has_ssl))
-        _autodiscover_cache[domain] = protocol
+        _autodiscover_cache[(domain, credentials)] = protocol
         raise
 
     real_ews_auth_type = transport.get_service_authtype(service_endpoint=ews_url, versions=API_VERSIONS, verify=verify)
@@ -199,7 +202,7 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl, verify, auth_t
 
     # Cache the final hostname of the autodiscover service so we don't need to autodiscover the same domain again
     log.debug('Adding cache entry for %s (hostname %s, has_ssl %s)' % (domain, hostname, has_ssl))
-    _autodiscover_cache[domain] = protocol
+    _autodiscover_cache[(domain, credentials)] = protocol
     # If we didn't want to verify SSL on the autodiscover server, we probably don't want to on the Exchange server,
     # either.
     return primary_smtp_address, Protocol(service_endpoint=ews_url, credentials=credentials, auth_type=ews_auth_type,

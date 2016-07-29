@@ -10,7 +10,7 @@ from yaml import load
 from exchangelib.account import Account
 from exchangelib.autodiscover import discover
 from exchangelib.configuration import Configuration
-from exchangelib.credentials import DELEGATE
+from exchangelib.credentials import DELEGATE, Credentials
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, ExternId, Choice, Email, Contact, Task, \
     EmailAddress, PhysicalAddress, PhoneNumber, IndexedField, RoomList
@@ -51,6 +51,19 @@ class BuildTest(unittest.TestCase):
             Build(16, 0).api_version()
         with self.assertRaises(KeyError):
             Build(15, 4).api_version()
+
+
+class CredentialsTest(unittest.TestCase):
+    def test_hash(self):
+        # Test that we can use credentials as a dict key
+        self.assertEqual(hash(Credentials('a', 'b')), hash(Credentials('a', 'b')))
+        self.assertNotEqual(hash(Credentials('a', 'b')), hash(Credentials('a', 'a')))
+        self.assertNotEqual(hash(Credentials('a', 'b')), hash(Credentials('b', 'b')))
+
+    def test_equality(self):
+        self.assertEqual(Credentials('a', 'b'), Credentials('a', 'b'))
+        self.assertNotEqual(Credentials('a', 'b'), Credentials('a', 'a'))
+        self.assertNotEqual(Credentials('a', 'b'), Credentials('b', 'b'))
 
 
 class EWSDateTest(unittest.TestCase):

@@ -148,7 +148,7 @@ class Protocol(BaseProtocol):
         # overkill.
         log.debug('Waiting for _server_cache_lock')
         with _server_cache_lock:
-            _server_cache_key = self.server, self.credentials.username
+            _server_cache_key = self.server, self.credentials
             if _server_cache_key in _server_cache:
                 # Get cached version and auth types and session / thread pools
                 log.debug("Cache hit for server '%s'", self.server)
