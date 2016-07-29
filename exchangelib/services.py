@@ -74,7 +74,7 @@ class EWSService:
             raise
         except Exception:
             # This may run from a thread pool, which obfuscates the stack trace. Print trace immediately.
-            log.warning('EWS %s, account %s: Exception in _get_elements: %s', self.protocol.ews_url, account,
+            log.warning('EWS %s, account %s: Exception in _get_elements: %s', self.protocol.service_endpoint, account,
                         traceback.format_exc(20))
             raise
 
@@ -94,7 +94,7 @@ class EWSService:
             r, session = post_ratelimited(
                 protocol=self.protocol,
                 session=session,
-                url=self.protocol.ews_url,
+                url=self.protocol.service_endpoint,
                 headers=None,
                 data=soap_payload,
                 timeout=self.protocol.timeout,
@@ -122,7 +122,6 @@ class EWSService:
                                                          (api_versions, account))
 
     def _get_soap_payload(self, soap_response):
-        log_prefix = 'EWS %s, service %s' % (self.protocol.ews_url, self.SERVICE_NAME)
         assert isinstance(soap_response, ElementType)
         body = soap_response.find('{%s}Body' % SOAPNS)
         if body is None:
@@ -140,7 +139,7 @@ class EWSService:
 
     def _raise_soap_errors(self, fault):
         assert isinstance(fault, ElementType)
-        log_prefix = 'EWS %s, service %s' % (self.protocol.ews_url, self.SERVICE_NAME)
+        log_prefix = 'EWS %s, service %s' % (self.protocol.service_endpoint, self.SERVICE_NAME)
         # Fault: See http://www.w3.org/TR/2000/NOTE-SOAP-20000508/#_Toc478383507
         faultcode = get_xml_attr(fault, 'faultcode')
         faultstring = get_xml_attr(fault, 'faultstring')
@@ -244,7 +243,7 @@ class PagingEWSService(EWSService):
     def _paged_call(self, **kwargs):
         # TODO This is awkward. The function must work with _get_payload() of both folder- and account-based services
         account = kwargs['folder'].account if 'folder' in kwargs else kwargs['account']
-        log_prefix = 'EWS %s, account %s, service %s' % (self.protocol.ews_url, account, self.SERVICE_NAME)
+        log_prefix = 'EWS %s, account %s, service %s' % (self.protocol.service_endpoint, account, self.SERVICE_NAME)
         elements = []
         offset = 0
         while True:
@@ -265,7 +264,7 @@ class PagingEWSService(EWSService):
 
     def _get_page(self, response):
         assert len(response) == 1
-        log_prefix = 'EWS %s, service %s' % (self.protocol.ews_url, self.SERVICE_NAME)
+        log_prefix = 'EWS %s, service %s' % (self.protocol.service_endpoint, self.SERVICE_NAME)
         rootfolder = self._get_element_container(message=response[0], name='{%s}RootFolder' % MNS)
         is_last_page = rootfolder.get('IncludesLastItemInRange').lower() in ('true', '0')
         offset = rootfolder.get('IndexedPagingOffset')

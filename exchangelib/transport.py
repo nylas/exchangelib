@@ -6,7 +6,7 @@ from requests.auth import HTTPBasicAuth, HTTPDigestAuth
 from requests_ntlm import HttpNtlmAuth
 
 from .credentials import IMPERSONATION, EMAIL
-from .errors import UnauthorizedError, TransportError, RedirectError
+from .errors import UnauthorizedError, TransportError, RedirectError, RelativeRedirect
 from .util import create_element, add_xml_child, is_xml, get_redirect_url
 
 log = logging.getLogger(__name__)
@@ -49,14 +49,14 @@ def _test_docs_credentials(protocol):
 
 
 def _test_service_credentials(protocol):
-    log.debug("Trying auth type '%s' on '%s'", protocol.ews_auth_type, protocol.ews_url)
+    log.debug("Trying auth type '%s' on '%s'", protocol.auth_type, protocol.service_endpoint)
     # Retrieve the result. We allow 401 errors to happen since the authentication type may be wrong, giving a 401
     # response.
     headers = {'Content-Type': 'text/xml; charset=utf-8'}
     data = dummy_xml(version=protocol.version.api_version)
-    auth = get_auth_instance(credentials=protocol.credentials, auth_type=protocol.ews_auth_type)
+    auth = get_auth_instance(credentials=protocol.credentials, auth_type=protocol.auth_type)
     with requests.sessions.Session() as s:
-        r = s.post(url=protocol.ews_url, headers=headers, data=data, auth=auth, allow_redirects=False)
+        r = s.post(url=protocol.service_endpoint, headers=headers, data=data, auth=auth, allow_redirects=False)
     return _test_response(auth=auth, response=r)
 
 
@@ -98,9 +98,6 @@ def wrap(content, version, account, ewstimezone=None, encoding='utf-8'):
         'xmlns:t': TNS,
         'xmlns:m': MNS,
     })
-    # envelope.set('xmlns:s', SOAPNS)
-    # envelope.set('xmlns:t', TNS)
-    # envelope.set('xmlns:m', MNS)
     header = create_element('s:Header')
     requestserverversion = create_element('t:RequestServerVersion', Version=version)
     header.append(requestserverversion)
@@ -147,53 +144,57 @@ def get_auth_type(auth):
         raise ValueError("Authentication model '%s' not supported" % auth.__class__) from e
 
 
-def get_autodiscover_authtype(server, has_ssl, verify, url, data, timeout):
+def get_autodiscover_authtype(service_endpoint, data, timeout, verify):
     # First issue a HEAD request to look for a location header. This is the autodiscover HTTP redirect method. If there
     # was no redirect, continue trying a POST request with a valid payload.
-    log.debug('Getting autodiscover auth type for %s %s', url, timeout)
+    log.debug('Getting autodiscover auth type for %s %s', service_endpoint, timeout)
     headers = {'Content-Type': 'text/xml; charset=utf-8'}
     with requests.sessions.Session() as s:
-        r = s.head(url=url, headers=headers, timeout=timeout, allow_redirects=False, verify=verify)
+        r = s.head(url=service_endpoint, headers=headers, timeout=timeout, allow_redirects=False, verify=verify)
         if r.status_code == 302:
-            redirect_url, redirect_server, redirect_has_ssl = get_redirect_url(r, server, has_ssl)
-            log.debug('Autodiscover HTTP redirect to %s', redirect_url)
-            if not (server == redirect_server and has_ssl == redirect_has_ssl):
-                raise RedirectError(url=redirect_url)
-            # Some MS servers are masters of fucking up HTTP, issuing 302 to an error page with zero content. Give this
+            try:
+                redirect_url, redirect_server, redirect_has_ssl = get_redirect_url(r, require_relative=True)
+                log.debug('Autodiscover HTTP redirect to %s', redirect_url)
+            except RelativeRedirect as e:
+                # We were redirected to a different domain or sheme. Raise RedirectError so higher-level code can
+                # try again on this new domain or scheme.
+                raise RedirectError(url=e.value)
+            # Some MS servers are masters of messing up HTTP, issuing 302 to an error page with zero content. Give this
             # URL a chance with a POST request.
             # raise TransportError('Circular redirect')
-        r = s.post(url=url, headers=headers, data=data, timeout=timeout, allow_redirects=False, verify=verify)
-    return _get_auth_method_from_response(server=server, response=r, has_ssl=has_ssl)
+        r = s.post(url=service_endpoint, headers=headers, data=data, timeout=timeout, allow_redirects=False,
+                   verify=verify)
+    return _get_auth_method_from_response(response=r)
 
 
-def get_docs_authtype(server, has_ssl, verify, url):
+def get_docs_authtype(docs_url, verify):
     # Get auth type by tasting headers from the server. Don't do HEAD requests. It's too error prone.
-    log.debug('Getting docs auth type for %s', url)
+    log.debug('Getting docs auth type for %s', docs_url)
     headers = {'Content-Type': 'text/xml; charset=utf-8'}
     with requests.sessions.Session() as s:
-        r = s.get(url=url, headers=headers, allow_redirects=True, verify=verify)
-    return _get_auth_method_from_response(server=server, response=r, has_ssl=has_ssl)
+        r = s.get(url=docs_url, headers=headers, allow_redirects=True, verify=verify)
+    return _get_auth_method_from_response(response=r)
 
 
-def get_service_authtype(server, has_ssl, verify, ews_url, versions):
+def get_service_authtype(service_endpoint, versions, verify):
     # Get auth type by tasting headers from the server. Only do post requests. HEAD is too error prone, and some servers
     # are set up to redirect to OWA on all requests except POST to /EWS/Exchange.asmx
-    log.debug('Getting service auth type for %s', ews_url)
+    log.debug('Getting service auth type for %s', service_endpoint)
     headers = {'Content-Type': 'text/xml; charset=utf-8'}
     # TODO We don't know the API version yet, but we need it to create a valid request because some Exchange servers
     # only respond when given a valid request. Try all known versions. Gross.
     with requests.sessions.Session() as s:
         for version in versions:
             data = dummy_xml(version=version)
-            log.debug('Requesting %s from %s', data, ews_url)
-            r = s.post(url=ews_url, headers=headers, data=data, allow_redirects=True, verify=verify)
-            auth_method = _get_auth_method_from_response(server=server, response=r, has_ssl=has_ssl)
+            log.debug('Requesting %s from %s', data, service_endpoint)
+            r = s.post(url=service_endpoint, headers=headers, data=data, allow_redirects=True, verify=verify)
+            auth_method = _get_auth_method_from_response(response=r)
             if auth_method != UNKNOWN:
                 return auth_method
             raise ValueError("Authentication type '%s' not supported" % auth_method)
 
 
-def _get_auth_method_from_response(server, response, has_ssl):
+def _get_auth_method_from_response(response):
     # First, get the auth method from headers. Then, test credentials. Don't handle redirects - burden is on caller.
     log.debug('Request headers: %s', response.request.headers)
     log.debug('Response headers: %s', response.headers)
@@ -202,8 +203,9 @@ def _get_auth_method_from_response(server, response, has_ssl):
         return NOAUTH
     if response.status_code == 302:
         # Some servers are set up to redirect to OWA on all requests except POST to EWS/Exchange.asmx
-        redirect_url, redirect_server, redirect_has_ssl = get_redirect_url(response, server, has_ssl)
-        if server == redirect_server and has_ssl == redirect_has_ssl:
+        try:
+            redirect_url, redirect_server, redirect_has_ssl = get_redirect_url(response, allow_relative=False)
+        except RelativeRedirect:
             raise TransportError('Circular redirect')
         raise RedirectError(url=redirect_url)
     if response.status_code != 401:

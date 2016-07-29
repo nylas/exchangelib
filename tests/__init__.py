@@ -344,9 +344,10 @@ class CommonTest(EWSTest):
         self.assertIn(self.account.primary_smtp_address, str(self.account))
 
     def test_autodiscover(self):
-        primary_smtp_address, protocol = discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
+        primary_smtp_address, protocol = discover(email=self.account.primary_smtp_address,
+                                                  credentials=self.config.credentials)
         self.assertEqual(primary_smtp_address, self.account.primary_smtp_address)
-        self.assertEqual(protocol.ews_url.lower(), self.config.protocol.ews_url.lower())
+        self.assertEqual(protocol.service_endpoint.lower(), self.config.protocol.service_endpoint.lower())
         self.assertEqual(protocol.version.build, self.config.protocol.version.build)
 
 

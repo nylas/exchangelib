@@ -9,7 +9,7 @@ Usage
 
 Here is a simple example that inserts, retrieves and deletes calendar items in an Exchange calendar::
 
-    from exchangelib import DELEGATE, IdOnly, Account, Configuration, EWSDateTime, EWSTimeZone
+    from exchangelib import DELEGATE, IdOnly, Account, Credentials, EWSDateTime, EWSTimeZone
     from exchangelib.folders import CalendarItem
 
     year, month, day = 2016, 3, 20
@@ -27,8 +27,8 @@ Here is a simple example that inserts, retrieves and deletes calendar items in a
             categories=['foo', 'bar'],
         ))
 
-    config = Configuration(username='MYWINDOMAIN\myusername', password='topsecret')
-    account = Account(primary_smtp_address='john@example.com', config=config, autodiscover=True, access_type=DELEGATE)
+    credentials = Credentials(username='MYWINDOMAIN\myusername', password='topsecret')
+    account = Account(primary_smtp_address='john@example.com', credentials=credentials, autodiscover=True, access_type=DELEGATE)
 
     # Create the calendar items in the user's calendar
     res = account.calendar.add_items(calendar_items)

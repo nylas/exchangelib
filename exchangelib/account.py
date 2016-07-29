@@ -1,7 +1,6 @@
 from logging import getLogger
 
 from .autodiscover import discover
-from .configuration import Configuration
 from .credentials import Credentials, DELEGATE, IMPERSONATION
 from .errors import ErrorFolderNotFound, ErrorAccessDenied
 from .folders import Root, Calendar, Messages, Tasks, Contacts, SHALLOW, DEEP, WELLKNOWN_FOLDERS
@@ -12,34 +11,34 @@ log = getLogger(__name__)
 
 class Account:
     """
-    Models an Exchange server user account. The primary key for accounts is their PrimarySMTPAddress
+    Models an Exchange server user account. The primary key for an account is its PrimarySMTPAddress
     """
-    def __init__(self, primary_smtp_address, fullname=None, credentials=None, access_type=None, autodiscover=False,
-                 verify_ssl=True, config=None, locale='da_DK'):
+    def __init__(self, primary_smtp_address, fullname=None, access_type=None, autodiscover=False, credentials=None,
+                 config=None, verify_ssl=True, locale='da_DK'):
         if '@' not in primary_smtp_address:
             raise ValueError("primary_smtp_address '%s' is not an email address" % primary_smtp_address)
         self.primary_smtp_address = primary_smtp_address
         self.fullname = fullname
         self.locale = locale
-        if not (credentials or config):
-            raise AttributeError('Either config or credentials must be supplied')
-        self.credentials = credentials or config.credentials
         # Assume delegate access if individual credentials are provided. Else, assume service user with impersonation
         self.access_type = access_type or (DELEGATE if credentials else IMPERSONATION)
         assert self.access_type in (DELEGATE, IMPERSONATION)
         if autodiscover:
+            if not credentials:
+                raise AttributeError('autodiscover requires credentials')
             self.primary_smtp_address, self.protocol = discover(email=self.primary_smtp_address,
-                                                                credentials=self.credentials, verify_ssl=verify_ssl)
+                                                                credentials=credentials, verify_ssl=verify_ssl)
             if config:
-                assert isinstance(config, Configuration)
+                raise AttributeError('config is ignored when autodiscover is active')
         else:
+            if not config:
+                raise AttributeError('non-autodiscover requires a config')
             self.protocol = config.protocol
         # We may need to override the default server version on a per-account basis because Microsoft may report one
         # server version up-front but delegate account requests to an older backend server.
         self.version = self.protocol.version
         self.root = Root(self)
 
-        assert isinstance(self.credentials, Credentials)
         assert isinstance(self.protocol, Protocol)
         log.debug('Added account: %s', self)
 

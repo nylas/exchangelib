@@ -28,7 +28,7 @@ from .errors import AutoDiscoverFailed, AutoDiscoverRedirect, TransportError, Re
 from .protocol import Protocol
 from . import transport
 from .util import create_element, get_xml_attr, add_xml_child, to_xml, is_xml, post_ratelimited, get_redirect_url, \
-    xml_to_str
+    xml_to_str, split_url
 
 log = logging.getLogger(__name__)
 
@@ -152,8 +152,7 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl, verify, auth_t
     log.debug('Trying autodiscover on %s', url)
     if not auth_type:
         try:
-            auth_type = _get_autodiscover_auth_type(hostname=hostname, url=url, has_ssl=has_ssl, verify=verify,
-                                                    email=email)
+            auth_type = _get_autodiscover_auth_type(url=url, verify=verify, email=email)
         except RedirectError as e:
             log.debug(e)
             redirect_url, redirect_hostname, redirect_has_ssl = e.url, e.server, e.has_ssl
@@ -172,10 +171,11 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl, verify, auth_t
                 raise AutoDiscoverFailed('We were redirected to the same host') from e
             raise RedirectError(url='%s://%s' % ('https' if redirect_has_ssl else 'http', redirect_hostname)) from e
 
-    protocol = AutodiscoverProtocol(url=url, verify_ssl=verify, credentials=credentials, auth_type=auth_type)
+    protocol = AutodiscoverProtocol(service_endpoint=url, credentials=credentials, auth_type=auth_type,
+                                    verify_ssl=verify)
     r = _get_autodiscover_response(protocol=protocol, email=email)
     if r.status_code == 302:
-        redirect_url, redirect_hostname, redirect_has_ssl = get_redirect_url(r, hostname, has_ssl)
+        redirect_url, redirect_hostname, redirect_has_ssl = get_redirect_url(r)
         log.debug('We were redirected to %s', redirect_url)
         # Don't raise RedirectError here because we need to pass the ssl and auth_type data
         return _autodiscover_hostname(redirect_hostname, credentials, email, has_ssl=redirect_has_ssl, verify=verify,
@@ -192,8 +192,7 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl, verify, auth_t
         _autodiscover_cache[domain] = protocol
         raise
 
-    real_ews_auth_type = transport.get_service_authtype(server=server, has_ssl=has_ssl, verify=verify, ews_url=ews_url,
-                                                        versions=API_VERSIONS)
+    real_ews_auth_type = transport.get_service_authtype(service_endpoint=ews_url, versions=API_VERSIONS, verify=verify)
     if ews_auth_type != real_ews_auth_type:
         log.debug('Autodiscover and real server disagree on auth method for %s (%s vs %s). Using server version',
                   email, ews_auth_type, real_ews_auth_type)
@@ -204,8 +203,8 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl, verify, auth_t
     _autodiscover_cache[domain] = protocol
     # If we didn't want to verify SSL on the autodiscover server, we probably don't want to on the Exchange server,
     # either.
-    return primary_smtp_address, Protocol(ews_url=ews_url, credentials=credentials, verify_ssl=verify,
-                                          ews_auth_type=ews_auth_type)
+    return primary_smtp_address, Protocol(service_endpoint=ews_url, credentials=credentials, auth_type=ews_auth_type,
+                                          verify_ssl=verify)
 
 
 def _autodiscover_quick(credentials, email, protocol):
@@ -216,15 +215,15 @@ def _autodiscover_quick(credentials, email, protocol):
     log.debug('Autodiscover success: %s may connect to %s as primary email %s', email, ews_url, primary_smtp_address)
     # If we didn't want to verify SSL on the autodiscover server, we probably don't want to on the Exchange server,
     # either.
-    return primary_smtp_address, Protocol(ews_url=ews_url, credentials=credentials, verify_ssl=protocol.verify_ssl,
-                                          ews_auth_type=ews_auth_type)
+    return primary_smtp_address, Protocol(service_endpoint=ews_url, credentials=credentials, auth_type=ews_auth_type,
+                                          verify_ssl=protocol.verify_ssl)
 
 
-def _get_autodiscover_auth_type(hostname, url, has_ssl, verify, email, encoding='utf-8'):
+def _get_autodiscover_auth_type(url, email, verify, encoding='utf-8'):
     try:
         data = _get_autodiscover_payload(email=email, encoding=encoding)
-        return transport.get_autodiscover_authtype(server=hostname, has_ssl=has_ssl, verify=verify, url=url, data=data,
-                                                   timeout=REQUEST_TIMEOUT)
+        return transport.get_autodiscover_authtype(service_endpoint=url, data=data, timeout=REQUEST_TIMEOUT,
+                                                   verify=verify)
     except (TransportError, requests.exceptions.ConnectionError, requests.exceptions.Timeout,
             requests.exceptions.SSLError) as e:
         if isinstance(e, RedirectError):
@@ -252,31 +251,31 @@ def _get_autodiscover_response(protocol, email, encoding='utf-8'):
         # hammered the server with requests. We allow redirects since some autodiscover servers will issue different
         # redirects depending on the POST data content.
         session = protocol.get_session()
-        r, session = post_ratelimited(protocol=protocol, session=session, url=protocol.ews_url, headers=headers,
-                                      data=data, timeout=protocol.timeout, verify=protocol.verify_ssl,
+        r, session = post_ratelimited(protocol=protocol, session=session, url=protocol.service_endpoint,
+                                      headers=headers, data=data, timeout=protocol.timeout, verify=protocol.verify_ssl,
                                       allow_redirects=True)
         protocol.release_session(session)
         log.debug('Response headers: %s', r.headers)
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
-        log.debug('Connection error on %s: %s', protocol.ews_url, e)
+        log.debug('Connection error on %s: %s', protocol.service_endpoint, e)
         # Don't raise AutoDiscoverFailed here. Connection errors could just as well be a valid but misbehaving server.
         raise
     except RedirectError:
         raise
     except TransportError:
-        log.debug('No access to %s using %s', protocol.ews_url, protocol.ews_auth_type)
-        raise AutoDiscoverFailed('No access to %s using %s' % (protocol.ews_url, protocol.ews_auth_type))
+        log.debug('No access to %s using %s', protocol.service_endpoint, protocol.auth_type)
+        raise AutoDiscoverFailed('No access to %s using %s' % (protocol.service_endpoint, protocol.auth_type))
     if r.status_code == 302:
         # Give caller a chance to re-do the request
         return r
     if r.status_code != 200:
-        log.debug('%s returned HTTP %s', protocol.ews_url, r.status_code)
+        log.debug('%s returned HTTP %s', protocol.service_endpoint, r.status_code)
         # raise an uncatched error for now, until we understand this failure case
-        raise TransportError('%s returned HTTP %s' % (protocol.ews_url, r.status_code))
+        raise TransportError('%s returned HTTP %s' % (protocol.service_endpoint, r.status_code))
     if not is_xml(r.text):
         # This is normal - e.g. a greedy webserver serving custom HTTP 404's as 200 OK
-        log.debug('URL %s: This is not XML: %s', protocol.ews_url, r.text[:1000])
-        raise AutoDiscoverFailed('URL %s: This is not XML: %s' % (protocol.ews_url, r.text[:1000]))
+        log.debug('URL %s: This is not XML: %s', protocol.service_endpoint, r.text[:1000])
+        raise AutoDiscoverFailed('URL %s: This is not XML: %s' % (protocol.service_endpoint, r.text[:1000]))
     return r
 
 
@@ -388,16 +387,13 @@ class AutodiscoverProtocol(Protocol):
     # Dummy class for post_ratelimited which implements the bare essentials
     SESSION_POOLSIZE = 1
 
-    def __init__(self, url, credentials, verify_ssl, auth_type):
+    def __init__(self, service_endpoint, credentials, verify_ssl, auth_type):
+        # The Protocol __init__ is more complicated. We just need the bare essentials
         assert isinstance(credentials, Credentials)
-        parsed_url = parse.urlparse(url)
-        self.server = parsed_url.hostname.lower()
+        self.has_ssl, self.server, _ = split_url(service_endpoint)
         self.credentials = credentials
-        # TODO: The following two are mis-named (it's the auth type and URL for the autodiscover service, not the EWS
-        # service) but we need to keep the naming because we inherit from Protocol. Ewww.
-        self.ews_url = url
-        self.ews_auth_type = auth_type
-        self.has_ssl = parsed_url.scheme == 'https'
+        self.service_endpoint = service_endpoint
+        self.auth_type = auth_type
         self.verify_ssl = verify_ssl
         self.timeout = REQUEST_TIMEOUT
         self._session_pool = queue.LifoQueue(maxsize=POOLSIZE)

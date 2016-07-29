@@ -9,7 +9,7 @@ import itertools
 from types import GeneratorType
 from decimal import Decimal
 
-from .errors import TransportError, RateLimitError, RedirectError
+from .errors import TransportError, RateLimitError, RedirectError, RelativeRedirect
 
 log = logging.getLogger(__name__)
 ElementType = type(Element('x'))  # Type is auto-generated inside cElementTree
@@ -170,28 +170,42 @@ class DummyResponse:
     request = DummyRequest()
 
 
-def get_redirect_url(response, server=None, has_ssl=None):
-    from urllib.parse import urlparse
+def split_url(url):
+    from urllib import parse
+    parsed_url = parse.urlparse(url)
+    # Use netloc instead og hostname since hostname is None if URL is relative
+    return parsed_url.scheme == 'https', parsed_url.netloc.lower(), parsed_url.path
+
+
+def get_redirect_url(response, allow_relative=True, require_relative=False):
+    # allow_relative=False throws RelativeRedirect error if scheme and hostname are equal to the request
+    # require_relative=True throws RelativeRedirect error if scheme and hostname are not equal to the request
     redirect_url = response.headers.get('location', None)
     if not redirect_url:
         raise TransportError('302 redirect but no location header')
-    # At least some are kind enough to supply a new location
-    url = urlparse(redirect_url)
-    response_url = urlparse(response.url)
-    if server is None:
-        server = response_url.netloc
-    if has_ssl is None:
-        has_ssl = response_url.scheme == 'https'
-    scheme = url.scheme or ('https' if has_ssl else 'http')
-    has_ssl = scheme == 'https'
-    if url.netloc:
-        server = url.netloc
-    server = server.lower()
-    redirect_url = '%s://%s%s' % (scheme, server, url.path)
-    if redirect_url == response.url:
+    # At least some servers are kind enough to supply a new location. It may be relative
+    redirect_has_ssl, redirect_server, redirect_path = split_url(redirect_url)
+    # The response may have been redirected already. Get the original URL
+    request_url = response.history[0] if response.history else response.url
+    request_has_ssl, request_server, request_path = split_url(request_url)
+    response_has_ssl, response_server, response_path = split_url(response.url)
+
+    if not redirect_server:
+        # Redirect URL is relative. Inherit server and scheme from response URL
+        redirect_server = response_server
+        redirect_has_ssl = response_has_ssl
+    if not redirect_path.startswith('/'):
+        # The path is not top-level. Add response path
+        redirect_path = (response_path or '/') + redirect_path
+    redirect_url = '%s://%s%s' % ('https' if redirect_has_ssl else 'http', redirect_server, redirect_path)
+    if redirect_url == request_url:
         # And some are mean enough to redirect to the same location
         raise TransportError('Redirect to same location: %s' % redirect_url)
-    return redirect_url, server, has_ssl
+    if not allow_relative and (request_has_ssl == response_has_ssl and request_server == redirect_server):
+        raise RelativeRedirect(redirect_url)
+    if require_relative and (request_has_ssl != response_has_ssl or request_server != redirect_server):
+        raise RelativeRedirect(redirect_url)
+    return redirect_url, redirect_server, redirect_has_ssl
 
 
 def post_ratelimited(protocol, session, url, headers, data, timeout=None, verify=True, allow_redirects=False):
@@ -273,13 +287,13 @@ Response headers: %(response_headers)s'''
                 continue
             if r.status_code == 302:
                 # If we get a normal 302 redirect, requests will issue a GET to that URL. We still want to POST
-                redirect_url, server, has_ssl = get_redirect_url(response=r, server=protocol.server,
-                                                                 has_ssl=protocol.has_ssl)
+                try:
+                    redirect_url, server, has_ssl = get_redirect_url(response=r, allow_relative=False)
+                except RelativeRedirect as e:
+                    log.debug("'allow_redirects' only supports relative redirects (%s -> %s)", url, e.value)
+                    raise RedirectError(url=e.value)
                 if not allow_redirects:
                     raise TransportError('Redirect not allowed but we were redirected (%s -> %s)' % (url, redirect_url))
-                if has_ssl != protocol.has_ssl or server != protocol.server:
-                    log.debug("'allow_redirects' only supports relative redirects (%s -> %s)", url, redirect_url)
-                    raise RedirectError(url=redirect_url)
                 url = redirect_url
                 log_vals['url'] = url
                 log.debug('302 Redirected to %s', url)

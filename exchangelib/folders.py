@@ -897,7 +897,8 @@ class Folder:
                 elif issubclass(field_uri, IndexedField):
                     log.warning("Skipping update on fieldname '%s' (not supported yet)", fieldname)
                     continue
-                    # TODO: we need to create a SetItemField for every item in the list, and possibly DeleteItemField for every label not on the list
+                    # TODO: we need to create a SetItemField for every item in the list, and possibly DeleteItemField
+                    # for every label not on the list
                     # fielduri = field_uri.field_uri_xml(label=val.label)
                 elif issubclass(field_uri, ExtendedProperty):
                     fielduri = field_uri.field_uri_xml()

@@ -175,7 +175,7 @@ class Version:
             log.warning(str(e))
             shortname = None
         api_version = VERSIONS[shortname][0] if shortname else None
-        return cls._guess_version_from_service(protocol=protocol, ews_url=protocol.ews_url, hint=api_version)
+        return cls._guess_version_from_service(protocol=protocol, hint=api_version)
 
     @staticmethod
     def _get_shortname_from_docs(auth, types_url):
@@ -208,7 +208,7 @@ class Version:
         return to_xml(r.text, encoding=r.encoding).get('version')
 
     @classmethod
-    def _guess_version_from_service(cls, protocol, ews_url, hint=None):
+    def _guess_version_from_service(cls, protocol, hint=None):
         # Keep sending requests until we get a valid response. If we have a hint, start guessing that.
         if hint:
             api_versions = [hint] + [v for v in API_VERSIONS if v != hint]
@@ -216,25 +216,26 @@ class Version:
             api_versions = API_VERSIONS
         for api_version in api_versions:
             try:
-                return cls._get_version_from_service(protocol=protocol, ews_url=ews_url, api_version=api_version)
+                return cls._get_version_from_service(protocol=protocol, api_version=api_version)
             except EWSWarning:
                 continue
         raise TransportError('Unable to guess version')
 
     @classmethod
-    def _get_version_from_service(cls, protocol, ews_url, api_version):
+    def _get_version_from_service(cls, protocol, api_version):
         assert api_version
         xml = dummy_xml(version=api_version)
         # Create a minimal, valid EWS request to force Exchange into accepting the request and returning EWS xml
         # containing server version info. Some servers will only reply with their version if a valid POST is sent.
         session = protocol.get_session()
         log.debug('Test if service API version is %s using auth %s', api_version, session.auth.__class__.__name__)
-        r, session = post_ratelimited(protocol=protocol, session=session, url=ews_url, headers=None, data=xml,
-                                      timeout=protocol.timeout, verify=protocol.verify_ssl, allow_redirects=False)
+        r, session = post_ratelimited(protocol=protocol, session=session, url=protocol.service_endpoint, headers=None,
+                                      data=xml, timeout=protocol.timeout, verify=protocol.verify_ssl,
+                                      allow_redirects=False)
         protocol.release_session(session)
 
         if r.status_code == 401:
-            raise UnauthorizedError('Wrong username or password for %s' % ews_url)
+            raise UnauthorizedError('Wrong username or password for %s' % protocol.service_endpoint)
         elif r.status_code == 302:
             log.debug('We were redirected. Unable to get version info from service')
             return None
@@ -249,14 +250,15 @@ class Version:
         if r.status_code != 200:
             if 'The referenced account is currently locked out' in r.text:
                 raise TransportError('The service account is currently locked out')
-            raise TransportError('Unexpected HTTP status %s when getting %s (%s)' % (r.status_code, ews_url, r.text))
+            raise TransportError('Unexpected HTTP status %s when getting %s (%s)' % (
+                r.status_code, protocol.service_endpoint, r.text))
         log.debug('Response data: %s', r.text)
         try:
             header = to_xml(r.text, encoding=r.encoding).find('{%s}Header' % SOAPNS)
             if not header:
                 raise ParseError()
         except ParseError as e:
-            raise EWSWarning('Unknown XML response from %s (response: %s)' % (ews_url, r.text)) from e
+            raise EWSWarning('Unknown XML response from %s (response: %s)' % (protocol.service_endpoint, r.text)) from e
         info = header.find('{%s}ServerVersionInfo' % TNS)
         if info is None:
             raise TransportError('No ServerVersionInfo in response: %s' % r.text)

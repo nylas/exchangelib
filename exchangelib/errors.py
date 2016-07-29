@@ -1,6 +1,7 @@
 """
 Stores errors specific to exchangelib, and mirrors all the possible errors that EWS can return.
 """
+from urllib import parse
 
 
 class EWSError(Exception):
@@ -40,7 +41,6 @@ class UnauthorizedError(EWSError):
 
 class RedirectError(TransportError):
     def __init__(self, url):
-        from urllib import parse
         parsed_url = parse.urlparse(url)
         self.url = url
         self.server = parsed_url.hostname.lower()
@@ -49,6 +49,10 @@ class RedirectError(TransportError):
 
     def __str__(self):
         return 'We were redirected to %s' % self.url
+
+
+class RelativeRedirect(TransportError):
+    pass
 
 
 class AutoDiscoverError(TransportError):

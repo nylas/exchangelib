@@ -10,7 +10,6 @@ from multiprocessing.pool import ThreadPool
 import logging
 from collections import defaultdict
 from threading import Lock
-from urllib import parse
 import random
 
 from requests import adapters, Session
@@ -19,6 +18,7 @@ from .credentials import Credentials
 from .errors import TransportError
 from .transport import get_auth_instance, get_service_authtype, get_docs_authtype, test_credentials, AUTH_TYPE_MAP
 from .version import Version, API_VERSIONS
+from .util import split_url
 
 log = logging.getLogger(__name__)
 
@@ -34,27 +34,27 @@ def close_connections():
     for cached_key, cached_values in _server_cache.items():
         server = cached_key[0]  # cached_key = server, username
         # Create a simple Protocol that we can close TCP connections on
-        cached_protocol = Protocol(ews_url='https://%s/EWS/Exchange.asmx' % server, credentials=Credentials('', ''))
+        cached_protocol = Protocol(service_endpoint='https://%s/EWS/Exchange.asmx' % server,
+                                   credentials=Credentials('', ''))
         cached_protocol.close()
 
 
 class Protocol:
     SESSION_POOLSIZE = 1
 
-    def __init__(self, ews_url, credentials, verify_ssl=True, ews_auth_type=None):
+    def __init__(self, service_endpoint, credentials, auth_type=None, verify_ssl=True):
         assert isinstance(credentials, Credentials)
-        parsed_url = parse.urlparse(ews_url)
-        self.server = parsed_url.hostname.lower()
-        self.has_ssl = parsed_url.scheme == 'https'
+        self.has_ssl, self.server, _ = split_url(service_endpoint)
         self.verify_ssl = verify_ssl
-        self.ews_url = ews_url
-        self.wsdl_url = '%s://%s/EWS/Services.wsdl' % (parsed_url.scheme, self.server)
-        self.messages_url = '%s://%s/EWS/messages.xsd' % (parsed_url.scheme, self.server)
-        self.types_url = '%s://%s/EWS/types.xsd' % (parsed_url.scheme, self.server)
+        self.service_endpoint = service_endpoint
+        scheme = 'https' if self.has_ssl else 'https'
+        self.wsdl_url = '%s://%s/EWS/Services.wsdl' % (scheme, self.server)
+        self.messages_url = '%s://%s/EWS/messages.xsd' % (scheme, self.server)
+        self.types_url = '%s://%s/EWS/types.xsd' % (scheme, self.server)
         self.credentials = credentials
         self.timeout = TIMEOUT
-        if ews_auth_type is not None:
-            assert ews_auth_type in AUTH_TYPE_MAP, 'Unsupported auth type %s' % ews_auth_type
+        if auth_type is not None:
+            assert auth_type in AUTH_TYPE_MAP, 'Unsupported auth type %s' % auth_type
 
         # Acquire lock to guard against multiple threads competing to cache information. Having a per-server lock is
         # overkill.
@@ -67,19 +67,17 @@ class Protocol:
                 for k, v in _server_cache[_server_cache_key].items():
                     setattr(self, k, v)
 
-                if ews_auth_type:
-                    if ews_auth_type != self.ews_auth_type:
+                if auth_type:
+                    if auth_type != self.auth_type:
                         # Some Exchange servers just can't make up their mind
-                        log.debug('Auth type mismatch on server %s. %s != %s' % (self.server, ews_auth_type,
-                                                                                 self.ews_auth_type))
+                        log.debug('Auth type mismatch on server %s. %s != %s' % (self.server, auth_type,
+                                                                                 self.auth_type))
             else:
                 log.debug("Cache miss. Adding server '%s', poolsize %s, timeout %s", self.server, POOLSIZE, TIMEOUT)
                 # Autodetect authentication type if necessary
-                self.ews_auth_type = ews_auth_type or get_service_authtype(server=self.server, has_ssl=self.has_ssl,
-                                                                           verify=self.verify_ssl, ews_url=ews_url,
-                                                                           versions=API_VERSIONS)
-                self.docs_auth_type = get_docs_authtype(server=self.server, has_ssl=self.has_ssl,
-                                                        verify=self.verify_ssl, url=self.types_url)
+                self.auth_type = auth_type or get_service_authtype(service_endpoint=service_endpoint,
+                                                                   versions=API_VERSIONS, verify=self.verify_ssl)
+                self.docs_auth_type = get_docs_authtype(verify=self.verify_ssl, docs_url=self.types_url)
 
                 # Try to behave nicely with the Exchange server. We want to keep the connection open between requests.
                 # We also want to re-use sessions, to avoid the NTLM auth handshake on every request.
@@ -99,7 +97,7 @@ class Protocol:
                 # Cache results
                 _server_cache[_server_cache_key] = dict(
                     version=self.version,
-                    ews_auth_type=self.ews_auth_type,
+                    auth_type=self.auth_type,
                     docs_auth_type=self.docs_auth_type,
                     thread_pool=self.thread_pool,
                     _session_pool=self._session_pool,
@@ -110,7 +108,7 @@ class Protocol:
         log.debug('Server %s: Closing sessions', self.server)
         while True:
             try:
-                self._session_pool.get(block=False).close_socket(self.ews_url)
+                self._session_pool.get(block=False).close_socket(self.service_endpoint)
             except queue.Empty:
                 break
 
@@ -137,20 +135,20 @@ class Protocol:
     def retire_session(self, session):
         # The session is useless. Close it completely and place a fresh session in the pool
         log.debug('Server %s: Retiring session %s', self.server, session.session_id)
-        session.close_socket(self.ews_url)
+        session.close_socket(self.service_endpoint)
         del session
         self.release_session(self.create_session())
 
     def renew_session(self, session):
         # The session is useless. Close it completely and place a fresh session in the pool
         log.debug('Server %s: Renewing session %s', self.server, session.session_id)
-        session.close_socket(self.ews_url)
+        session.close_socket(self.service_endpoint)
         del session
         return self.create_session()
 
     def create_session(self):
         session = EWSSession(self)
-        session.auth = get_auth_instance(credentials=self.credentials, auth_type=self.ews_auth_type)
+        session.auth = get_auth_instance(credentials=self.credentials, auth_type=self.auth_type)
         # Leave this inside the loop because headers are mutable
         headers = {'Content-Type': 'text/xml; charset=utf-8', 'Accept-Encoding': 'compress, gzip'}
         session.headers.update(headers)
@@ -171,7 +169,8 @@ class Protocol:
         return test_credentials(protocol=self)
 
     def __repr__(self):
-        return self.__class__.__name__ + repr((self.ews_url, self.credentials, self.verify_ssl, self.ews_auth_type))
+        return self.__class__.__name__ + repr((self.service_endpoint, self.credentials, self.verify_ssl,
+                                               self.auth_type))
 
     def __str__(self):
         return '''\
@@ -181,11 +180,11 @@ EWS API version: %s
 Build number: %s
 EWS auth: %s
 XSD auth: %s''' % (
-            self.ews_url,
+            self.service_endpoint,
             self.version.fullname,
             self.version.api_version,
             self.version.build,
-            self.ews_auth_type,
+            self.auth_type,
             self.docs_auth_type,
         )
 
