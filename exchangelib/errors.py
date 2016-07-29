@@ -63,6 +63,10 @@ class AutoDiscoverFailed(AutoDiscoverError):
     pass
 
 
+class AutoDiscoverCircularRedirect(AutoDiscoverError):
+    pass
+
+
 class AutoDiscoverRedirect(AutoDiscoverError):
     def __init__(self, redirect_email):
         self.redirect_email = redirect_email

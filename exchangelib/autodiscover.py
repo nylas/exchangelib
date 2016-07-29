@@ -9,23 +9,18 @@ WARNING: We are taking many shortcuts here, like assuming SSL and following 302 
 If you have problems autodiscovering, start by doing an official test at https://testconnectivity.microsoft.com
 """
 
-# TODO: According to Microsoft, we may forever cache the (email domain -> autodiscover endpoint URL) mapping, or until
-# it stops responding. My previous experience with Exchange products in mind, I'm not sure if I should trust that
-# advice. But it could save some valuable seconds every time we start a new connection to a known server. In any case,
-# this info would require persistent storage. Additionally, stored data would contains credentials and other sensitive
-# data that cold be accessible by non-privileged users. Don't attempt a persistent autodiscover cache implementation
-# without considering the security implications carefully.
-
 import logging
 from threading import Lock
 import queue
 
-import requests.exceptions
 import dns.resolver
+import requests.exceptions
+from sqlitedict import SqliteDict, SqliteMultithread
 
 from .credentials import Credentials
 from .version import API_VERSIONS
-from .errors import AutoDiscoverFailed, AutoDiscoverRedirect, TransportError, RedirectError, ErrorNonExistentMailbox
+from .errors import AutoDiscoverFailed, AutoDiscoverRedirect, AutoDiscoverCircularRedirect, TransportError, \
+    RedirectError, ErrorNonExistentMailbox
 from .protocol import BaseProtocol, Protocol
 from . import transport
 from .util import create_element, get_xml_attr, add_xml_child, to_xml, is_xml, post_ratelimited, get_redirect_url, \
@@ -40,8 +35,76 @@ RESPONSE_NS = 'http://schemas.microsoft.com/exchange/autodiscover/outlook/respon
 
 TIMEOUT = 10  # Seconds
 
-# Contains a mapping from (email domain, credentials) -> AutodiscoverProtocol object
-_autodiscover_cache = {}
+
+class AutodiscoverCache:
+    # Stores the translation from (email domain, credentials) -> AutodiscoverProtocol object so we can re-use TCP
+    # connections to an autodiscover server within the same process. Also persists the email domain -> (autodiscover
+    # endpoint URL, auth_type) translation to the filesystem.
+
+    # According to Microsoft, we may forever cache the (email domain -> autodiscover endpoint URL) mapping, or until
+    # it stops responding. My previous experience with Exchange products in mind, I'm not sure if I should trust that
+    # advice. But it could save some valuable seconds every time we start a new connection to a known server. In any
+    # case, the persistent storage must not contain any sensitive information since the cache could be readable by
+    # unprivileged users. Domain, endpoint and auth_type are OK to cache since this info is make publicly available on
+    # HTTP and DNS servers via the autodiscover protocol. Just don't persist any credentials info.
+
+    # If an autodiscover lookup fails for any reason, the corresponding cache entry must be purged.
+
+    # SqliteDict is supposedly thread-safe and process-safe and does a lookup to the storage every time, which suits our
+    # needs.
+    def __init__(self, storage_file):
+        self._protocols = {}  # Mapping from (domain, credentials) to AutodiscoverProtocol
+        self._endpoints = SqliteDict(storage_file, autocommit=True)  # Mapping from domain to (endpoint, auth_type)
+
+    def _ensure_conn(self):
+        # Work around issue https://github.com/RaRe-Technologies/sqlitedict/issues/54
+        if self._endpoints.conn is None:
+            self._endpoints.conn = SqliteMultithread(self._endpoints.filename, autocommit=True, journal_mode="DELETE")
+
+    def __contains__(self, key):
+        domain, credentials = key
+        with self._endpoints:
+            self._ensure_conn()
+            return domain in self._endpoints
+
+    def __getitem__(self, key):
+        protocol = self._protocols[key]
+        if protocol:
+            return protocol
+        domain, credentials = key
+        with self._endpoints:
+            self._ensure_conn()
+            endpoint, auth_type = self._endpoints[domain]  # It's OK to fail with KeyError here
+        protocol = AutodiscoverProtocol(service_endpoint=endpoint, credentials=credentials, auth_type=auth_type)
+        self._protocols[key] = protocol
+        return protocol
+
+    def __setitem__(self, key, protocol):
+        domain, credentials = key
+        with self._endpoints:
+            self._ensure_conn()
+            self._endpoints[domain] = (protocol.service_endpoint, protocol.auth_type)
+        self._protocols[key] = protocol
+
+    def __delitem__(self, key):
+        domain, credentials = key
+        with self._endpoints:
+            self._ensure_conn()
+            del self._endpoints[domain]
+        try:
+            del self._protocols[key]
+        except KeyError:
+            pass
+
+    def items(self):
+        return self._protocols.items()
+
+    def __str__(self):
+        return str(self._protocols)
+
+
+AUTODISCOVER_PERSISTENT_STORAGE = '/tmp/exchangelib.cache'
+_autodiscover_cache = AutodiscoverCache(AUTODISCOVER_PERSISTENT_STORAGE)
 _autodiscover_cache_lock = Lock()
 
 
@@ -61,9 +124,10 @@ def discover(email, credentials, verify_ssl=True):
     assert isinstance(credentials, Credentials)
     domain = get_domain(email)
     # Use lock to guard against multiple threads competing to cache information
-    if (domain, credentials) in _autodiscover_cache:
+    autodiscover_key = (domain, credentials)
+    if autodiscover_key in _autodiscover_cache:
         # Python dict() is thread safe, so accessing _autodiscover_cache without a lock should be OK
-        protocol = _autodiscover_cache[(domain, credentials)]
+        protocol = _autodiscover_cache[autodiscover_key]
         protocol.verify_ssl = verify_ssl
         assert isinstance(protocol, AutodiscoverProtocol)
         log.debug('Cache hit for domain %s credentials %s: %s', domain, protocol.server, credentials)
@@ -77,16 +141,21 @@ def discover(email, credentials, verify_ssl=True):
         except AutoDiscoverRedirect as e:
             log.debug('%s redirects to %s', email, e.redirect_email)
             if email.lower() == e.redirect_email.lower():
-                raise AutoDiscoverFailed('Redirect to same email address: %s' % email) from e
+                raise AutoDiscoverCircularRedirect('Redirect to same email address: %s' % email) from e
             # Start over with the new email address
-            return discover(email=e.redirect_email, credentials=credentials, verify_ssl=verify_ssl)
+            try:
+                return discover(email=e.redirect_email, credentials=credentials, verify_ssl=verify_ssl)
+            except AutoDiscoverFailed:
+                # Autodiscover no longer works with this domain. Clear cache and try again
+                del _autodiscover_cache[autodiscover_key]
+                return discover(email=e.redirect_email, credentials=credentials, verify_ssl=verify_ssl)
         # This is unreachable
 
     log.debug('Waiting for _autodiscover_cache_lock')
     with _autodiscover_cache_lock:
         log.debug('_autodiscover_cache_lock acquired')
         # Don't recurse while holding the lock!
-        if (domain, credentials) in _autodiscover_cache:
+        if autodiscover_key in _autodiscover_cache:
             # Cache was primed by some other thread while we were waiting for the lock.
             log.debug('Cache filled for domain %s while we were waiting', domain)
         else:
@@ -101,7 +170,7 @@ def discover(email, credentials, verify_ssl=True):
                 return primary_smtp_address, protocol
             except AutoDiscoverRedirect as e:
                 if email.lower() == e.redirect_email.lower():
-                    raise AutoDiscoverFailed('Redirect to same email address: %s' % email) from e
+                    raise AutoDiscoverCircularRedirect('Redirect to same email address: %s' % email) from e
                 log.debug('%s redirects to %s', email, e.redirect_email)
                 email = e.redirect_email
             finally:
