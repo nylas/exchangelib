@@ -40,6 +40,10 @@ def close_connections():
 
 
 class Protocol:
+    # A session poolsize of 1 is intended. We may have lots of different credentials hitting the server and each
+    # credential needs its own session (NTLM auth will only send credentials once and then secure the session, so a
+    # session can only belong to one credential). Having multiple sessions in the pool would quickly exhaust the maximum
+    # number of concurrent sessions the Exchange server allows from one client.
     SESSION_POOLSIZE = 1
 
     def __init__(self, service_endpoint, credentials, auth_type=None, verify_ssl=True):
