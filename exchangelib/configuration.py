@@ -43,8 +43,8 @@ class Configuration:
         self.protocol = Protocol(
             service_endpoint=service_endpoint,
             auth_type=auth_type,
-            verify_ssl=verify_ssl,
             credentials=credentials,
+            verify_ssl=verify_ssl,
         )
 
     @property

@@ -39,11 +39,11 @@ def close_connections():
 class BaseProtocol:
     # Base class for Protocol which implements the bare essentials
 
-    # The maximum number of sessions we will open to this service endpoint. Keep this low unless you have an agreement
-    # with the Exchange admin on the receiving end to hammer the server and rate-limiting policies have been disabled
-    # for the connecting user.
+    # The maximum number of sessions (== TCP connections, see below) we will open to this service endpoint. Keep this
+    # low unless you have an agreement with the Exchange admin on the receiving end to hammer the server and
+    # rate-limiting policies have been disabled for the connecting user.
     SESSION_POOLSIZE = 4
-    # We want only 1 connection per Session object. We may have lots of different credentials hitting the server and
+    # We want only 1 TCP connection per Session object. We may have lots of different credentials hitting the server and
     # each credential needs its own session (NTLM auth will only send credentials once and then secure the connection,
     # so a connection can only handle requests for one credential). Having multiple connections ser Session could
     # quickly exhaust the maximum number of concurrent connections the Exchange server allows from one client.
@@ -52,7 +52,6 @@ class BaseProtocol:
     TIMEOUT = 120
 
     def __init__(self, service_endpoint, credentials, auth_type, verify_ssl):
-        # The Protocol __init__ is more complicated. We just need the bare essentials
         assert isinstance(credentials, Credentials)
         if auth_type is not None:
             assert auth_type in AUTH_TYPE_MAP, 'Unsupported auth type %s' % auth_type

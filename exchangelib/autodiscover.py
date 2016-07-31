@@ -68,14 +68,15 @@ class AutodiscoverCache:
             return domain in self._endpoints
 
     def __getitem__(self, key):
-        protocol = self._protocols[key]
+        protocol = self._protocols.get(key)
         if protocol:
             return protocol
         domain, credentials = key
         with self._endpoints:
             self._ensure_conn()
             endpoint, auth_type = self._endpoints[domain]  # It's OK to fail with KeyError here
-        protocol = AutodiscoverProtocol(service_endpoint=endpoint, credentials=credentials, auth_type=auth_type)
+        protocol = AutodiscoverProtocol(service_endpoint=endpoint, credentials=credentials, auth_type=auth_type,
+                                        verify_ssl=True)
         self._protocols[key] = protocol
         return protocol
 
@@ -242,9 +243,9 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl, verify, auth_t
                 raise AutoDiscoverFailed('We were redirected to the same host') from e
             raise RedirectError(url='%s://%s' % ('https' if redirect_has_ssl else 'http', redirect_hostname)) from e
 
-    protocol = AutodiscoverProtocol(service_endpoint=url, credentials=credentials, auth_type=auth_type,
-                                    verify_ssl=verify)
-    r = _get_autodiscover_response(protocol=protocol, email=email)
+    autodiscover_protocol = AutodiscoverProtocol(service_endpoint=url, credentials=credentials, auth_type=auth_type,
+                                                 verify_ssl=verify)
+    r = _get_autodiscover_response(protocol=autodiscover_protocol, email=email)
     if r.status_code == 302:
         redirect_url, redirect_hostname, redirect_has_ssl = get_redirect_url(r)
         log.debug('We were redirected to %s', redirect_url)
@@ -260,21 +261,17 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl, verify, auth_t
         # These are both valid responses from an autodiscover server, showing that we have found the correct
         # server for the original domain. Fill cache before re-raising
         log.debug('Adding cache entry for %s (hostname %s, has_ssl %s)' % (domain, hostname, has_ssl))
-        _autodiscover_cache[(domain, credentials)] = protocol
+        _autodiscover_cache[(domain, credentials)] = autodiscover_protocol
         raise
-
-    real_ews_auth_type = transport.get_service_authtype(service_endpoint=ews_url, versions=API_VERSIONS, verify=verify)
-    if ews_auth_type != real_ews_auth_type:
-        log.debug('Autodiscover and real server disagree on auth method for %s (%s vs %s). Using server version',
-                  email, ews_auth_type, real_ews_auth_type)
-        ews_auth_type = real_ews_auth_type
 
     # Cache the final hostname of the autodiscover service so we don't need to autodiscover the same domain again
     log.debug('Adding cache entry for %s (hostname %s, has_ssl %s)' % (domain, hostname, has_ssl))
-    _autodiscover_cache[(domain, credentials)] = protocol
+    _autodiscover_cache[(domain, credentials)] = autodiscover_protocol
+    # Autodiscover response contains an auth type, but we don't want to spend time here testing if it actually works.
+    # Instead of forcing a possibly-wrong auth type, just let Protocol auto-detect the auth type.
     # If we didn't want to verify SSL on the autodiscover server, we probably don't want to on the Exchange server,
     # either.
-    return primary_smtp_address, Protocol(service_endpoint=ews_url, credentials=credentials, auth_type=ews_auth_type,
+    return primary_smtp_address, Protocol(service_endpoint=ews_url, credentials=credentials, auth_type=None,
                                           verify_ssl=verify)
 
 
@@ -284,9 +281,11 @@ def _autodiscover_quick(credentials, email, protocol):
     if not primary_smtp_address:
         primary_smtp_address = email
     log.debug('Autodiscover success: %s may connect to %s as primary email %s', email, ews_url, primary_smtp_address)
+    # Autodiscover response contains an auth type, but we don't want to spend time here testing if it actually works.
+    # Instead of forcing a possibly-wrong auth type, just let Protocol auto-detect the auth type.
     # If we didn't want to verify SSL on the autodiscover server, we probably don't want to on the Exchange server,
     # either.
-    return primary_smtp_address, Protocol(service_endpoint=ews_url, credentials=credentials, auth_type=ews_auth_type,
+    return primary_smtp_address, Protocol(service_endpoint=ews_url, credentials=credentials, auth_type=None,
                                           verify_ssl=protocol.verify_ssl)
 
 
@@ -395,7 +394,7 @@ def _parse_response(response, encoding='utf-8'):
         except KeyError:
             log.warning("Unknown auth package '%s'")
             ews_auth_type = transport.UNKNOWN
-        log.debug('Primary SMTP:%s, EWS endpoint:%s, auth type:%s', primary_smtp_address, ews_url, ews_auth_type)
+        log.debug('Primary SMTP: %s, EWS endpoint: %s, auth type: %s', primary_smtp_address, ews_url, ews_auth_type)
         assert server
         assert has_ssl in (True, False)
         assert ews_url
