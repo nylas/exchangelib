@@ -44,7 +44,7 @@ def _test_docs_credentials(protocol):
     # response.
     auth = get_auth_instance(credentials=protocol.credentials, auth_type=protocol.docs_auth_type)
     with requests.sessions.Session() as s:
-        r = s.get(url=protocol.types_url, auth=auth, allow_redirects=False)
+        r = s.get(url=protocol.types_url, auth=auth, allow_redirects=False, verify=protocol.verify_ssl)
     return _test_response(auth=auth, response=r)
 
 
@@ -56,7 +56,8 @@ def _test_service_credentials(protocol):
     data = dummy_xml(version=protocol.version.api_version)
     auth = get_auth_instance(credentials=protocol.credentials, auth_type=protocol.auth_type)
     with requests.sessions.Session() as s:
-        r = s.post(url=protocol.service_endpoint, headers=headers, data=data, auth=auth, allow_redirects=False)
+        r = s.post(url=protocol.service_endpoint, headers=headers, data=data, auth=auth, allow_redirects=False,
+                   verify=protocol.verify_ssl)
     return _test_response(auth=auth, response=r)
 
 
@@ -117,7 +118,7 @@ def wrap(content, version, account, ewstimezone=None, encoding='utf-8'):
     body.append(content)
     envelope.append(body)
     return (b'<?xml version="1.0" encoding="' + encoding.encode(encoding)) + b'"?>' \
-        + tostring(envelope, encoding=encoding)
+           + tostring(envelope, encoding=encoding)
 
 
 def get_auth_instance(credentials, auth_type):

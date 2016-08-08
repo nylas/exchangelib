@@ -169,7 +169,8 @@ class Version:
         # We can't use a session object from the protocol pool for docs because sessions are created with service auth.
         try:
             auth = get_auth_instance(credentials=protocol.credentials, auth_type=protocol.docs_auth_type)
-            shortname = cls._get_shortname_from_docs(auth=auth, types_url=protocol.types_url)
+            shortname = cls._get_shortname_from_docs(auth=auth, types_url=protocol.types_url,
+                                                     verify_ssl=protocol.verify_ssl)
             log.debug('Shortname according to %s: %s', protocol.types_url, shortname)
         except (TransportError, UnauthorizedError) as e:
             log.warning(str(e))
@@ -178,13 +179,13 @@ class Version:
         return cls._guess_version_from_service(protocol=protocol, hint=api_version)
 
     @staticmethod
-    def _get_shortname_from_docs(auth, types_url):
+    def _get_shortname_from_docs(auth, types_url, verify_ssl):
         # Get the server version from types.xsd. We can't necessarily use the service auth type since it may not be the
         # same as the auth type for docs.
         log.debug('Getting %s with auth type %s', types_url, auth.__class__.__name__)
         # Some servers send an empty response if we send 'Connection': 'close' header
         with requests.sessions.Session() as s:
-            r = s.get(url=types_url, auth=auth, allow_redirects=False, stream=False)
+            r = s.get(url=types_url, auth=auth, allow_redirects=False, stream=False, verify=verify_ssl)
         log.debug('Request headers: %s', r.request.headers)
         log.debug('Response code: %s', r.status_code)
         log.debug('Response headers: %s', r.headers)

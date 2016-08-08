@@ -232,7 +232,7 @@ class EWSTest(unittest.TestCase):
         self.tz = EWSTimeZone.timezone('Europe/Copenhagen')
         self.categories = ['Test']
         self.config = Configuration(server=settings['server'], username=settings['username'],
-                                    password=settings['password'])
+                                    password=settings['password'], verify_ssl=settings['verify_ssl'])
         self.account = Account(primary_smtp_address=settings['account'], access_type=DELEGATE, config=self.config)
         self.maxDiff = None
 
