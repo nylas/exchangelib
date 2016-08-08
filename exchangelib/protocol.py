@@ -8,7 +8,6 @@ import socket
 import queue
 from multiprocessing.pool import ThreadPool
 import logging
-from collections import defaultdict
 from threading import Lock
 import random
 
@@ -22,18 +21,12 @@ from .util import split_url
 
 log = logging.getLogger(__name__)
 
-# Used to cache version and auth types for visited servers
-_server_cache = defaultdict(dict)
-_server_cache_lock = Lock()
-
 
 def close_connections():
-    for cached_key, cached_values in _server_cache.items():
-        server = cached_key[0]  # cached_key = server, username
-        # Create a simple Protocol that we can close TCP connections on
-        cached_protocol = Protocol(service_endpoint='https://%s/EWS/Exchange.asmx' % server,
-                                   credentials=Credentials('', ''))
-        cached_protocol.close()
+    for key, protocol in CachingProtocol._protocol_cache.items():
+        service_endpoint, credentials, verify_ssl = key
+        log.debug("Service endpoint '%s': Closing sessions", service_endpoint)
+        protocol.close()
 
 
 class BaseProtocol:
@@ -134,7 +127,36 @@ class BaseProtocol:
                                                self.verify_ssl))
 
 
-class Protocol(BaseProtocol):
+class CachingProtocol(type):
+    _protocol_cache = {}
+    _protocol_cache_lock = Lock()
+
+    def __call__(cls, *args, **kwargs):
+        # Cache Protocol instances that point to the same endpoint and use the same credentials. This ensures that we
+        # re-use thread and connection pools etc. instead of flooding the remote server. This is a modified Singleton
+        # pattern.
+        #
+        # We ignore auth_type from kwargs in the cache key. We trust caller to supply the correct auth_type - otherwise
+        # __init__ will guess the correct auth type.
+        #
+        # We may be using multiple different credentials and changing our minds on SSL verification. This key
+        # combination should be safe.
+        #
+        _protocol_cache_key = kwargs['service_endpoint'], kwargs['credentials'], kwargs['verify_ssl']
+        # Acquire lock to guard against multiple threads competing to cache information. Having a per-server lock is
+        # probably overkill although it would reduce lock contention.
+        log.debug('Waiting for _protocol_cache_lock')
+        with cls._protocol_cache_lock:
+            protocol = cls._protocol_cache.get(_protocol_cache_key)
+            if protocol is None:
+                log.debug("Protocol __call__ cache miss. Adding key '%s'", str(_protocol_cache_key))
+                protocol = super().__call__(*args, **kwargs)
+                cls._protocol_cache[_protocol_cache_key] = protocol
+        log.debug('_protocol_cache_lock released')
+        return protocol
+
+
+class Protocol(BaseProtocol, metaclass=CachingProtocol):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -143,55 +165,25 @@ class Protocol(BaseProtocol):
         self.messages_url = '%s://%s/EWS/messages.xsd' % (scheme, self.server)
         self.types_url = '%s://%s/EWS/types.xsd' % (scheme, self.server)
 
-        # Acquire lock to guard against multiple threads competing to cache information. Having a per-server lock is
-        # overkill.
-        log.debug('Waiting for _server_cache_lock')
-        with _server_cache_lock:
-            _server_cache_key = self.server, self.credentials
-            if _server_cache_key in _server_cache:
-                # Get cached version and auth types and session / thread pools
-                log.debug("Cache hit for server '%s'", self.server)
-                auth_type = self.auth_type
-                for k, v in _server_cache[_server_cache_key].items():
-                    setattr(self, k, v)
+        # Autodetect authentication type if necessary
+        if self.auth_type is None:
+            self.auth_type = get_service_authtype(service_endpoint=self.service_endpoint, versions=API_VERSIONS,
+                                                  verify=self.verify_ssl)
+        self.docs_auth_type = get_docs_authtype(verify=self.verify_ssl, docs_url=self.types_url)
 
-                if auth_type:
-                    if auth_type != self.auth_type:
-                        # Some Exchange servers just can't make up their mind about which auth to prefer
-                        log.debug('Auth type mismatch on server %s. %s != %s' % (self.server, auth_type,
-                                                                                 self.auth_type))
-            else:
-                log.debug("Cache miss. Adding server '%s', poolsize %s, timeout %s", self.server, self.SESSION_POOLSIZE,
-                          self.TIMEOUT)
-                # Autodetect authentication type if necessary
-                if not self.auth_type:
-                    self.auth_type = get_service_authtype(service_endpoint=self.service_endpoint, versions=API_VERSIONS,
-                                                          verify=self.verify_ssl)
-                self.docs_auth_type = get_docs_authtype(verify=self.verify_ssl, docs_url=self.types_url)
+        # Try to behave nicely with the Exchange server. We want to keep the connection open between requests.
+        # We also want to re-use sessions, to avoid the NTLM auth handshake on every request.
+        self._session_pool = queue.LifoQueue(maxsize=self.SESSION_POOLSIZE)
+        for i in range(self.SESSION_POOLSIZE):
+            self._session_pool.put(self.create_session(), block=False)
 
-                # Try to behave nicely with the Exchange server. We want to keep the connection open between requests.
-                # We also want to re-use sessions, to avoid the NTLM auth handshake on every request.
-                self._session_pool = queue.LifoQueue(maxsize=self.SESSION_POOLSIZE)
-                for i in range(self.SESSION_POOLSIZE):
-                    self._session_pool.put(self.create_session(), block=False)
+        # Used by services to process service requests that are able to run in parallel. Thread pool should be
+        # larger than connection the pool so we have time to process data without idling the connection.
+        thread_poolsize = 4 * self.SESSION_POOLSIZE
+        self.thread_pool = ThreadPool(processes=thread_poolsize)
 
-                # Used by services to process service requests that are able to run in parallel. Thread pool should be
-                # larger than connection the pool so we have time to process data without idling the connection.
-                thread_poolsize = 4 * self.SESSION_POOLSIZE
-                self.thread_pool = ThreadPool(processes=thread_poolsize)
-
-                # Needs auth objects and a working session pool
-                self.version = Version.guess(self)
-
-                # Cache results
-                _server_cache[_server_cache_key] = dict(
-                    version=self.version,
-                    auth_type=self.auth_type,
-                    docs_auth_type=self.docs_auth_type,
-                    thread_pool=self.thread_pool,
-                    _session_pool=self._session_pool,
-                )
-        log.debug('_server_cache_lock released')
+        # Needs auth objects and a working session pool
+        self.version = Version.guess(self)
 
     def __str__(self):
         return '''\

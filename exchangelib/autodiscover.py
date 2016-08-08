@@ -18,7 +18,6 @@ import requests.exceptions
 from sqlitedict import SqliteDict, SqliteMultithread
 
 from .credentials import Credentials
-from .version import API_VERSIONS
 from .errors import AutoDiscoverFailed, AutoDiscoverRedirect, AutoDiscoverCircularRedirect, TransportError, \
     RedirectError, ErrorNonExistentMailbox
 from .protocol import BaseProtocol, Protocol
@@ -62,7 +61,7 @@ class AutodiscoverCache:
             self._endpoints.conn = SqliteMultithread(self._endpoints.filename, autocommit=True, journal_mode="DELETE")
 
     def __contains__(self, key):
-        domain, credentials = key
+        domain, credentials, verify_ssl = key
         with self._endpoints:
             self._ensure_conn()
             return domain in self._endpoints
@@ -71,7 +70,7 @@ class AutodiscoverCache:
         protocol = self._protocols.get(key)
         if protocol:
             return protocol
-        domain, credentials = key
+        domain, credentials, verify_ssl = key
         with self._endpoints:
             self._ensure_conn()
             endpoint, auth_type = self._endpoints[domain]  # It's OK to fail with KeyError here
@@ -81,14 +80,14 @@ class AutodiscoverCache:
         return protocol
 
     def __setitem__(self, key, protocol):
-        domain, credentials = key
+        domain, credentials, verify_ssl = key
         with self._endpoints:
             self._ensure_conn()
             self._endpoints[domain] = (protocol.service_endpoint, protocol.auth_type)
         self._protocols[key] = protocol
 
     def __delitem__(self, key):
-        domain, credentials = key
+        domain, credentials, verify_ssl = key
         with self._endpoints:
             self._ensure_conn()
             del self._endpoints[domain]
@@ -110,7 +109,8 @@ _autodiscover_cache_lock = Lock()
 
 
 def close_connections():
-    for domain, protocol in _autodiscover_cache.items():
+    for key, protocol in _autodiscover_cache.items():
+        domain, credentials, verify_ssl = key
         log.debug('Domain %s: Closing sessions', domain)
         protocol.close()
 
@@ -124,12 +124,13 @@ def discover(email, credentials, verify_ssl=True):
     log.debug('Attempting autodiscover on email %s', email)
     assert isinstance(credentials, Credentials)
     domain = get_domain(email)
+    # We may be using multiple different credentials and changing our minds on SSL verification. This key combination
+    # should be safe.
+    autodiscover_key = (domain, credentials, verify_ssl)
     # Use lock to guard against multiple threads competing to cache information
-    autodiscover_key = (domain, credentials)
     if autodiscover_key in _autodiscover_cache:
         # Python dict() is thread safe, so accessing _autodiscover_cache without a lock should be OK
         protocol = _autodiscover_cache[autodiscover_key]
-        protocol.verify_ssl = verify_ssl
         assert isinstance(protocol, AutodiscoverProtocol)
         log.debug('Cache hit for domain %s credentials %s: %s', domain, protocol.server, credentials)
         try:
@@ -261,12 +262,12 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl, verify, auth_t
         # These are both valid responses from an autodiscover server, showing that we have found the correct
         # server for the original domain. Fill cache before re-raising
         log.debug('Adding cache entry for %s (hostname %s, has_ssl %s)' % (domain, hostname, has_ssl))
-        _autodiscover_cache[(domain, credentials)] = autodiscover_protocol
+        _autodiscover_cache[(domain, credentials, verify)] = autodiscover_protocol
         raise
 
     # Cache the final hostname of the autodiscover service so we don't need to autodiscover the same domain again
     log.debug('Adding cache entry for %s (hostname %s, has_ssl %s)' % (domain, hostname, has_ssl))
-    _autodiscover_cache[(domain, credentials)] = autodiscover_protocol
+    _autodiscover_cache[(domain, credentials, verify)] = autodiscover_protocol
     # Autodiscover response contains an auth type, but we don't want to spend time here testing if it actually works.
     # Instead of forcing a possibly-wrong auth type, just let Protocol auto-detect the auth type.
     # If we didn't want to verify SSL on the autodiscover server, we probably don't want to on the Exchange server,

@@ -362,6 +362,7 @@ class CommonTest(EWSTest):
         self.assertEqual(primary_smtp_address, self.account.primary_smtp_address)
         self.assertEqual(protocol.service_endpoint.lower(), self.config.protocol.service_endpoint.lower())
         self.assertEqual(protocol.version.build, self.config.protocol.version.build)
+        self.assertEqual(id(protocol), id(self.config.protocol), (protocol, self.config.protocol))
 
 
 class BaseItemTest(EWSTest):
