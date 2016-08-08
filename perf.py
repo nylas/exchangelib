@@ -21,11 +21,12 @@ except FileNotFoundError:
     raise
 
 categories = ['foobar', 'perftest']
-tz = EWSTimeZone.timezone('Europe/Copenhagen')
+tz = EWSTimeZone.timezone('US/Pacific')
 
 t0 = datetime.now()
 
-config = Configuration(server=settings['server'], username=settings['username'], password=settings['password'])
+config = Configuration(server=settings['server'], username=settings['username'], password=settings['password'],
+                       verify_ssl=False)
 print(('Exchange server: %s' % config.protocol.server))
 
 account = Account(config=config, primary_smtp_address=settings['account'], access_type=DELEGATE)
@@ -100,6 +101,7 @@ def perf_test(cbs, dbs, ps):
     print(('Total time: %s' % total))
     return avg_create, avg_fetch, avg_delete, total
 
+
 from datetime import timedelta
 from time import sleep
 
@@ -129,6 +131,7 @@ def run(cbs, dbs, ps):
     check(c, d, t, cbs, dbs, ps)
     # Let server cool off a bit. Otherwise perf numbers deteriorate over time even though the same settings are used.
     sleep(60)
+
 
 for poolsize in (2, 2, 2):
     for batchsize in (25, 25, 25):

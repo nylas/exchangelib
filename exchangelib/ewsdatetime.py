@@ -80,6 +80,7 @@ class EWSTimeZone:
     Represents a timezone as expected by the EWS TimezoneContext / TimezoneDefinition XML element, and returned by
     services.GetServerTimeZones.
     """
+
     @classmethod
     def from_pytz(cls, tz):
         # pytz timezones are dynamically generated. Subclass the tz.__class__ and add the extra Microsoft timezone
@@ -113,9 +114,11 @@ class EWSTimeZone:
 
     # Manually maintained translation between pytz location / timezone name and MS timezone IDs
     PYTZ_TO_MS_MAP = {
-        'Europe/Copenhagen': 'Romance Standard Time',
         'UTC': 'UTC',
         'GMT': 'GMT Standard Time',
+        'US/Pacific': 'Pacific Standard Time',
+        'US/Eastern': 'Eastern Standard Time',
+        'Europe/Copenhagen': 'Romance Standard Time',
     }
 
     # This is a somewhat authoritative list of the timezones available on an Exchange server. Format is (id, name).
@@ -220,6 +223,7 @@ class EWSTimeZone:
         ('Kamchatka Standard Time', '(UTC+12:00) Petropavlovsk-Kamchatsky'),
         ('Tonga Standard Time', "(UTC+13:00) Nuku'alofa"),
     ])
+
 
 UTC = EWSTimeZone.timezone('UTC')
 

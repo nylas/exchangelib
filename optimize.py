@@ -24,9 +24,10 @@ except FileNotFoundError:
     raise
 
 categories = ['perftest']
-tz = EWSTimeZone.timezone('Europe/Copenhagen')
+tz = EWSTimeZone.timezone('US/Pacific')
 
-config = Configuration(server=settings['server'], username=settings['username'], password=settings['password'])
+config = Configuration(server=settings['server'], username=settings['username'], password=settings['password'],
+                       verify_ssl=settings['verify_ssl'])
 print(('Exchange server: %s' % config.protocol.server))
 
 account = Account(config=config, primary_smtp_address=settings['account'], access_type=DELEGATE)
