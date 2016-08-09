@@ -12,10 +12,10 @@ If you have problems autodiscovering, start by doing an official test at https:/
 import logging
 from threading import Lock
 import queue
+import shelve
 
 import dns.resolver
 import requests.exceptions
-from sqlitedict import SqliteDict, SqliteMultithread
 
 from .credentials import Credentials
 from .errors import AutoDiscoverFailed, AutoDiscoverRedirect, AutoDiscoverCircularRedirect, TransportError, \
@@ -53,51 +53,48 @@ class AutodiscoverCache:
     # needs.
     def __init__(self, storage_file):
         self._protocols = {}  # Mapping from (domain, credentials) to AutodiscoverProtocol
-        self._endpoints = SqliteDict(storage_file, autocommit=True)  # Mapping from domain to (endpoint, auth_type)
+        self._storage_file = storage_file
 
-    def _ensure_conn(self):
-        # Work around issue https://github.com/RaRe-Technologies/sqlitedict/issues/54
-        if self._endpoints.conn is None:
-            self._endpoints.conn = SqliteMultithread(self._endpoints.filename, autocommit=True, journal_mode="DELETE")
+    def items(self):
+        return self._protocols.items()
 
     def __contains__(self, key):
         domain, credentials, verify_ssl = key
-        with self._endpoints:
-            self._ensure_conn()
-            return domain in self._endpoints
+        with shelve.open(self._storage_file) as db:
+            return domain in db
 
     def __getitem__(self, key):
         protocol = self._protocols.get(key)
         if protocol:
             return protocol
         domain, credentials, verify_ssl = key
-        with self._endpoints:
-            self._ensure_conn()
-            endpoint, auth_type = self._endpoints[domain]  # It's OK to fail with KeyError here
+        with shelve.open(self._storage_file) as db:
+            endpoint, auth_type = db[domain]  # It's OK to fail with KeyError here
         protocol = AutodiscoverProtocol(service_endpoint=endpoint, credentials=credentials, auth_type=auth_type,
-                                        verify_ssl=True)
+                                        verify_ssl=verify_ssl)
         self._protocols[key] = protocol
         return protocol
 
     def __setitem__(self, key, protocol):
         domain, credentials, verify_ssl = key
-        with self._endpoints:
-            self._ensure_conn()
-            self._endpoints[domain] = (protocol.service_endpoint, protocol.auth_type)
+        with shelve.open(self._storage_file) as db:
+            db[domain] = (protocol.service_endpoint, protocol.auth_type)
         self._protocols[key] = protocol
 
     def __delitem__(self, key):
         domain, credentials, verify_ssl = key
-        with self._endpoints:
-            self._ensure_conn()
-            del self._endpoints[domain]
+        with shelve.open(self._storage_file) as db:
+            del db[domain]
         try:
             del self._protocols[key]
         except KeyError:
             pass
 
-    def items(self):
-        return self._protocols.items()
+    def __del__(self):
+        for key, protocol in _autodiscover_cache.items():
+            domain, credentials, verify_ssl = key
+            log.debug('Domain %s: Closing sessions', domain)
+            protocol.close()
 
     def __str__(self):
         return str(self._protocols)
@@ -132,7 +129,7 @@ def discover(email, credentials, verify_ssl=True):
         # Python dict() is thread safe, so accessing _autodiscover_cache without a lock should be OK
         protocol = _autodiscover_cache[autodiscover_key]
         assert isinstance(protocol, AutodiscoverProtocol)
-        log.debug('Cache hit for domain %s credentials %s: %s', domain, protocol.server, credentials)
+        log.debug('Cache hit for domain %s credentials %s: %s', domain, credentials, protocol.server)
         try:
             # This is the main path when the cache is primed
             primary_smtp_address, protocol = _autodiscover_quick(credentials=credentials, email=email,
