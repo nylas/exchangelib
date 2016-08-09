@@ -60,7 +60,7 @@ class BaseProtocol:
         while True:
             try:
                 self._session_pool.get(block=False).close_socket(self.service_endpoint)
-            except queue.Empty:
+            except (queue.Empty, ReferenceError):
                 break
 
     def get_session(self):
@@ -200,6 +200,9 @@ XSD auth: %s''' % (
             self.auth_type,
             self.docs_auth_type,
         )
+
+    def __del__(self):
+        self.close()
 
 
 class EWSSession(Session):
