@@ -35,7 +35,7 @@ class Configuration:
         credentials = Credentials(username, password)
         if auth_type is not None:
             assert auth_type in AUTH_TYPE_MAP, 'Unsupported auth type %s' % auth_type
-        if not server or service_endpoint:
+        if not (server or service_endpoint):
             raise AttributeError('Either server or service_endpoint must be provided')
         # Set up a default protocol that non-autodiscover accounts can use
         if not service_endpoint:
