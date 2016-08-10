@@ -35,6 +35,9 @@ RESPONSE_NS = 'http://schemas.microsoft.com/exchange/autodiscover/outlook/respon
 TIMEOUT = 10  # Seconds
 
 
+AUTODISCOVER_PERSISTENT_STORAGE = '/tmp/exchangelib.cache'
+
+
 class AutodiscoverCache:
     # Stores the translation from (email domain, credentials) -> AutodiscoverProtocol object so we can re-use TCP
     # connections to an autodiscover server within the same process. Also persists the email domain -> (autodiscover
@@ -51,9 +54,12 @@ class AutodiscoverCache:
 
     # SqliteDict is supposedly thread-safe and process-safe and does a lookup to the storage every time, which suits our
     # needs.
-    def __init__(self, storage_file):
+    def __init__(self):
         self._protocols = {}  # Mapping from (domain, credentials) to AutodiscoverProtocol
-        self._storage_file = storage_file
+
+    @property
+    def _storage_file(self):
+        return AUTODISCOVER_PERSISTENT_STORAGE
 
     def items(self):
         return self._protocols.items()
@@ -100,8 +106,7 @@ class AutodiscoverCache:
         return str(self._protocols)
 
 
-AUTODISCOVER_PERSISTENT_STORAGE = '/tmp/exchangelib.cache'
-_autodiscover_cache = AutodiscoverCache(AUTODISCOVER_PERSISTENT_STORAGE)
+_autodiscover_cache = AutodiscoverCache()
 _autodiscover_cache_lock = Lock()
 
 
