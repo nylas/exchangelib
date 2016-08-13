@@ -23,7 +23,7 @@ from .errors import AutoDiscoverFailed, AutoDiscoverRedirect, AutoDiscoverCircul
 from .protocol import BaseProtocol, Protocol
 from . import transport
 from .util import create_element, get_xml_attr, add_xml_child, to_xml, is_xml, post_ratelimited, get_redirect_url, \
-    xml_to_str
+    xml_to_str, get_domain
 
 log = logging.getLogger(__name__)
 
@@ -64,6 +64,12 @@ class AutodiscoverCache:
     def items(self):
         return self._protocols.items()
 
+    def clear(self):
+        # Wipe the entire cache
+        with shelve.open(self._storage_file) as db:
+            db.clear()
+        self._protocols.clear()
+
     def __contains__(self, key):
         domain, credentials, verify_ssl = key
         with shelve.open(self._storage_file) as db:
@@ -96,11 +102,14 @@ class AutodiscoverCache:
         except KeyError:
             pass
 
-    def __del__(self):
-        for key, protocol in _autodiscover_cache.items():
+    def close(self):
+        for key, protocol in self._protocols.items():
             domain, credentials, verify_ssl = key
             log.debug('Domain %s: Closing sessions', domain)
             protocol.close()
+
+    def __del__(self):
+        self.close()
 
     def __str__(self):
         return str(self._protocols)
@@ -111,10 +120,7 @@ _autodiscover_cache_lock = Lock()
 
 
 def close_connections():
-    for key, protocol in _autodiscover_cache.items():
-        domain, credentials, verify_ssl = key
-        log.debug('Domain %s: Closing sessions', domain)
-        protocol.close()
+    _autodiscover_cache.close()
 
 
 def discover(email, credentials, verify_ssl=True):
@@ -445,13 +451,6 @@ def _get_hostname_from_srv(hostname):
         raise AutoDiscoverFailed('No SRV record for %s' % hostname) from e
     except dns.resolver.NXDOMAIN as e:
         raise AutoDiscoverFailed('Nonexistent domain %s' % hostname) from e
-
-
-def get_domain(email):
-    try:
-        return email.split('@')[1].lower().strip()
-    except (IndexError, AttributeError) as e:
-        raise ValueError("'%s' is not a valid email" % email) from e
 
 
 class AutodiscoverProtocol(BaseProtocol):

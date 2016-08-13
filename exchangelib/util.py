@@ -15,10 +15,10 @@ log = logging.getLogger(__name__)
 ElementType = type(Element('x'))  # Type is auto-generated inside cElementTree
 
 
-# Some control characters are illegal in XML 1.0 (and XML 1.1). Some Exchange serveres will emit XML 1.0
-# containing characters only allowed in XML 1.1
+# Regex of UTF-8 control characters that are illegal in XML 1.0 (and XML 1.1)
 _illegal_xml_chars_RE = re.compile('[\x00-\x08\x0b\x0c\x0e-\x1F\uD800-\uDFFF\uFFFE\uFFFF]')
-BOM = '\xef\xbb\xbf'  # UTF-8 byte order mark which tails some Microsoft XML strings
+# UTF-8 byte order mark which may precede the XML from an Exchange server
+BOM = '\xef\xbb\xbf'
 
 
 def chunkify(iterable, chunksize):
@@ -168,6 +168,13 @@ class DummyResponse:
     headers = {}
     text = ''
     request = DummyRequest()
+
+
+def get_domain(email):
+    try:
+        return email.split('@')[1].lower().strip()
+    except (IndexError, AttributeError) as e:
+        raise ValueError("'%s' is not a valid email" % email) from e
 
 
 def split_url(url):

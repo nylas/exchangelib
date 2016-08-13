@@ -4,19 +4,22 @@ from datetime import timedelta, datetime, date, time
 import random
 import string
 from decimal import Decimal
+import requests
 
 from yaml import load
 
+from exchangelib import close_connections
 from exchangelib.account import Account
-from exchangelib.autodiscover import discover
+from exchangelib.autodiscover import discover, _autodiscover_cache
 from exchangelib.configuration import Configuration
 from exchangelib.credentials import DELEGATE, Credentials
+from exchangelib.errors import RelativeRedirect, TransportError
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, ExternId, Choice, Email, Contact, Task, \
-    EmailAddress, PhysicalAddress, PhoneNumber, IndexedField, RoomList
+    EmailAddress, PhysicalAddress, PhoneNumber, IndexedField, RoomList, Calendar, Messages, Tasks, Contacts
 from exchangelib.restriction import Restriction
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, AllProperties, IdOnly
-from exchangelib.util import xml_to_str, chunkify, peek
+from exchangelib.util import xml_to_str, chunkify, peek, get_redirect_url
 from exchangelib.version import Build
 
 
@@ -94,6 +97,9 @@ class EWSDateTest(unittest.TestCase):
         # Test summertime
         dt = tz.localize(EWSDateTime(2000, 8, 2, 3, 4, 5))
         self.assertEqual(dt.astimezone(utc_tz).ewsformat(), '2000-08-02T01:04:05Z')
+        # Test error when tzinfo is set directly
+        with self.assertRaises(ValueError):
+            EWSDateTime(2000, 1, 1, tzinfo=tz)
 
 
 class RestrictionTest(unittest.TestCase):
@@ -217,6 +223,32 @@ class UtilTest(unittest.TestCase):
         is_empty, seq = peek((i for i in [1, 2, 3]))
         self.assertEqual((is_empty, list(seq)), (False, [1, 2, 3]))
 
+    def test_get_redirect_url(self):
+        r = requests.get('https://httpbin.org/redirect-to?url=https://example.com/', allow_redirects=False)
+        url, server, has_ssl = get_redirect_url(r)
+        self.assertEqual(url, 'https://example.com/')
+        self.assertEqual(server, 'example.com')
+        self.assertEqual(has_ssl, True)
+        r = requests.get('https://httpbin.org/redirect-to?url=http://example.com/', allow_redirects=False)
+        url, server, has_ssl = get_redirect_url(r)
+        self.assertEqual(url, 'http://example.com/')
+        self.assertEqual(server, 'example.com')
+        self.assertEqual(has_ssl, False)
+        r = requests.get('https://httpbin.org/redirect-to?url=/example', allow_redirects=False)
+        url, server, has_ssl = get_redirect_url(r)
+        self.assertEqual(url, 'https://httpbin.org/example')
+        self.assertEqual(server, 'httpbin.org')
+        self.assertEqual(has_ssl, True)
+        with self.assertRaises(RelativeRedirect):
+            r = requests.get('https://httpbin.org/redirect-to?url=https://example.com', allow_redirects=False)
+            get_redirect_url(r, require_relative=True)
+        with self.assertRaises(RelativeRedirect):
+            r = requests.get('https://httpbin.org/redirect-to?url=/example', allow_redirects=False)
+            get_redirect_url(r, allow_relative=False)
+
+    def test_close_connections(self):
+        close_connections()
+
 
 class EWSTest(unittest.TestCase):
     def setUp(self):
@@ -325,6 +357,13 @@ class CommonTest(EWSTest):
         roomlists = ws.call(roomlist=roomlist)
         self.assertEqual(roomlists, [])
 
+    def test_folders(self):
+        folders = self.account.folders
+        self.assertTrue(Calendar in folders)
+        self.assertTrue(Messages in folders)
+        self.assertTrue(Tasks in folders)
+        self.assertTrue(Contacts in folders)
+
     def test_getfolders(self):
         folders = self.account.root.get_folders()
         self.assertEqual(len(folders), 61, sorted(f.name for f in folders))
@@ -355,6 +394,20 @@ class CommonTest(EWSTest):
         self.assertIn(self.config.protocol.version.api_version, str(self.config.protocol))
         self.assertIn(self.config.credentials.username, str(self.config.credentials))
         self.assertIn(self.account.primary_smtp_address, str(self.account))
+        self.assertIn(str(self.account.version.build.major_version), repr(self.account.version))
+        repr(self.config)
+        repr(self.config.protocol)
+        repr(self.account.version)
+        repr(self.account.inbox)
+        repr(self.account.contacts)
+        repr(self.account.tasks)
+        repr(self.account.calendar)
+
+    def test_configuration(self):
+        with self.assertRaises(AttributeError):
+            Configuration(username='foo', password='bar')
+        with self.assertRaises(AttributeError):
+            Configuration(username='foo', password='bar', service_endpoint='http://example.com/svc', auth_type='XXX')
 
     def test_autodiscover(self):
         primary_smtp_address, protocol = discover(email=self.account.primary_smtp_address,
@@ -362,7 +415,26 @@ class CommonTest(EWSTest):
         self.assertEqual(primary_smtp_address, self.account.primary_smtp_address)
         self.assertEqual(protocol.service_endpoint.lower(), self.config.protocol.service_endpoint.lower())
         self.assertEqual(protocol.version.build, self.config.protocol.version.build)
-        self.assertEqual(id(protocol), id(self.config.protocol), (protocol, self.config.protocol))
+
+    def test_autodiscover_from_account(self):
+        _autodiscover_cache.clear()
+        account = Account(primary_smtp_address=self.account.primary_smtp_address, credentials=self.config.credentials,
+                          autodiscover=True)
+        self.assertEqual(account.primary_smtp_address, self.account.primary_smtp_address)
+        self.assertEqual(account.protocol.service_endpoint.lower(), self.config.protocol.service_endpoint.lower())
+        self.assertEqual(account.protocol.version.build, self.config.protocol.version.build)
+        # Make sure cache is full
+        self.assertTrue((account.domain, self.config.credentials, True) in _autodiscover_cache)
+        # Test that autodiscover works with a full cache
+        account = Account(primary_smtp_address=self.account.primary_smtp_address, credentials=self.config.credentials,
+                          autodiscover=True)
+        self.assertEqual(account.primary_smtp_address, self.account.primary_smtp_address)
+        # Test cache manipulation
+        key = (account.domain, self.config.credentials, True)
+        self.assertTrue(key in _autodiscover_cache)
+        del _autodiscover_cache[key]
+        self.assertFalse(key in _autodiscover_cache)
+        del _autodiscover_cache
 
 
 class BaseItemTest(EWSTest):

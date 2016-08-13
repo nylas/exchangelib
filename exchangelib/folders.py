@@ -680,6 +680,7 @@ class Folder:
         """
         Finds all items in the folder, optionally restricted by start- and enddates and a list of categories
         """
+        # TODO: This should be tailored to support the most comon fields for a specific folder type.
         log.debug(
             'Finding %s items for %s from %s to %s with cats %s shape %s',
             self.DISTINGUISHED_FOLDER_ID,

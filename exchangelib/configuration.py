@@ -33,8 +33,8 @@ class Configuration:
     def __init__(self, username, password, server=None, has_ssl=True, service_endpoint=None, auth_type=None,
                  verify_ssl=True):
         credentials = Credentials(username, password)
-        if auth_type is not None:
-            assert auth_type in AUTH_TYPE_MAP, 'Unsupported auth type %s' % auth_type
+        if auth_type is not None and auth_type not in AUTH_TYPE_MAP:
+            raise AttributeError('Unsupported auth type %s' % auth_type)
         if not (server or service_endpoint):
             raise AttributeError('Either server or service_endpoint must be provided')
         # Set up a default protocol that non-autodiscover accounts can use

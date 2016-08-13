@@ -28,7 +28,7 @@ class Credentials:
         elif username.count('\\') == 1:
             self.type = DOMAIN
         else:
-            self.type = DOMAIN
+            self.type = UPN
         self.username = username
         self.password = password
 

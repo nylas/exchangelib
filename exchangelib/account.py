@@ -5,6 +5,7 @@ from .credentials import Credentials, DELEGATE, IMPERSONATION
 from .errors import ErrorFolderNotFound, ErrorAccessDenied
 from .folders import Root, Calendar, Messages, Tasks, Contacts, SHALLOW, DEEP, WELLKNOWN_FOLDERS
 from .protocol import Protocol
+from .util import get_domain
 
 log = getLogger(__name__)
 
@@ -127,8 +128,9 @@ class Account:
         self._contacts = self._get_default_folder(Contacts)
         return self._contacts
 
-    def get_domain(self):
-        return self.primary_smtp_address.split('@')[1].lower().strip()
+    @property
+    def domain(self):
+        return get_domain(self.primary_smtp_address)
 
     def __str__(self):
         txt = '%s' % self.primary_smtp_address
