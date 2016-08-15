@@ -259,8 +259,9 @@ class EWSTest(unittest.TestCase):
             with open(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'settings.yml')) as f:
                 settings = load(f)
         except FileNotFoundError:
+            print('Skipping %s - no settings.yml file found' % self.__class__.__name__)
             print('Copy settings.yml.sample to settings.yml and enter values for your test server')
-            raise
+            raise unittest.SkipTest('Skipping %s - no settings.yml file found' % self.__class__.__name__)
         self.tz = EWSTimeZone.timezone('Europe/Copenhagen')
         self.categories = ['Test']
         self.config = Configuration(server=settings['server'], username=settings['username'],

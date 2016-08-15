@@ -9,5 +9,11 @@ python:
 install:
   - "python setup.py -q install"
   - "pip install PyYAML"
+  - "pip install coverage"
+  - "pip install coveralls"
 # command to run tests
-script: nosetests
+script:
+  - "nosetests tests"
+  - "coverage run --source=syncset setup.py test"
+after_success:
+    coveralls
