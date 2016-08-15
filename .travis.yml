@@ -14,6 +14,6 @@ install:
 # command to run tests
 script:
   - "nosetests tests"
-  - "coverage run --source=syncset setup.py test"
+  - "coverage run --source=exchangelib setup.py test"
 after_success:
     coveralls
