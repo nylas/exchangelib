@@ -5,6 +5,18 @@ This module provides an well-performing, well-behaving and simple interface for 
 searching, creating, updating and deleting calendar, mailbox, task and contact items.
 
 
+.. image:: https://badge.fury.io/py/exchangelib.svg
+    :target: https://badge.fury.io/py/exchangelib
+
+.. image:: https://landscape.io/github/ecederstrand/exchangelib/master/landscape.png
+   :target: https://landscape.io/github/ecederstrand/exchangelib/master
+
+.. image:: https://secure.travis-ci.org/ecederstrand/exchangelib.png
+    :target: http://travis-ci.org/ecederstrand/exchangelib
+
+.. image:: https://coveralls.io/repos/ecederstrand/exchangelib/badge.svg?branch=master
+    :target: https://coveralls.io/r/ecederstrand/exchangelib?branch=master
+
 
 Usage
 ~~~~~
