@@ -15,7 +15,7 @@ searching, creating, updating and deleting calendar, mailbox, task and contact i
     :target: http://travis-ci.org/ecederstrand/exchangelib
 
 .. image:: https://coveralls.io/repos/github/ecederstrand/exchangelib/badge.svg?branch=
-:target: https://coveralls.io/github/ecederstrand/exchangelib?branch=
+    :target: https://coveralls.io/github/ecederstrand/exchangelib?branch=
 
 
 Usage
