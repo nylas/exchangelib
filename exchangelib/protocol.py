@@ -174,7 +174,7 @@ class Protocol(BaseProtocol, metaclass=CachingProtocol):
         # Try to behave nicely with the Exchange server. We want to keep the connection open between requests.
         # We also want to re-use sessions, to avoid the NTLM auth handshake on every request.
         self._session_pool = queue.LifoQueue(maxsize=self.SESSION_POOLSIZE)
-        for i in range(self.SESSION_POOLSIZE):
+        for _ in range(self.SESSION_POOLSIZE):
             self._session_pool.put(self.create_session(), block=False)
 
         # Used by services to process service requests that are able to run in parallel. Thread pool should be

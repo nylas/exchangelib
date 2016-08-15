@@ -217,7 +217,7 @@ def get_redirect_url(response, allow_relative=True, require_relative=False):
 
 def post_ratelimited(protocol, session, url, headers, data, timeout=None, verify=True, allow_redirects=False):
     from socket import timeout as SocketTimeout
-    from requests.exceptions import ConnectionError, ReadTimeout, ChunkedEncodingError
+    import requests.exceptions
     # The contract on sessions here is to return the session that ends up being used, or retiring the session if we
     # intend to raise an exception. We give up on max_wait timeout, not number of retries
     r = None
@@ -250,7 +250,8 @@ Response headers: %(response_headers)s'''
             try:
                 r = session.post(url=url, headers=headers, data=data, allow_redirects=False, timeout=timeout,
                                  verify=verify)
-            except (ChunkedEncodingError, ConnectionError, ConnectionResetError, ReadTimeout, SocketTimeout):
+            except (requests.exceptions.ChunkedEncodingError, requests.exceptions.ConnectionError, ConnectionResetError,
+                    requests.exceptions.ReadTimeout, SocketTimeout):
                 log.debug(
                     'Session %(session_id)s thread %(thread_id)s: timeout or connection error POST\'ing to %(url)s',
                     log_vals)

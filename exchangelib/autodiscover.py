@@ -269,12 +269,12 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl, verify, auth_t
     except (ErrorNonExistentMailbox, AutoDiscoverRedirect):
         # These are both valid responses from an autodiscover server, showing that we have found the correct
         # server for the original domain. Fill cache before re-raising
-        log.debug('Adding cache entry for %s (hostname %s, has_ssl %s)' % (domain, hostname, has_ssl))
+        log.debug('Adding cache entry for %s (hostname %s, has_ssl %s)', domain, hostname, has_ssl)
         _autodiscover_cache[(domain, credentials, verify)] = autodiscover_protocol
         raise
 
     # Cache the final hostname of the autodiscover service so we don't need to autodiscover the same domain again
-    log.debug('Adding cache entry for %s (hostname %s, has_ssl %s)' % (domain, hostname, has_ssl))
+    log.debug('Adding cache entry for %s (hostname %s, has_ssl %s)', domain, hostname, has_ssl)
     _autodiscover_cache[(domain, credentials, verify)] = autodiscover_protocol
     # Autodiscover response contains an auth type, but we don't want to spend time here testing if it actually works.
     # Instead of forcing a possibly-wrong auth type, just let Protocol auto-detect the auth type.
@@ -460,7 +460,7 @@ class AutodiscoverProtocol(BaseProtocol):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._session_pool = queue.LifoQueue(maxsize=self.SESSION_POOLSIZE)
-        for i in range(self.SESSION_POOLSIZE):
+        for _ in range(self.SESSION_POOLSIZE):
             self._session_pool.put(self.create_session(), block=False)
 
     def __str__(self):

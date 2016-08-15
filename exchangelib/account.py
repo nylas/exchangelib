@@ -1,7 +1,7 @@
 from logging import getLogger
 
 from .autodiscover import discover
-from .credentials import Credentials, DELEGATE, IMPERSONATION
+from .credentials import DELEGATE, IMPERSONATION
 from .errors import ErrorFolderNotFound, ErrorAccessDenied
 from .folders import Root, Calendar, Messages, Tasks, Contacts, SHALLOW, DEEP, WELLKNOWN_FOLDERS
 from .protocol import Protocol
