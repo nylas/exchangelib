@@ -10,7 +10,7 @@ from yaml import load
 
 from exchangelib import close_connections
 from exchangelib.account import Account
-from exchangelib.autodiscover import discover, _autodiscover_cache
+from exchangelib.autodiscover import discover
 from exchangelib.configuration import Configuration
 from exchangelib.credentials import DELEGATE, Credentials
 from exchangelib.errors import RelativeRedirect, TransportError
@@ -418,6 +418,7 @@ class CommonTest(EWSTest):
         self.assertEqual(protocol.version.build, self.config.protocol.version.build)
 
     def test_autodiscover_from_account(self):
+        from exchangelib.autodiscover import _autodiscover_cache
         _autodiscover_cache.clear()
         account = Account(primary_smtp_address=self.account.primary_smtp_address, credentials=self.config.credentials,
                           autodiscover=True)
