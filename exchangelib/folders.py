@@ -424,7 +424,7 @@ class Attendee(EWSElement):
         last_response_time = get_xml_attr(elem, '{%s}LastResponseTime' % TNS)
         return cls(
             mailbox=Mailbox.from_xml(elem.find(Mailbox.response_tag())),
-            response_type=get_xml_attr(elem, '{%s}ResponseType' % TNS),
+            response_type=get_xml_attr(elem, '{%s}ResponseType' % TNS) or 'Unknown',
             last_response_time=EWSDateTime.from_string(last_response_time) if last_response_time else None,
         )
 
