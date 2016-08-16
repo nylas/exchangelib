@@ -173,7 +173,7 @@ class Version:
                                                      verify_ssl=protocol.verify_ssl)
             log.debug('Shortname according to %s: %s', protocol.types_url, shortname)
         except (TransportError, UnauthorizedError) as e:
-            log.warning(str(e))
+            log.info(str(e))
             shortname = None
         api_version = VERSIONS[shortname][0] if shortname else None
         return cls._guess_version_from_service(protocol=protocol, hint=api_version)
