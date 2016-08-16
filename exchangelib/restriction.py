@@ -38,14 +38,7 @@ class Restriction:
         from xml.etree.ElementTree import ElementTree
         log.debug('Parsing source: %s', source)
 
-        # Make the syntax of the expression legal Python syntax by replacing ':' in identifiers with '_'. Play safe and
-        # only do this for known property prefixes. See Table 1 and 5 in
-        # https://msdn.microsoft.com/en-us/library/office/dn467898(v=exchg.150).aspx
-        for prefix in ('message:', 'calendar:', 'contacts:', 'conversation:', 'distributionlist:', 'folder:', 'item:',
-                       'meeting:', 'meetingRequest:', 'postitem:', 'task:'):
-            new = prefix[:-1] + '_'
-            source = source.replace(prefix, new)
-
+        source = cls._escape(source)
         st = expr(source).tolist()
         etree = ElementTree(cls._parse_syntaxtree(st))
         # etree.register_namespace('t', 'http://schemas.microsoft.com/exchange/services/2006/messages')
@@ -116,7 +109,7 @@ class Restriction:
                     return None
                 if val == 'in':
                     return create_element('t:Contains', ContainmentMode='Substring', ContainmentComparison='Exact')
-                return create_element('t:FieldURI', FieldURI=val.replace('_', ':'))  # Switch back to correct spelling
+                return create_element('t:FieldURI', FieldURI=cls._unescape(val))
             if key == EQEQUAL:
                 return create_element('t:IsEqualTo')
             if key == NOTEQUAL:
@@ -135,6 +128,26 @@ class Restriction:
             if key in (LPAR, RPAR, NEWLINE, ENDMARKER):
                 return None
             raise ValueError('Unknown token type: %s %s' % (key, val))
+
+    @staticmethod
+    def _escape(source):
+        # Make the syntax of the expression legal Python syntax by replacing ':' in identifiers with '_'. Play safe and
+        # only do this for known property prefixes. See Table 1 and 5 in
+        # https://msdn.microsoft.com/en-us/library/office/dn467898(v=exchg.150).aspx
+        for prefix in ('message:', 'calendar:', 'contacts:', 'conversation:', 'distributionlist:', 'folder:', 'item:',
+                       'meeting:', 'meetingRequest:', 'postitem:', 'task:'):
+            new = prefix[:-1] + '_'
+            source = source.replace(prefix, new)
+        return source
+
+    @staticmethod
+    def _unescape(fieldname):
+        # Switch back to correct spelling. Inverse of _unescape()
+        for prefix in ('message_', 'calendar_', 'contacts_', 'conversation_', 'distributionlist_', 'folder_', 'item_',
+                       'meeting_', 'meetingRequest_', 'postitem_', 'task_'):
+            if fieldname.startswith(prefix):
+                return prefix[:-1] + ':' + fieldname[len(prefix):]
+        return fieldname
 
     @classmethod
     def from_params(cls, start=None, end=None, categories=None, subject=None):
