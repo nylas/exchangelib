@@ -444,6 +444,9 @@ class Item(EWSElement):
     FIELDURI_PREFIX = 'item'
 
     # ITEM_FIELDS is a mapping from Python attribute name to a 2-tuple containing XML element name and value type.
+    # Not all attributes are supported. See full list at
+    # https://msdn.microsoft.com/en-us/library/office/aa580790(v=exchg.150).aspx
+
     # 'extern_id' is not a native EWS Item field. We use it for identification when item originates in an external
     # system. The field is implemented as an extended property on the Item.
     ITEM_FIELDS = {
@@ -463,7 +466,7 @@ class Item(EWSElement):
     EXTRA_ITEM_FIELDS = {
         'datetime_created': ('DateTimeCreated', EWSDateTime),
         'datetime_sent': ('DateTimeSent', EWSDateTime),
-        'datetime_recieved': ('DateTimeReceived', EWSDateTime),
+        'datetime_received': ('DateTimeReceived', EWSDateTime),
         'last_modified_name': ('LastModifiedName', str),
         'last_modified_time': ('LastModifiedTime', EWSDateTime),
     }
@@ -519,6 +522,7 @@ class Item(EWSElement):
 
     @classmethod
     def fielduri_for_field(cls, fieldname):
+        # See all valid FieldURI values at https://msdn.microsoft.com/en-us/library/office/aa494315(v=exchg.150).aspx
         try:
             field_uri = cls.uri_for_field(fieldname)
             if isinstance(field_uri, str):
