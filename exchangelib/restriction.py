@@ -25,9 +25,15 @@ class Q:
     LT = '<'
     LTE = '<='
     IN = 'in'
+    EXACT = 'exact'
+    IEXACT = 'iexact'
     CONTAINS = 'contains'
+    ICONTAINS = 'icontains'
+    STARTSWITH = 'startswith'
+    ISTARTSWITH = 'istartswith'
     RANGE = 'range'
-    OP_TYPES = (EQ, NE, GT, GTE, LT, LTE, IN, CONTAINS, RANGE)
+    OP_TYPES = (EQ, NE, GT, GTE, LT, LTE, IN, EXACT, IEXACT, CONTAINS, ICONTAINS, STARTSWITH, ISTARTSWITH, RANGE)
+    CONTAINS_OPS = (EXACT, IEXACT, CONTAINS, ICONTAINS, STARTSWITH, ISTARTSWITH)
 
     def __init__(self, *args, **kwargs):
         if 'conn_type' in kwargs:
@@ -52,9 +58,17 @@ class Q:
             if '__' in key:
                 field, lookup = key.rsplit('__')
                 if lookup == self.RANGE:
-                    # Interpret 'foo_range=(1, 2)' as 'foo__gte=1 and foo__lte=2'
-                    self.children.append(self.__class__(**{'%s__%s' % (field, self.GTE): value[0]}))
-                    self.children.append(self.__class__(**{'%s__%s' % (field, self.LTE): value[1]}))
+                    # EWS doesn't have a 'range' operator. Emulate 'foo__range=(1, 2)' as 'foo__gte=1 and foo__lte=2'
+                    # (both values inclusive).
+                    self.children.append(self.__class__(**{'%s__gte' % field: value[0]}))
+                    self.children.append(self.__class__(**{'%s__lte' % field: value[1]}))
+                    continue
+                if lookup == self.IN:
+                    # EWS doesn't have an 'in' operator. Emulate 'foo in (1, 2, ...)' as 'foo==1 or foo==2 or ...'
+                    or_args = []
+                    for val in value:
+                        or_args.append(self.__class__(**{field: val}))
+                    self.children.append(Q(*or_args, conn_type=self.OR))
                     continue
                 else:
                     op = self._lookup_to_op(lookup)
@@ -76,11 +90,17 @@ class Q:
     def _lookup_to_op(cls, lookup):
         try:
             return {
+                'not': cls.NE,
                 'gt': cls.GT,
                 'gte': cls.GTE,
                 'lt': cls.LT,
                 'lte': cls.LTE,
+                'exact': cls.EXACT,
+                'iexact': cls.IEXACT,
                 'contains': cls.CONTAINS,
+                'icontains': cls.ICONTAINS,
+                'startswith': cls.STARTSWITH,
+                'istartswith': cls.ISTARTSWITH,
             }[lookup]
         except KeyError:
             raise ValueError("Lookup '%s' is not supported" % lookup)
@@ -109,8 +129,35 @@ class Q:
             return create_element('t:IsLessThan')
         if op == cls.GT:
             return create_element('t:IsGreaterThan')
-        if op == cls.CONTAINS:
-            return create_element('t:Contains', ContainmentMode='Substring', ContainmentComparison='Exact')
+        if op in (cls.EXACT, cls.IEXACT, cls.CONTAINS, cls.ICONTAINS, cls.STARTSWITH, cls.ISTARTSWITH):
+            # For description of Contains attribute values, see
+            #     https://msdn.microsoft.com/en-us/library/office/aa580702(v=exchg.150).aspx
+            #
+            # Possible ContainmentMode values:
+            #     FullString, Prefixed, Substring, PrefixOnWords, ExactPhrase
+            # Django lookups have no equivalent of PrefixOnWords and ExactPhrase (and I'm unsure how they actually
+            # work).
+            # TODO EWS has no equivalent of '__endswith' or '__iendswith' so that would need to be emulated using
+            # Substring and post-processing in Python.
+            #
+            # Possible ContainmentComparison values (there are more, but the rest are "To be removed"):
+            #     Exact, IgnoreCase, IgnoreNonSpacingCharacters, IgnoreCaseAndNonSpacingCharacters
+            # I'm unsure about non-spacing characters, but as I read
+            #    https://en.wikipedia.org/wiki/Graphic_character#Spacing_and_non-spacing_characters
+            # we shouldn't ignore them ('a' would match both 'a' and 'å', the latter having a non-spacing character).
+            if op in {cls.EXACT, cls.IEXACT}:
+                match_mode = 'FullString'
+            elif op in (cls.CONTAINS, cls.ICONTAINS):
+                match_mode = 'Substring'
+            elif op in (cls.STARTSWITH, cls.ISTARTSWITH):
+                match_mode = 'Prefixed'
+            else:
+                assert False
+            if op in (cls.IEXACT, cls.ICONTAINS, cls.ISTARTSWITH):
+                compare_mode = 'IgnoreCase'
+            else:
+                compare_mode = 'Exact'
+            return create_element('t:Contains', ContainmentMode=match_mode, ContainmentComparison=compare_mode)
         raise ValueError("Unknown op: '%s'" % op)
 
     def is_leaf(self):
@@ -165,7 +212,7 @@ class Q:
             field = create_element('t:FieldURI', FieldURI=self.field)
             elem.append(field)
             constant = create_element('t:Constant', Value=value_to_xml_text(self.value))
-            if self.op == self.CONTAINS:
+            if self.op in self.CONTAINS_OPS:
                 elem.append(constant)
             else:
                 uriorconst = create_element('t:FieldURIOrConstant')

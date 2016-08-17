@@ -411,7 +411,7 @@ class CommonTest(EWSTest):
             items.append(item)
         return_ids = self.account.calendar.add_items(items=items)
         self.assertEqual(len(return_ids), len(items))
-        ids = self.account.calendar.find_items(start__lt=end, end__gt=start, categories__contains=self.categories, shape=IdOnly)
+        ids = self.account.calendar.find_items(start__lt=end, end__gt=start, categories__contains=self.categories)
         self.assertEqual(len(ids), len(items))
         items = self.account.calendar.get_items(return_ids)
         for i, item in enumerate(items):
@@ -486,7 +486,7 @@ class BaseItemTest(EWSTest):
         self.test_folder = getattr(self.account, self.TEST_FOLDER)
 
     def tearDown(self):
-        ids = self.test_folder.find_items(categories__contains=self.categories, shape=IdOnly)
+        ids = self.test_folder.find_items(categories__contains=self.categories)
         self.test_folder.delete_items(ids, all_occurrences=True)
 
     def get_test_item(self):
@@ -520,18 +520,244 @@ class BaseItemTest(EWSTest):
         self.assertEqual(self.test_folder.delete_items(ids=[]), [])
 
     def test_finditems(self):
+        now = UTC_NOW()
+
+        # Test categories which are handled specially
+        ids = self.test_folder.add_items(items=[self.get_test_item()])
+        self.assertEqual(
+            len(self.test_folder.find_items(categories__contains=['ci6xahH1'])),
+            0
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(categories__contains=self.categories)),
+            1
+        )
+        self.test_folder.delete_items(ids, all_occurrences=True)
+
+        # Test 'range'
+        ids = self.test_folder.add_items(items=[self.get_test_item()])
+        self.assertEqual(
+            len(self.test_folder.find_items(datetime_created__range=(now + timedelta(hours=1), now + timedelta(hours=2)), categories__contains=self.categories)),
+            0
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(datetime_created__range=(now - timedelta(hours=1), now + timedelta(hours=1)), categories__contains=self.categories)),
+            1
+        )
+        self.test_folder.delete_items(ids, all_occurrences=True)
+
+        # Test '>'
+        ids = self.test_folder.add_items(items=[self.get_test_item()])
+        self.assertEqual(
+            len(self.test_folder.find_items(datetime_created__gt=now + timedelta(hours=1), categories__contains=self.categories)),
+            0
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(datetime_created__gt=now - timedelta(hours=1), categories__contains=self.categories)),
+            1
+        )
+        self.test_folder.delete_items(ids, all_occurrences=True)
+
+        # Test '>='
+        ids = self.test_folder.add_items(items=[self.get_test_item()])
+        self.assertEqual(
+            len(self.test_folder.find_items(datetime_created__gte=now + timedelta(hours=1), categories__contains=self.categories)),
+            0
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(datetime_created__gte=now - timedelta(hours=1), categories__contains=self.categories)),
+            1
+        )
+        self.test_folder.delete_items(ids, all_occurrences=True)
+
+        # Test '<'
+        ids = self.test_folder.add_items(items=[self.get_test_item()])
+        self.assertEqual(
+            len(self.test_folder.find_items(datetime_created__lt=now - timedelta(hours=1), categories__contains=self.categories)),
+            0
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(datetime_created__lt=now + timedelta(hours=1), categories__contains=self.categories)),
+            1
+        )
+        self.test_folder.delete_items(ids, all_occurrences=True)
+
+        # Test '<='
+        ids = self.test_folder.add_items(items=[self.get_test_item()])
+        self.assertEqual(
+            len(self.test_folder.find_items(datetime_created__lte=now - timedelta(hours=1), categories__contains=self.categories)),
+            0
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(datetime_created__lte=now + timedelta(hours=1), categories__contains=self.categories)),
+            1
+        )
+        self.test_folder.delete_items(ids, all_occurrences=True)
+
+        # Test '='
         item = self.get_test_item()
-        self.test_folder.add_items(items=[item, item])
-        items = self.test_folder.find_items(categories__contains=self.categories, shape=AllProperties)
-        for item in items:
-            assert isinstance(item, self.ITEM_CLASS)
-        self.assertEqual(len(items), 2)
-        self.test_folder.delete_items(items, all_occurrences=True)
+        item.subject = get_random_string(16)
+        ids = self.test_folder.add_items(items=[item])
+        self.assertEqual(
+            len(self.test_folder.find_items(subject=item.subject + 'XXX', categories__contains=self.categories)),
+            0
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(subject=item.subject, categories__contains=self.categories)),
+            1
+        )
+        self.test_folder.delete_items(ids, all_occurrences=True)
+
+        # Test '!='
+        item = self.get_test_item()
+        item.subject = get_random_string(16)
+        ids = self.test_folder.add_items(items=[item])
+        self.assertEqual(
+            len(self.test_folder.find_items(subject__not=item.subject, categories__contains=self.categories)),
+            0
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(subject__not=item.subject + 'XXX', categories__contains=self.categories)),
+            1
+        )
+        self.test_folder.delete_items(ids, all_occurrences=True)
+
+        # Test 'exact'
+        item = self.get_test_item()
+        item.subject = get_random_string(16)
+        ids = self.test_folder.add_items(items=[item])
+        self.assertEqual(
+            len(self.test_folder.find_items(subject__iexact=item.subject + 'XXX', categories__contains=self.categories)),
+            0
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(subject__exact=item.subject.lower(), categories__contains=self.categories)),
+            0
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(subject__exact=item.subject.upper(), categories__contains=self.categories)),
+            0
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(subject__exact=item.subject, categories__contains=self.categories)),
+            1
+        )
+        self.test_folder.delete_items(ids, all_occurrences=True)
+
+        # Test 'iexact'
+        item = self.get_test_item()
+        item.subject = get_random_string(16)
+        ids = self.test_folder.add_items(items=[item])
+        self.assertEqual(
+            len(self.test_folder.find_items(subject__iexact=item.subject + 'XXX', categories__contains=self.categories)),
+            0
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(subject__iexact=item.subject.lower(), categories__contains=self.categories)),
+            1
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(subject__iexact=item.subject.upper(), categories__contains=self.categories)),
+            1
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(subject__iexact=item.subject, categories__contains=self.categories)),
+            1
+        )
+        self.test_folder.delete_items(ids, all_occurrences=True)
+
+        # Test 'contains'
+        item = self.get_test_item()
+        item.subject = get_random_string(16)
+        ids = self.test_folder.add_items(items=[item])
+        self.assertEqual(
+            len(self.test_folder.find_items(subject__contains=item.subject[2:14] + 'XXX', categories__contains=self.categories)),
+            0
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(subject__contains=item.subject[2:14].lower(), categories__contains=self.categories)),
+            0
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(subject__contains=item.subject[2:14].upper(), categories__contains=self.categories)),
+            0
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(subject__contains=item.subject[2:14], categories__contains=self.categories)),
+            1
+        )
+        self.test_folder.delete_items(ids, all_occurrences=True)
+
+        # Test 'icontains'
+        item = self.get_test_item()
+        item.subject = get_random_string(16)
+        ids = self.test_folder.add_items(items=[item])
+        self.assertEqual(
+            len(self.test_folder.find_items(subject__icontains=item.subject[2:14] + 'XXX', categories__contains=self.categories)),
+            0
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(subject__icontains=item.subject[2:14].lower(), categories__contains=self.categories)),
+            1
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(subject__icontains=item.subject[2:14].upper(), categories__contains=self.categories)),
+            1
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(subject__icontains=item.subject[2:14], categories__contains=self.categories)),
+            1
+        )
+        self.test_folder.delete_items(ids, all_occurrences=True)
+
+        # Test 'startswith'
+        item = self.get_test_item()
+        item.subject = get_random_string(16)
+        ids = self.test_folder.add_items(items=[item])
+        self.assertEqual(
+            len(self.test_folder.find_items(subject__startswith='XXX' + item.subject[:12], categories__contains=self.categories)),
+            0
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(subject__startswith=item.subject[:12].lower(), categories__contains=self.categories)),
+            0
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(subject__startswith=item.subject[:12].upper(), categories__contains=self.categories)),
+            0
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(subject__startswith=item.subject[:12], categories__contains=self.categories)),
+            1
+        )
+        self.test_folder.delete_items(ids, all_occurrences=True)
+
+        # Test 'istartswith'
+        item = self.get_test_item()
+        item.subject = get_random_string(16)
+        ids = self.test_folder.add_items(items=[item])
+        self.assertEqual(
+            len(self.test_folder.find_items(subject__istartswith='XXX' + item.subject[:12], categories__contains=self.categories)),
+            0
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(subject__istartswith=item.subject[:12].lower(), categories__contains=self.categories)),
+            1
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(subject__istartswith=item.subject[:12].upper(), categories__contains=self.categories)),
+            1
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(subject__istartswith=item.subject[:12], categories__contains=self.categories)),
+            1
+        )
+        self.test_folder.delete_items(ids, all_occurrences=True)
 
     def test_getitems(self):
         item = self.get_test_item()
         self.test_folder.add_items(items=[item, item])
-        ids = self.test_folder.find_items(categories__contains=self.categories, shape=IdOnly)
+        ids = self.test_folder.find_items(categories__contains=self.categories)
         items = self.test_folder.get_items(ids=ids)
         for item in items:
             assert isinstance(item, self.ITEM_CLASS)
@@ -541,7 +767,7 @@ class BaseItemTest(EWSTest):
     def test_extra_fields(self):
         item = self.get_test_item()
         self.test_folder.add_items(items=[item, item])
-        ids = self.test_folder.find_items(categories__contains=self.categories, shape=IdOnly)
+        ids = self.test_folder.find_items(categories__contains=self.categories)
         self.test_folder.with_extra_fields = True
         items = self.test_folder.get_items(ids=ids)
         self.test_folder.with_extra_fields = False
@@ -595,7 +821,7 @@ class BaseItemTest(EWSTest):
         insert_ids = self.test_folder.add_items(items=(i for i in [item]))
         self.assertEqual(len(insert_ids), 1)
         assert isinstance(insert_ids[0], tuple)
-        find_ids = self.test_folder.find_items(categories__contains=insert_kwargs['categories'], shape=IdOnly)
+        find_ids = self.test_folder.find_items(categories__contains=insert_kwargs['categories'])
         self.assertEqual(len(find_ids), 1)
         self.assertEqual(len(find_ids[0]), 2)
         self.assertEqual(insert_ids, find_ids)

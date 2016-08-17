@@ -688,17 +688,26 @@ class Folder:
         Optional extra arguments follow a Django-like QuerySet filter syntax (see
            https://docs.djangoproject.com/en/1.10/ref/models/querysets/#field-lookups).
 
+        We don't support '__year' and other data-related lookups. We also don't support '__endswith' or '__iendswith'.
+
+        We support the additional '__not' lookup in place of Django's exclude() for simple cases. For more complicated
+        cases you need to create a Q object and use ~Q().
+
         Examples:
 
             my_account.inbox.find_items(datetime_received__gt=EWSDateTime(2016, 1, 1))
             my_account.calendar.find_items(start__range=(EWSDateTime(2016, 1, 1), EWSDateTime(2017, 1, 1)))
             my_account.tasks.find_items(subject='Hi mom')
+            my_account.tasks.find_items(subject__not='Hi mom')
             my_account.tasks.find_items(subject__contains='Foo')
+            my_account.tasks.find_items(subject__icontains='foo')
 
         """
+        # TODO: support endswith/iendswith using contains/icontains and filtering afterwards.
         # Define the extra properties we want on the return objects. 'body' field can only be fetched with GetItem.
         additional_fields = None
         categories = []
+        categories_lookup = None
         q_kwargs = {}
         for key, value in kwargs.items():
             # Convert Item attribute name to FieldURI
@@ -709,14 +718,16 @@ class Folder:
             # TODO Filtering by category doesn't work on Exchange 2010 (and others?), returning
             # "ErrorContainsFilterWrongType: The Contains filter can only be used for string properties." Fall back to
             # filtering after getting all items instead. This may be a legal and a performance problem because we get
-            # ALL items, including private appointments.
+            # ALL items, including private appointments, emails etc.
             if field == 'categories':
                 if lookup != 'contains':
+                    # TODO: expand the post-processing part to also support 'in', 'not', 'exact', 'icontains', 'iexact'
                     raise ValueError("Categories can only be filtered using 'categories__contains=['a', 'b']'")
                 if isinstance(value, str):
                     categories.append(value)
                 else:
                     categories.extend(value)
+                categories_lookup = lookup
                 additional_fields = [self.item_model.fielduri_for_field('categories')]
                 continue
             if lookup:
@@ -725,10 +736,11 @@ class Folder:
                 q_kwargs[self.item_model.fielduri_for_field(field)] = value
         q = Q(**q_kwargs)
         log.debug(
-            'Finding %s items for %s (search expression: %s)',
+            'Finding %s items for %s (shape: %s, depth=%s, search expression: %s)',
             self.DISTINGUISHED_FOLDER_ID,
             self.account,
             shape,
+            depth,
             q.expr(),
         )
         xml_func = self.item_model.id_from_xml if shape == IdOnly else self.item_model.from_xml
@@ -772,6 +784,7 @@ class Folder:
     def delete_items(self, ids, all_occurrences=False):
         """
         Deletes items in the folder. 'ids' is an iterable of either (item_id, changekey) tuples or Item objects.
+        'all_occurrences' is only applicable for recurring Task items.
         """
         is_empty, ids = peek(ids)
         if is_empty:
@@ -872,7 +885,7 @@ class Folder:
         return createitem
 
     def delete_xml(self, ids, all_occurrences=True):
-        # Prepare reuseable Element objects. # TODO: Make it possible to set all_occurrences in higher-level code
+        # Prepare reuseable Element objects.
         if isinstance(self, Calendar):
             deleteitem = create_element(
                 'm:%s' % DeleteItem.SERVICE_NAME, DeleteType='HardDelete', SendMeetingCancellations='SendToNone')
