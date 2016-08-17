@@ -104,7 +104,7 @@ class EWSDateTest(unittest.TestCase):
 
 class RestrictionTest(unittest.TestCase):
     def test_parse(self):
-        xml = Restriction.parse_source(
+        r = Restriction.from_source(
             "calendar:Start > '2016-01-15T13:45:56Z' and (not calendar:Subject == 'EWS Test')"
         )
         result = '''\
@@ -126,7 +126,7 @@ class RestrictionTest(unittest.TestCase):
         </t:Not>
     </t:And>
 </m:Restriction>'''
-        self.assertEqual(xml_to_str(xml), ''.join(l.lstrip() for l in result.split('\n')))
+        self.assertEqual(xml_to_str(r.xml), ''.join(l.lstrip() for l in result.split('\n')))
 
     def test_from_params(self):
         tz = EWSTimeZone.timezone('Europe/Copenhagen')
@@ -167,9 +167,11 @@ class RestrictionTest(unittest.TestCase):
         self.assertEqual((~Q()).expr(), None)
         self.assertEqual(Q(x=5).expr(), 'x == 5')
         self.assertEqual((~Q(x=5)).expr(), 'x != 5')
+        q = (Q(b__contains='a', x__contains=5) | Q(~Q(a__contains='c'), f__gt=3, c=6)) & ~Q(y=9, z__contains='b')
         self.assertEqual(
-            ((Q(baz__contains='zyx', x__contains=5) | Q(foo__gt=345, bar=6)) & ~Q(y=9, z__contains='b')).expr(),
-            "((baz contains 'zyx' AND x contains 5) OR (bar == 6 AND foo > 345)) AND NOT (y == 9 AND z contains 'b')"
+            q.expr(),
+            "((b contains 'a' AND x contains 5) OR (NOT a contains 'c' AND c == 6 AND f > 3)) "
+            "AND NOT (y == 9 AND z contains 'b')"
         )
 
 

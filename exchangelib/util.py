@@ -74,11 +74,24 @@ def get_xml_attrs(tree, name):
     return [elem.text.strip() for elem in tree.findall(name) if elem.text is not None]
 
 
-def set_xml_value(elem, value, version):
+def value_to_xml_text(value):
     from .ewsdatetime import EWSDateTime
-    from .folders import EWSElement
     if isinstance(value, str):
-        elem.text = safe_xml_value(value)
+        return safe_xml_value(value)
+    if isinstance(value, bool):
+        return '1' if value else '0'
+    if isinstance(value, (int, Decimal)):
+        return str(value)
+    if isinstance(value, EWSDateTime):
+        return value.ewsformat()
+    raise ValueError('Unsupported type: %s (%s)' % (type(value), value))
+
+
+def set_xml_value(elem, value, version):
+    from .folders import EWSElement
+    from .ewsdatetime import EWSDateTime
+    if isinstance(value, (str, bool, int, Decimal, EWSDateTime)):
+        elem.text = value_to_xml_text(value)
     elif isinstance(value, (tuple, list)):
         for v in value:
             if isinstance(v, EWSElement):
@@ -90,12 +103,6 @@ def set_xml_value(elem, value, version):
                 add_xml_child(elem, 't:String', v)
             else:
                 raise AttributeError('Unsupported type %s for list value %s on elem %s' % (type(v), v, elem))
-    elif isinstance(value, bool):
-        elem.text = '1' if value else '0'
-    elif isinstance(value, (int, Decimal)):
-        elem.text = str(value)
-    elif isinstance(value, EWSDateTime):
-        elem.text = value.ewsformat()
     elif isinstance(value, EWSElement):
         assert version
         elem.append(value.to_xml(version))

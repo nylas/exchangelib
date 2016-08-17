@@ -2,7 +2,7 @@ import logging
 from threading import Lock
 
 from .ewsdatetime import UTC
-from .util import create_element, xml_to_str
+from .util import create_element, xml_to_str, value_to_xml_text
 
 log = logging.getLogger(__name__)
 
@@ -81,14 +81,70 @@ class Q:
         except KeyError:
             raise ValueError("Lookup '%s' is not supported" % lookup)
 
+    @classmethod
+    def _conn_to_xml(cls, conn_type):
+        if conn_type == cls.AND:
+            return create_element('t:And')
+        if conn_type == cls.OR:
+            return create_element('t:Or')
+        if conn_type == cls.NOT:
+            return create_element('t:Not')
+        raise ValueError("Unknown conn_type: '%s'" % conn_type)
+
+    @classmethod
+    def _op_to_xml(cls, op):
+        if op == cls.EQ:
+            return create_element('t:IsEqualTo')
+        if op == cls.NE:
+            return create_element('t:IsNotEqualTo')
+        if op == cls.GTE:
+            return create_element('t:IsGreaterThanOrEqualTo')
+        if op == cls.LTE:
+            return create_element('t:IsLessThanOrEqualTo')
+        if op == cls.LT:
+            return create_element('t:IsLessThan')
+        if op == cls.GT:
+            return create_element('t:IsGreaterThan')
+        if op == cls.CONTAINS:
+            return create_element('t:Contains', ContainmentMode='Substring', ContainmentComparison='Exact')
+        raise ValueError("Unknown op: '%s'" % op)
+
     def is_leaf(self):
-        return len(self.children) == 0
+        return not self.children
 
     def is_empty(self):
         return self.is_leaf() and self.field is None
 
+    def expr(self):
+        if self.is_empty():
+            return None
+        if self.is_leaf():
+            assert self.field and self.op and self.value is not None
+            expr = '%s %s %s' % (self.field, self.op, repr(self.value))
+        elif len(self.children) == 1:
+            # Flatten the tree a bit
+            expr = self.children[0].expr()
+        else:
+            # Sort children by field name so we get stable output (for easier testing). Children should never be empty.
+            expr = (' %s ' % (self.AND if self.conn_type == self.NOT else self.conn_type)).join(
+                (c.expr() if c.is_leaf() or c.conn_type == self.NOT else '(%s)' % c.expr())
+                for c in sorted(self.children, key=lambda i: i.field or '')
+            )
+        if not expr:
+            return None  # Should not be necessary, but play safe
+        if self.conn_type == self.NOT:
+            # Add the NOT operator. Put children in parens if there is more than one child.
+            if self.is_leaf() or (len(self.children) == 1 and self.children[0].is_leaf()):
+                expr = self.conn_type + ' %s' % expr
+            else:
+                expr = self.conn_type + ' (%s)' % expr
+        return expr
+
     def to_xml(self):
-        # Return an XML tree structure of this Q object. First, remove any empty children. If conn_type is AND or OR and
+        from xml.etree.ElementTree import ElementTree
+        return ElementTree(self._to_xml_elem()).getroot()
+
+    def _to_xml_elem(self):
         # there are exactly one child, ignore the AND/OR. If this is an empty leaf (equivalent of Q()), return None
         pass
 
@@ -101,7 +157,7 @@ class Q:
         return self.__class__(self, other, conn_type=self.OR)
 
     def __invert__(self):
-        # If this is a leaf and op has an inverse, change op. Else use NOT
+        # If this is a leaf and op has an inverse, change op. Else return a new Q with conn_type NOT
         if self.conn_type == self.NOT:
             # This is NOT NOT. Change to AND
             self.conn_type = self.AND
@@ -126,26 +182,11 @@ class Q:
                 return self
         return self.__class__(self, conn_type=self.NOT)
 
-    def expr(self):
-        if self.is_empty():
-            return None
-        if self.is_leaf():
-            expr = '%s %s %s' % (self.field, self.op, repr(self.value))
-        else:
-            # Sort children by field name so we get stable output (for easier testing)
-            expr = (' %s ' % (self.AND if self.conn_type == self.NOT else self.conn_type)).join(
-                ('(%s)' % c.expr() if len(c.children) > 1 else c.expr())
-                for c in sorted(self.children, key=lambda i: i.field or '')
-            )
-        if not expr:
-            return None
-        if self.conn_type == self.NOT:
-            expr = self.conn_type + (' (%s)' if len(self.children) > 1 else ' %s') % expr
-        return expr
-
     def __repr__(self):
         if self.is_leaf():
             return self.__class__.__name__ + '(%s %s %s)' % (self.field, self.op, repr(self.value))
+        if self.conn_type == self.NOT or len(self.children) > 1:
+            return self.__class__.__name__ + repr((self.conn_type,) + tuple(self.children))
         return self.__class__.__name__ + repr(tuple(self.children))
 
 
@@ -154,7 +195,11 @@ class Restriction:
     Implements an EWS Restriction type.
 
     """
-    def __init__(self, source):
+    def __init__(self, xml):
+        self.xml = xml
+
+    @classmethod
+    def from_source(cls, source):
         """
         source is a search expression in Python syntax. EWS Item fieldnames may be spelled with a colon (:). They will
         be escaped as underscores (_) since colons are not allowed in Python identifiers. Example:
@@ -164,26 +209,16 @@ class Restriction:
         with _source_cache_lock:
             # Something within the parser module seems to be deadlocking. Wrap in lock
             if source not in _source_cache:
-                _source_cache[source] = self.parse_source(source)
-        self.xml = _source_cache[source]
-
-    @classmethod
-    def parse_source(cls, source):
-        """
-        Takes a string and returns an XML tree.
-
-        """
-        from parser import expr
-        from xml.etree.ElementTree import ElementTree
-        log.debug('Parsing source: %s', source)
-
-        source = cls._escape(source)
-        st = expr(source).tolist()
-        etree = ElementTree(cls._parse_syntaxtree(st))
-        # etree.register_namespace('t', 'http://schemas.microsoft.com/exchange/services/2006/messages')
-        # etree.register_namespace('m', 'http://schemas.microsoft.com/exchange/services/2006/types')
-        log.debug('Source parsed')
-        return etree.getroot()
+                from parser import expr
+                log.debug('Parsing source: %s', source)
+                st = expr(cls._escape(source)).tolist()
+                from xml.etree.ElementTree import ElementTree
+                etree = ElementTree(cls._parse_syntaxtree(st))
+                # etree.register_namespace('t', 'http://schemas.microsoft.com/exchange/services/2006/messages')
+                # etree.register_namespace('m', 'http://schemas.microsoft.com/exchange/services/2006/types')
+                log.debug('Source parsed')
+                _source_cache[source] = etree.getroot()
+        return cls(_source_cache[source])
 
     @classmethod
     def _parse_syntaxtree(cls, slist):
@@ -313,7 +348,7 @@ class Restriction:
                     expr2.append('item:Categories in "%s"' % cat)
                 search_expr.append('( ' + ' or '.join(expr2) + ' )')
         expr_str = ' and '.join(search_expr)
-        return cls(expr_str)
+        return cls.from_source(expr_str)
 
     def __str__(self):
         """
