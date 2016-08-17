@@ -5,11 +5,11 @@ Change Log
 1.6.0
 -----
 * Complete rewrite of ``Folder.find_items()``. The old ``start``, ``end``, ``subject`` and
-``categories`` args are deprecated in favor of a Django QuerySet filter() syntax. The
-supported lookup types are ``__gt``, ``__lt``, ``__gte``, ``__lte``, ``__range``, ``__in``,
-``__exact``,``__iexact``, ``__contains``,``__icontains``, ``__contains``, ``__icontains``,
-``__startswith``, ``__istartswith``, plus an additional ``__not`` which translates to ``!=``.
-Additionally, *all* fields on the item are now supported in ``Folder.find_items()``.
+  ``categories`` args are deprecated in favor of a Django QuerySet filter() syntax. The
+  supported lookup types are ``__gt``, ``__lt``, ``__gte``, ``__lte``, ``__range``, ``__in``,
+  ``__exact``,``__iexact``, ``__contains``,``__icontains``, ``__contains``, ``__icontains``,
+  ``__startswith``, ``__istartswith``, plus an additional ``__not`` which translates to ``!=``.
+  Additionally, *all* fields on the item are now supported in ``Folder.find_items()``.
 
 WARNING: This change is backwards-incompatible! Old uses of ``Folder.find_items()`` like this:
 
@@ -32,7 +32,7 @@ should be rewritten like this:
     )
 
 * Added a ``exchangelib.restrictions.Q`` class much like Django Q objects that can be used to
-create even more complex filtering. Q objects must be passed directly to ``exchangelib.services.FindItem``.
+  create even more complex filtering. Q objects must be passed directly to ``exchangelib.services.FindItem``.
 
 1.3.6
 -----
@@ -44,14 +44,14 @@ create even more complex filtering. Q objects must be passed directly to ``excha
 1.3.4
 -----
 * Add support for ``required_attendees``, ``optional_attendees`` and ``resources``
-attribute on ``folders.CalendarItem``. These are implemented with a new ``folders.Attendee``
-class.
+  attribute on ``folders.CalendarItem``. These are implemented with a new ``folders.Attendee``
+  class.
 
 
 1.3.3
 -----
 * Add support for ``organizer`` attribute on ``CalendarItem``.  Implemented with a
-new ``folders.Mailbox`` class.
+  new ``folders.Mailbox`` class.
 
 
 1.2
