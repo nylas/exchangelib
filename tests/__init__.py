@@ -103,6 +103,9 @@ class EWSDateTest(unittest.TestCase):
 
 
 class RestrictionTest(unittest.TestCase):
+    def setUp(self):
+        self.maxDiff = None
+
     def test_parse(self):
         r = Restriction.from_source(
             "calendar:Start > '2016-01-15T13:45:56Z' and (not calendar:Subject == 'EWS Test')"
@@ -132,10 +135,19 @@ class RestrictionTest(unittest.TestCase):
         tz = EWSTimeZone.timezone('Europe/Copenhagen')
         start = tz.localize(EWSDateTime(1900, 9, 26, 8, 0, 0))
         end = tz.localize(EWSDateTime(2200, 9, 26, 11, 0, 0))
-        xml = Restriction.from_params(start=start, end=end, categories=['FOO', 'BAR'])
         result = '''\
 <m:Restriction>
     <t:And>
+        <t:Or>
+            <t:Contains ContainmentComparison="Exact" ContainmentMode="Substring">
+                <t:FieldURI FieldURI="item:Categories" />
+                <t:Constant Value="FOO" />
+            </t:Contains>
+            <t:Contains ContainmentComparison="Exact" ContainmentMode="Substring">
+                <t:FieldURI FieldURI="item:Categories" />
+                <t:Constant Value="BAR" />
+            </t:Contains>
+        </t:Or>
         <t:IsGreaterThan>
             <t:FieldURI FieldURI="calendar:End" />
             <t:FieldURIOrConstant>
@@ -148,19 +160,16 @@ class RestrictionTest(unittest.TestCase):
                 <t:Constant Value="2200-09-26T10:00:00Z" />
             </t:FieldURIOrConstant>
         </t:IsLessThan>
-        <t:Or>
-            <t:Contains ContainmentComparison="Exact" ContainmentMode="Substring">
-                <t:FieldURI FieldURI="item:Categories" />
-                <t:Constant Value="FOO" />
-            </t:Contains>
-            <t:Contains ContainmentComparison="Exact" ContainmentMode="Substring">
-                <t:FieldURI FieldURI="item:Categories" />
-                <t:Constant Value="BAR" />
-            </t:Contains>
-        </t:Or>
     </t:And>
 </m:Restriction>'''
-        self.assertEqual(str(xml), ''.join(l.lstrip() for l in result.split('\n')))
+        q = Q(
+            Q(**{'item:Categories__contains': 'FOO'}) | Q(**{'item:Categories__contains': 'BAR'}),
+            **{'calendar:Start__lt': end, 'calendar:End__gt': start}
+        )
+        r = Restriction(q.to_xml())
+        self.assertEqual(str(r), ''.join(l.lstrip() for l in result.split('\n')))
+        r = Restriction.from_params(start=start, end=end, categories=['FOO', 'BAR'])
+        self.assertEqual(str(r), ''.join(l.lstrip() for l in result.split('\n')))
 
     def test_q_expr(self):
         self.assertEqual(Q().expr(), None)

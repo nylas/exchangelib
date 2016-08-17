@@ -1,7 +1,7 @@
 import logging
 from threading import Lock
 
-from .ewsdatetime import UTC
+from .ewsdatetime import EWSDateTime, UTC
 from .util import create_element, xml_to_str, value_to_xml_text
 
 log = logging.getLogger(__name__)
@@ -64,7 +64,11 @@ class Q:
             if len(args) == 0 and len(kwargs) == 1:
                 self.field = field
                 self.op = op
-                self.value = value
+                if isinstance(value, EWSDateTime):
+                    # We want to convert all values to UTC
+                    self.value = value.astimezone(UTC)
+                else:
+                    self.value = value
             else:
                 self.children.append(Q(**{key: value}))
 
@@ -142,11 +146,45 @@ class Q:
 
     def to_xml(self):
         from xml.etree.ElementTree import ElementTree
-        return ElementTree(self._to_xml_elem()).getroot()
+        restriction = create_element('m:Restriction')
+        restriction.append(self._to_xml_elem())
+        return ElementTree(restriction).getroot()
 
     def _to_xml_elem(self):
-        # there are exactly one child, ignore the AND/OR. If this is an empty leaf (equivalent of Q()), return None
-        pass
+        # Return an XML tree structure of this Q object. First, remove any empty children. If conn_type is AND or OR and
+        # there is exactly one child, ignore the AND/OR and treat this node as a leaf. If this is an empty leaf
+        # (equivalent of Q()), return None.
+        if self.is_empty():
+            return None
+        if self.is_leaf():
+            assert self.field and self.op and self.value is not None
+            elem = self._op_to_xml(self.op)
+            field = create_element('t:FieldURI', FieldURI=self.field)
+            elem.append(field)
+            constant = create_element('t:Constant', Value=value_to_xml_text(self.value))
+            if self.op == self.CONTAINS:
+                elem.append(constant)
+            else:
+                uriorconst = create_element('t:FieldURIOrConstant')
+                uriorconst.append(constant)
+                elem.append(uriorconst)
+        elif len(self.children) == 1:
+            # Flatten the tree a bit
+            elem = self.children[0]._to_xml_elem()
+        else:
+            # We have multiple children. If conn_type is NOT, then group children with AND. We'll add the NOT later
+            elem = self._conn_to_xml(self.AND if self.conn_type == self.NOT else self.conn_type)
+            # Sort children by field name so we get stable output (for easier testing). Children should never be empty
+            for c in sorted(self.children, key=lambda i: i.field or ''):
+                elem.append(c._to_xml_elem())
+        if elem is None:
+            return None  # Should not be necessary, but play safe
+        if self.conn_type == self.NOT:
+            # Encapsulate everything in the NOT element
+            not_elem = self._conn_to_xml(self.conn_type)
+            not_elem.append(elem)
+            return not_elem
+        return elem
 
     def __and__(self, other):
         # Return a new Q with two children and conn_type AND
@@ -331,12 +369,6 @@ class Restriction:
         if not (start or end or categories):
             return None
         search_expr = []
-        if start:
-            search_expr.append('calendar:End > "%s"' % start.astimezone(UTC).ewsformat())
-        if end:
-            search_expr.append('calendar:Start < "%s"' % end.astimezone(UTC).ewsformat())
-        if subject:
-            search_expr.append('item:Subject = "%s"' % subject)
         if categories:
             if len(categories) == 1:
                 search_expr.append('item:Categories in "%s"' % categories[0])
@@ -347,6 +379,12 @@ class Restriction:
                     # returns no items, and searching for a list of categories doesn't work either.
                     expr2.append('item:Categories in "%s"' % cat)
                 search_expr.append('( ' + ' or '.join(expr2) + ' )')
+        if start:
+            search_expr.append('calendar:End > "%s"' % start.astimezone(UTC).ewsformat())
+        if end:
+            search_expr.append('calendar:Start < "%s"' % end.astimezone(UTC).ewsformat())
+        if subject:
+            search_expr.append('item:Subject = "%s"' % subject)
         expr_str = ' and '.join(search_expr)
         return cls.from_source(expr_str)
 
