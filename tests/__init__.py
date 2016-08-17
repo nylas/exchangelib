@@ -13,11 +13,11 @@ from exchangelib.account import Account
 from exchangelib.autodiscover import discover
 from exchangelib.configuration import Configuration
 from exchangelib.credentials import DELEGATE, Credentials
-from exchangelib.errors import RelativeRedirect, TransportError
+from exchangelib.errors import RelativeRedirect
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, ExternId, Choice, Email, Contact, Task, \
     EmailAddress, PhysicalAddress, PhoneNumber, IndexedField, RoomList, Calendar, Messages, Tasks, Contacts
-from exchangelib.restriction import Restriction
+from exchangelib.restriction import Restriction, Q
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, AllProperties, IdOnly
 from exchangelib.util import xml_to_str, chunkify, peek, get_redirect_url
 from exchangelib.version import Build
@@ -161,6 +161,16 @@ class RestrictionTest(unittest.TestCase):
     </t:And>
 </m:Restriction>'''
         self.assertEqual(str(xml), ''.join(l.lstrip() for l in result.split('\n')))
+
+    def test_q_expr(self):
+        self.assertEqual(Q().expr(), None)
+        self.assertEqual((~Q()).expr(), None)
+        self.assertEqual(Q(x=5).expr(), 'x == 5')
+        self.assertEqual((~Q(x=5)).expr(), 'x != 5')
+        self.assertEqual(
+            ((Q(baz__contains='zyx', x__contains=5) | Q(foo__gt=345, bar=6)) & ~Q(y=9, z__contains='b')).expr(),
+            "((baz contains 'zyx' AND x contains 5) OR (bar == 6 AND foo > 345)) AND NOT (y == 9 AND z contains 'b')"
+        )
 
 
 class UtilTest(unittest.TestCase):

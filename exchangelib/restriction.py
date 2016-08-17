@@ -10,6 +10,145 @@ _source_cache = dict()
 _source_cache_lock = Lock()
 
 
+class Q:
+    # Connection types
+    AND = 'AND'
+    OR = 'OR'
+    NOT = 'NOT'
+    CONN_TYPES = (AND, OR, NOT)
+
+    # Operators
+    EQ = '=='
+    NE = '!='
+    GT = '>'
+    GTE = '>='
+    LT = '<'
+    LTE = '<='
+    IN = 'in'
+    CONTAINS = 'contains'
+    RANGE = 'range'
+    OP_TYPES = (EQ, NE, GT, GTE, LT, LTE, IN, CONTAINS, RANGE)
+
+    def __init__(self, *args, **kwargs):
+        if 'conn_type' in kwargs:
+            self.conn_type = kwargs.pop('conn_type')
+        else:
+            self.conn_type = self.AND
+        assert self.conn_type in self.CONN_TYPES
+
+        self.field = None
+        self.op = None
+        self.value = None
+
+        # Build children of Q objects from *args and **kwargs
+        self.children = []
+        for q in args:
+            if not isinstance(q, self.__class__):
+                raise AttributeError("'%s' must be a Q instance")
+            if not q.is_empty():
+                self.children.append(q)
+
+        for key, value in kwargs.items():
+            if '__' in key:
+                field, lookup = key.rsplit('__')
+                if lookup == self.RANGE:
+                    # Interpret 'foo_range=(1, 2)' as 'foo__gte=1 and foo__lte=2'
+                    self.children.append(self.__class__(**{'%s__%s' % (field, self.GTE): value[0]}))
+                    self.children.append(self.__class__(**{'%s__%s' % (field, self.LTE): value[1]}))
+                    continue
+                else:
+                    op = self._lookup_to_op(lookup)
+            else:
+                field, op = key, self.EQ
+            assert op in self.OP_TYPES
+            if len(args) == 0 and len(kwargs) == 1:
+                self.field = field
+                self.op = op
+                self.value = value
+            else:
+                self.children.append(Q(**{key: value}))
+
+    @classmethod
+    def _lookup_to_op(cls, lookup):
+        try:
+            return {
+                'gt': cls.GT,
+                'gte': cls.GTE,
+                'lt': cls.LT,
+                'lte': cls.LTE,
+                'contains': cls.CONTAINS,
+            }[lookup]
+        except KeyError:
+            raise ValueError("Lookup '%s' is not supported" % lookup)
+
+    def is_leaf(self):
+        return len(self.children) == 0
+
+    def is_empty(self):
+        return self.is_leaf() and self.field is None
+
+    def to_xml(self):
+        # Return an XML tree structure of this Q object. First, remove any empty children. If conn_type is AND or OR and
+        # there are exactly one child, ignore the AND/OR. If this is an empty leaf (equivalent of Q()), return None
+        pass
+
+    def __and__(self, other):
+        # Return a new Q with two children and conn_type AND
+        return self.__class__(self, other, conn_type=self.AND)
+
+    def __or__(self, other):
+        # Return a new Q with two children and conn_type OR
+        return self.__class__(self, other, conn_type=self.OR)
+
+    def __invert__(self):
+        # If this is a leaf and op has an inverse, change op. Else use NOT
+        if self.conn_type == self.NOT:
+            # This is NOT NOT. Change to AND
+            self.conn_type = self.AND
+        if self.is_leaf():
+            if self.op == self.EQ:
+                self.op = self.NE
+                return self
+            if self.op == self.NE:
+                self.op = self.EQ
+                return self
+            if self.op == self.GT:
+                self.op = self.LTE
+                return self
+            if self.op == self.GTE:
+                self.op = self.LT
+                return self
+            if self.op == self.LT:
+                self.op = self.GTE
+                return self
+            if self.op == self.LTE:
+                self.op = self.GT
+                return self
+        return self.__class__(self, conn_type=self.NOT)
+
+    def expr(self):
+        if self.is_empty():
+            return None
+        if self.is_leaf():
+            expr = '%s %s %s' % (self.field, self.op, repr(self.value))
+        else:
+            # Sort children by field name so we get stable output (for easier testing)
+            expr = (' %s ' % (self.AND if self.conn_type == self.NOT else self.conn_type)).join(
+                ('(%s)' % c.expr() if len(c.children) > 1 else c.expr())
+                for c in sorted(self.children, key=lambda i: i.field or '')
+            )
+        if not expr:
+            return None
+        if self.conn_type == self.NOT:
+            expr = self.conn_type + (' (%s)' if len(self.children) > 1 else ' %s') % expr
+        return expr
+
+    def __repr__(self):
+        if self.is_leaf():
+            return self.__class__.__name__ + '(%s %s %s)' % (self.field, self.op, repr(self.value))
+        return self.__class__.__name__ + repr(tuple(self.children))
+
+
 class Restriction:
     """
     Implements an EWS Restriction type.
@@ -20,7 +159,7 @@ class Restriction:
         source is a search expression in Python syntax. EWS Item fieldnames may be spelled with a colon (:). They will
         be escaped as underscores (_) since colons are not allowed in Python identifiers. Example:
 
-              calendar:Start > '2009-01-15T13:45:56Z' and ( not calendar:Subject == 'EWS Test' )
+            calendar:Start > '2009-01-15T13:45:56Z' and not (item:Subject == 'EWS Test' or item:Subject == 'Foo')
         """
         with _source_cache_lock:
             # Something within the parser module seems to be deadlocking. Wrap in lock
@@ -142,12 +281,14 @@ class Restriction:
 
     @staticmethod
     def _unescape(fieldname):
-        # Switch back to correct spelling. Inverse of _unescape()
-        for prefix in ('message_', 'calendar_', 'contacts_', 'conversation_', 'distributionlist_', 'folder_', 'item_',
-                       'meeting_', 'meetingRequest_', 'postitem_', 'task_'):
-            if fieldname.startswith(prefix):
-                return prefix[:-1] + ':' + fieldname[len(prefix):]
-        return fieldname
+        # Switch back to correct fieldname spelling. Inverse of _unescape()
+        if '_' not in fieldname:
+            return fieldname
+        prefix, field = fieldname.split('_', maxsplit=1)
+        # There aren't any valid FieldURI values with an underscore
+        assert prefix in ('message', 'calendar', 'contacts', 'conversation', 'distributionlist', 'folder', 'item',
+                          'meeting', 'meetingRequest', 'postitem', 'task')
+        return '%s:%s' % (prefix, field)
 
     @classmethod
     def from_params(cls, start=None, end=None, categories=None, subject=None):
