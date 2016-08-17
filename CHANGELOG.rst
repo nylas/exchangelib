@@ -11,25 +11,27 @@ Change Log
   ``__startswith``, ``__istartswith``, plus an additional ``__not`` which translates to ``!=``.
   Additionally, *all* fields on the item are now supported in ``Folder.find_items()``.
 
-WARNING: This change is backwards-incompatible! Old uses of ``Folder.find_items()`` like this:
+  **WARNING**: This change is backwards-incompatible! Old uses of ``Folder.find_items()`` like this:
 
-.. code-block:: python
+  .. code-block:: python
 
-    ids = account.calendar.find_items(
-        start=tz.localize(EWSDateTime(year, month, day)),
-        end=tz.localize(EWSDateTime(year, month, day + 1)),
-        categories=['foo', 'bar'],
-    )
+      ids = account.calendar.find_items(
+          start=tz.localize(EWSDateTime(year, month, day)),
+          end=tz.localize(EWSDateTime(year, month, day + 1)),
+          categories=['foo', 'bar'],
+      )
 
-should be rewritten like this:
+  must be rewritten like this:
 
-.. code-block:: python
+  .. code-block:: python
 
-    ids = account.calendar.find_items(
-        start__lt=tz.localize(EWSDateTime(year, month, day + 1)),
-        end__gt=tz.localize(EWSDateTime(year, month, day)),
-        categories__contains=['foo', 'bar'],
-    )
+      ids = account.calendar.find_items(
+          start__lt=tz.localize(EWSDateTime(year, month, day + 1)),
+          end__gt=tz.localize(EWSDateTime(year, month, day)),
+          categories__contains=['foo', 'bar'],
+      )
+      
+  failing to do so will most likely result in empty or wrong results.
 
 * Added a ``exchangelib.restrictions.Q`` class much like Django Q objects that can be used to
   create even more complex filtering. Q objects must be passed directly to ``exchangelib.services.FindItem``.
