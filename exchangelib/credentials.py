@@ -11,10 +11,6 @@ log = logging.getLogger(__name__)
 IMPERSONATION = 'impersonation'
 DELEGATE = 'delegate'
 
-EMAIL = 'email'
-DOMAIN = 'domain'
-UPN = 'upn'
-
 
 class Credentials:
     # Keeps login info the way Exchange likes it. Usernames for authentication are of one of these forms:
@@ -22,13 +18,17 @@ class Credentials:
     #    * PrimarySMTPAddress
     #    * WINDOMAIN\username
     #    * User Principal Name (UPN)
+    EMAIL = 'email'
+    DOMAIN = 'domain'
+    UPN = 'upn'
+
     def __init__(self, username, password):
         if username.count('@') == 1:
-            self.type = EMAIL
+            self.type = self.EMAIL
         elif username.count('\\') == 1:
-            self.type = DOMAIN
+            self.type = self.DOMAIN
         else:
-            self.type = UPN
+            self.type = self.UPN
         self.username = username
         self.password = password
 

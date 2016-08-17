@@ -107,6 +107,8 @@ class AutodiscoverCache:
             domain, credentials, verify_ssl = key
             log.debug('Domain %s: Closing sessions', domain)
             protocol.close()
+            del protocol
+        self._protocols.clear()
 
     def __del__(self):
         self.close()

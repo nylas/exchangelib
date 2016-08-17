@@ -680,36 +680,59 @@ class Folder:
     def attr_to_response_xml_elem(cls, fieldname):
         return cls.item_model.response_xml_elem_for_field(fieldname)
 
-    def find_items(self, start=None, end=None, categories=None, subject=None, shape=IdOnly, depth=SHALLOW):
+    def find_items(self, shape=IdOnly, depth=SHALLOW, **kwargs):
         """
-        Finds all items in the folder, optionally restricted by start- and enddates and a list of categories
+        Finds items in the folder. 'shape' controls the exact fields returned are governed by . 'depth' controls the
+        search depth.
+
+        Optional extra arguments follow a Django-like QuerySet filter syntax (see
+           https://docs.djangoproject.com/en/1.10/ref/models/querysets/#field-lookups).
+
+        Examples:
+
+            my_account.inbox.find_items(datetime_received__gt=EWSDateTime(2016, 1, 1))
+            my_account.calendar.find_items(start__range=(EWSDateTime(2016, 1, 1), EWSDateTime(2017, 1, 1)))
+            my_account.tasks.find_items(subject='Hi mom')
+            my_account.tasks.find_items(subject__contains='Foo')
+
         """
-        # TODO: This should be tailored to support the most comon fields for a specific folder type.
+        # Define the extra properties we want on the return objects. 'body' field can only be fetched with GetItem.
+        additional_fields = None
+        categories = []
+        q_kwargs = {}
+        for key, value in kwargs.items():
+            # Convert Item attribute name to FieldURI
+            if '__' in key:
+                field, lookup = key.rsplit('__')
+            else:
+                field, lookup = key, None
+            # TODO Filtering by category doesn't work on Exchange 2010 (and others?), returning
+            # "ErrorContainsFilterWrongType: The Contains filter can only be used for string properties." Fall back to
+            # filtering after getting all items instead. This may be a legal and a performance problem because we get
+            # ALL items, including private appointments.
+            if field == 'categories':
+                if lookup != 'contains':
+                    raise ValueError("Categories can only be filtered using 'categories__contains=['a', 'b']'")
+                if isinstance(value, str):
+                    categories.append(value)
+                else:
+                    categories.extend(value)
+                additional_fields = [self.item_model.fielduri_for_field('categories')]
+                continue
+            if lookup:
+                q_kwargs['%s__%s' % (self.item_model.fielduri_for_field(field), lookup)] = value
+            else:
+                q_kwargs[self.item_model.fielduri_for_field(field)] = value
+        q = Q(**q_kwargs)
         log.debug(
-            'Finding %s items for %s from %s to %s with cats %s shape %s',
+            'Finding %s items for %s (search expression: %s)',
             self.DISTINGUISHED_FOLDER_ID,
             self.account,
-            start,
-            end,
-            categories,
-            shape
+            shape,
+            q.expr(),
         )
         xml_func = self.item_model.id_from_xml if shape == IdOnly else self.item_model.from_xml
-        # Define the extra properties we want on the return objects. 'body' field can only be fetched with GetItem.
-        additional_fields = [self.item_model.fielduri_for_field('categories')] if categories else None
-        # Define any search restrictions we want to set on the search.
-        # TODO Filtering by category doesn't work on Exchange 2010 (and others?), returning
-        # "ErrorContainsFilterWrongType: The Contains filter can only be used for string properties." Fall back to
-        # filtering after getting all items instead. This may be a legal and a performance problem because we get ALL
-        # items, including private appointments.
-        q_kwargs = {}
-        if start:
-            q_kwargs['%s__gt' % self.item_model.fielduri_for_field('end')] = start
-        if end:
-            q_kwargs['%s__lt' % self.item_model.fielduri_for_field('start')] = end
-        if subject:
-            q_kwargs['%s' % self.item_model.fielduri_for_field('subject')] = subject
-        restriction = Restriction(Q(**q_kwargs).to_xml()) if q_kwargs else None
+        restriction = Restriction(q.to_xml()) if q_kwargs else None
         items = FindItem(self.account.protocol).call(folder=self, additional_fields=additional_fields,
                                                      restriction=restriction, shape=shape, depth=depth)
         if not categories:

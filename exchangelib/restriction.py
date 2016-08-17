@@ -237,6 +237,9 @@ class Restriction:
 
     """
     def __init__(self, xml):
+        from xml.etree.ElementTree import Element
+        if not isinstance(xml, Element):
+            raise ValueError("'xml' must be an ElementTree (%s)", type(xml))
         self.xml = xml
 
     @classmethod

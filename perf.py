@@ -83,7 +83,7 @@ def perf_test(cbs, dbs, ps):
 
     start = tz.localize(EWSDateTime(year, month, day, 0, 0, 0))
     end = tz.localize(EWSDateTime(year, month, day, 23, 59, 59))
-    ids = cal.find_items(start=start, end=end, categories=categories, shape=services.IdOnly)
+    ids = cal.find_items(start__le=end, end__gt=start, categories__contains=categories, shape=services.IdOnly)
     t4 = datetime.now()
     delta = t4 - t3
     avg_fetch = avg(delta, n)

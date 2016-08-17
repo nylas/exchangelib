@@ -68,6 +68,11 @@ class CredentialsTest(unittest.TestCase):
         self.assertNotEqual(Credentials('a', 'b'), Credentials('a', 'a'))
         self.assertNotEqual(Credentials('a', 'b'), Credentials('b', 'b'))
 
+    def test_type(self):
+        self.assertEqual(Credentials('a', 'b').type, Credentials.UPN)
+        self.assertEqual(Credentials('a@example.com', 'b').type, Credentials.EMAIL)
+        self.assertEqual(Credentials('a\\n', 'b').type, Credentials.DOMAIN)
+
 
 class EWSDateTest(unittest.TestCase):
     def test_ewsdatetime(self):
@@ -168,6 +173,11 @@ class RestrictionTest(unittest.TestCase):
         )
         r = Restriction(q.to_xml())
         self.assertEqual(str(r), ''.join(l.lstrip() for l in result.split('\n')))
+        # Test empty Q
+        q = Q()
+        self.assertEqual(q.to_xml(), None)
+        with self.assertRaises(ValueError):
+            Restriction(q.to_xml())
 
     def test_q_expr(self):
         self.assertEqual(Q().expr(), None)
@@ -401,7 +411,7 @@ class CommonTest(EWSTest):
             items.append(item)
         return_ids = self.account.calendar.add_items(items=items)
         self.assertEqual(len(return_ids), len(items))
-        ids = self.account.calendar.find_items(start=start, end=end, categories=self.categories, shape=IdOnly)
+        ids = self.account.calendar.find_items(start__lt=end, end__gt=start, categories__contains=self.categories, shape=IdOnly)
         self.assertEqual(len(ids), len(items))
         items = self.account.calendar.get_items(return_ids)
         for i, item in enumerate(items):
@@ -476,7 +486,7 @@ class BaseItemTest(EWSTest):
         self.test_folder = getattr(self.account, self.TEST_FOLDER)
 
     def tearDown(self):
-        ids = self.test_folder.find_items(categories=self.categories, shape=IdOnly)
+        ids = self.test_folder.find_items(categories__contains=self.categories, shape=IdOnly)
         self.test_folder.delete_items(ids, all_occurrences=True)
 
     def get_test_item(self):
@@ -512,7 +522,7 @@ class BaseItemTest(EWSTest):
     def test_finditems(self):
         item = self.get_test_item()
         self.test_folder.add_items(items=[item, item])
-        items = self.test_folder.find_items(categories=self.categories, shape=AllProperties)
+        items = self.test_folder.find_items(categories__contains=self.categories, shape=AllProperties)
         for item in items:
             assert isinstance(item, self.ITEM_CLASS)
         self.assertEqual(len(items), 2)
@@ -521,7 +531,7 @@ class BaseItemTest(EWSTest):
     def test_getitems(self):
         item = self.get_test_item()
         self.test_folder.add_items(items=[item, item])
-        ids = self.test_folder.find_items(categories=self.categories, shape=IdOnly)
+        ids = self.test_folder.find_items(categories__contains=self.categories, shape=IdOnly)
         items = self.test_folder.get_items(ids=ids)
         for item in items:
             assert isinstance(item, self.ITEM_CLASS)
@@ -531,7 +541,7 @@ class BaseItemTest(EWSTest):
     def test_extra_fields(self):
         item = self.get_test_item()
         self.test_folder.add_items(items=[item, item])
-        ids = self.test_folder.find_items(categories=self.categories, shape=IdOnly)
+        ids = self.test_folder.find_items(categories__contains=self.categories, shape=IdOnly)
         self.test_folder.with_extra_fields = True
         items = self.test_folder.get_items(ids=ids)
         self.test_folder.with_extra_fields = False
@@ -585,7 +595,7 @@ class BaseItemTest(EWSTest):
         insert_ids = self.test_folder.add_items(items=(i for i in [item]))
         self.assertEqual(len(insert_ids), 1)
         assert isinstance(insert_ids[0], tuple)
-        find_ids = self.test_folder.find_items(categories=insert_kwargs['categories'], shape=IdOnly)
+        find_ids = self.test_folder.find_items(categories__contains=insert_kwargs['categories'], shape=IdOnly)
         self.assertEqual(len(find_ids), 1)
         self.assertEqual(len(find_ids[0]), 2)
         self.assertEqual(insert_ids, find_ids)

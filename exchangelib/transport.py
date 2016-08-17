@@ -5,7 +5,7 @@ import requests.sessions
 from requests.auth import HTTPBasicAuth, HTTPDigestAuth
 from requests_ntlm import HttpNtlmAuth
 
-from .credentials import IMPERSONATION, EMAIL
+from .credentials import IMPERSONATION
 from .errors import UnauthorizedError, TransportError, RedirectError, RelativeRedirect
 from .util import create_element, add_xml_child, is_xml, get_redirect_url
 
@@ -133,7 +133,7 @@ def get_auth_instance(credentials, auth_type):
         if model is None:
             return None
         username = credentials.username
-        if auth_type == NTLM and credentials.type == EMAIL:
+        if auth_type == NTLM and credentials.type == credentials.EMAIL:
             username = '\\' + username
         return model(username=username, password=credentials.password)
 

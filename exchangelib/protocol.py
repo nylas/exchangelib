@@ -27,6 +27,8 @@ def close_connections():
         service_endpoint, credentials, verify_ssl = key
         log.debug("Service endpoint '%s': Closing sessions", service_endpoint)
         protocol.close()
+        del protocol
+    CachingProtocol._protocol_cache.clear()
 
 
 class BaseProtocol:
@@ -54,6 +56,9 @@ class BaseProtocol:
         self.auth_type = auth_type
         self.verify_ssl = verify_ssl
         self._session_pool = None  # Consumers need to fill the session pool themselves
+
+    def __del__(self):
+        self.close()
 
     def close(self):
         log.debug('Server %s: Closing sessions', self.server)
@@ -200,9 +205,6 @@ XSD auth: %s''' % (
             self.auth_type,
             self.docs_auth_type,
         )
-
-    def __del__(self):
-        self.close()
 
 
 class EWSSession(Session):
