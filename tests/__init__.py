@@ -131,7 +131,7 @@ class RestrictionTest(unittest.TestCase):
 </m:Restriction>'''
         self.assertEqual(xml_to_str(r.xml), ''.join(l.lstrip() for l in result.split('\n')))
 
-    def test_from_params(self):
+    def test_q(self):
         tz = EWSTimeZone.timezone('Europe/Copenhagen')
         start = tz.localize(EWSDateTime(1900, 9, 26, 8, 0, 0))
         end = tz.localize(EWSDateTime(2200, 9, 26, 11, 0, 0))
@@ -167,8 +167,6 @@ class RestrictionTest(unittest.TestCase):
             **{'calendar:Start__lt': end, 'calendar:End__gt': start}
         )
         r = Restriction(q.to_xml())
-        self.assertEqual(str(r), ''.join(l.lstrip() for l in result.split('\n')))
-        r = Restriction.from_params(start=start, end=end, categories=['FOO', 'BAR'])
         self.assertEqual(str(r), ''.join(l.lstrip() for l in result.split('\n')))
 
     def test_q_expr(self):
@@ -385,6 +383,9 @@ class CommonTest(EWSTest):
         self.assertTrue(Messages in folders)
         self.assertTrue(Tasks in folders)
         self.assertTrue(Contacts in folders)
+        for folder_cls, cls_folders in folders.items():
+            for f in cls_folders:
+                f.test_access()
 
     def test_getfolders(self):
         folders = self.account.root.get_folders()

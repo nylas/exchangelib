@@ -145,6 +145,9 @@ class Q:
         return expr
 
     def to_xml(self):
+        elem = self._to_xml_elem()
+        if elem is None:
+            return None
         from xml.etree.ElementTree import ElementTree
         restriction = create_element('m:Restriction')
         restriction.append(self._to_xml_elem())
@@ -362,31 +365,6 @@ class Restriction:
         assert prefix in ('message', 'calendar', 'contacts', 'conversation', 'distributionlist', 'folder', 'item',
                           'meeting', 'meetingRequest', 'postitem', 'task')
         return '%s:%s' % (prefix, field)
-
-    @classmethod
-    def from_params(cls, start=None, end=None, categories=None, subject=None):
-        # Builds a search expression string using the most common criteria and returns a Restriction object
-        if not (start or end or categories):
-            return None
-        search_expr = []
-        if categories:
-            if len(categories) == 1:
-                search_expr.append('item:Categories in "%s"' % categories[0])
-            else:
-                expr2 = []
-                for cat in categories:
-                    # TODO Searching for items with multiple categories seems to be broken in EWS. 'And' operator
-                    # returns no items, and searching for a list of categories doesn't work either.
-                    expr2.append('item:Categories in "%s"' % cat)
-                search_expr.append('( ' + ' or '.join(expr2) + ' )')
-        if start:
-            search_expr.append('calendar:End > "%s"' % start.astimezone(UTC).ewsformat())
-        if end:
-            search_expr.append('calendar:Start < "%s"' % end.astimezone(UTC).ewsformat())
-        if subject:
-            search_expr.append('item:Subject = "%s"' % subject)
-        expr_str = ' and '.join(search_expr)
-        return cls.from_source(expr_str)
 
     def __str__(self):
         """

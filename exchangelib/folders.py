@@ -10,7 +10,7 @@ from decimal import Decimal
 
 from .credentials import DELEGATE
 from .ewsdatetime import EWSDateTime, UTC_NOW
-from .restriction import Restriction
+from .restriction import Restriction, Q
 from .services import TNS, FindItem, IdOnly, SHALLOW, DEEP, DeleteItem, CreateItem, UpdateItem, FindFolder, GetFolder, \
     GetItem, MNS
 from .util import create_element, add_xml_child, get_xml_attrs, get_xml_attr, set_xml_value, ElementType, peek
@@ -696,13 +696,20 @@ class Folder:
         )
         xml_func = self.item_model.id_from_xml if shape == IdOnly else self.item_model.from_xml
         # Define the extra properties we want on the return objects. 'body' field can only be fetched with GetItem.
-        additional_fields = ['item:Categories'] if categories else None
+        additional_fields = [self.item_model.fielduri_for_field('categories')] if categories else None
         # Define any search restrictions we want to set on the search.
         # TODO Filtering by category doesn't work on Exchange 2010 (and others?), returning
         # "ErrorContainsFilterWrongType: The Contains filter can only be used for string properties." Fall back to
         # filtering after getting all items instead. This may be a legal and a performance problem because we get ALL
         # items, including private appointments.
-        restriction = Restriction.from_params(start=start, end=end, subject=subject)
+        q_kwargs = {}
+        if start:
+            q_kwargs['%s__gt' % self.item_model.fielduri_for_field('end')] = start
+        if end:
+            q_kwargs['%s__lt' % self.item_model.fielduri_for_field('start')] = end
+        if subject:
+            q_kwargs['%s' % self.item_model.fielduri_for_field('subject')] = subject
+        restriction = Restriction(Q(**q_kwargs).to_xml()) if q_kwargs else None
         items = FindItem(self.account.protocol).call(folder=self, additional_fields=additional_fields,
                                                      restriction=restriction, shape=shape, depth=depth)
         if not categories:
@@ -782,7 +789,7 @@ class Folder:
         Does a simple FindItem to test (read) access to the folder. Maybe the account doesn't exist, maybe the
         service user doesn't have access to the calendar. This will throw the most common errors.
         """
-        restriction = Restriction.from_params(subject='DUMMY')
+        restriction = Restriction(Q(**{Item.fielduri_for_field('subject'): 'DUMMY'}).to_xml())
         FindItem(self.account.protocol).call(folder=self, restriction=restriction, shape=IdOnly)
         return True
 
