@@ -192,15 +192,15 @@ class Q:
         return expr
 
     def to_xml(self):
-        elem = self._to_xml_elem()
+        elem = self.xml_elem()
         if elem is None:
             return None
         from xml.etree.ElementTree import ElementTree
         restriction = create_element('m:Restriction')
-        restriction.append(self._to_xml_elem())
+        restriction.append(self.xml_elem())
         return ElementTree(restriction).getroot()
 
-    def _to_xml_elem(self):
+    def xml_elem(self):
         # Return an XML tree structure of this Q object. First, remove any empty children. If conn_type is AND or OR and
         # there is exactly one child, ignore the AND/OR and treat this node as a leaf. If this is an empty leaf
         # (equivalent of Q()), return None.
@@ -220,13 +220,13 @@ class Q:
                 elem.append(uriorconst)
         elif len(self.children) == 1:
             # Flatten the tree a bit
-            elem = self.children[0]._to_xml_elem()
+            elem = self.children[0].xml_elem()
         else:
             # We have multiple children. If conn_type is NOT, then group children with AND. We'll add the NOT later
             elem = self._conn_to_xml(self.AND if self.conn_type == self.NOT else self.conn_type)
             # Sort children by field name so we get stable output (for easier testing). Children should never be empty
             for c in sorted(self.children, key=lambda i: i.field or ''):
-                elem.append(c._to_xml_elem())
+                elem.append(c.xml_elem())
         if elem is None:
             return None  # Should not be necessary, but play safe
         if self.conn_type == self.NOT:
@@ -290,21 +290,23 @@ class Restriction:
         self.xml = xml
 
     @classmethod
-    def from_source(cls, source):
+    def from_source(cls, source, item_model):
         """
-        source is a search expression in Python syntax. EWS Item fieldnames may be spelled with a colon (:). They will
-        be escaped as underscores (_) since colons are not allowed in Python identifiers. Example:
+        source is a search expression in Python syntax using item attributes as labels. 'item_model' is the Item class
+        the search expression is intended for. Example for a CalendarItem:
 
-            calendar:Start > '2009-01-15T13:45:56Z' and not (item:Subject == 'EWS Test' or item:Subject == 'Foo')
+            start > '2009-01-15T13:45:56Z' and not (subject == 'EWS Test' or subject == 'Foo')
         """
+        from .folders import Item
+        assert issubclass(item_model, Item)
         with _source_cache_lock:
             # Something within the parser module seems to be deadlocking. Wrap in lock
             if source not in _source_cache:
                 from parser import expr
                 log.debug('Parsing source: %s', source)
-                st = expr(cls._escape(source)).tolist()
+                st = expr(source).tolist()
                 from xml.etree.ElementTree import ElementTree
-                etree = ElementTree(cls._parse_syntaxtree(st))
+                etree = ElementTree(cls._parse_syntaxtree(st, item_model))
                 # etree.register_namespace('t', 'http://schemas.microsoft.com/exchange/services/2006/messages')
                 # etree.register_namespace('m', 'http://schemas.microsoft.com/exchange/services/2006/types')
                 log.debug('Source parsed')
@@ -312,7 +314,7 @@ class Restriction:
         return cls(_source_cache[source])
 
     @classmethod
-    def _parse_syntaxtree(cls, slist):
+    def _parse_syntaxtree(cls, slist, item_model):
         """
         Takes a Python syntax tree containing a search restriction expression and returns the tree as EWS-formatted XML
         """
@@ -323,35 +325,35 @@ class Restriction:
         if isinstance(slist[1], list):
             if len(slist) == 2:
                 # Let nested 2-element lists pass transparently
-                return cls._parse_syntaxtree(slist[1])
+                return cls._parse_syntaxtree(slist[1], item_model)
             if key == atom:
                 # This is a parens with contents. Continue without the parens since they are unnecessary when building
                 # a tree - a node *is* the parens.
                 assert slist[1][0] == LPAR
                 assert slist[3][0] == RPAR
-                return cls._parse_syntaxtree(slist[2])
+                return cls._parse_syntaxtree(slist[2], item_model)
             if key == or_test:
                 e = create_element('t:Or')
-                for item in [cls._parse_syntaxtree(l) for l in slist[1:]]:
+                for item in [cls._parse_syntaxtree(l, item_model) for l in slist[1:]]:
                     if item is not None:
                         e.append(item)
                 return e
             if key == and_test:
                 e = create_element('t:And')
-                for item in [cls._parse_syntaxtree(l) for l in slist[1:]]:
+                for item in [cls._parse_syntaxtree(l, item_model) for l in slist[1:]]:
                     if item is not None:
                         e.append(item)
                 return e
             if key == not_test:
                 e = create_element('t:Not')
-                for item in [cls._parse_syntaxtree(l) for l in slist[1:]]:
+                for item in [cls._parse_syntaxtree(l, item_model) for l in slist[1:]]:
                     if item is not None:
                         e.append(item)
                 return e
             if key == comparison:
-                op = cls._parse_syntaxtree(slist[2])
-                field = cls._parse_syntaxtree(slist[1])
-                constant = cls._parse_syntaxtree(slist[3])
+                op = cls._parse_syntaxtree(slist[2], item_model)
+                field = cls._parse_syntaxtree(slist[1], item_model)
+                constant = cls._parse_syntaxtree(slist[3], item_model)
                 op.append(field)
                 if op.tag == 't:Contains':
                     op.append(constant)
@@ -362,7 +364,7 @@ class Restriction:
                 return op
             if key == eval_input:
                 e = create_element('m:Restriction')
-                for item in [cls._parse_syntaxtree(l) for l in slist[1:]]:
+                for item in [cls._parse_syntaxtree(l, item_model) for l in slist[1:]]:
                     if item is not None:
                         e.append(item)
                 return e
@@ -374,7 +376,7 @@ class Restriction:
                     return None
                 if val == 'in':
                     return create_element('t:Contains', ContainmentMode='Substring', ContainmentComparison='Exact')
-                return create_element('t:FieldURI', FieldURI=cls._unescape(val))
+                return create_element('t:FieldURI', FieldURI=item_model.fielduri_for_field(val))
             if key == EQEQUAL:
                 return create_element('t:IsEqualTo')
             if key == NOTEQUAL:
@@ -393,28 +395,6 @@ class Restriction:
             if key in (LPAR, RPAR, NEWLINE, ENDMARKER):
                 return None
             raise ValueError('Unknown token type: %s %s' % (key, val))
-
-    @staticmethod
-    def _escape(source):
-        # Make the syntax of the expression legal Python syntax by replacing ':' in identifiers with '_'. Play safe and
-        # only do this for known property prefixes. See Table 1 and 5 in
-        # https://msdn.microsoft.com/en-us/library/office/dn467898(v=exchg.150).aspx
-        for prefix in ('message:', 'calendar:', 'contacts:', 'conversation:', 'distributionlist:', 'folder:', 'item:',
-                       'meeting:', 'meetingRequest:', 'postitem:', 'task:'):
-            new = prefix[:-1] + '_'
-            source = source.replace(prefix, new)
-        return source
-
-    @staticmethod
-    def _unescape(fieldname):
-        # Switch back to correct fieldname spelling. Inverse of _unescape()
-        if '_' not in fieldname:
-            return fieldname
-        prefix, field = fieldname.split('_', maxsplit=1)
-        # There aren't any valid FieldURI values with an underscore
-        assert prefix in ('message', 'calendar', 'contacts', 'conversation', 'distributionlist', 'folder', 'item',
-                          'meeting', 'meetingRequest', 'postitem', 'task')
-        return '%s:%s' % (prefix, field)
 
     def __str__(self):
         """

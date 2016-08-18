@@ -112,9 +112,7 @@ class RestrictionTest(unittest.TestCase):
         self.maxDiff = None
 
     def test_parse(self):
-        r = Restriction.from_source(
-            "calendar:Start > '2016-01-15T13:45:56Z' and (not calendar:Subject == 'EWS Test')"
-        )
+        r = Restriction.from_source("start > '2016-01-15T13:45:56Z' and (not subject == 'EWS Test')", CalendarItem)
         result = '''\
 <m:Restriction>
     <t:And>
@@ -126,7 +124,7 @@ class RestrictionTest(unittest.TestCase):
         </t:IsGreaterThan>
         <t:Not>
             <t:IsEqualTo>
-                <t:FieldURI FieldURI="calendar:Subject" />
+                <t:FieldURI FieldURI="item:Subject" />
                 <t:FieldURIOrConstant>
                     <t:Constant Value="EWS Test" />
                 </t:FieldURIOrConstant>
