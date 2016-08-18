@@ -23,7 +23,7 @@ Change Log
 * Complete rewrite of ``Folder.find_items()``. The old ``start``, ``end``, ``subject`` and
   ``categories`` args are deprecated in favor of a Django QuerySet filter() syntax. The
   supported lookup types are ``__gt``, ``__lt``, ``__gte``, ``__lte``, ``__range``, ``__in``,
-  ``__exact``,``__iexact``, ``__contains``,``__icontains``, ``__contains``, ``__icontains``,
+  ``__exact``, ``__iexact``, ``__contains``, ``__icontains``, ``__contains``, ``__icontains``,
   ``__startswith``, ``__istartswith``, plus an additional ``__not`` which translates to ``!=``.
   Additionally, *all* fields on the item are now supported in ``Folder.find_items()``.
 
