@@ -26,7 +26,7 @@ Here is a simple example that inserts, retrieves and deletes calendar items in a
 .. code-block:: python
 
     from exchangelib import DELEGATE, IMPERSONATION, IdOnly, Account, Credentials, \
-        EWSDateTime, EWSTimeZone, Configuration, NTLM
+        EWSDateTime, EWSTimeZone, Configuration, NTLM, Restriction, Q
     from exchangelib.folders import Calendar, CalendarItem
 
     year, month, day = 2016, 3, 20
@@ -66,12 +66,26 @@ Here is a simple example that inserts, retrieves and deletes calendar items in a
     res = account.calendar.add_items(calendar_items)
     print(res)
 
-    # Get Exchange ID and changekey of the calendar items we just created. We search by
-    # categories so we only get the items created by us.
+    # Get Exchange ID and changekey of the calendar items we just created. We filter by
+    # categories so we only get the items created by us. The syntax for find_items() is
+    # modeled after Django QuerySet filters.
+    #
+    # If you need more complex filtering, find_items() also accepts a Python-like search expression:
+    #
+    # ids = account.calendar.find_items(
+    #       "start < '2016-01-02T03:04:05T' and end > '2016-01-01T03:04:05T' and categories in ('foo', 'bar')",
+    #       shape=IdOnly
+    # )
+    #
+    # find_items() also support Q objects that are modeled after Django Q objects
+    #
+    # q = (Q(subject__iexact='foo') | Q(subject__contains='bar')) & ~Q(subject__startswith='baz')
+    # ids = account.calendar.find_items(q, shape=IdOnly)
+    #
     ids = account.calendar.find_items(
-        start=tz.localize(EWSDateTime(year, month, day)),
-        end=tz.localize(EWSDateTime(year, month, day + 1)),
-        categories=['foo', 'bar'],
+        start__lt=tz.localize(EWSDateTime(year, month, day + 1)),
+        end__gt=tz.localize(EWSDateTime(year, month, day)),
+        categories__contains=['foo', 'bar'],
         shape=IdOnly,
     )
     print(ids)

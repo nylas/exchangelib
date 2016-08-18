@@ -191,7 +191,18 @@ class Q:
                 expr = self.conn_type + ' (%s)' % expr
         return expr
 
-    def to_xml(self):
+    def translate_fields(self, item_model):
+        # Recursively translate Python attribute names to EWS FieldURI values
+        if self.field is not None:
+            self.field = item_model.fielduri_for_field(self.field)
+        for c in self.children:
+            c.translate_fields(item_model=item_model)
+
+    def to_xml(self, item_model):
+        # Translate this Q object to a valid Restriction XML tree
+        from .folders import Item
+        assert issubclass(item_model, Item)
+        self.translate_fields(item_model)
         elem = self.xml_elem()
         if elem is None:
             return None
@@ -292,10 +303,12 @@ class Restriction:
     @classmethod
     def from_source(cls, source, item_model):
         """
-        source is a search expression in Python syntax using item attributes as labels. 'item_model' is the Item class
-        the search expression is intended for. Example for a CalendarItem:
+        'source' is a search expression in Python syntax using Item attributes as labels.
+        'item_model' is the Item class the search expression is intended for.
+        Example search expression for a CalendarItem:
 
             start > '2009-01-15T13:45:56Z' and not (subject == 'EWS Test' or subject == 'Foo')
+
         """
         from .folders import Item
         assert issubclass(item_model, Item)
@@ -376,6 +389,7 @@ class Restriction:
                     return None
                 if val == 'in':
                     return create_element('t:Contains', ContainmentMode='Substring', ContainmentComparison='Exact')
+                # Translate the Python attribute name to EWS FieldURI
                 return create_element('t:FieldURI', FieldURI=item_model.fielduri_for_field(val))
             if key == EQEQUAL:
                 return create_element('t:IsEqualTo')

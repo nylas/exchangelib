@@ -2,6 +2,22 @@
 Change Log
 ==========
 
+1.6.1
+-----
+* Simplify ``Q`` objects and ``Restriction.from_source()`` by using Item attribute names in expressions and kwargs
+  instead of EWS FieldURI values. Change ``Folder.find_items()`` to accept either a search expression, or a list of
+  ``Q`` objects just like Django ``filter()`` does. E.g.:
+
+  .. code-block:: python
+
+      ids = account.calendar.find_items(
+            "start < '2016-01-02T03:04:05T' and end > '2016-01-01T03:04:05T' and categories in ('foo', 'bar')",
+            shape=IdOnly
+      )
+
+      q1, q2 = (Q(subject__iexact='foo') | Q(subject__contains='bar')), ~Q(subject__startswith='baz')
+      ids = account.calendar.find_items(q1, q2, shape=IdOnly)
+
 1.6.0
 -----
 * Complete rewrite of ``Folder.find_items()``. The old ``start``, ``end``, ``subject`` and
@@ -30,7 +46,7 @@ Change Log
           end__gt=tz.localize(EWSDateTime(year, month, day)),
           categories__contains=['foo', 'bar'],
       )
-      
+
   failing to do so will most likely result in empty or wrong results.
 
 * Added a ``exchangelib.restrictions.Q`` class much like Django Q objects that can be used to

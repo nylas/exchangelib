@@ -165,17 +165,14 @@ class RestrictionTest(unittest.TestCase):
         </t:IsLessThan>
     </t:And>
 </m:Restriction>'''
-        q = Q(
-            Q(**{'item:Categories__contains': 'FOO'}) | Q(**{'item:Categories__contains': 'BAR'}),
-            **{'calendar:Start__lt': end, 'calendar:End__gt': start}
-        )
-        r = Restriction(q.to_xml())
+        q = Q(Q(categories__contains='FOO') | Q(categories__contains='BAR'), start__lt=end, end__gt=start)
+        r = Restriction(q.to_xml(item_model=CalendarItem))
         self.assertEqual(str(r), ''.join(l.lstrip() for l in result.split('\n')))
         # Test empty Q
         q = Q()
-        self.assertEqual(q.to_xml(), None)
+        self.assertEqual(q.to_xml(item_model=CalendarItem), None)
         with self.assertRaises(ValueError):
-            Restriction(q.to_xml())
+            Restriction(q.to_xml(item_model=CalendarItem))
 
     def test_q_expr(self):
         self.assertEqual(Q().expr(), None)
@@ -519,6 +516,38 @@ class BaseItemTest(EWSTest):
 
     def test_finditems(self):
         now = UTC_NOW()
+
+        # Test argument types
+        item = self.get_test_item()
+        item.subject = get_random_string(16)
+        ids = self.test_folder.add_items(items=[item])
+        # Search expr
+        self.assertEqual(
+            len(self.test_folder.find_items("subject == '%s'" % item.subject)),
+            1
+        )
+        # Search expr with Q
+        with self.assertRaises(AttributeError):
+            self.test_folder.find_items("subject == '%s'" % item.subject, Q())
+        # Search expr with kwargs
+        with self.assertRaises(AttributeError):
+            self.test_folder.find_items("subject == '%s'" % item.subject, foo='bar')
+        # Q object
+        self.assertEqual(
+            len(self.test_folder.find_items(Q(subject=item.subject))),
+            1
+        )
+        # Multiple Q objects
+        self.assertEqual(
+            len(self.test_folder.find_items(Q(subject=item.subject), ~Q(subject=item.subject + 'XXX'))),
+            1
+        )
+        # Multiple Q object and kwargs
+        self.assertEqual(
+            len(self.test_folder.find_items(Q(subject=item.subject), categories__contains=self.categories)),
+            1
+        )
+        self.test_folder.delete_items(ids, all_occurrences=True)
 
         # Test categories which are handled specially
         ids = self.test_folder.add_items(items=[self.get_test_item()])
