@@ -116,12 +116,6 @@ class RestrictionTest(unittest.TestCase):
         result = '''\
 <m:Restriction>
     <t:And>
-        <t:IsGreaterThan>
-            <t:FieldURI FieldURI="calendar:Start" />
-            <t:FieldURIOrConstant>
-                <t:Constant Value="2016-01-15T13:45:56Z" />
-            </t:FieldURIOrConstant>
-        </t:IsGreaterThan>
         <t:Not>
             <t:IsEqualTo>
                 <t:FieldURI FieldURI="item:Subject" />
@@ -130,6 +124,12 @@ class RestrictionTest(unittest.TestCase):
                 </t:FieldURIOrConstant>
             </t:IsEqualTo>
         </t:Not>
+        <t:IsGreaterThan>
+            <t:FieldURI FieldURI="calendar:Start" />
+            <t:FieldURIOrConstant>
+                <t:Constant Value="2016-01-15T13:45:56Z" />
+            </t:FieldURIOrConstant>
+        </t:IsGreaterThan>
     </t:And>
 </m:Restriction>'''
         self.assertEqual(xml_to_str(r.xml), ''.join(l.lstrip() for l in result.split('\n')))
@@ -166,13 +166,13 @@ class RestrictionTest(unittest.TestCase):
     </t:And>
 </m:Restriction>'''
         q = Q(Q(categories__contains='FOO') | Q(categories__contains='BAR'), start__lt=end, end__gt=start)
-        r = Restriction(q.to_xml(item_model=CalendarItem))
+        r = Restriction(q.translate_fields(item_model=CalendarItem))
         self.assertEqual(str(r), ''.join(l.lstrip() for l in result.split('\n')))
         # Test empty Q
         q = Q()
         self.assertEqual(q.to_xml(item_model=CalendarItem), None)
         with self.assertRaises(ValueError):
-            Restriction(q.to_xml(item_model=CalendarItem))
+            Restriction(q.translate_fields(item_model=CalendarItem))
 
     def test_q_expr(self):
         self.assertEqual(Q().expr(), None)
@@ -527,11 +527,15 @@ class BaseItemTest(EWSTest):
             1
         )
         # Search expr with Q
-        with self.assertRaises(AttributeError):
-            self.test_folder.find_items("subject == '%s'" % item.subject, Q())
+        self.assertEqual(
+            len(self.test_folder.find_items("subject == '%s'" % item.subject, Q())),
+            1
+        )
         # Search expr with kwargs
-        with self.assertRaises(AttributeError):
-            self.test_folder.find_items("subject == '%s'" % item.subject, foo='bar')
+        self.assertEqual(
+            len(self.test_folder.find_items("subject == '%s'" % item.subject, categories__contains=self.categories)),
+            1
+        )
         # Q object
         self.assertEqual(
             len(self.test_folder.find_items(Q(subject=item.subject))),

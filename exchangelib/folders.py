@@ -714,23 +714,21 @@ class Folder:
         additional_fields = None
 
         # Build up any restrictions
-        restriction = None
         q = None
         categories = []
         categories_lookup = None
-        if args and isinstance(args[0], str):
-            # We got a search expression
-            if len(args) > 1:
-                raise AttributeError('Search expression cannot be combined with Q objects or other search expressions')
-            if kwargs:
-                raise AttributeError('Search expression and keyword args cannot be combined')
-            restriction = Restriction.from_source(args[0], item_model=self.item_model)
-        elif args:
-            for q in args:
-                if not isinstance(q, Q):
-                    raise ValueError("Non-keyword arg '%s' must be a Q object" % q)
+        if args:
+            q_args = []
+            for arg in args:
+                # Convert all search expressions to q objects
+                if isinstance(arg, str):
+                    q_args.append(Restriction.from_source(args[0], item_model=self.item_model).q)
+                else:
+                    if not isinstance(arg, Q):
+                        raise ValueError("Non-keyword arg '%s' must be a Q object" % arg)
+                    q_args.append(arg)
             # AND all the given Q objects together
-            q = functools.reduce(lambda a, b: a & b, args)
+            q = functools.reduce(lambda a, b: a & b, q_args)
         if kwargs:
             q_kwargs = {}
             for key, value in kwargs.items():
@@ -743,7 +741,7 @@ class Folder:
                 # filtering after getting all items instead. This may be a legal and a performance problem because we get
                 # ALL items, including private appointments, emails etc.
                 if field == 'categories':
-                    if lookup != 'contains':
+                    if lookup != Q.LOOKUP_CONTAINS:
                         # TODO: expand the post-processing part to also support 'in', 'not', 'exact', 'icontains', 'iexact'
                         raise ValueError("Categories can only be filtered using 'categories__contains=['a', 'b']'")
                     if isinstance(value, str):
@@ -757,8 +755,9 @@ class Folder:
             if q_kwargs:
                 q = q & Q(**q_kwargs) if q else Q(**q_kwargs)
         if q:
-            assert restriction is None
-            restriction = Restriction(q.to_xml(item_model=self.item_model))
+            restriction = Restriction(q.translate_fields(item_model=self.item_model))
+        else:
+            restriction = None
         log.debug(
             'Finding %s items for %s (shape: %s, depth: %s, restriction: %s)',
             self.DISTINGUISHED_FOLDER_ID,
@@ -848,8 +847,7 @@ class Folder:
         Does a simple FindItem to test (read) access to the folder. Maybe the account doesn't exist, maybe the
         service user doesn't have access to the calendar. This will throw the most common errors.
         """
-        restriction = Restriction(Q(subject='DUMMY').to_xml(item_model=Item))
-        FindItem(self.account.protocol).call(folder=self, restriction=restriction, shape=IdOnly)
+        self.find_items(subject='DUMMY')
         return True
 
     def folderid_xml(self):

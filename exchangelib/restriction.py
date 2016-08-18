@@ -17,23 +17,36 @@ class Q:
     NOT = 'NOT'
     CONN_TYPES = (AND, OR, NOT)
 
-    # Operators
+    # EWS Operators
     EQ = '=='
     NE = '!='
     GT = '>'
     GTE = '>='
     LT = '<'
     LTE = '<='
-    IN = 'in'
     EXACT = 'exact'
     IEXACT = 'iexact'
     CONTAINS = 'contains'
     ICONTAINS = 'icontains'
     STARTSWITH = 'startswith'
     ISTARTSWITH = 'istartswith'
-    RANGE = 'range'
-    OP_TYPES = (EQ, NE, GT, GTE, LT, LTE, IN, EXACT, IEXACT, CONTAINS, ICONTAINS, STARTSWITH, ISTARTSWITH, RANGE)
+    OP_TYPES = (EQ, NE, GT, GTE, LT, LTE, EXACT, IEXACT, CONTAINS, ICONTAINS, STARTSWITH, ISTARTSWITH)
     CONTAINS_OPS = (EXACT, IEXACT, CONTAINS, ICONTAINS, STARTSWITH, ISTARTSWITH)
+
+    # Valid lookups
+    LOOKUP_RANGE = 'range'
+    LOOKUP_IN = 'in'
+    LOOKUP_NOT = 'not'
+    LOOKUP_GT = 'gt'
+    LOOKUP_GTE = 'gte'
+    LOOKUP_LT = 'lt'
+    LOOKUP_LTE = 'lte'
+    LOOKUP_EXACT = 'exact'
+    LOOKUP_IEXACT = 'iexact'
+    LOOKUP_CONTAINS = 'contains'
+    LOOKUP_ICONTAINS = 'icontains'
+    LOOKUP_STARTSWITH = 'startswith'
+    LOOKUP_ISTARTSWITH = 'istartswith'
 
     def __init__(self, *args, **kwargs):
         if 'conn_type' in kwargs:
@@ -41,6 +54,8 @@ class Q:
         else:
             self.conn_type = self.AND
         assert self.conn_type in self.CONN_TYPES
+
+        self.translated = False  # Make sure we don't translate field names twice
 
         self.field = None
         self.op = None
@@ -50,20 +65,23 @@ class Q:
         self.children = []
         for q in args:
             if not isinstance(q, self.__class__):
-                raise AttributeError("'%s' must be a Q instance")
+                if isinstance(q, Restriction):
+                    q = q.q
+                else:
+                    raise AttributeError("'%s' must be a Q or Restriction instance")
             if not q.is_empty():
                 self.children.append(q)
 
         for key, value in kwargs.items():
             if '__' in key:
                 field, lookup = key.rsplit('__')
-                if lookup == self.RANGE:
+                if lookup == self.LOOKUP_RANGE:
                     # EWS doesn't have a 'range' operator. Emulate 'foo__range=(1, 2)' as 'foo__gte=1 and foo__lte=2'
                     # (both values inclusive).
                     self.children.append(self.__class__(**{'%s__gte' % field: value[0]}))
                     self.children.append(self.__class__(**{'%s__lte' % field: value[1]}))
                     continue
-                if lookup == self.IN:
+                if lookup == self.LOOKUP_IN:
                     # EWS doesn't have an 'in' operator. Emulate 'foo in (1, 2, ...)' as 'foo==1 or foo==2 or ...'
                     or_args = []
                     for val in value:
@@ -90,17 +108,17 @@ class Q:
     def _lookup_to_op(cls, lookup):
         try:
             return {
-                'not': cls.NE,
-                'gt': cls.GT,
-                'gte': cls.GTE,
-                'lt': cls.LT,
-                'lte': cls.LTE,
-                'exact': cls.EXACT,
-                'iexact': cls.IEXACT,
-                'contains': cls.CONTAINS,
-                'icontains': cls.ICONTAINS,
-                'startswith': cls.STARTSWITH,
-                'istartswith': cls.ISTARTSWITH,
+                cls.LOOKUP_NOT: cls.NE,
+                cls.LOOKUP_GT: cls.GT,
+                cls.LOOKUP_GTE: cls.GTE,
+                cls.LOOKUP_LT: cls.LT,
+                cls.LOOKUP_LTE: cls.LTE,
+                cls.LOOKUP_EXACT: cls.EXACT,
+                cls.LOOKUP_IEXACT: cls.IEXACT,
+                cls.LOOKUP_CONTAINS: cls.CONTAINS,
+                cls.LOOKUP_ICONTAINS: cls.ICONTAINS,
+                cls.LOOKUP_STARTSWITH: cls.STARTSWITH,
+                cls.LOOKUP_ISTARTSWITH: cls.ISTARTSWITH,
             }[lookup]
         except KeyError:
             raise ValueError("Lookup '%s' is not supported" % lookup)
@@ -193,15 +211,20 @@ class Q:
 
     def translate_fields(self, item_model):
         # Recursively translate Python attribute names to EWS FieldURI values
+        if self.translated:
+            return self
         if self.field is not None:
             self.field = item_model.fielduri_for_field(self.field)
         for c in self.children:
             c.translate_fields(item_model=item_model)
+        self.translated = True
+        return self
 
     def to_xml(self, item_model):
         # Translate this Q object to a valid Restriction XML tree
         from .folders import Item
-        assert issubclass(item_model, Item)
+        if not self.translated:
+            assert issubclass(item_model, Item)
         self.translate_fields(item_model)
         elem = self.xml_elem()
         if elem is None:
@@ -294,11 +317,19 @@ class Restriction:
     Implements an EWS Restriction type.
 
     """
-    def __init__(self, xml):
-        from xml.etree.ElementTree import Element
-        if not isinstance(xml, Element):
-            raise ValueError("'xml' must be an ElementTree (%s)", type(xml))
-        self.xml = xml
+    def __init__(self, q):
+        if not isinstance(q, Q):
+            raise ValueError("'q' must be a Q object (%s)", type(q))
+        if not q.translated:
+            raise ValueError("'%s' must be a translated Q object", q)
+        if q.is_empty():
+            raise ValueError("Q object must not be empty")
+        self.q = q
+
+    @property
+    def xml(self):
+        # item_model=None is OK since q has already been translated
+        return self.q.to_xml(item_model=None)
 
     @classmethod
     def from_source(cls, source, item_model):
@@ -318,18 +349,15 @@ class Restriction:
                 from parser import expr
                 log.debug('Parsing source: %s', source)
                 st = expr(source).tolist()
-                from xml.etree.ElementTree import ElementTree
-                etree = ElementTree(cls._parse_syntaxtree(st, item_model))
-                # etree.register_namespace('t', 'http://schemas.microsoft.com/exchange/services/2006/messages')
-                # etree.register_namespace('m', 'http://schemas.microsoft.com/exchange/services/2006/types')
-                log.debug('Source parsed')
-                _source_cache[source] = etree.getroot()
+                q = cls._parse_syntaxtree(st)
+                q.translate_fields(item_model=item_model)
+                _source_cache[source] = q
         return cls(_source_cache[source])
 
     @classmethod
-    def _parse_syntaxtree(cls, slist, item_model):
+    def _parse_syntaxtree(cls, slist):
         """
-        Takes a Python syntax tree containing a search restriction expression and returns the tree as EWS-formatted XML
+        Takes a Python syntax tree containing a search restriction expression and returns a Q object
         """
         from token import NAME, EQEQUAL, NOTEQUAL, GREATEREQUAL, LESSEQUAL, LESS, GREATER, STRING, LPAR, RPAR, \
             NEWLINE, ENDMARKER
@@ -338,49 +366,45 @@ class Restriction:
         if isinstance(slist[1], list):
             if len(slist) == 2:
                 # Let nested 2-element lists pass transparently
-                return cls._parse_syntaxtree(slist[1], item_model)
+                return cls._parse_syntaxtree(slist[1])
             if key == atom:
                 # This is a parens with contents. Continue without the parens since they are unnecessary when building
                 # a tree - a node *is* the parens.
                 assert slist[1][0] == LPAR
                 assert slist[3][0] == RPAR
-                return cls._parse_syntaxtree(slist[2], item_model)
+                return cls._parse_syntaxtree(slist[2])
             if key == or_test:
-                e = create_element('t:Or')
-                for item in [cls._parse_syntaxtree(l, item_model) for l in slist[1:]]:
+                children = []
+                for item in [cls._parse_syntaxtree(l) for l in slist[1:]]:
                     if item is not None:
-                        e.append(item)
-                return e
+                        children.append(item)
+                return Q(*children, conn_type=Q.OR)
             if key == and_test:
-                e = create_element('t:And')
-                for item in [cls._parse_syntaxtree(l, item_model) for l in slist[1:]]:
+                children = []
+                for item in [cls._parse_syntaxtree(l) for l in slist[1:]]:
                     if item is not None:
-                        e.append(item)
-                return e
+                        children.append(item)
+                return Q(*children, conn_type=Q.AND)
             if key == not_test:
-                e = create_element('t:Not')
-                for item in [cls._parse_syntaxtree(l, item_model) for l in slist[1:]]:
+                children = []
+                for item in [cls._parse_syntaxtree(l) for l in slist[1:]]:
                     if item is not None:
-                        e.append(item)
-                return e
+                        children.append(item)
+                return Q(*children, conn_type=Q.NOT)
             if key == comparison:
-                op = cls._parse_syntaxtree(slist[2], item_model)
-                field = cls._parse_syntaxtree(slist[1], item_model)
-                constant = cls._parse_syntaxtree(slist[3], item_model)
-                op.append(field)
-                if op.tag == 't:Contains':
-                    op.append(constant)
+                lookup = cls._parse_syntaxtree(slist[2])
+                field = cls._parse_syntaxtree(slist[1])
+                value = cls._parse_syntaxtree(slist[3])
+                if lookup:
+                    return Q(**{'%s__%s' % (field, lookup): value})
                 else:
-                    uriorconst = create_element('t:FieldURIOrConstant')
-                    uriorconst.append(constant)
-                    op.append(uriorconst)
-                return op
+                    return Q(**{field: value})
             if key == eval_input:
-                e = create_element('m:Restriction')
-                for item in [cls._parse_syntaxtree(l, item_model) for l in slist[1:]]:
+                children = []
+                for item in [cls._parse_syntaxtree(l) for l in slist[1:]]:
                     if item is not None:
-                        e.append(item)
-                return e
+                        children.append(item)
+                return Q(*children, conn_type=Q.AND)
             raise ValueError('Unknown element type: %s %s (slist %s len %s)' % (key, sym_name[key], slist, len(slist)))
         else:
             val = slist[1]
@@ -388,27 +412,33 @@ class Restriction:
                 if val in ('and', 'or', 'not'):
                     return None
                 if val == 'in':
-                    return create_element('t:Contains', ContainmentMode='Substring', ContainmentComparison='Exact')
-                # Translate the Python attribute name to EWS FieldURI
-                return create_element('t:FieldURI', FieldURI=item_model.fielduri_for_field(val))
-            if key == EQEQUAL:
-                return create_element('t:IsEqualTo')
-            if key == NOTEQUAL:
-                return create_element('t:IsNotEqualTo')
-            if key == GREATEREQUAL:
-                return create_element('t:IsGreaterThanOrEqualTo')
-            if key == LESSEQUAL:
-                return create_element('t:IsLessThanOrEqualTo')
-            if key == LESS:
-                return create_element('t:IsLessThan')
-            if key == GREATER:
-                return create_element('t:IsGreaterThan')
+                    return Q.LOOKUP_CONTAINS
+                # Field name
+                return val
             if key == STRING:
-                # This is a string, so strip single/double quotes
-                return create_element('t:Constant', Value=val.strip('"\''))
+                # This is a string value, so strip single/double quotes
+                return val.strip('"\'')
             if key in (LPAR, RPAR, NEWLINE, ENDMARKER):
                 return None
-            raise ValueError('Unknown token type: %s %s' % (key, val))
+            try:
+                return {
+                    EQEQUAL: None,
+                    NOTEQUAL: Q.LOOKUP_NOT,
+                    GREATER: Q.LOOKUP_GT,
+                    GREATEREQUAL: Q.LOOKUP_GTE,
+                    LESS: Q.LOOKUP_LT,
+                    LESSEQUAL: Q.LOOKUP_LTE,
+                }[key]
+            except KeyError:
+                raise ValueError('Unknown token type: %s %s' % (key, val))
+
+    def __and__(self, other):
+        # Return a new Q with two children and conn_type AND
+        return Q(self, other, conn_type=Q.AND)
+
+    def __or__(self, other):
+        # Return a new Q with two children and conn_type OR
+        return Q(self, other, conn_type=Q.OR)
 
     def __str__(self):
         """
