@@ -133,6 +133,9 @@ class RestrictionTest(unittest.TestCase):
     </t:And>
 </m:Restriction>'''
         self.assertEqual(xml_to_str(r.xml), ''.join(l.lstrip() for l in result.split('\n')))
+        # from_source() calls from parser.expr which is a security risk. Make sure stupid things can't happen
+        with self.assertRaises(SyntaxError):
+            Restriction.from_source('raise Exception()', item_model=CalendarItem)
 
     def test_q(self):
         tz = EWSTimeZone.timezone('Europe/Copenhagen')
