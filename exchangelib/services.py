@@ -425,15 +425,6 @@ class FindItem(PagingEWSService, EWSFolderService):
         return self._paged_call(folder=folder, **kwargs)
 
     def _get_payload(self, folder, additional_fields=None, restriction=None, shape=IdOnly, depth=SHALLOW, offset=0):
-        log.debug(
-            'Finding %s items for %s extra fields %s restriction %s shape %s offset %s',
-            folder.DISTINGUISHED_FOLDER_ID,
-            folder.account,
-            additional_fields,
-            restriction,
-            shape,
-            offset,
-        )
         finditem = create_element('m:%s' % self.SERVICE_NAME, Traversal=SHALLOW)
         itemshape = create_element('m:ItemShape')
         add_xml_child(itemshape, 't:BaseShape', shape)
@@ -475,13 +466,6 @@ class FindFolder(PagingEWSService, EWSFolderService):
         return self._paged_call(folder=folder, **kwargs)
 
     def _get_payload(self, folder, additional_fields=None, shape=IdOnly, depth=DEEP, offset=0):
-        log.debug(
-            'Getting folders for %s, root:%s, extra fields:%s, shape:%s',
-            folder.account,
-            folder.name,
-            additional_fields,
-            shape
-        )
         findfolder = create_element('m:%s' % self.SERVICE_NAME, Traversal=depth)
         foldershape = create_element('m:FolderShape')
         add_xml_child(foldershape, 't:BaseShape', shape)
@@ -521,13 +505,6 @@ class GetFolder(EWSFolderService):
         return self._get_elements(payload=self._get_payload(folder, **kwargs), account=folder.account)
 
     def _get_payload(self, folder, additional_fields=None, shape=IdOnly):
-        log.debug(
-            'Getting folders for %s, folder:%s, extra fields:%s, shape:%s',
-            folder.account,
-            folder.name,
-            additional_fields,
-            shape
-        )
         getfolder = create_element('m:%s' % self.SERVICE_NAME)
         foldershape = create_element('m:FolderShape')
         add_xml_child(foldershape, 't:BaseShape', shape)

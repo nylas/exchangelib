@@ -706,7 +706,10 @@ class Folder:
             my_account.tasks.find_items(subject__icontains='foo')
 
         """
-        # TODO: support endswith/iendswith using contains/icontains and filtering afterwards.
+        # 'endswith' and 'iendswith' could be implemented by searching with 'contains' or 'icontains' and then
+        # post-processing items. Fetch the field in question with additional_fields and remove items where the search
+        # string is not a postfix.
+
         shape = IdOnly if 'shape' not in kwargs else kwargs.pop('shape')
         depth = SHALLOW if 'depth' not in kwargs else kwargs.pop('depth')
 
@@ -715,8 +718,6 @@ class Folder:
 
         # Build up any restrictions
         q = None
-        categories = []
-        categories_lookup = None
         if args:
             q_args = []
             for arg in args:
@@ -730,66 +731,64 @@ class Folder:
             # AND all the given Q objects together
             q = functools.reduce(lambda a, b: a & b, q_args)
         if kwargs:
-            q_kwargs = {}
+            kwargs_q = q or Q()
             for key, value in kwargs.items():
                 if '__' in key:
                     field, lookup = key.rsplit('__')
                 else:
                     field, lookup = key, None
-                # TODO Filtering by category doesn't work on Exchange 2010 (and others?), returning
-                # "ErrorContainsFilterWrongType: The Contains filter can only be used for string properties." Fall back to
-                # filtering after getting all items instead. This may be a legal and a performance problem because we get
-                # ALL items, including private appointments, emails etc.
+                # Filtering by category is a bit quirky. The only lookup type I have found to work is:
+                #
+                #     item:Categories == 'foo' AND item:Categories == 'bar' AND ...
+                #
+                #     item:Categories == 'foo' OR item:Categories == 'bar' OR ...
+                #
+                # The former returns items that have these categories, but maybe also others. The latter returns
+                # items that have at least one of these categories. This translates to the 'contsins' and 'in' lookups.
+                # Both versions are case-insensitive.
+                #
+                # Exact matching and case-sensitive or partial-string mattching is not possible since that requires the
+                # 'Contains' element which only supports matching on string elements, not arrays.
+                #
+                # Exact matching of categories (i.e. match ['a', 'b'] but not ['a', 'b', 'c']) could be implemented by
+                # post-processing items. Fetch 'item:Categories' with additional_fields and remove the items that don't
+                # have an exact match, after the call to FindItems.
                 if field == 'categories':
-                    if lookup != Q.LOOKUP_CONTAINS:
-                        # TODO: expand the post-processing part to also support 'in', 'not', 'exact', 'icontains', 'iexact'
-                        raise ValueError("Categories can only be filtered using 'categories__contains=['a', 'b']'")
+                    if lookup not in (Q.LOOKUP_CONTAINS, Q.LOOKUP_IN):
+                        raise ValueError(
+                            "Categories can only be filtered using 'categories__contains=['a', 'b', ...]' and "
+                            "'categories__in=['a', 'b', ...]'")
                     if isinstance(value, str):
-                        categories.append(value)
+                        kwargs_q &= Q(categories=value)
                     else:
-                        categories.extend(value)
-                    categories_lookup = lookup
-                    additional_fields = [self.item_model.fielduri_for_field('categories')]
+                        children = [Q(categories=v) for v in value]
+                        if lookup == Q.LOOKUP_CONTAINS:
+                            kwargs_q &= Q(*children, conn_type=Q.AND)
+                        elif lookup == Q.LOOKUP_IN:
+                            kwargs_q &= Q(*children, conn_type=Q.OR)
+                        else:
+                            assert False
                     continue
-                q_kwargs[key] = value
-            if q_kwargs:
-                q = q & Q(**q_kwargs) if q else Q(**q_kwargs)
+                kwargs_q &= Q(**{key: value})
+            q = kwargs_q
         if q:
             restriction = Restriction(q.translate_fields(item_model=self.item_model))
         else:
             restriction = None
         log.debug(
-            'Finding %s items for %s (shape: %s, depth: %s, restriction: %s)',
+            'Finding %s items for %s (shape: %s, depth: %s, extra fields: %s, restriction: %s)',
             self.DISTINGUISHED_FOLDER_ID,
             self.account,
             shape,
             depth,
-            restriction,
+            additional_fields,
+            restriction.q.expr(),
         )
         xml_func = self.item_model.id_from_xml if shape == IdOnly else self.item_model.from_xml
         items = FindItem(self.account.protocol).call(folder=self, additional_fields=additional_fields,
                                                      restriction=restriction, shape=shape, depth=depth)
-        if not categories:
-            log.debug('Found %s items', len(items))
-            return list(map(xml_func, items))
-
-        # Filter for category. Searching for categories only works with 'Or' operator on Exchange 2007, so we need to
-        # ignore items with only some but not all categories present.
-        filtered_items = []
-        categoryset = set(categories)
-        for item in items:
-            if not isinstance(item, ElementType):
-                status, error = item
-                assert not status
-                log.warning('Error fetching items: %s', error)
-                continue
-            cats = item.find(self.attr_to_response_xml_elem('categories'))
-            if cats is not None:
-                item_cats = get_xml_attrs(cats, '{%s}String' % TNS)
-                if categoryset.issubset(set(item_cats)):
-                    filtered_items.append(item)
-        log.debug('%s of %s items match category', len(filtered_items), len(items))
-        return list(map(xml_func, filtered_items))
+        log.debug('Found %s items', len(items))
+        return list(map(xml_func, items))
 
     def add_items(self, items):
         """

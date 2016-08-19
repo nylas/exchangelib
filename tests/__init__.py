@@ -484,7 +484,7 @@ class BaseItemTest(EWSTest):
         ids = self.test_folder.find_items(categories__contains=self.categories)
         self.test_folder.delete_items(ids, all_occurrences=True)
 
-    def get_test_item(self):
+    def get_test_item(self, categories=None):
         item_kwargs = {}
         for f in self.ITEM_CLASS.required_fields():
             if f == 'start':
@@ -497,7 +497,7 @@ class BaseItemTest(EWSTest):
                 # ITEM_CLASS.__init__ should select a default choice for us
                 continue
             item_kwargs[f] = self.random_val(field_type)
-        return self.ITEM_CLASS(item_id='', changekey='', categories=self.categories, **item_kwargs)
+        return self.ITEM_CLASS(item_id='', changekey='', categories=categories or self.categories, **item_kwargs)
 
     def test_magic(self):
         item = self.get_test_item()
@@ -553,14 +553,58 @@ class BaseItemTest(EWSTest):
         )
         self.test_folder.delete_items(ids, all_occurrences=True)
 
-        # Test categories which are handled specially
-        ids = self.test_folder.add_items(items=[self.get_test_item()])
+        # Test categories which are handled specially - only '__contains' and '__in' lookups are supported
+        # First, delete any leftovers from last run. tearDown(doesn't do that since we're using non-devault categories)
+        ids = self.test_folder.find_items(categories__contains=['TestA', 'TestB'])
+        self.test_folder.delete_items(ids, all_occurrences=True)
+        item = self.get_test_item(categories=['TestA', 'TestB'])
+        ids = self.test_folder.add_items(items=[item])
         self.assertEqual(
-            len(self.test_folder.find_items(categories__contains=['ci6xahH1'])),
+            len(self.test_folder.find_items(categories__contains='ci6xahH1')),  # Plain string
             0
         )
         self.assertEqual(
-            len(self.test_folder.find_items(categories__contains=self.categories)),
+            len(self.test_folder.find_items(categories__contains=['ci6xahH1'])),  # Same, but as list
+            0
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(categories__contains=['TestA', 'TestC'])),  # One wrong category
+            0
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(categories__contains=['TESTA'])),  # Test case insensitivity
+            1
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(categories__contains=['testa'])),  # Test case insensitivity
+            1
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(categories__contains=['TestA'])),  # Partial
+            1
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(categories__contains=item.categories)),  # Exact match
+            1
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(categories__in='ci6xahH1')),  # Plain string
+            0
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(categories__in=['ci6xahH1'])),  # Same, but as list
+            0
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(categories__in=['TestA', 'TestC'])),  # One wrong category
+            1
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(categories__in=['TestA'])),  # Partial
+            1
+        )
+        self.assertEqual(
+            len(self.test_folder.find_items(categories__in=item.categories)),  # Exact match
             1
         )
         self.test_folder.delete_items(ids, all_occurrences=True)

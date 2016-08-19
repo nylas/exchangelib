@@ -304,6 +304,9 @@ class Q:
                 return self
         return self.__class__(self, conn_type=self.NOT)
 
+    def __str__(self):
+        return self.expr()
+
     def __repr__(self):
         if self.is_leaf():
             return self.__class__.__name__ + '(%s %s %s)' % (self.field, self.op, repr(self.value))
