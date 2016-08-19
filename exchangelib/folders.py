@@ -744,10 +744,10 @@ class Folder:
                 #     item:Categories == 'foo' OR item:Categories == 'bar' OR ...
                 #
                 # The former returns items that have these categories, but maybe also others. The latter returns
-                # items that have at least one of these categories. This translates to the 'contsins' and 'in' lookups.
+                # items that have at least one of these categories. This translates to the 'contains' and 'in' lookups.
                 # Both versions are case-insensitive.
                 #
-                # Exact matching and case-sensitive or partial-string mattching is not possible since that requires the
+                # Exact matching and case-sensitive or partial-string matching is not possible since that requires the
                 # 'Contains' element which only supports matching on string elements, not arrays.
                 #
                 # Exact matching of categories (i.e. match ['a', 'b'] but not ['a', 'b', 'c']) could be implemented by
@@ -782,7 +782,7 @@ class Folder:
             shape,
             depth,
             additional_fields,
-            restriction.q.expr(),
+            restriction.q,
         )
         xml_func = self.item_model.id_from_xml if shape == IdOnly else self.item_model.from_xml
         items = FindItem(self.account.protocol).call(folder=self, additional_fields=additional_fields,
