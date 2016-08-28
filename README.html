@@ -1,0 +1,431 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="Docutils 0.12: http://docutils.sourceforge.net/" />
+<title>Exchange Web Services client library</title>
+<style type="text/css">
+
+/*
+:Author: David Goodger (goodger@python.org)
+:Id: $Id: html4css1.css 7614 2013-02-21 15:55:51Z milde $
+:Copyright: This stylesheet has been placed in the public domain.
+
+Default cascading style sheet for the HTML output of Docutils.
+
+See http://docutils.sf.net/docs/howto/html-stylesheets.html for how to
+customize this style sheet.
+*/
+
+/* used to remove borders from tables and images */
+.borderless, table.borderless td, table.borderless th {
+  border: 0 }
+
+table.borderless td, table.borderless th {
+  /* Override padding for "table.docutils td" with "! important".
+     The right padding separates the table cells. */
+  padding: 0 0.5em 0 0 ! important }
+
+.first {
+  /* Override more specific margin styles with "! important". */
+  margin-top: 0 ! important }
+
+.last, .with-subtitle {
+  margin-bottom: 0 ! important }
+
+.hidden {
+  display: none }
+
+a.toc-backref {
+  text-decoration: none ;
+  color: black }
+
+blockquote.epigraph {
+  margin: 2em 5em ; }
+
+dl.docutils dd {
+  margin-bottom: 0.5em }
+
+object[type="image/svg+xml"], object[type="application/x-shockwave-flash"] {
+  overflow: hidden;
+}
+
+/* Uncomment (and remove this text!) to get bold-faced definition list terms
+dl.docutils dt {
+  font-weight: bold }
+*/
+
+div.abstract {
+  margin: 2em 5em }
+
+div.abstract p.topic-title {
+  font-weight: bold ;
+  text-align: center }
+
+div.admonition, div.attention, div.caution, div.danger, div.error,
+div.hint, div.important, div.note, div.tip, div.warning {
+  margin: 2em ;
+  border: medium outset ;
+  padding: 1em }
+
+div.admonition p.admonition-title, div.hint p.admonition-title,
+div.important p.admonition-title, div.note p.admonition-title,
+div.tip p.admonition-title {
+  font-weight: bold ;
+  font-family: sans-serif }
+
+div.attention p.admonition-title, div.caution p.admonition-title,
+div.danger p.admonition-title, div.error p.admonition-title,
+div.warning p.admonition-title, .code .error {
+  color: red ;
+  font-weight: bold ;
+  font-family: sans-serif }
+
+/* Uncomment (and remove this text!) to get reduced vertical space in
+   compound paragraphs.
+div.compound .compound-first, div.compound .compound-middle {
+  margin-bottom: 0.5em }
+
+div.compound .compound-last, div.compound .compound-middle {
+  margin-top: 0.5em }
+*/
+
+div.dedication {
+  margin: 2em 5em ;
+  text-align: center ;
+  font-style: italic }
+
+div.dedication p.topic-title {
+  font-weight: bold ;
+  font-style: normal }
+
+div.figure {
+  margin-left: 2em ;
+  margin-right: 2em }
+
+div.footer, div.header {
+  clear: both;
+  font-size: smaller }
+
+div.line-block {
+  display: block ;
+  margin-top: 1em ;
+  margin-bottom: 1em }
+
+div.line-block div.line-block {
+  margin-top: 0 ;
+  margin-bottom: 0 ;
+  margin-left: 1.5em }
+
+div.sidebar {
+  margin: 0 0 0.5em 1em ;
+  border: medium outset ;
+  padding: 1em ;
+  background-color: #ffffee ;
+  width: 40% ;
+  float: right ;
+  clear: right }
+
+div.sidebar p.rubric {
+  font-family: sans-serif ;
+  font-size: medium }
+
+div.system-messages {
+  margin: 5em }
+
+div.system-messages h1 {
+  color: red }
+
+div.system-message {
+  border: medium outset ;
+  padding: 1em }
+
+div.system-message p.system-message-title {
+  color: red ;
+  font-weight: bold }
+
+div.topic {
+  margin: 2em }
+
+h1.section-subtitle, h2.section-subtitle, h3.section-subtitle,
+h4.section-subtitle, h5.section-subtitle, h6.section-subtitle {
+  margin-top: 0.4em }
+
+h1.title {
+  text-align: center }
+
+h2.subtitle {
+  text-align: center }
+
+hr.docutils {
+  width: 75% }
+
+img.align-left, .figure.align-left, object.align-left {
+  clear: left ;
+  float: left ;
+  margin-right: 1em }
+
+img.align-right, .figure.align-right, object.align-right {
+  clear: right ;
+  float: right ;
+  margin-left: 1em }
+
+img.align-center, .figure.align-center, object.align-center {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.align-left {
+  text-align: left }
+
+.align-center {
+  clear: both ;
+  text-align: center }
+
+.align-right {
+  text-align: right }
+
+/* reset inner alignment in figures */
+div.align-right {
+  text-align: inherit }
+
+/* div.align-center * { */
+/*   text-align: left } */
+
+ol.simple, ul.simple {
+  margin-bottom: 1em }
+
+ol.arabic {
+  list-style: decimal }
+
+ol.loweralpha {
+  list-style: lower-alpha }
+
+ol.upperalpha {
+  list-style: upper-alpha }
+
+ol.lowerroman {
+  list-style: lower-roman }
+
+ol.upperroman {
+  list-style: upper-roman }
+
+p.attribution {
+  text-align: right ;
+  margin-left: 50% }
+
+p.caption {
+  font-style: italic }
+
+p.credits {
+  font-style: italic ;
+  font-size: smaller }
+
+p.label {
+  white-space: nowrap }
+
+p.rubric {
+  font-weight: bold ;
+  font-size: larger ;
+  color: maroon ;
+  text-align: center }
+
+p.sidebar-title {
+  font-family: sans-serif ;
+  font-weight: bold ;
+  font-size: larger }
+
+p.sidebar-subtitle {
+  font-family: sans-serif ;
+  font-weight: bold }
+
+p.topic-title {
+  font-weight: bold }
+
+pre.address {
+  margin-bottom: 0 ;
+  margin-top: 0 ;
+  font: inherit }
+
+pre.literal-block, pre.doctest-block, pre.math, pre.code {
+  margin-left: 2em ;
+  margin-right: 2em }
+
+pre.code .ln { color: grey; } /* line numbers */
+pre.code, code { background-color: #eeeeee }
+pre.code .comment, code .comment { color: #5C6576 }
+pre.code .keyword, code .keyword { color: #3B0D06; font-weight: bold }
+pre.code .literal.string, code .literal.string { color: #0C5404 }
+pre.code .name.builtin, code .name.builtin { color: #352B84 }
+pre.code .deleted, code .deleted { background-color: #DEB0A1}
+pre.code .inserted, code .inserted { background-color: #A3D289}
+
+span.classifier {
+  font-family: sans-serif ;
+  font-style: oblique }
+
+span.classifier-delimiter {
+  font-family: sans-serif ;
+  font-weight: bold }
+
+span.interpreted {
+  font-family: sans-serif }
+
+span.option {
+  white-space: nowrap }
+
+span.pre {
+  white-space: pre }
+
+span.problematic {
+  color: red }
+
+span.section-subtitle {
+  /* font-size relative to parent (h1..h6 element) */
+  font-size: 80% }
+
+table.citation {
+  border-left: solid 1px gray;
+  margin-left: 1px }
+
+table.docinfo {
+  margin: 2em 4em }
+
+table.docutils {
+  margin-top: 0.5em ;
+  margin-bottom: 0.5em }
+
+table.footnote {
+  border-left: solid 1px black;
+  margin-left: 1px }
+
+table.docutils td, table.docutils th,
+table.docinfo td, table.docinfo th {
+  padding-left: 0.5em ;
+  padding-right: 0.5em ;
+  vertical-align: top }
+
+table.docutils th.field-name, table.docinfo th.docinfo-name {
+  font-weight: bold ;
+  text-align: left ;
+  white-space: nowrap ;
+  padding-left: 0 }
+
+/* "booktabs" style (no vertical lines) */
+table.docutils.booktabs {
+  border: 0px;
+  border-top: 2px solid;
+  border-bottom: 2px solid;
+  border-collapse: collapse;
+}
+table.docutils.booktabs * {
+  border: 0px;
+}
+table.docutils.booktabs th {
+  border-bottom: thin solid;
+  text-align: left;
+}
+
+h1 tt.docutils, h2 tt.docutils, h3 tt.docutils,
+h4 tt.docutils, h5 tt.docutils, h6 tt.docutils {
+  font-size: 100% }
+
+ul.auto-toc {
+  list-style-type: none }
+
+</style>
+</head>
+<body>
+<div class="document" id="exchange-web-services-client-library">
+<h1 class="title">Exchange Web Services client library</h1>
+
+<p>This module provides an well-performing, well-behaving and simple interface for communicating with a Microsoft Exchange
+2007-2016 Server or Office365 using Exchange Web Services (EWS). It currently implements autodiscover, and functions for
+searching, creating, updating and deleting calendar, mailbox, task and contact items.</p>
+<a class="reference external image-reference" href="https://badge.fury.io/py/exchangelib"><object data="https://badge.fury.io/py/exchangelib.svg" type="image/svg+xml">https://badge.fury.io/py/exchangelib.svg</object></a>
+<a class="reference external image-reference" href="https://landscape.io/github/ecederstrand/exchangelib/master"><img alt="https://landscape.io/github/ecederstrand/exchangelib/master/landscape.png" src="https://landscape.io/github/ecederstrand/exchangelib/master/landscape.png" /></a>
+<a class="reference external image-reference" href="http://travis-ci.org/ecederstrand/exchangelib"><img alt="https://secure.travis-ci.org/ecederstrand/exchangelib.png" src="https://secure.travis-ci.org/ecederstrand/exchangelib.png" /></a>
+<a class="reference external image-reference" href="https://coveralls.io/github/ecederstrand/exchangelib?branch="><img alt="https://coveralls.io/repos/github/ecederstrand/exchangelib/badge.svg?branch=" src="https://coveralls.io/repos/github/ecederstrand/exchangelib/badge.svg?branch=" /></a>
+<div class="section" id="usage">
+<h1>Usage</h1>
+<p>Here is a simple example that inserts, retrieves and deletes calendar items in an Exchange calendar:</p>
+<pre class="code python literal-block">
+<span class="keyword namespace">from</span> <span class="name namespace">exchangelib</span> <span class="keyword namespace">import</span> <span class="name">DELEGATE</span><span class="punctuation">,</span> <span class="name">IMPERSONATION</span><span class="punctuation">,</span> <span class="name">IdOnly</span><span class="punctuation">,</span> <span class="name">Account</span><span class="punctuation">,</span> <span class="name">Credentials</span><span class="punctuation">,</span> \
+    <span class="name">EWSDateTime</span><span class="punctuation">,</span> <span class="name">EWSTimeZone</span><span class="punctuation">,</span> <span class="name">Configuration</span><span class="punctuation">,</span> <span class="name">NTLM</span><span class="punctuation">,</span> <span class="name">Restriction</span><span class="punctuation">,</span> <span class="name">Q</span>
+<span class="keyword namespace">from</span> <span class="name namespace">exchangelib.folders</span> <span class="keyword namespace">import</span> <span class="name">Calendar</span><span class="punctuation">,</span> <span class="name">CalendarItem</span>
+
+<span class="name">year</span><span class="punctuation">,</span> <span class="name">month</span><span class="punctuation">,</span> <span class="name">day</span> <span class="operator">=</span> <span class="literal number integer">2016</span><span class="punctuation">,</span> <span class="literal number integer">3</span><span class="punctuation">,</span> <span class="literal number integer">20</span>
+<span class="name">tz</span> <span class="operator">=</span> <span class="name">EWSTimeZone</span><span class="operator">.</span><span class="name">timezone</span><span class="punctuation">(</span><span class="literal string single">'Europe/Copenhagen'</span><span class="punctuation">)</span>
+
+<span class="comment single"># Build a list of calendar items</span>
+<span class="name">calendar_items</span> <span class="operator">=</span> <span class="punctuation">[]</span>
+<span class="keyword">for</span> <span class="name">hour</span> <span class="operator word">in</span> <span class="name builtin">range</span><span class="punctuation">(</span><span class="literal number integer">7</span><span class="punctuation">,</span> <span class="literal number integer">17</span><span class="punctuation">):</span>
+    <span class="name">calendar_items</span><span class="operator">.</span><span class="name">append</span><span class="punctuation">(</span><span class="name">CalendarItem</span><span class="punctuation">(</span>
+        <span class="name">start</span><span class="operator">=</span><span class="name">tz</span><span class="operator">.</span><span class="name">localize</span><span class="punctuation">(</span><span class="name">EWSDateTime</span><span class="punctuation">(</span><span class="name">year</span><span class="punctuation">,</span> <span class="name">month</span><span class="punctuation">,</span> <span class="name">day</span><span class="punctuation">,</span> <span class="name">hour</span><span class="punctuation">,</span> <span class="literal number integer">30</span><span class="punctuation">)),</span>
+        <span class="name">end</span><span class="operator">=</span><span class="name">tz</span><span class="operator">.</span><span class="name">localize</span><span class="punctuation">(</span><span class="name">EWSDateTime</span><span class="punctuation">(</span><span class="name">year</span><span class="punctuation">,</span> <span class="name">month</span><span class="punctuation">,</span> <span class="name">day</span><span class="punctuation">,</span> <span class="name">hour</span> <span class="operator">+</span> <span class="literal number integer">1</span><span class="punctuation">,</span> <span class="literal number integer">15</span><span class="punctuation">)),</span>
+        <span class="name">subject</span><span class="operator">=</span><span class="literal string single">'Test item'</span><span class="punctuation">,</span>
+        <span class="name">body</span><span class="operator">=</span><span class="literal string single">'Hello from Python'</span><span class="punctuation">,</span>
+        <span class="name">location</span><span class="operator">=</span><span class="literal string single">'devnull'</span><span class="punctuation">,</span>
+        <span class="name">categories</span><span class="operator">=</span><span class="punctuation">[</span><span class="literal string single">'foo'</span><span class="punctuation">,</span> <span class="literal string single">'bar'</span><span class="punctuation">],</span>
+    <span class="punctuation">))</span>
+
+<span class="comment single"># Username in WINDOMAIN\username format. Office365 wants usernames in PrimarySMTPAddress</span>
+<span class="comment single"># ('myusername&#64;example.com') format. UPN format is also supported.</span>
+<span class="name">credentials</span> <span class="operator">=</span> <span class="name">Credentials</span><span class="punctuation">(</span><span class="name">username</span><span class="operator">=</span><span class="literal string single">'MYWINDOMAIN</span><span class="literal string escape">\\</span><span class="literal string single">myusername'</span><span class="punctuation">,</span> <span class="name">password</span><span class="operator">=</span><span class="literal string single">'topsecret'</span><span class="punctuation">)</span>
+
+<span class="comment single"># If your credentials have been given impersonation access to the target account, use</span>
+<span class="comment single"># access_type=IMPERSONATION</span>
+<span class="name">account</span> <span class="operator">=</span> <span class="name">Account</span><span class="punctuation">(</span><span class="name">primary_smtp_address</span><span class="operator">=</span><span class="literal string single">'john&#64;example.com'</span><span class="punctuation">,</span> <span class="name">credentials</span><span class="operator">=</span><span class="name">credentials</span><span class="punctuation">,</span>
+                  <span class="name">autodiscover</span><span class="operator">=</span><span class="name builtin pseudo">True</span><span class="punctuation">,</span> <span class="name">access_type</span><span class="operator">=</span><span class="name">DELEGATE</span><span class="punctuation">)</span>
+
+<span class="comment single"># If the server doesn't support autodiscover, use a Configuration object to set the</span>
+<span class="comment single"># server location:</span>
+<span class="comment single"># config = Configuration(server='mail.example.com', username='MYWINDOMAIN\\myusername',</span>
+<span class="comment single">#                        password='topsecret', auth_type=NTLM)</span>
+<span class="comment single"># account = Account(primary_smtp_address='john&#64;example.com', config=config,</span>
+<span class="comment single">#                   access_type=DELEGATE)</span>
+
+
+<span class="comment single"># Create the calendar items in the user's standard calendar.  If you want to access a</span>
+<span class="comment single"># non-standard calendar, choose a different one from account.folders[Calendar]</span>
+<span class="name">res</span> <span class="operator">=</span> <span class="name">account</span><span class="operator">.</span><span class="name">calendar</span><span class="operator">.</span><span class="name">add_items</span><span class="punctuation">(</span><span class="name">calendar_items</span><span class="punctuation">)</span>
+<span class="keyword">print</span><span class="punctuation">(</span><span class="name">res</span><span class="punctuation">)</span>
+
+<span class="comment single"># Get Exchange ID and changekey of the calendar items we just created. We filter by</span>
+<span class="comment single"># categories so we only get the items created by us. The syntax for find_items() is</span>
+<span class="comment single"># modeled after Django QuerySet filters.</span>
+<span class="comment single">#</span>
+<span class="comment single"># If you need more complex filtering, find_items() also accepts a Python-like search expression:</span>
+<span class="comment single">#</span>
+<span class="comment single"># ids = account.calendar.find_items(</span>
+<span class="comment single">#       &quot;start &lt; '2016-01-02T03:04:05T' and end &gt; '2016-01-01T03:04:05T' and categories in ('foo', 'bar')&quot;,</span>
+<span class="comment single">#       shape=IdOnly</span>
+<span class="comment single"># )</span>
+<span class="comment single">#</span>
+<span class="comment single"># find_items() also support Q objects that are modeled after Django Q objects</span>
+<span class="comment single">#</span>
+<span class="comment single"># q = (Q(subject__iexact='foo') | Q(subject__contains='bar')) &amp; ~Q(subject__startswith='baz')</span>
+<span class="comment single"># ids = account.calendar.find_items(q, shape=IdOnly)</span>
+<span class="comment single">#</span>
+<span class="name">ids</span> <span class="operator">=</span> <span class="name">account</span><span class="operator">.</span><span class="name">calendar</span><span class="operator">.</span><span class="name">find_items</span><span class="punctuation">(</span>
+    <span class="name">start__lt</span><span class="operator">=</span><span class="name">tz</span><span class="operator">.</span><span class="name">localize</span><span class="punctuation">(</span><span class="name">EWSDateTime</span><span class="punctuation">(</span><span class="name">year</span><span class="punctuation">,</span> <span class="name">month</span><span class="punctuation">,</span> <span class="name">day</span> <span class="operator">+</span> <span class="literal number integer">1</span><span class="punctuation">)),</span>
+    <span class="name">end__gt</span><span class="operator">=</span><span class="name">tz</span><span class="operator">.</span><span class="name">localize</span><span class="punctuation">(</span><span class="name">EWSDateTime</span><span class="punctuation">(</span><span class="name">year</span><span class="punctuation">,</span> <span class="name">month</span><span class="punctuation">,</span> <span class="name">day</span><span class="punctuation">)),</span>
+    <span class="name">categories__contains</span><span class="operator">=</span><span class="punctuation">[</span><span class="literal string single">'foo'</span><span class="punctuation">,</span> <span class="literal string single">'bar'</span><span class="punctuation">],</span>
+    <span class="name">shape</span><span class="operator">=</span><span class="name">IdOnly</span><span class="punctuation">,</span>
+<span class="punctuation">)</span>
+<span class="keyword">print</span><span class="punctuation">(</span><span class="name">ids</span><span class="punctuation">)</span>
+
+<span class="comment single"># Get the rest of the attributes on the calendar items we just created</span>
+<span class="name">items</span> <span class="operator">=</span> <span class="name">account</span><span class="operator">.</span><span class="name">calendar</span><span class="operator">.</span><span class="name">get_items</span><span class="punctuation">(</span><span class="name">ids</span><span class="punctuation">)</span>
+<span class="keyword">print</span><span class="punctuation">(</span><span class="name">items</span><span class="punctuation">)</span>
+
+<span class="comment single"># Delete the calendar items again</span>
+<span class="name">res</span> <span class="operator">=</span> <span class="name">account</span><span class="operator">.</span><span class="name">calendar</span><span class="operator">.</span><span class="name">delete_items</span><span class="punctuation">(</span><span class="name">ids</span><span class="punctuation">)</span>
+<span class="keyword">print</span><span class="punctuation">(</span><span class="name">res</span><span class="punctuation">)</span>
+</pre>
+</div>
+</div>
+</body>
+</html>

@@ -81,8 +81,12 @@ class Account:
             log.debug('Searching default %s folder in full folder list', fld_class.__name__)
             flds = []
             for folder in self.folders[fld_class]:
+                # Apparently default folder names can be renamed to a set of localized names using a PowerShell command:
+                # https://technet.microsoft.com/da-dk/library/dd351103(v=exchg.160).aspx
+                #
                 # Search for a folder wth a localized name. This is a hack because I can't find a way to get the
-                # default Calendar, Inbox, etc. folders without looking at the folder name which could be localized.
+                # default Calendar, Inbox, etc. folders without looking at the folder name, which could be localized.
+                #
                 # TODO: fld_class.LOCALIZED_NAMES is most definitely neither complete nor authoritative
                 if folder.name.title() in fld_class.LOCALIZED_NAMES.get(self.locale, []):
                     flds.append(folder)

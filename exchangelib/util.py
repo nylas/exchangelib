@@ -223,6 +223,21 @@ def get_redirect_url(response, allow_relative=True, require_relative=False):
 
 
 def post_ratelimited(protocol, session, url, headers, data, timeout=None, verify=True, allow_redirects=False):
+    """
+    Wrap POST requests in a try-catch loop with a lot of error handling logic and some basic rate-limiting. If a request
+    fails, and some conditions are met, the loop waits in increasing intervals, up to 1 hour, before trying again. The
+    reason for this is that servers often malfunction for short periods of time, either because of ongoing data
+    migrations or other maintenance tasks, misconfigurations or heavy load, or because the connecting user has hit a
+    throttling policy limit.
+
+    If the loop exited early, consumers of exchangelib that don't implement their own rate-limiting code could quickly
+    swamp such a server with new requests. That would only make things worse. Instead, it's better if the request loop
+    waits patiently until the server is functioning again.
+
+    If the connecting user has hit a throttling policy, then the server will start to malfunction in many interesting
+    ways, but never actually tell the user what is happening. There is no way to distinguish this situation from other
+    malfunctions. The only cure is to stop making requests.
+    """
     from socket import timeout as SocketTimeout
     import requests.exceptions
     # The contract on sessions here is to return the session that ends up being used, or retiring the session if we

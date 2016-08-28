@@ -155,8 +155,14 @@ class Q:
             #     FullString, Prefixed, Substring, PrefixOnWords, ExactPhrase
             # Django lookups have no equivalent of PrefixOnWords and ExactPhrase (and I'm unsure how they actually
             # work).
-            # TODO EWS has no equivalent of '__endswith' or '__iendswith' so that would need to be emulated using
-            # Substring and post-processing in Python.
+            #
+            # EWS has no equivalent of '__endswith' or '__iendswith'. That could be emulated using '__contains' and
+            # '__icontains' and filtering results afterwards in Python. But it could be inefficient because we might be
+            # fetching and discarding a lot of non-matching items, plus we would need to always fetch the field we're
+            # matching on, to be able to do the filtering. I think it's better to leave this to the consumer, i.e.:
+            #
+            # items = [i for i in fld.find_items(subject__contains=suffix) if i.subject.endswith(suffix)]
+            # items = [i for i in fld.find_items(subject__icontains=suffix) if i.subject.lower().endswith(suffix.lower())]
             #
             # Possible ContainmentComparison values (there are more, but the rest are "To be removed"):
             #     Exact, IgnoreCase, IgnoreNonSpacingCharacters, IgnoreCaseAndNonSpacingCharacters
