@@ -1,8 +1,8 @@
 Exchange Web Services client library
 ====================================
-This module provides an well-performing, well-behaving and simple interface for communicating with a Microsoft Exchange
-2007-2016 Server or Office365 using Exchange Web Services (EWS). It currently implements autodiscover, and functions for
-searching, creating, updating and deleting calendar, mailbox, task and contact items.
+This module provides an well-performing, well-behaving, platform-independent and simple interface for communicating with
+a Microsoft Exchange 2007-2016 Server or Office365 using Exchange Web Services (EWS). It currently implements
+autodiscover, and functions for searching, creating, updating and deleting calendar, mailbox, task and contact items.
 
 
 .. image:: https://badge.fury.io/py/exchangelib.svg
@@ -90,9 +90,10 @@ Here is a simple example that inserts, retrieves and deletes calendar items in a
     )
     print(ids)
 
-    # Get the rest of the attributes on the calendar items we just created
+    # Get the rest of the attributes on the calendar items we just created. Most attributes from EWS are supported.
     items = account.calendar.get_items(ids)
-    print(items)
+    for item in items:
+        print(item.start, item.end, item.subject, items.body, item.location)
 
     # Delete the calendar items again
     res = account.calendar.delete_items(ids)

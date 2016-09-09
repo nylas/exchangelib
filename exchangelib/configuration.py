@@ -18,11 +18,11 @@ class Configuration:
 
     You can also set the EWS service endpoint directly:
 
-        config = Configuration(service_endpoint='https://mail.example.com/EWS/Exchange.smx', username=...)
+        config = Configuration(service_endpoint='https://mail.example.com/EWS/Exchange.asmx', username=...)
 
     If you know which authentication type the server uses, you add that as a hint:
 
-        config = Configuration(service_endpoint='https://mail.example.com/EWS/Exchange.smx', auth_type=NTLM,  username=...)
+        config = Configuration(service_endpoint='https://mail.example.com/EWS/Exchange.asmx', auth_type=NTLM,  username=...)
 
     If you want to use autodiscover, don't use a Configuration object. Instead, set up an account like this:
 
