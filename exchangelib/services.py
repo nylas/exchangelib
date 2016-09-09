@@ -369,7 +369,8 @@ class GetItem(EWSPooledService):
 
     def call(self, folder, **kwargs):
         self.element_name = folder.item_model.response_tag()
-        return self._pool_requests(account=folder.account, payload_func=folder.get_xml, items=kwargs['ids'])
+        return self._pool_requests(account=folder.account, payload_func=folder.get_xml, items=kwargs['ids'],
+                                   with_extra=kwargs['with_extra'])
 
 
 class CreateItem(EWSPooledService):

@@ -2,6 +2,12 @@
 Change Log
 ==========
 
+1.6.2
+-----
+* Use of `my_folder.with_extra_fields = True` to get the extra fields in `Item.EXTRA_ITEM_FIELDS` is deprecated (it was
+  a kludge anyway). Instead, use `my_folder.get_items(ids, with_extra=[True, False])`. The default was also changed to
+  True, to avoid head-scratching with newcomers.
+
 1.6.1
 -----
 * Simplify ``Q`` objects and ``Restriction.from_source()`` by using Item attribute names in expressions and kwargs

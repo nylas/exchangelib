@@ -666,7 +666,6 @@ class Folder:
             assert self.folder_id
         if self.folder_id:
             assert self.changekey
-        self.with_extra_fields = False
         log.debug('%s created for %s', self.__class__.__name__, account)
 
     @property
@@ -683,8 +682,11 @@ class Folder:
 
     def find_items(self, *args, **kwargs):
         """
-        Finds items in the folder. 'shape' controls the exact fields returned are governed by . 'depth' controls the
-        search depth.
+        Finds items in the folder.
+
+        'shape' controls the exact fields returned are governed by. Be aware that the 'body' element can only be fetched
+        with get_items().
+        'depth' controls the search depth into sub-folders.
 
         Non-keyword args may be a search expression as supported by Restriction.from_source(), or a list of Q instances.
 
@@ -829,16 +831,21 @@ class Folder:
             return []
         return list(map(self.item_model.id_from_xml, UpdateItem(self.account.protocol).call(folder=self, items=items)))
 
-    def get_items(self, ids):
-        # get_xml() uses self.with_extra_fields. Pass this to from_xml()
+    def get_items(self, ids, with_extra=True):
+        # 'with_extra' determines whether to get the extra fields defined in Item.EXTRA_ITEM_FIELDS. This is still a
+        # kludge - instead, the user should be able to specify the exact fields to get or ignore. See also find_items()
+        if hasattr(self, 'with_extra_fields'):
+            raise DeprecationWarning(
+                "'%(cls)s.with_extra_fields' is deprecated. Use '%(cls)s.get_items(ids, with_extra=True)' instead"
+                % dict(cls=self.__class__.__name__))
         is_empty, ids = peek(ids)
         if is_empty:
             # We accept generators, so it's not always convenient for caller to know up-front if 'items' is empty. Allow
             # empty 'items' and return early.
             return []
         return list(map(
-            lambda i: self.item_model.from_xml(i, self.with_extra_fields),
-            GetItem(self.account.protocol).call(folder=self, ids=ids)
+            lambda i: self.item_model.from_xml(i, with_extra=with_extra),
+            GetItem(self.account.protocol).call(folder=self, ids=ids, with_extra=with_extra)
         ))
 
     def test_access(self):
@@ -861,8 +868,8 @@ class Folder:
                 set_xml_value(distinguishedfolderid, mailbox, self.account.version)
             return distinguishedfolderid
 
-    def get_xml(self, ids):
-        # This list should be configurable. 'body' element can only be fetched with GetItem.
+    def get_xml(self, ids, with_extra):
+        # The 'additional_properties' list should be configurable. 'body' element can only be fetched with GetItem.
         # CalendarItem.from_xml() specifies the items we currently expect. For full list, see
         # https://msdn.microsoft.com/en-us/library/office/aa494315(v=exchg.150).aspx
         log.debug(
@@ -873,7 +880,7 @@ class Folder:
         getitem = create_element('m:%s' % GetItem.SERVICE_NAME)
         itemshape = create_element('m:ItemShape')
         add_xml_child(itemshape, 't:BaseShape', IdOnly)
-        additional_properties = self.item_model.additional_property_elems(with_extra=self.with_extra_fields)
+        additional_properties = self.item_model.additional_property_elems(with_extra=with_extra)
         if additional_properties:
             add_xml_child(itemshape, 't:AdditionalProperties', additional_properties)
         getitem.append(itemshape)

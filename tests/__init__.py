@@ -846,13 +846,21 @@ class BaseItemTest(EWSTest):
         item = self.get_test_item()
         self.test_folder.add_items(items=[item, item])
         ids = self.test_folder.find_items(categories__contains=self.categories)
-        self.test_folder.with_extra_fields = True
-        items = self.test_folder.get_items(ids=ids)
-        self.test_folder.with_extra_fields = False
+        items = self.test_folder.get_items(ids=ids, with_extra=True)
         for item in items:
             assert isinstance(item, self.ITEM_CLASS)
             for f in self.ITEM_CLASS.fieldnames(with_extra=True):
                 self.assertTrue(hasattr(item, f))
+            for f in self.ITEM_CLASS.EXTRA_ITEM_FIELDS.keys():
+                self.assertTrue(getattr(item, f) is not None, (f, getattr(item, f)))
+        self.assertEqual(len(items), 2)
+        items = self.test_folder.get_items(ids=ids, with_extra=False)
+        for item in items:
+            assert isinstance(item, self.ITEM_CLASS)
+            for f in self.ITEM_CLASS.fieldnames(with_extra=False):
+                self.assertTrue(hasattr(item, f))
+            for f in self.ITEM_CLASS.EXTRA_ITEM_FIELDS.keys():
+                self.assertTrue(getattr(item, f) is None, (f, getattr(item, f)))
         self.assertEqual(len(items), 2)
         self.test_folder.delete_items(items, all_occurrences=True)
 
