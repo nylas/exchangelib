@@ -36,11 +36,13 @@ IdOnly = 'IdOnly'
 # This doesn't actually get all properties in FindItem, just the "first-class" ones. See
 #    http://msdn.microsoft.com/en-us/library/office/dn600367(v=exchg.150).aspx
 AllProperties = 'AllProperties'
+SHAPE_CHOICES = (IdOnly, AllProperties)
 
 # Traversal enums
 SHALLOW = 'Shallow'
 DEEP = 'Deep'
 SOFTDELETED = 'SoftDeleted'
+TRAVERSAL_CHOICES = (SHALLOW, DEEP, SOFTDELETED)
 
 
 class EWSService:
@@ -280,6 +282,9 @@ class PagingEWSService(EWSService):
 
 
 class GetServerTimeZones(EWSService):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/dd899371(v=exchg.150).aspx
+    """
     SERVICE_NAME = 'GetServerTimeZones'
     element_container_name = '{%s}TimeZoneDefinitions' % MNS
 
@@ -307,6 +312,9 @@ class GetServerTimeZones(EWSService):
 
 
 class GetRoomLists(EWSService):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/dd899486(v=exchg.150).aspx
+    """
     SERVICE_NAME = 'GetRoomLists'
     element_container_name = '{%s}RoomLists' % MNS
 
@@ -327,6 +335,9 @@ class GetRoomLists(EWSService):
 
 
 class GetRooms(EWSService):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/dd899454(v=exchg.150).aspx
+    """
     SERVICE_NAME = 'GetRooms'
     element_container_name = '{%s}Rooms' % MNS
 
@@ -362,6 +373,8 @@ class EWSPooledService(EWSService):
 class GetItem(EWSPooledService):
     """
     Take a list of (id, changekey) tuples and returns a list of items in stable order
+
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa563775(v=exchg.150).aspx
     """
     CHUNKSIZE = 100
     SERVICE_NAME = 'GetItem'
@@ -378,6 +391,7 @@ class CreateItem(EWSPooledService):
     Takes folder and a list of items. Returns result of creation as a list of tuples (success[True|False],
     errormessage), in the same order as the input list.
 
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa565209(v=exchg.150).aspx
     """
     CHUNKSIZE = 25
     SERVICE_NAME = 'CreateItem'
@@ -393,6 +407,8 @@ class DeleteItem(EWSPooledService):
     Takes a folder and a list of (id, changekey) tuples. Returns result of deletion as a list of tuples
     (success[True|False], errormessage), in the same order as the input list.
 
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa562961(v=exchg.150).aspx
+
     """
     CHUNKSIZE = 25
     SERVICE_NAME = 'DeleteItem'
@@ -404,6 +420,9 @@ class DeleteItem(EWSPooledService):
 
 
 class UpdateItem(EWSPooledService):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa580254(v=exchg.150).aspx
+    """
     CHUNKSIZE = 25
     SERVICE_NAME = 'UpdateItem'
     element_container_name = '{%s}Items' % MNS
@@ -417,6 +436,8 @@ class FindItem(PagingEWSService, EWSFolderService):
     """
     Gets all items for 'account' in folder 'folder_id', optionally expanded with 'additional_fields' Element,
     optionally restricted by a Restriction definition.
+
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa566370(v=exchg.150).aspx
     """
     SERVICE_NAME = 'FindItem'
     element_container_name = '{%s}Items' % TNS
@@ -426,7 +447,7 @@ class FindItem(PagingEWSService, EWSFolderService):
         return self._paged_call(folder=folder, **kwargs)
 
     def _get_payload(self, folder, additional_fields=None, restriction=None, shape=IdOnly, depth=SHALLOW, offset=0):
-        finditem = create_element('m:%s' % self.SERVICE_NAME, Traversal=SHALLOW)
+        finditem = create_element('m:%s' % self.SERVICE_NAME, Traversal=depth)
         itemshape = create_element('m:ItemShape')
         add_xml_child(itemshape, 't:BaseShape', shape)
         if additional_fields:
@@ -448,6 +469,8 @@ class FindItem(PagingEWSService, EWSFolderService):
 class FindFolder(PagingEWSService, EWSFolderService):
     """
     Gets a list of folders belonging to an account.
+
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa564962(v=exchg.150).aspx
     """
     SERVICE_NAME = 'FindFolder'
     element_container_name = '{%s}Folders' % TNS
@@ -488,6 +511,9 @@ class FindFolder(PagingEWSService, EWSFolderService):
 
 
 class GetFolder(EWSFolderService):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa580263(v=exchg.150).aspx
+    """
     SERVICE_NAME = 'GetFolder'
     element_container_name = '{%s}Folders' % MNS
     # See http://msdn.microsoft.com/en-us/library/aa564009(v=exchg.150).aspx
@@ -522,6 +548,9 @@ class GetFolder(EWSFolderService):
 
 
 class ResolveNames(EWSAccountService):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa565329(v=exchg.150).aspx
+    """
     SERVICE_NAME = 'ResolveNames'
     element_container_name = '{%s}ResolutionSet' % MNS
 

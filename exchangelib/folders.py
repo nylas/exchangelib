@@ -13,7 +13,7 @@ from .credentials import DELEGATE
 from .ewsdatetime import EWSDateTime, UTC_NOW
 from .restriction import Restriction, Q
 from .services import TNS, FindItem, IdOnly, SHALLOW, DEEP, DeleteItem, CreateItem, UpdateItem, FindFolder, GetFolder, \
-    GetItem, MNS
+    GetItem, MNS, TRAVERSAL_CHOICES, SHAPE_CHOICES
 from .util import create_element, add_xml_child, get_xml_attrs, get_xml_attr, set_xml_value, ElementType, peek
 from .version import EXCHANGE_2010, EXCHANGE_2013
 
@@ -714,6 +714,8 @@ class Folder:
 
         shape = IdOnly if 'shape' not in kwargs else kwargs.pop('shape')
         depth = SHALLOW if 'depth' not in kwargs else kwargs.pop('depth')
+        assert shape in SHAPE_CHOICES
+        assert depth in TRAVERSAL_CHOICES
 
         # Define the extra properties we want on the return objects. 'body' field can only be fetched with GetItem.
         additional_fields = None
@@ -869,6 +871,8 @@ class Folder:
             return distinguishedfolderid
 
     def get_xml(self, ids, with_extra):
+        # Takes a list of (item_id, changekey) tuples or Item objects and returns the XML for a GetItem request.
+        #
         # The 'additional_properties' list should be configurable. 'body' element can only be fetched with GetItem.
         # CalendarItem.from_xml() specifies the items we currently expect. For full list, see
         # https://msdn.microsoft.com/en-us/library/office/aa494315(v=exchg.150).aspx
@@ -896,11 +900,17 @@ class Folder:
         return getitem
 
     def create_xml(self, items):
-        # Takes an account name, a folder name, a list of Calendar.Item obejcts and a function to convert items to XML
-        # Elements
+        # Takes a list of Item obejcts (CalendarItem, Message etc) and returns the XML for a CreateItem request.
+        # convert items to XML Elements
         if isinstance(self, Calendar):
+            # SendMeetingInvitations is required for calendar items. It is also applicable to tasks, meeting request responses
+            # (see https://msdn.microsoft.com/en-us/library/office/aa566464(v=exchg.150).aspx) and sharing invitation
+            # accepts (see https://msdn.microsoft.com/en-us/library/office/ee693280(v=exchg.150).aspx). The last two are not supported yet.
+            # Possible SendMeetingInvitations values: ('SendToNone', 'SendOnlyToAll', 'SendToAllAndSaveCopy')
             createitem = create_element('m:%s' % CreateItem.SERVICE_NAME, SendMeetingInvitations='SendToNone')
         elif isinstance(self, Messages):
+            # MessageDisposition is only applicable to email messages, where it is required..
+            # Possible MessageDisposition values: ('SaveOnly', 'SendOnly', 'SendAndSaveCopy')
             createitem = create_element('m:%s' % CreateItem.SERVICE_NAME, MessageDisposition='SaveOnly')
         else:
             createitem = create_element('m:%s' % CreateItem.SERVICE_NAME)
@@ -912,7 +922,7 @@ class Folder:
         return createitem
 
     def delete_xml(self, ids, all_occurrences=True):
-        # Prepare reuseable Element objects.
+        # Takes a list of (item_id, changekey) tuples or Item objects and returns the XML for a DeleteItem request.
         if isinstance(self, Calendar):
             deleteitem = create_element(
                 'm:%s' % DeleteItem.SERVICE_NAME, DeleteType='HardDelete', SendMeetingCancellations='SendToNone')
@@ -937,7 +947,8 @@ class Folder:
         return deleteitem
 
     def update_xml(self, items):
-        # Prepare reuseable Element objects
+        # Takes a dict with an (item_id, changekey) tuple or Item object as the key, and a dict of
+        # field_name -> new_value as values. Returns the XML for a DeleteItem request.
         if isinstance(self, Calendar):
             updateitem = create_element('m:%s' % UpdateItem.SERVICE_NAME, ConflictResolution='AutoResolve',
                                         SendMeetingInvitationsOrCancellations='SendToNone')
@@ -1046,6 +1057,8 @@ class Folder:
                          changekey=changekey)
 
     def get_folders(self, shape=IdOnly, depth=DEEP):
+        assert shape in SHAPE_CHOICES
+        assert depth in TRAVERSAL_CHOICES
         folders = []
         for elem in FindFolder(self.account.protocol).call(
                 folder=self,
@@ -1057,6 +1070,7 @@ class Folder:
         return folders
 
     def get_folder(self, shape=IdOnly):
+        assert shape in SHAPE_CHOICES
         folders = []
         for elem in GetFolder(self.account.protocol).call(
                 folder=self,
