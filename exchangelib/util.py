@@ -224,6 +224,10 @@ def get_redirect_url(response, allow_relative=True, require_relative=False):
 
 def post_ratelimited(protocol, session, url, headers, data, timeout=None, verify=True, allow_redirects=False):
     """
+    There are two error-handling policies implemented here: a fail-fast policy intended for stnad-alone scripts which
+    fails on all responses except HTTP 200. The other policy is intended for long-running tasks that need to respect
+    rate-limiting errors from the server and paper over outages of up to 1 hour.
+
     Wrap POST requests in a try-catch loop with a lot of error handling logic and some basic rate-limiting. If a request
     fails, and some conditions are met, the loop waits in increasing intervals, up to 1 hour, before trying again. The
     reason for this is that servers often malfunction for short periods of time, either because of ongoing data
@@ -300,6 +304,8 @@ Response headers: %(response_headers)s'''
                 # This can be 302 redirect to error page, 401 authentication error or 503 service unavailable
                 if r.status_code not in (302, 401, 503):
                     # Only retry if we didn't get a useful response
+                    break
+                if not protocol.credentials.is_service_account:
                     break
                 log_vals['i'] += 1
                 log_vals['wait'] = wait  # We set it to 0 initially

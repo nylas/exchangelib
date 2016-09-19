@@ -22,7 +22,7 @@ class Credentials:
     DOMAIN = 'domain'
     UPN = 'upn'
 
-    def __init__(self, username, password):
+    def __init__(self, username, password, is_service_account=False):
         if username.count('@') == 1:
             self.type = self.EMAIL
         elif username.count('\\') == 1:
@@ -31,6 +31,10 @@ class Credentials:
             self.type = self.UPN
         self.username = username
         self.password = password
+
+        # Used to choose the error handling policy. When True, a fault-tolerant policy is used. False, a fail-fast
+        # policy is used.
+        self.is_service_account = is_service_account
 
     def __hash__(self):
         return hash((self.username, self.password))

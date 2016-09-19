@@ -2,6 +2,12 @@
 Change Log
 ==========
 
+HEAD
+----
+* Add the ``is_service_account`` flag to ``Credentials`` to choose between either a fail-fast or fault-tolerant error
+handling policy.
+
+
 1.6.2
 -----
 * Use of ``my_folder.with_extra_fields = True`` to get the extra fields in ``Item.EXTRA_ITEM_FIELDS`` is deprecated (it was

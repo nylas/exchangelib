@@ -31,8 +31,8 @@ class Configuration:
 
     """
     def __init__(self, username, password, server=None, has_ssl=True, service_endpoint=None, auth_type=None,
-                 verify_ssl=True):
-        credentials = Credentials(username, password)
+                 verify_ssl=True, is_service_account=False):
+        credentials = Credentials(username, password, is_service_account=is_service_account)
         if auth_type is not None and auth_type not in AUTH_TYPE_MAP:
             raise AttributeError('Unsupported auth type %s' % auth_type)
         if not (server or service_endpoint):

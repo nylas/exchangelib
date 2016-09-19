@@ -517,6 +517,14 @@ class BaseItemTest(EWSTest):
         self.assertEqual(self.test_folder.update_items(items=[]), [])
         self.assertEqual(self.test_folder.delete_items(ids=[]), [])
 
+    def test_error_policy(self):
+        # Test the is_service_account flag. This is difficult to test thoroughly
+        self.account.protocol.credentials.is_service_account = True
+        item = self.get_test_item()
+        item.subject = get_random_string(16)
+        self.test_folder.find_items()
+        self.account.protocol.credentials.is_service_account = False
+
     def test_finditems(self):
         now = UTC_NOW()
 
