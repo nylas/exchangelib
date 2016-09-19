@@ -786,7 +786,7 @@ class Folder:
             shape,
             depth,
             additional_fields,
-            restriction.q,
+            restriction.q if restriction else None,
         )
         xml_func = self.item_model.id_from_xml if shape == IdOnly else self.item_model.from_xml
         items = FindItem(self.account.protocol).call(folder=self, additional_fields=additional_fields,

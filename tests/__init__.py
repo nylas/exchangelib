@@ -524,6 +524,11 @@ class BaseItemTest(EWSTest):
         item = self.get_test_item()
         item.subject = get_random_string(16)
         ids = self.test_folder.add_items(items=[item])
+        # No arguments. There may be leftover items in the folder, so just make sure there's at least one.
+        self.assertGreaterEqual(
+            len(self.test_folder.find_items()),
+            1
+        )
         # Search expr
         self.assertEqual(
             len(self.test_folder.find_items("subject == '%s'" % item.subject)),
