@@ -5,10 +5,7 @@ import os
 
 from yaml import load
 
-from exchangelib import DELEGATE, services
-from exchangelib.configuration import Configuration
-from exchangelib.account import Account
-from exchangelib.ewsdatetime import EWSDateTime, EWSTimeZone
+from exchangelib import DELEGATE, services, Credentials, Configuration, Account, EWSDateTime, EWSTimeZone
 from exchangelib.folders import CalendarItem
 
 logging.basicConfig(level=logging.WARNING)
@@ -25,8 +22,9 @@ tz = EWSTimeZone.timezone('US/Pacific')
 
 t0 = datetime.now()
 
-config = Configuration(server=settings['server'], username=settings['username'], password=settings['password'],
-                       verify_ssl=False)
+config = Configuration(server=settings['server'],
+                       credentials=Credentials(settings['username'], settings['password'], is_service_account=True),
+                       verify_ssl=settings['verify_ssl'])
 print(('Exchange server: %s' % config.protocol.server))
 
 account = Account(config=config, primary_smtp_address=settings['account'], access_type=DELEGATE)

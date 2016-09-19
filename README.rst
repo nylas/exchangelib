@@ -46,6 +46,9 @@ Here is a simple example that inserts, retrieves and deletes calendar items in a
 
     # Username in WINDOMAIN\username format. Office365 wants usernames in PrimarySMTPAddress
     # ('myusername@example.com') format. UPN format is also supported.
+    #
+    # By default, fault-tolerant error handling is used. This means that calls may block for a long time if the server
+    # is unavailable. If you need immediate failures, add 'is_service_account=False' to Credentials.
     credentials = Credentials(username='MYWINDOMAIN\\myusername', password='topsecret')
 
     # If your credentials have been given impersonation access to the target account, use
@@ -55,8 +58,9 @@ Here is a simple example that inserts, retrieves and deletes calendar items in a
 
     # If the server doesn't support autodiscover, use a Configuration object to set the
     # server location:
-    # config = Configuration(server='mail.example.com', username='MYWINDOMAIN\\myusername',
-    #                        password='topsecret', auth_type=NTLM)
+    # config = Configuration(server='mail.example.com',
+    #                        credentials=Credentials(username='MYWINDOMAIN\\myusername', password='topsecret'),
+    #                        auth_type=NTLM)
     # account = Account(primary_smtp_address='john@example.com', config=config,
     #                   access_type=DELEGATE)
 

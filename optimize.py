@@ -8,10 +8,7 @@ from datetime import datetime
 
 from yaml import load
 
-from exchangelib import DELEGATE, services
-from exchangelib.configuration import Configuration
-from exchangelib.account import Account
-from exchangelib.ewsdatetime import EWSDateTime, EWSTimeZone
+from exchangelib import DELEGATE, services, Credentials, Configuration, Account, EWSDateTime, EWSTimeZone
 from exchangelib.folders import CalendarItem
 
 logging.basicConfig(level=logging.WARNING)
@@ -26,7 +23,8 @@ except FileNotFoundError:
 categories = ['perftest']
 tz = EWSTimeZone.timezone('US/Pacific')
 
-config = Configuration(server=settings['server'], username=settings['username'], password=settings['password'],
+config = Configuration(server=settings['server'],
+                       credentials=Credentials(settings['username'], settings['password'], is_service_account=True),
                        verify_ssl=settings['verify_ssl'])
 print(('Exchange server: %s' % config.protocol.server))
 

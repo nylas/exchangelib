@@ -22,7 +22,7 @@ class Credentials:
     DOMAIN = 'domain'
     UPN = 'upn'
 
-    def __init__(self, username, password, is_service_account=False):
+    def __init__(self, username, password, is_service_account=True):
         if username.count('@') == 1:
             self.type = self.EMAIL
         elif username.count('\\') == 1:

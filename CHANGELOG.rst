@@ -4,9 +4,9 @@ Change Log
 
 HEAD
 ----
-* Add the ``is_service_account`` flag to ``Credentials`` to choose between either a fail-fast or fault-tolerant error
-handling policy.
-
+* Add the ``is_service_account`` flag to ``Credentials``. ``is_service_account=False`` disables the fault-tolerant error
+handling policy and enables immediate failures.
+* ``Configuration`` now takes
 
 1.6.2
 -----

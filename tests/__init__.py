@@ -291,8 +291,9 @@ class EWSTest(unittest.TestCase):
             raise unittest.SkipTest('Skipping %s - no settings.yml file found' % self.__class__.__name__)
         self.tz = EWSTimeZone.timezone('Europe/Copenhagen')
         self.categories = ['Test']
-        self.config = Configuration(server=settings['server'], username=settings['username'],
-                                    password=settings['password'], verify_ssl=settings['verify_ssl'])
+        self.config = Configuration(server=settings['server'],
+                                    credentials=Credentials(settings['username'], settings['password']),
+                                    verify_ssl=settings['verify_ssl'])
         self.account = Account(primary_smtp_address=settings['account'], access_type=DELEGATE, config=self.config)
         self.maxDiff = None
 
@@ -436,9 +437,11 @@ class CommonTest(EWSTest):
 
     def test_configuration(self):
         with self.assertRaises(AttributeError):
-            Configuration(username='foo', password='bar')
+            Configuration(credentials=Credentials(username='foo', password='bar'))
         with self.assertRaises(AttributeError):
-            Configuration(username='foo', password='bar', service_endpoint='http://example.com/svc', auth_type='XXX')
+            Configuration(credentials=Credentials(username='foo', password='bar'),
+                          service_endpoint='http://example.com/svc',
+                          auth_type='XXX')
 
     def test_autodiscover(self):
         primary_smtp_address, protocol = discover(email=self.account.primary_smtp_address,
@@ -519,11 +522,11 @@ class BaseItemTest(EWSTest):
 
     def test_error_policy(self):
         # Test the is_service_account flag. This is difficult to test thoroughly
-        self.account.protocol.credentials.is_service_account = True
+        self.account.protocol.credentials.is_service_account = False
         item = self.get_test_item()
         item.subject = get_random_string(16)
         self.test_folder.find_items()
-        self.account.protocol.credentials.is_service_account = False
+        self.account.protocol.credentials.is_service_account = True
 
     def test_finditems(self):
         now = UTC_NOW()
