@@ -19,6 +19,35 @@ from .version import EXCHANGE_2010, EXCHANGE_2013
 
 log = getLogger(__name__)
 
+# MessageDisposition values
+SAVE_ONLY = 'SaveOnly'
+SEND_ONLY = 'SendOnly'
+SEND_AND_SAVE_COPY = 'SendAndSaveCopy'
+MESSAGE_DISPOSITION_CHOICES = (SAVE_ONLY, SEND_ONLY, SEND_AND_SAVE_COPY)
+
+# SendMeetingInvitations values
+SEND_TO_NONE = 'SendToNone'
+SEND_ONLY_TO_ALL = 'SendOnlyToAll'
+SEND_TO_ALL_AND_SAVE_COPY = 'SendToAllAndSaveCopy'
+SEND_MEETING_INVITATIONS_CHOICES = (SEND_TO_NONE, SEND_ONLY_TO_ALL, SEND_TO_ALL_AND_SAVE_COPY)
+
+# AffectedTaskOccurrences values
+ALL_OCCURRENCIES = 'AllOccurrences'
+SPECIFIED_OCCURRENCE_ONLY = 'SpecifiedOccurrenceOnly'
+AFFECTED_TASK_OCCURRENCES_CHOICES = (ALL_OCCURRENCIES, SPECIFIED_OCCURRENCE_ONLY)
+
+# ConflictResolution values
+NEVER_OVERWRITE = 'NeverOverwrite'
+AUTO_RESOLVE = 'AutoResolve'
+ALWAYS_OVERWRITE = 'AlwaysOverwrite'
+CONFLICT_RESOLUTION_CHOICES = (NEVER_OVERWRITE, AUTO_RESOLVE, ALWAYS_OVERWRITE)
+
+# DeleteType values
+HARD_DELETE = 'HardDelete'
+SOFT_DELETE = 'SoftDelete'
+MOVE_TO_DELETED_ITEMS = 'MoveToDeletedItems'
+DELETE_TYPE_CHOICES = (HARD_DELETE, SOFT_DELETE, MOVE_TO_DELETED_ITEMS)
+
 
 class Choice(str):
     # A helper class used for string enums
@@ -795,31 +824,42 @@ class Folder:
         log.debug('Found %s items', len(items))
         return list(map(xml_func, items))
 
-    def add_items(self, items):
+    def add_items(self, items, message_disposition=SAVE_ONLY, send_meeting_invitations=SEND_TO_NONE):
         """
         Creates new items in the folder. 'items' is an iterable of Item objects. Returns a list of (id, changekey)
         tuples in the same order as the input.
         """
+        assert message_disposition in MESSAGE_DISPOSITION_CHOICES, message_disposition
+        assert send_meeting_invitations in SEND_MEETING_INVITATIONS_CHOICES, send_meeting_invitations
         is_empty, items = peek(items)
         if is_empty:
             # We accept generators, so it's not always convenient for caller to know up-front if 'items' is empty. Allow
             # empty 'items' and return early.
             return []
-        return list(map(self.item_model.id_from_xml, CreateItem(self.account.protocol).call(folder=self, items=items)))
+        return list(map(self.item_model.id_from_xml, CreateItem(self.account.protocol).call(
+            folder=self, items=items, message_disposition=message_disposition,
+            send_meeting_invitations=send_meeting_invitations)))
 
-    def delete_items(self, ids, all_occurrences=False):
+    def delete_items(self, ids, delete_type=HARD_DELETE, send_meeting_invitations=SEND_TO_NONE,
+                     affected_task_occurrences=SPECIFIED_OCCURRENCE_ONLY):
         """
         Deletes items in the folder. 'ids' is an iterable of either (item_id, changekey) tuples or Item objects.
-        'all_occurrences' is only applicable for recurring Task items.
+        'affected_task_occurrences' is only applicable for recurring Task items.
         """
+        assert delete_type in DELETE_TYPE_CHOICES
+        assert send_meeting_invitations in SEND_MEETING_INVITATIONS_CHOICES, send_meeting_invitations
+        assert affected_task_occurrences in AFFECTED_TASK_OCCURRENCES_CHOICES, affected_task_occurrences
         is_empty, ids = peek(ids)
         if is_empty:
             # We accept generators, so it's not always convenient for caller to know up-front if 'items' is empty. Allow
             # empty 'items' and return early.
             return []
-        return DeleteItem(self.account.protocol).call(folder=self, ids=ids, all_occurrences=all_occurrences)
+        return DeleteItem(self.account.protocol).call(
+            folder=self, ids=ids, delete_type=delete_type, send_meeting_invitations=send_meeting_invitations,
+            affected_task_occurrences=affected_task_occurrences)
 
-    def update_items(self, items):
+    def update_items(self, items, conflict_resolution=AUTO_RESOLVE, message_disposition=SAVE_ONLY,
+                     send_meeting_invitations_or_cancellations=SEND_TO_NONE):
         """
         Updates items in the folder. 'items' is an iterable of tuples containing two elements:
 
@@ -827,12 +867,16 @@ class Folder:
             2. a dict containing the Item attributes to change
 
         """
+        assert conflict_resolution in CONFLICT_RESOLUTION_CHOICES, conflict_resolution
+        assert message_disposition in MESSAGE_DISPOSITION_CHOICES, message_disposition
         is_empty, items = peek(items)
         if is_empty:
             # We accept generators, so it's not always convenient for caller to know up-front if 'items' is empty. Allow
             # empty 'items' and return early.
             return []
-        return list(map(self.item_model.id_from_xml, UpdateItem(self.account.protocol).call(folder=self, items=items)))
+        return list(map(self.item_model.id_from_xml, UpdateItem(self.account.protocol).call(
+            folder=self, items=items, conflict_resolution=conflict_resolution, message_disposition=message_disposition,
+            send_meeting_invitations_or_cancellations=send_meeting_invitations_or_cancellations)))
 
     def get_items(self, ids, with_extra=True):
         # 'with_extra' determines whether to get the extra fields defined in Item.EXTRA_ITEM_FIELDS. This is still a
@@ -900,19 +944,19 @@ class Folder:
         getitem.append(item_ids)
         return getitem
 
-    def create_xml(self, items):
+    def create_xml(self, items, message_disposition, send_meeting_invitations):
         # Takes a list of Item obejcts (CalendarItem, Message etc) and returns the XML for a CreateItem request.
         # convert items to XML Elements
         if isinstance(self, Calendar):
-            # SendMeetingInvitations is required for calendar items. It is also applicable to tasks, meeting request responses
-            # (see https://msdn.microsoft.com/en-us/library/office/aa566464(v=exchg.150).aspx) and sharing invitation
-            # accepts (see https://msdn.microsoft.com/en-us/library/office/ee693280(v=exchg.150).aspx). The last two are not supported yet.
-            # Possible SendMeetingInvitations values: ('SendToNone', 'SendOnlyToAll', 'SendToAllAndSaveCopy')
-            createitem = create_element('m:%s' % CreateItem.SERVICE_NAME, SendMeetingInvitations='SendToNone')
+            # SendMeetingInvitations is required for calendar items. It is also applicable to tasks, meeting request
+            # responses (see https://msdn.microsoft.com/en-us/library/office/aa566464(v=exchg.150).aspx) and sharing
+            # invitation accepts (see https://msdn.microsoft.com/en-us/library/office/ee693280(v=exchg.150).aspx). The
+            # last two are not supported yet.
+            createitem = create_element('m:%s' % CreateItem.SERVICE_NAME,
+                                        SendMeetingInvitations=send_meeting_invitations)
         elif isinstance(self, Messages):
-            # MessageDisposition is only applicable to email messages, where it is required..
-            # Possible MessageDisposition values: ('SaveOnly', 'SendOnly', 'SendAndSaveCopy')
-            createitem = create_element('m:%s' % CreateItem.SERVICE_NAME, MessageDisposition='SaveOnly')
+            # MessageDisposition is only applicable to email messages, where it is required.
+            createitem = create_element('m:%s' % CreateItem.SERVICE_NAME, MessageDisposition=message_disposition)
         else:
             createitem = create_element('m:%s' % CreateItem.SERVICE_NAME)
         add_xml_child(createitem, 'm:SavedItemFolderId', self.folderid_xml())
@@ -922,17 +966,18 @@ class Folder:
         add_xml_child(createitem, 'm:Items', item_elems)
         return createitem
 
-    def delete_xml(self, ids, all_occurrences=True):
+    def delete_xml(self, ids, delete_type, send_meeting_invitations, affected_task_occurrences):
         # Takes a list of (item_id, changekey) tuples or Item objects and returns the XML for a DeleteItem request.
         if isinstance(self, Calendar):
             deleteitem = create_element(
-                'm:%s' % DeleteItem.SERVICE_NAME, DeleteType='HardDelete', SendMeetingCancellations='SendToNone')
+                'm:%s' % DeleteItem.SERVICE_NAME, DeleteType=delete_type,
+                SendMeetingCancellations=send_meeting_invitations)
         elif isinstance(self, Tasks):
             deleteitem = create_element(
-                'm:%s' % DeleteItem.SERVICE_NAME, DeleteType='HardDelete',
-                AffectedTaskOccurrences='AllOccurrences' if all_occurrences else 'SpecifiedOccurrenceOnly')
+                'm:%s' % DeleteItem.SERVICE_NAME, DeleteType=delete_type,
+                AffectedTaskOccurrences=affected_task_occurrences)
         else:
-            deleteitem = create_element('m:%s' % DeleteItem.SERVICE_NAME, DeleteType='HardDelete')
+            deleteitem = create_element('m:%s' % DeleteItem.SERVICE_NAME, DeleteType=delete_type)
         if self.account.version.build >= EXCHANGE_2013:
             deleteitem.set('SuppressReadReceipts', 'true')
 
@@ -947,17 +992,17 @@ class Folder:
         deleteitem.append(item_ids)
         return deleteitem
 
-    def update_xml(self, items):
+    def update_xml(self, items, conflict_resolution, message_disposition, send_meeting_invitations_or_cancellations):
         # Takes a dict with an (item_id, changekey) tuple or Item object as the key, and a dict of
         # field_name -> new_value as values. Returns the XML for a DeleteItem request.
         if isinstance(self, Calendar):
-            updateitem = create_element('m:%s' % UpdateItem.SERVICE_NAME, ConflictResolution='AutoResolve',
-                                        SendMeetingInvitationsOrCancellations='SendToNone')
+            updateitem = create_element('m:%s' % UpdateItem.SERVICE_NAME, ConflictResolution=conflict_resolution,
+                                        SendMeetingInvitationsOrCancellations=send_meeting_invitations_or_cancellations)
         elif isinstance(self, Messages):
-            updateitem = create_element('m:%s' % UpdateItem.SERVICE_NAME, ConflictResolution='AutoResolve',
-                                        MessageDisposition='SaveOnly')
+            updateitem = create_element('m:%s' % UpdateItem.SERVICE_NAME, ConflictResolution=conflict_resolution,
+                                        MessageDisposition=message_disposition)
         else:
-            updateitem = create_element('m:%s' % UpdateItem.SERVICE_NAME, ConflictResolution='AutoResolve')
+            updateitem = create_element('m:%s' % UpdateItem.SERVICE_NAME, ConflictResolution=conflict_resolution)
         if self.account.version.build >= EXCHANGE_2013:
             updateitem.set('SuppressReadReceipts', 'true')
 

@@ -399,7 +399,11 @@ class CreateItem(EWSPooledService):
 
     def call(self, folder, **kwargs):
         self.element_name = folder.item_model.response_tag()
-        return self._pool_requests(account=folder.account, payload_func=folder.create_xml, items=kwargs['items'])
+        return self._pool_requests(
+            account=folder.account, payload_func=folder.create_xml, items=kwargs['items'],
+            message_disposition=kwargs['message_disposition'],
+            send_meeting_invitations=kwargs['send_meeting_invitations'],
+        )
 
 
 class DeleteItem(EWSPooledService):
@@ -415,8 +419,11 @@ class DeleteItem(EWSPooledService):
     element_container_name = None  # DeleteItem doesn't return a response object, just status in XML attrs
 
     def call(self, folder, **kwargs):
-        return self._pool_requests(account=folder.account, payload_func=folder.delete_xml, items=kwargs['ids'],
-                                   all_occurrences=kwargs['all_occurrences'])
+        return self._pool_requests(
+            account=folder.account, payload_func=folder.delete_xml, items=kwargs['ids'],
+            delete_type=kwargs['delete_type'], send_meeting_invitations=kwargs['send_meeting_invitations'],
+            affected_task_occurrences=kwargs['affected_task_occurrences'],
+        )
 
 
 class UpdateItem(EWSPooledService):
@@ -429,7 +436,11 @@ class UpdateItem(EWSPooledService):
 
     def call(self, folder, **kwargs):
         self.element_name = folder.item_model.response_tag()
-        return self._pool_requests(account=folder.account, payload_func=folder.update_xml, items=kwargs['items'])
+        return self._pool_requests(
+            account=folder.account, payload_func=folder.update_xml, items=kwargs['items'],
+            conflict_resolution=kwargs['conflict_resolution'], message_disposition=kwargs['message_disposition'],
+            send_meeting_invitations_or_cancellations=kwargs['send_meeting_invitations_or_cancellations'],
+        )
 
 
 class FindItem(PagingEWSService, EWSFolderService):

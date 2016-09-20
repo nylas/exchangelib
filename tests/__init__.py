@@ -17,7 +17,7 @@ from exchangelib.errors import RelativeRedirect
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, ExternId, Choice, Email, Contact, Task, \
     EmailAddress, PhysicalAddress, PhoneNumber, IndexedField, RoomList, Calendar, DeletedItems, Drafts, Inbox, Outbox, \
-    SentItems, JunkEmail, Tasks, Contacts
+    SentItems, JunkEmail, Tasks, Contacts, ALL_OCCURRENCIES
 from exchangelib.restriction import Restriction, Q
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, AllProperties, IdOnly
 from exchangelib.util import xml_to_str, chunkify, peek, get_redirect_url
@@ -493,7 +493,7 @@ class BaseItemTest(EWSTest):
 
     def tearDown(self):
         ids = self.test_folder.find_items(categories__contains=self.categories)
-        self.test_folder.delete_items(ids, all_occurrences=True)
+        self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
 
     def get_test_item(self, categories=None):
         item_kwargs = {}
@@ -575,12 +575,12 @@ class BaseItemTest(EWSTest):
             len(self.test_folder.find_items(Q(subject=item.subject), categories__contains=self.categories)),
             1
         )
-        self.test_folder.delete_items(ids, all_occurrences=True)
+        self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
 
         # Test categories which are handled specially - only '__contains' and '__in' lookups are supported
         # First, delete any leftovers from last run. tearDown(doesn't do that since we're using non-devault categories)
         ids = self.test_folder.find_items(categories__contains=['TestA', 'TestB'])
-        self.test_folder.delete_items(ids, all_occurrences=True)
+        self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
         item = self.get_test_item(categories=['TestA', 'TestB'])
         ids = self.test_folder.add_items(items=[item])
         self.assertEqual(
@@ -631,7 +631,7 @@ class BaseItemTest(EWSTest):
             len(self.test_folder.find_items(categories__in=item.categories)),  # Exact match
             1
         )
-        self.test_folder.delete_items(ids, all_occurrences=True)
+        self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
 
         # Test 'range'
         ids = self.test_folder.add_items(items=[self.get_test_item()])
@@ -643,7 +643,7 @@ class BaseItemTest(EWSTest):
             len(self.test_folder.find_items(datetime_created__range=(now - timedelta(hours=1), now + timedelta(hours=1)), categories__contains=self.categories)),
             1
         )
-        self.test_folder.delete_items(ids, all_occurrences=True)
+        self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
 
         # Test '>'
         ids = self.test_folder.add_items(items=[self.get_test_item()])
@@ -655,7 +655,7 @@ class BaseItemTest(EWSTest):
             len(self.test_folder.find_items(datetime_created__gt=now - timedelta(hours=1), categories__contains=self.categories)),
             1
         )
-        self.test_folder.delete_items(ids, all_occurrences=True)
+        self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
 
         # Test '>='
         ids = self.test_folder.add_items(items=[self.get_test_item()])
@@ -667,7 +667,7 @@ class BaseItemTest(EWSTest):
             len(self.test_folder.find_items(datetime_created__gte=now - timedelta(hours=1), categories__contains=self.categories)),
             1
         )
-        self.test_folder.delete_items(ids, all_occurrences=True)
+        self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
 
         # Test '<'
         ids = self.test_folder.add_items(items=[self.get_test_item()])
@@ -679,7 +679,7 @@ class BaseItemTest(EWSTest):
             len(self.test_folder.find_items(datetime_created__lt=now + timedelta(hours=1), categories__contains=self.categories)),
             1
         )
-        self.test_folder.delete_items(ids, all_occurrences=True)
+        self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
 
         # Test '<='
         ids = self.test_folder.add_items(items=[self.get_test_item()])
@@ -691,7 +691,7 @@ class BaseItemTest(EWSTest):
             len(self.test_folder.find_items(datetime_created__lte=now + timedelta(hours=1), categories__contains=self.categories)),
             1
         )
-        self.test_folder.delete_items(ids, all_occurrences=True)
+        self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
 
         # Test '='
         item = self.get_test_item()
@@ -705,7 +705,7 @@ class BaseItemTest(EWSTest):
             len(self.test_folder.find_items(subject=item.subject, categories__contains=self.categories)),
             1
         )
-        self.test_folder.delete_items(ids, all_occurrences=True)
+        self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
 
         # Test '!='
         item = self.get_test_item()
@@ -719,7 +719,7 @@ class BaseItemTest(EWSTest):
             len(self.test_folder.find_items(subject__not=item.subject + 'XXX', categories__contains=self.categories)),
             1
         )
-        self.test_folder.delete_items(ids, all_occurrences=True)
+        self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
 
         # Test 'exact'
         item = self.get_test_item()
@@ -741,7 +741,7 @@ class BaseItemTest(EWSTest):
             len(self.test_folder.find_items(subject__exact=item.subject, categories__contains=self.categories)),
             1
         )
-        self.test_folder.delete_items(ids, all_occurrences=True)
+        self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
 
         # Test 'iexact'
         item = self.get_test_item()
@@ -763,7 +763,7 @@ class BaseItemTest(EWSTest):
             len(self.test_folder.find_items(subject__iexact=item.subject, categories__contains=self.categories)),
             1
         )
-        self.test_folder.delete_items(ids, all_occurrences=True)
+        self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
 
         # Test 'contains'
         item = self.get_test_item()
@@ -785,7 +785,7 @@ class BaseItemTest(EWSTest):
             len(self.test_folder.find_items(subject__contains=item.subject[2:14], categories__contains=self.categories)),
             1
         )
-        self.test_folder.delete_items(ids, all_occurrences=True)
+        self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
 
         # Test 'icontains'
         item = self.get_test_item()
@@ -807,7 +807,7 @@ class BaseItemTest(EWSTest):
             len(self.test_folder.find_items(subject__icontains=item.subject[2:14], categories__contains=self.categories)),
             1
         )
-        self.test_folder.delete_items(ids, all_occurrences=True)
+        self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
 
         # Test 'startswith'
         item = self.get_test_item()
@@ -829,7 +829,7 @@ class BaseItemTest(EWSTest):
             len(self.test_folder.find_items(subject__startswith=item.subject[:12], categories__contains=self.categories)),
             1
         )
-        self.test_folder.delete_items(ids, all_occurrences=True)
+        self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
 
         # Test 'istartswith'
         item = self.get_test_item()
@@ -851,7 +851,7 @@ class BaseItemTest(EWSTest):
             len(self.test_folder.find_items(subject__istartswith=item.subject[:12], categories__contains=self.categories)),
             1
         )
-        self.test_folder.delete_items(ids, all_occurrences=True)
+        self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
 
     def test_getitems(self):
         item = self.get_test_item()
@@ -861,7 +861,7 @@ class BaseItemTest(EWSTest):
         for item in items:
             assert isinstance(item, self.ITEM_CLASS)
         self.assertEqual(len(items), 2)
-        self.test_folder.delete_items(items, all_occurrences=True)
+        self.test_folder.delete_items(items, affected_task_occurrences=ALL_OCCURRENCIES)
 
     def test_extra_fields(self):
         item = self.get_test_item()
@@ -883,7 +883,7 @@ class BaseItemTest(EWSTest):
             for f in self.ITEM_CLASS.EXTRA_ITEM_FIELDS.keys():
                 self.assertTrue(getattr(item, f) is None, (f, getattr(item, f)))
         self.assertEqual(len(items), 2)
-        self.test_folder.delete_items(items, all_occurrences=True)
+        self.test_folder.delete_items(items, affected_task_occurrences=ALL_OCCURRENCIES)
 
     def test_item(self):
         # Test insert
@@ -1055,7 +1055,7 @@ class BaseItemTest(EWSTest):
         self.assertEqual(item.extern_id, extern_id)
 
         # Remove test item. Test with generator as argument
-        status = self.test_folder.delete_items(ids=(i for i in wipe2_ids), all_occurrences=True)
+        status = self.test_folder.delete_items(ids=(i for i in wipe2_ids), affected_task_occurrences=ALL_OCCURRENCIES)
         self.assertEqual(status, [(True, None)])
 
 
