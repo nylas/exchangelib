@@ -10,5 +10,4 @@ Cool things to work on:
 * SendItem service to send draft emails: https://msdn.microsoft.com/en-us/library/office/aa580238(v=exchg.150).aspx
 * Make it possible to configure the returned item attributes with ``my_folder.filter(foo=bar).only('subject', 'body')``
 * Make ``my_folder.find_items()`` lazy to support the above chaining.
-* Make it possible to save or update an item with ``CalendarItem.save()`` or ``Message.send()``
-* Support all well-known Messages folders as attributesto account.
+* Make it possible to save or update an item with ``CalendarItem.save()`` or ``Message.send()`` (support changing MessageDisposition value)

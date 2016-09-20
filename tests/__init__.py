@@ -16,7 +16,8 @@ from exchangelib.credentials import DELEGATE, Credentials
 from exchangelib.errors import RelativeRedirect
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, ExternId, Choice, Email, Contact, Task, \
-    EmailAddress, PhysicalAddress, PhoneNumber, IndexedField, RoomList, Calendar, Messages, Tasks, Contacts
+    EmailAddress, PhysicalAddress, PhoneNumber, IndexedField, RoomList, Calendar, DeletedItems, Drafts, Inbox, Outbox, \
+    SentItems, JunkEmail, Tasks, Contacts
 from exchangelib.restriction import Restriction, Q
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, AllProperties, IdOnly
 from exchangelib.util import xml_to_str, chunkify, peek, get_redirect_url
@@ -388,10 +389,8 @@ class CommonTest(EWSTest):
 
     def test_folders(self):
         folders = self.account.folders
-        self.assertTrue(Calendar in folders)
-        self.assertTrue(Messages in folders)
-        self.assertTrue(Tasks in folders)
-        self.assertTrue(Contacts in folders)
+        for fld in (Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Tasks, Contacts):
+            self.assertTrue(fld in folders)
         for folder_cls, cls_folders in folders.items():
             for f in cls_folders:
                 f.test_access()
@@ -430,7 +429,13 @@ class CommonTest(EWSTest):
         repr(self.config)
         repr(self.config.protocol)
         repr(self.account.version)
+        # Folders
+        repr(self.account.deleted_items)
+        repr(self.account.drafts)
         repr(self.account.inbox)
+        repr(self.account.outbox)
+        repr(self.account.sent_items)
+        repr(self.account.junk_email)
         repr(self.account.contacts)
         repr(self.account.tasks)
         repr(self.account.calendar)
@@ -1059,7 +1064,8 @@ class CalendarTest(BaseItemTest):
     ITEM_CLASS = CalendarItem
 
 
-class InboxTest(BaseItemTest):
+class MessagesTest(BaseItemTest):
+    # Just test one of the Message-type folders
     TEST_FOLDER = 'inbox'
     ITEM_CLASS = Message
 

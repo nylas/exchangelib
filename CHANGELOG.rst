@@ -5,8 +5,11 @@ Change Log
 HEAD
 ----
 * Add the ``is_service_account`` flag to ``Credentials``. ``is_service_account=False`` disables the fault-tolerant error
-handling policy and enables immediate failures.
-* ``Configuration`` now takes
+  handling policy and enables immediate failures.
+* ``Configuration`` now expects a single ``credentials`` attribute instead of separate ``username`` and ``password``
+  attributes.
+* Added support for distinguished folders ``Account.deleted_items``, ``Account.drafts``, ``Account.outbox``,
+  ``Account.sent_items`` and ``Account.junk_email``.
 
 1.6.2
 -----

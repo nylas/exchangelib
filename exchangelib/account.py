@@ -3,7 +3,8 @@ from logging import getLogger
 from .autodiscover import discover
 from .credentials import DELEGATE, IMPERSONATION
 from .errors import ErrorFolderNotFound, ErrorAccessDenied
-from .folders import Root, Calendar, Messages, Tasks, Contacts, SHALLOW, DEEP, WELLKNOWN_FOLDERS
+from .folders import Root, Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Tasks, Contacts, \
+    SHALLOW, DEEP, WELLKNOWN_FOLDERS
 from .protocol import Protocol
 from .util import get_domain
 
@@ -112,11 +113,46 @@ class Account:
         return self._calendar
 
     @property
+    def deleted_items(self):
+        if hasattr(self, '_deleted_items'):
+            return self._deleted_items
+        self._deleted_items = self._get_default_folder(DeletedItems)
+        return self._deleted_items
+
+    @property
+    def drafts(self):
+        if hasattr(self, '_drafts'):
+            return self._drafts
+        self._drafts = self._get_default_folder(Drafts)
+        return self._drafts
+
+    @property
     def inbox(self):
         if hasattr(self, '_inbox'):
             return self._inbox
-        self._inbox = self._get_default_folder(Messages)
+        self._inbox = self._get_default_folder(Inbox)
         return self._inbox
+
+    @property
+    def outbox(self):
+        if hasattr(self, '_outbox'):
+            return self._outbox
+        self._outbox = self._get_default_folder(Outbox)
+        return self._outbox
+
+    @property
+    def sent_items(self):
+        if hasattr(self, '_sent_items'):
+            return self._sent_items
+        self._sent_items = self._get_default_folder(SentItems)
+        return self._sent_items
+
+    @property
+    def junk_email(self):
+        if hasattr(self, '_junk_email'):
+            return self._junk_email
+        self._junk_email = self._get_default_folder(JunkEmail)
+        return self._junk_email
 
     @property
     def tasks(self):

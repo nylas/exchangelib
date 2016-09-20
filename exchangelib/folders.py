@@ -652,9 +652,10 @@ class Item(EWSElement):
 
 
 class Folder:
-    DISTINGUISHED_FOLDER_ID = None  # Must be lowercase
+    DISTINGUISHED_FOLDER_ID = None  # See https://msdn.microsoft.com/en-us/library/office/aa580808(v=exchg.150).aspx
     CONTAINER_CLASS = None  # See http://msdn.microsoft.com/en-us/library/hh354773(v=exchg.80).aspx
     item_model = Item
+    LOCALIZED_NAMES = dict()
 
     def __init__(self, account, name=None, folder_class=None, folder_id=None, changekey=None):
         self.account = account
@@ -1298,13 +1299,50 @@ class Message(ItemMixIn):
 
 
 class Messages(Folder):
-    DISTINGUISHED_FOLDER_ID = 'inbox'
     CONTAINER_CLASS = 'IPF.Note'
     item_model = Message
 
-    # These must be capitalized
+
+class DeletedItems(Messages):
+    DISTINGUISHED_FOLDER_ID = 'deleteditems'
+
+    LOCALIZED_NAMES = {
+    }
+
+
+class Drafts(Messages):
+    DISTINGUISHED_FOLDER_ID = 'drafts'
+
+    LOCALIZED_NAMES = {
+    }
+
+
+class Inbox(Messages):
+    DISTINGUISHED_FOLDER_ID = 'inbox'
+
     LOCALIZED_NAMES = {
         'da_DK': ('Indbakke',)
+    }
+
+
+class Outbox(Messages):
+    DISTINGUISHED_FOLDER_ID = 'outbox'
+
+    LOCALIZED_NAMES = {
+    }
+
+
+class SentItems(Messages):
+    DISTINGUISHED_FOLDER_ID = 'sentitems'
+
+    LOCALIZED_NAMES = {
+    }
+
+
+class JunkEmail(Messages):
+    DISTINGUISHED_FOLDER_ID = 'junkemail'
+
+    LOCALIZED_NAMES = {
     }
 
 
@@ -1501,18 +1539,18 @@ class WellknownFolder(Folder):
 WELLKNOWN_FOLDERS = dict([
     ('Calendar', Calendar),
     ('Contacts', Contacts),
-    ('DeletedItems', Messages),
-    ('Drafts', Messages),
-    ('Inbox', Messages),
+    ('DeletedItems', DeletedItems),
+    ('Drafts', Drafts),
+    ('Inbox', Inbox),
     ('Journal', WellknownFolder),
     ('Notes', WellknownFolder),
-    ('Outbox', Messages),
-    ('SentItems', Messages),
+    ('Outbox', Outbox),
+    ('SentItems', SentItems),
     ('Tasks', Tasks),
     ('MsgFolderRoot', WellknownFolder),
     ('PublicFoldersRoot', WellknownFolder),
     ('Root', Root),
-    ('JunkEmail', Messages),
+    ('JunkEmail', JunkEmail),
     ('Search', WellknownFolder),
     ('VoiceMail', WellknownFolder),
     ('RecoverableItemsRoot', WellknownFolder),
