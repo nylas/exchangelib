@@ -290,8 +290,8 @@ Response headers: %(response_headers)s'''
             log_vals['request_headers'] = r.request.headers
             log_vals['response_headers'] = r.headers
             log.debug(log_msg, log_vals)
-            # log.debug('Request data: %s', data)
-            # log.debug('Response data: %s', getattr(r, 'text'))
+            log.debug('Request data: %s', data)
+            log.debug('Response data: %s', getattr(r, 'text'))
             # The genericerrorpage.htm/internalerror.asp is ridiculous behaviour for random outages. Redirect to
             # '/internalsite/internalerror.asp' or '/internalsite/initparams.aspx' is caused by e.g. SSL certificate
             # f*ckups on the Exchange server.

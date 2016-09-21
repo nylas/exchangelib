@@ -95,7 +95,7 @@ Here is a simple example that inserts, retrieves and deletes calendar items in a
     print(ids)
 
     # Get the rest of the attributes on the calendar items we just created. Most attributes from EWS are supported.
-    items = account.calendar.get_items(ids)
+    items = account.get_items(ids)
     for item in items:
         print(item.start, item.end, item.subject, items.body, item.location)
 

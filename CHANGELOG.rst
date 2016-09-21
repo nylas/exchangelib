@@ -4,18 +4,27 @@ Change Log
 
 HEAD
 ----
-* Add the ``is_service_account`` flag to ``Credentials``. ``is_service_account=False`` disables the fault-tolerant error
+* Added the ``is_service_account`` flag to ``Credentials``. ``is_service_account=False`` disables the fault-tolerant error
   handling policy and enables immediate failures.
 * ``Configuration`` now expects a single ``credentials`` attribute instead of separate ``username`` and ``password``
   attributes.
-* Added support for distinguished folders ``Account.deleted_items``, ``Account.drafts``, ``Account.outbox``,
-  ``Account.sent_items`` and ``Account.junk_email``.
+* Added support for distinguished folders ``Account.trash``, ``Account.drafts``, ``Account.outbox``,
+  ``Account.sent`` and ``Account.junk``.
+* Made various policies for message saving, meeting invitation sending, conflict resolution, task occurrences and
+  deletion available on ``add_items()``, ``update_items()`` and ``delete_items()``.
+* Added convenience methods ``Item.save()``, ``Item.delete()``, ``Item.soft_delete()``, ``Item.move_to_trash()``, and
+  methods ``Message.send()`` and ``Message.send_and_save()`` that are specific to ``Message` objects. These methods
+  make it easier to create, update and delete single items.
+* Added helper method ``Folder.clear()`` that deletes all items in a folder, and ``Folder.add()`` that gets all items in
+  a folder.
+
 
 1.6.2
 -----
 * Use of ``my_folder.with_extra_fields = True`` to get the extra fields in ``Item.EXTRA_ITEM_FIELDS`` is deprecated (it was
   a kludge anyway). Instead, use ``my_folder.get_items(ids, with_extra=[True, False])``. The default was also changed to
   ``True``, to avoid head-scratching with newcomers.
+
 
 1.6.1
 -----
@@ -32,6 +41,7 @@ HEAD
 
       q1, q2 = (Q(subject__iexact='foo') | Q(subject__contains='bar')), ~Q(subject__startswith='baz')
       ids = account.calendar.find_items(q1, q2, shape=IdOnly)
+
 
 1.6.0
 -----
@@ -66,6 +76,7 @@ HEAD
 
 * Added a ``exchangelib.restrictions.Q`` class much like Django Q objects that can be used to
   create even more complex filtering. Q objects must be passed directly to ``exchangelib.services.FindItem``.
+
 
 1.3.6
 -----

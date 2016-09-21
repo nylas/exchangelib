@@ -44,8 +44,6 @@ for i in range(0, n):
     start = tz.localize(EWSDateTime(year, month, day, 8, 30))
     end = tz.localize(EWSDateTime(year, month, day, 9, 15))
     calitems.append(CalendarItem(
-        item_id='',
-        changekey='',
         start=start,
         end=end,
         subject='Performance test %s' % i,

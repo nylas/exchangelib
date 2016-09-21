@@ -4,7 +4,7 @@ from .autodiscover import discover
 from .credentials import DELEGATE, IMPERSONATION
 from .errors import ErrorFolderNotFound, ErrorAccessDenied
 from .folders import Root, Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Tasks, Contacts, \
-    SHALLOW, DEEP, WELLKNOWN_FOLDERS
+    RecoverableItemsRoot, RecoverableItemsDeletions, SHALLOW, DEEP, WELLKNOWN_FOLDERS
 from .protocol import Protocol
 from .util import get_domain
 
@@ -39,7 +39,7 @@ class Account:
         # We may need to override the default server version on a per-account basis because Microsoft may report one
         # server version up-front but delegate account requests to an older backend server.
         self.version = self.protocol.version
-        self.root = Root(self)
+        self.root = Root.get_distinguished(account=self)
 
         assert isinstance(self.protocol, Protocol)
         log.debug('Added account: %s', self)
@@ -69,7 +69,7 @@ class Account:
         try:
             # Get the default folder
             log.debug('Testing default %s folder with GetFolder', fld_class.__name__)
-            return fld_class(self).get_folder()
+            return fld_class.get_distinguished(account=self)
         except ErrorAccessDenied:
             # Maybe we just don't have GetFolder access? Try FindItems instead
             log.debug('Testing default %s folder with FindItem', fld_class.__name__)
@@ -113,11 +113,11 @@ class Account:
         return self._calendar
 
     @property
-    def deleted_items(self):
-        if hasattr(self, '_deleted_items'):
-            return self._deleted_items
-        self._deleted_items = self._get_default_folder(DeletedItems)
-        return self._deleted_items
+    def trash(self):
+        if hasattr(self, '_trash'):
+            return self._trash
+        self._trash = self._get_default_folder(DeletedItems)
+        return self._trash
 
     @property
     def drafts(self):
@@ -141,18 +141,18 @@ class Account:
         return self._outbox
 
     @property
-    def sent_items(self):
-        if hasattr(self, '_sent_items'):
-            return self._sent_items
-        self._sent_items = self._get_default_folder(SentItems)
-        return self._sent_items
+    def sent(self):
+        if hasattr(self, '_sent'):
+            return self._sent
+        self._sent = self._get_default_folder(SentItems)
+        return self._sent
 
     @property
-    def junk_email(self):
-        if hasattr(self, '_junk_email'):
-            return self._junk_email
-        self._junk_email = self._get_default_folder(JunkEmail)
-        return self._junk_email
+    def junk(self):
+        if hasattr(self, '_junk'):
+            return self._junk
+        self._junk = self._get_default_folder(JunkEmail)
+        return self._junk
 
     @property
     def tasks(self):
@@ -167,6 +167,20 @@ class Account:
             return self._contacts
         self._contacts = self._get_default_folder(Contacts)
         return self._contacts
+
+    @property
+    def recoverable_items_root(self):
+        if hasattr(self, '_recoverable_items_root'):
+            return self._recoverable_items_root
+        self._recoverable_items_root = self._get_default_folder(RecoverableItemsRoot)
+        return self._recoverable_items_root
+
+    @property
+    def recoverable_deleted_items(self):
+        if hasattr(self, '_recoverable_deleted_items'):
+            return self._recoverable_deleted_items
+        self._recoverable_deleted_items = self._get_default_folder(RecoverableItemsDeletions)
+        return self._recoverable_deleted_items
 
     @property
     def domain(self):

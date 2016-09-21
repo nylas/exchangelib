@@ -1,11 +1,12 @@
 import os
 import unittest
-from datetime import timedelta, datetime, date, time
+import datetime
 import random
 import string
 from decimal import Decimal
-import requests
+import time
 
+import requests
 from yaml import load
 
 from exchangelib import close_connections
@@ -13,13 +14,13 @@ from exchangelib.account import Account
 from exchangelib.autodiscover import discover
 from exchangelib.configuration import Configuration
 from exchangelib.credentials import DELEGATE, Credentials
-from exchangelib.errors import RelativeRedirect
+from exchangelib.errors import RelativeRedirect, ErrorItemNotFound
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, ExternId, Choice, Email, Contact, Task, \
     EmailAddress, PhysicalAddress, PhoneNumber, IndexedField, RoomList, Calendar, DeletedItems, Drafts, Inbox, Outbox, \
     SentItems, JunkEmail, Tasks, Contacts, ALL_OCCURRENCIES
 from exchangelib.restriction import Restriction, Q
-from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, AllProperties, IdOnly
+from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms
 from exchangelib.util import xml_to_str, chunkify, peek, get_redirect_url
 from exchangelib.version import Build
 
@@ -92,11 +93,11 @@ class EWSDateTest(unittest.TestCase):
             repr(dt),
             "EWSDateTime(2000, 1, 2, 3, 4, 5, tzinfo=<DstTzInfo 'Europe/Copenhagen' CET+1:00:00 STD>)"
         )
-        self.assertIsInstance(dt + timedelta(days=1), EWSDateTime)
-        self.assertIsInstance(dt - timedelta(days=1), EWSDateTime)
-        self.assertIsInstance(dt - EWSDateTime.now(tz=tz), timedelta)
+        self.assertIsInstance(dt + datetime.timedelta(days=1), EWSDateTime)
+        self.assertIsInstance(dt - datetime.timedelta(days=1), EWSDateTime)
+        self.assertIsInstance(dt - EWSDateTime.now(tz=tz), datetime.timedelta)
         self.assertIsInstance(EWSDateTime.now(tz=tz), EWSDateTime)
-        self.assertEqual(dt, EWSDateTime.from_datetime(tz.localize(datetime(2000, 1, 2, 3, 4, 5))))
+        self.assertEqual(dt, EWSDateTime.from_datetime(tz.localize(datetime.datetime(2000, 1, 2, 3, 4, 5))))
         self.assertEqual(dt.ewsformat(), '2000-01-02T03:04:05')
         utc_tz = EWSTimeZone.timezone('UTC')
         self.assertEqual(dt.astimezone(utc_tz).ewsformat(), '2000-01-02T02:04:05Z')
@@ -201,7 +202,7 @@ class UtilTest(unittest.TestCase):
         self.assertEqual(list(chunkify(seq, chunksize=3)), [(1, 2, 3), (4, 6, 7), (9,)])
 
         seq = {1, 2, 3, 4, 5}
-        self.assertEqual(list(chunkify(seq, chunksize=2)), [[1, 2], [3, 4], [5,]])
+        self.assertEqual(list(chunkify(seq, chunksize=2)), [[1, 2], [3, 4], [5, ]])
 
         seq = range(5)
         self.assertEqual(list(chunkify(seq, chunksize=2)), [range(0, 2), range(2, 4), range(4, 5)])
@@ -394,6 +395,19 @@ class CommonTest(EWSTest):
         for folder_cls, cls_folders in folders.items():
             for f in cls_folders:
                 f.test_access()
+        # Test shortcuts
+        for f, cls in (
+                (self.account.trash, DeletedItems),
+                (self.account.drafts, Drafts),
+                (self.account.inbox, Inbox),
+                (self.account.outbox, Outbox),
+                (self.account.sent, SentItems),
+                (self.account.junk, JunkEmail),
+                (self.account.contacts, Contacts),
+                (self.account.tasks, Tasks),
+                (self.account.calendar, Calendar),
+        ):
+            self.assertIsInstance(f, cls)
 
     def test_getfolders(self):
         folders = self.account.root.get_folders()
@@ -405,7 +419,7 @@ class CommonTest(EWSTest):
         items = []
         for i in range(150):
             subject = 'Test Subject %s' % i
-            item = CalendarItem(item_id='', changekey='', start=start, end=end, subject=subject, categories=self.categories)
+            item = CalendarItem(start=start, end=end, subject=subject, categories=self.categories)
             items.append(item)
         return_ids = self.account.calendar.add_items(items=items)
         self.assertEqual(len(return_ids), len(items))
@@ -430,12 +444,12 @@ class CommonTest(EWSTest):
         repr(self.config.protocol)
         repr(self.account.version)
         # Folders
-        repr(self.account.deleted_items)
+        repr(self.account.trash)
         repr(self.account.drafts)
         repr(self.account.inbox)
         repr(self.account.outbox)
-        repr(self.account.sent_items)
-        repr(self.account.junk_email)
+        repr(self.account.sent)
+        repr(self.account.junk)
         repr(self.account.contacts)
         repr(self.account.tasks)
         repr(self.account.calendar)
@@ -490,32 +504,113 @@ class BaseItemTest(EWSTest):
     def setUp(self):
         super().setUp()
         self.test_folder = getattr(self.account, self.TEST_FOLDER)
+        self.assertEqual(self.test_folder.DISTINGUISHED_FOLDER_ID, self.TEST_FOLDER)
+        self.test_folder.delete_items(ids=self.test_folder.find_items(categories__contains=self.categories))
 
     def tearDown(self):
-        ids = self.test_folder.find_items(categories__contains=self.categories)
-        self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
+        self.test_folder.delete_items(ids=self.test_folder.find_items(categories__contains=self.categories))
 
-    def get_test_item(self, categories=None):
-        item_kwargs = {}
-        for f in self.ITEM_CLASS.required_fields():
+    def get_random_insert_kwargs(self):
+        insert_kwargs = {}
+        for f in self.ITEM_CLASS.fieldnames():
+            if f in self.ITEM_CLASS.readonly_fields():
+                # These cannot be created
+                continue
+            if f == 'resources':
+                # The test server doesn't have any resources
+                continue
+            if f == 'optional_attendees':
+                # 'optional_attendees' and 'required_attendees' are mutually exclusive
+                insert_kwargs[f] = None
+                continue
             if f == 'start':
-                item_kwargs['start'], item_kwargs['end'] = get_random_datetime_range()
+                insert_kwargs['start'], insert_kwargs['end'] = get_random_datetime_range()
                 continue
             if f == 'end':
                 continue
+            if f == 'due_date':
+                # start_date must be before due_date
+                insert_kwargs['start_date'], insert_kwargs['due_date'] = get_random_datetime_range()
+                continue
+            if f == 'start_date':
+                continue
+            if f == 'status':
+                # Start with an incomplete task
+                status = get_random_choice(Task.choices_for_field(f) - {Task.COMPLETED})
+                insert_kwargs[f] = status
+                insert_kwargs['percent_complete'] = Decimal(0) if status == Task.NOT_STARTED else get_random_decimal(0, 100)
+                continue
+            if f == 'percent_complete':
+                continue
             field_type = self.ITEM_CLASS.type_for_field(f)
             if field_type == Choice:
-                # ITEM_CLASS.__init__ should select a default choice for us
+                insert_kwargs[f] = get_random_choice(self.ITEM_CLASS.choices_for_field(f))
                 continue
-            item_kwargs[f] = self.random_val(field_type)
-        return self.ITEM_CLASS(item_id='', changekey='', categories=categories or self.categories, **item_kwargs)
+            insert_kwargs[f] = self.random_val(field_type)
+        return insert_kwargs
+
+    def get_random_update_kwargs(self, insert_kwargs):
+        update_kwargs = {}
+        now = UTC_NOW()
+        for f in self.ITEM_CLASS.fieldnames():
+            if f in self.ITEM_CLASS.readonly_fields():
+                # These cannot be changed
+                continue
+            if f == 'resources':
+                # The test server doesn't have any resources
+                continue
+            field_type = self.ITEM_CLASS.type_for_field(f)
+            if isinstance(field_type, list):
+                if issubclass(field_type[0], IndexedField):
+                    # TODO: We don't know how to update IndexedField types yet
+                    continue
+            if f == 'start':
+                update_kwargs['start'], update_kwargs['end'] = get_random_datetime_range()
+                continue
+            if f == 'end':
+                continue
+            if f == 'due_date':
+                # start_date must be before due_date, and before complete_date which must be in the past
+                d1, d2 = get_random_datetime(end_date=now), get_random_datetime(end_date=now)
+                update_kwargs['start_date'], update_kwargs['due_date'] = sorted([d1, d2])
+                continue
+            if f == 'start_date':
+                continue
+            if f == 'status':
+                # Update task to a completed state. complete_date must be a date in the past, and < than start_date
+                update_kwargs[f] = Task.COMPLETED
+                update_kwargs['percent_complete'] = Decimal(100)
+                continue
+            if f == 'percent_complete':
+                continue
+            if f == 'reminder_is_set' and self.ITEM_CLASS == Task:
+                # Task type doesn't allow updating 'reminder_is_set' to True. TODO: Really?
+                update_kwargs[f] = False
+                continue
+            field_type = self.ITEM_CLASS.type_for_field(f)
+            if field_type == bool:
+                update_kwargs[f] = not(insert_kwargs[f])
+                continue
+            if field_type == Choice:
+                update_kwargs[f] = get_random_choice(self.ITEM_CLASS.choices_for_field(f))
+                continue
+            if field_type in (Mailbox, [Mailbox], Attendee, [Attendee]):
+                if insert_kwargs[f] is None:
+                    update_kwargs[f] = self.random_val(field_type)
+                else:
+                    update_kwargs[f] = None
+                continue
+            update_kwargs[f] = self.random_val(field_type)
+        return update_kwargs
+
+    def get_test_item(self, folder=None, categories=None):
+        item_kwargs = self.get_random_insert_kwargs()
+        item_kwargs['categories'] = categories or self.categories
+        return self.ITEM_CLASS(folder=folder or self.test_folder, **item_kwargs)
 
     def test_magic(self):
         item = self.get_test_item()
-        if self.ITEM_CLASS == CalendarItem:
-            self.assertIn('ItemId', str(item))
-        else:
-            self.assertIn(item.__class__.__name__, str(item))
+        self.assertIn('item_id', str(item))
         self.assertIn(item.__class__.__name__, repr(item))
 
     def test_empty_args(self):
@@ -530,7 +625,7 @@ class BaseItemTest(EWSTest):
         self.account.protocol.credentials.is_service_account = False
         item = self.get_test_item()
         item.subject = get_random_string(16)
-        self.test_folder.find_items()
+        self.test_folder.all()
         self.account.protocol.credentials.is_service_account = True
 
     def test_finditems(self):
@@ -636,11 +731,11 @@ class BaseItemTest(EWSTest):
         # Test 'range'
         ids = self.test_folder.add_items(items=[self.get_test_item()])
         self.assertEqual(
-            len(self.test_folder.find_items(datetime_created__range=(now + timedelta(hours=1), now + timedelta(hours=2)), categories__contains=self.categories)),
+            len(self.test_folder.find_items(datetime_created__range=(now + datetime.timedelta(hours=1), now + datetime.timedelta(hours=2)), categories__contains=self.categories)),
             0
         )
         self.assertEqual(
-            len(self.test_folder.find_items(datetime_created__range=(now - timedelta(hours=1), now + timedelta(hours=1)), categories__contains=self.categories)),
+            len(self.test_folder.find_items(datetime_created__range=(now - datetime.timedelta(hours=1), now + datetime.timedelta(hours=1)), categories__contains=self.categories)),
             1
         )
         self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
@@ -648,11 +743,11 @@ class BaseItemTest(EWSTest):
         # Test '>'
         ids = self.test_folder.add_items(items=[self.get_test_item()])
         self.assertEqual(
-            len(self.test_folder.find_items(datetime_created__gt=now + timedelta(hours=1), categories__contains=self.categories)),
+            len(self.test_folder.find_items(datetime_created__gt=now + datetime.timedelta(hours=1), categories__contains=self.categories)),
             0
         )
         self.assertEqual(
-            len(self.test_folder.find_items(datetime_created__gt=now - timedelta(hours=1), categories__contains=self.categories)),
+            len(self.test_folder.find_items(datetime_created__gt=now - datetime.timedelta(hours=1), categories__contains=self.categories)),
             1
         )
         self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
@@ -660,11 +755,11 @@ class BaseItemTest(EWSTest):
         # Test '>='
         ids = self.test_folder.add_items(items=[self.get_test_item()])
         self.assertEqual(
-            len(self.test_folder.find_items(datetime_created__gte=now + timedelta(hours=1), categories__contains=self.categories)),
+            len(self.test_folder.find_items(datetime_created__gte=now + datetime.timedelta(hours=1), categories__contains=self.categories)),
             0
         )
         self.assertEqual(
-            len(self.test_folder.find_items(datetime_created__gte=now - timedelta(hours=1), categories__contains=self.categories)),
+            len(self.test_folder.find_items(datetime_created__gte=now - datetime.timedelta(hours=1), categories__contains=self.categories)),
             1
         )
         self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
@@ -672,11 +767,11 @@ class BaseItemTest(EWSTest):
         # Test '<'
         ids = self.test_folder.add_items(items=[self.get_test_item()])
         self.assertEqual(
-            len(self.test_folder.find_items(datetime_created__lt=now - timedelta(hours=1), categories__contains=self.categories)),
+            len(self.test_folder.find_items(datetime_created__lt=now - datetime.timedelta(hours=1), categories__contains=self.categories)),
             0
         )
         self.assertEqual(
-            len(self.test_folder.find_items(datetime_created__lt=now + timedelta(hours=1), categories__contains=self.categories)),
+            len(self.test_folder.find_items(datetime_created__lt=now + datetime.timedelta(hours=1), categories__contains=self.categories)),
             1
         )
         self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
@@ -684,11 +779,11 @@ class BaseItemTest(EWSTest):
         # Test '<='
         ids = self.test_folder.add_items(items=[self.get_test_item()])
         self.assertEqual(
-            len(self.test_folder.find_items(datetime_created__lte=now - timedelta(hours=1), categories__contains=self.categories)),
+            len(self.test_folder.find_items(datetime_created__lte=now - datetime.timedelta(hours=1), categories__contains=self.categories)),
             0
         )
         self.assertEqual(
-            len(self.test_folder.find_items(datetime_created__lte=now + timedelta(hours=1), categories__contains=self.categories)),
+            len(self.test_folder.find_items(datetime_created__lte=now + datetime.timedelta(hours=1), categories__contains=self.categories)),
             1
         )
         self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
@@ -885,50 +980,84 @@ class BaseItemTest(EWSTest):
         self.assertEqual(len(items), 2)
         self.test_folder.delete_items(items, affected_task_occurrences=ALL_OCCURRENCIES)
 
+    def test_save_and_delete(self):
+        # Test that we can create, update and delete single items using methods directly on the item
+        insert_kwargs = self.get_random_insert_kwargs()
+        item = self.ITEM_CLASS(folder=self.test_folder, **insert_kwargs)
+        self.assertIsNone(item.item_id)
+        self.assertIsNone(item.changekey)
+
+        # Create
+        item.save()
+        self.assertIsNotNone(item.item_id)
+        self.assertIsNotNone(item.changekey)
+
+        # Update
+        update_kwargs = self.get_random_update_kwargs(insert_kwargs)
+        for k, v in update_kwargs.items():
+            setattr(item, k, v)
+        item.save()
+        updated_item = self.test_folder.get_items(ids=[item])[0]
+        for k, v in update_kwargs.items():
+            self.assertEqual(getattr(updated_item, k), v, (k, getattr(updated_item, k), v))
+
+        # Hard delete
+        item_id = (item.item_id, item.changekey)
+        item.delete(affected_task_occurrences=ALL_OCCURRENCIES)
+        with self.assertRaises(ErrorItemNotFound):
+            # It's gone from the account
+            self.test_folder.get_items(ids=[item_id])
+            # Really gone, not just changed ItemId
+            ids = self.test_folder.find_items(categories__contains=item.categories)
+            self.assertEqual(len(ids), 0)
+
+    def test_soft_delete(self):
+        # First, empty trash bin
+        self.account.trash.clear()
+        item = self.get_test_item().save()
+        item_id = (item.item_id, item.changekey)
+        # Soft delete
+        item.soft_delete(affected_task_occurrences=ALL_OCCURRENCIES)
+        with self.assertRaises(ErrorItemNotFound):
+            # It's gone from the test folter
+            self.test_folder.get_items(ids=[item_id])
+        # Really gone, not just changed ItemId
+        self.assertEqual(len(self.test_folder.find_items(categories__contains=item.categories)), 0)
+        # If the dumpster is enabled, we should be able to find the item again. It probably isn't on this test account.
+        self.assertEqual(len(self.test_folder.find_items(categories__contains=item.categories)), 0)
+        self.assertEqual(len(self.account.trash.find_items(categories__contains=item.categories)), 0)
+        self.assertEqual(len(self.account.recoverable_deleted_items.find_items(categories__contains=item.categories)), 0)
+
+    def test_move_to_trash(self):
+        # First, empty trash bin
+        self.account.trash.clear()
+        item = self.get_test_item().save()
+        item_id = (item.item_id, item.changekey)
+        # Move to trash
+        item.move_to_trash(affected_task_occurrences=ALL_OCCURRENCIES)
+        with self.assertRaises(ErrorItemNotFound):
+            # Not in the test folder anymore
+            self.test_folder.get_items(ids=[item_id])
+        # Really gone, not just changed ItemId
+        self.assertEqual(len(self.test_folder.find_items(categories__contains=item.categories)), 0)
+        # Test that the item moved to trash
+        if isinstance(item, Message):
+            # TODO: This only works for Messages?!
+            ids = self.account.trash.find_items(categories__contains=item.categories)
+            self.assertEqual(len(ids), 1)
+            moved_item = self.account.trash.get_items(ids=ids)[0]
+            # The item was copied, so the ItemId has changed. Let's compare the subject instead
+            self.assertEqual(item.subject, moved_item.subject)
+
     def test_item(self):
         # Test insert
-        insert_kwargs = {}
-        for f in self.ITEM_CLASS.fieldnames():
-            if f in self.ITEM_CLASS.readonly_fields():
-                # These cannot be created
-                continue
-            if f == 'resources':
-                # The test server doesn't have any resources
-                continue
-            if f == 'optional_attendees':
-                # 'optional_attendees' and 'required_attendees' are mutually exclusive
-                insert_kwargs[f] = None
-                continue
-            if f == 'start':
-                insert_kwargs['start'], insert_kwargs['end'] = get_random_datetime_range()
-                continue
-            if f == 'end':
-                continue
-            if f == 'due_date':
-                # start_date must be before due_date
-                insert_kwargs['start_date'], insert_kwargs['due_date'] = get_random_datetime_range()
-                continue
-            if f == 'start_date':
-                continue
-            if f == 'status':
-                # Start with an incomplete task
-                status = get_random_choice(Task.choices_for_field(f) - {Task.COMPLETED})
-                insert_kwargs[f] = status
-                insert_kwargs['percent_complete'] = Decimal(0) if status == Task.NOT_STARTED else get_random_decimal(0, 100)
-                continue
-            if f == 'percent_complete':
-                continue
-            field_type = self.ITEM_CLASS.type_for_field(f)
-            if field_type == Choice:
-                insert_kwargs[f] = get_random_choice(self.ITEM_CLASS.choices_for_field(f))
-                continue
-            insert_kwargs[f] = self.random_val(field_type)
-        item = self.ITEM_CLASS(item_id='', changekey='', **insert_kwargs)
+        insert_kwargs = self.get_random_insert_kwargs()
+        item = self.ITEM_CLASS(**insert_kwargs)
         # Test with generator as argument
         insert_ids = self.test_folder.add_items(items=(i for i in [item]))
         self.assertEqual(len(insert_ids), 1)
         assert isinstance(insert_ids[0], tuple)
-        find_ids = self.test_folder.find_items(categories__contains=insert_kwargs['categories'])
+        find_ids = self.test_folder.find_items(categories__contains=item.categories)
         self.assertEqual(len(find_ids), 1)
         self.assertEqual(len(find_ids[0]), 2)
         self.assertEqual(insert_ids, find_ids)
@@ -946,52 +1075,7 @@ class BaseItemTest(EWSTest):
                 self.assertEqual(getattr(item, f), insert_kwargs[f], (f, repr(item), insert_kwargs))
 
         # Test update
-        update_kwargs = {}
-        now = UTC_NOW()
-        for f in self.ITEM_CLASS.fieldnames():
-            if f in self.ITEM_CLASS.readonly_fields():
-                # These cannot be changed
-                continue
-            if f == 'resources':
-                # The test server doesn't have any resources
-                continue
-            if f == 'start':
-                update_kwargs['start'], update_kwargs['end'] = get_random_datetime_range()
-                continue
-            if f == 'end':
-                continue
-            if f == 'due_date':
-                # start_date must be before due_date, and before complete_date which must be in the past
-                d1, d2 = get_random_datetime(end_date=now), get_random_datetime(end_date=now)
-                update_kwargs['start_date'], update_kwargs['due_date'] = sorted([d1, d2])
-                continue
-            if f == 'start_date':
-                continue
-            if f == 'status':
-                # Update task to a completed state. complete_date must be a date in the past, and < than start_date
-                update_kwargs[f] = Task.COMPLETED
-                update_kwargs['percent_complete'] = Decimal(100)
-                continue
-            if f == 'percent_complete':
-                continue
-            if f == 'reminder_is_set' and self.ITEM_CLASS == Task:
-                # Task type doesn't allow updating 'reminder_is_set' to True. TODO: Really?
-                update_kwargs[f] = False
-                continue
-            field_type = self.ITEM_CLASS.type_for_field(f)
-            if field_type == bool:
-                update_kwargs[f] = not(insert_kwargs[f])
-                continue
-            if field_type == Choice:
-                update_kwargs[f] = get_random_choice(self.ITEM_CLASS.choices_for_field(f))
-                continue
-            if field_type in (Mailbox, [Mailbox], Attendee, [Attendee]):
-                if insert_kwargs[f] is None:
-                    update_kwargs[f] = self.random_val(field_type)
-                else:
-                    update_kwargs[f] = None
-                continue
-            update_kwargs[f] = self.random_val(field_type)
+        update_kwargs = self.get_random_update_kwargs(insert_kwargs)
         # Test with generator as argument
         update_ids = self.test_folder.update_items(items=(i for i in [(item, update_kwargs), ]))
         self.assertEqual(len(update_ids), 1)
@@ -1069,6 +1153,26 @@ class MessagesTest(BaseItemTest):
     TEST_FOLDER = 'inbox'
     ITEM_CLASS = Message
 
+    def test_send(self):
+        # Test that we can send (only) Message items
+        item = self.get_test_item()
+        item.send()
+        self.assertIsNone(item.item_id)
+        self.assertIsNone(item.changekey)
+        self.assertEqual(len(self.test_folder.find_items(categories__contains=self.categories)), 0)
+
+    def test_send_and_save(self):
+        # Test that we can send_and_save Message items
+        item = self.get_test_item()
+        item.send_and_save()
+        self.assertIsNone(item.item_id)
+        self.assertIsNone(item.changekey)
+        time.sleep(1)  # Requests are supposed to be transactional, but apparently not...
+        ids = self.test_folder.find_items(categories__contains=self.categories)
+        self.assertEqual(len(ids), 1)
+        item.item_id, item.changekey = ids[0]
+        item.delete()
+
 
 class TasksTest(BaseItemTest):
     TEST_FOLDER = 'tasks'
@@ -1121,21 +1225,22 @@ def get_random_email():
     ))
 
 
-def get_random_date(start_date=date(1900, 1, 1), end_date=date(2100, 1, 1)):
+def get_random_date(start_date=datetime.date(1900, 1, 1), end_date=datetime.date(2100, 1, 1)):
     return EWSDate.fromordinal(random.randint(start_date.toordinal(), end_date.toordinal()))
 
 
-def get_random_datetime(start_date=date(1900, 1, 1), end_date=date(2100, 1, 1)):
+def get_random_datetime(start_date=datetime.date(1900, 1, 1), end_date=datetime.date(2100, 1, 1)):
     # Create a random datetime with minute precision
     random_date = get_random_date(start_date=start_date, end_date=end_date)
-    random_datetime = datetime.combine(random_date, time.min) + timedelta(minutes=random.randint(0, 60*24))
+    random_datetime = datetime.datetime.combine(random_date, datetime.time.min) \
+                      + datetime.timedelta(minutes=random.randint(0, 60*24))
     return UTC.localize(EWSDateTime.from_datetime(random_datetime))
 
 
 def get_random_datetime_range():
     # Create two random datetimes. Calendar items raise ErrorCalendarDurationIsTooLong if duration is > 5 years.
     dt1 = get_random_datetime()
-    dt2 = dt1 + timedelta(minutes=random.randint(0, 60*24*365*5))
+    dt2 = dt1 + datetime.timedelta(minutes=random.randint(0, 60*24*365*5))
     return dt1, dt2
 
 

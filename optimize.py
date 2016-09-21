@@ -38,8 +38,6 @@ def calitems():
     start = tz.localize(EWSDateTime(2000, 3, 1, 8, 30, 0))
     end = tz.localize(EWSDateTime(2000, 3, 1, 9, 15, 0))
     item = CalendarItem(
-        item_id='',
-        changekey='',
         subject='Performance optimization test %s by pyexchange' % i,
         start=start,
         end=end,

@@ -22,7 +22,7 @@ from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, 
     ErrorInternalServerTransientError, ErrorNoRespondingCASInDestinationSite, ErrorImpersonationFailed, \
     ErrorMailboxMoveInProgress, ErrorAccessDenied, ErrorConnectionFailed, RateLimitError, ErrorServerBusy, \
     ErrorTooManyObjectsOpened, ErrorInvalidLicense, ErrorInvalidSchemaVersionForMailboxVersion, \
-    ErrorInvalidServerVersion
+    ErrorInvalidServerVersion, ErrorItemNotFound
 from .transport import wrap, SOAPNS, TNS, MNS, ENS
 from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, ElementType, \
     xml_to_str, set_xml_value
@@ -33,16 +33,18 @@ log = logging.getLogger(__name__)
 
 # Shape enums
 IdOnly = 'IdOnly'
-# This doesn't actually get all properties in FindItem, just the "first-class" ones. See
+# AllProperties doesn't actually get all properties in FindItem, just the "first-class" ones. See
 #    http://msdn.microsoft.com/en-us/library/office/dn600367(v=exchg.150).aspx
 AllProperties = 'AllProperties'
 SHAPE_CHOICES = (IdOnly, AllProperties)
 
 # Traversal enums
 SHALLOW = 'Shallow'
+SOFT_DELETED = 'SoftDeleted'
 DEEP = 'Deep'
-SOFTDELETED = 'SoftDeleted'
-TRAVERSAL_CHOICES = (SHALLOW, DEEP, SOFTDELETED)
+ASSOCIATED = 'Associated'
+ITEM_TRAVERSAL_CHOICES = (SHALLOW, SOFT_DELETED, ASSOCIATED)
+FOLDER_TRAVERSAL_CHOICES = (SHALLOW, DEEP, SOFT_DELETED)
 
 
 class EWSService:
@@ -69,7 +71,7 @@ class EWSService:
                 ErrorFolderNotFound, ErrorNonExistentMailbox, ErrorMailboxStoreUnavailable, ErrorImpersonateUserDenied,
                 ErrorInternalServerError, ErrorInternalServerTransientError, ErrorNoRespondingCASInDestinationSite,
                 ErrorImpersonationFailed, ErrorMailboxMoveInProgress, ErrorAccessDenied, ErrorConnectionFailed,
-                RateLimitError, ErrorServerBusy, ErrorTooManyObjectsOpened, ErrorInvalidLicense):
+                RateLimitError, ErrorServerBusy, ErrorTooManyObjectsOpened, ErrorInvalidLicense, ErrorItemNotFound):
             # These are known and understood, and don't require a backtrace
             # TODO: ErrorTooManyObjectsOpened means there are too many connections to the database. We should be able to
             # act on this by lowering the self.protocol connection pool size.
@@ -372,7 +374,8 @@ class EWSPooledService(EWSService):
 
 class GetItem(EWSPooledService):
     """
-    Take a list of (id, changekey) tuples and returns a list of items in stable order
+    Take a list of (id, changekey) tuples and returns all items in 'account', optionally expanded with
+    'additional_fields' fields, in stable order.
 
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa563775(v=exchg.150).aspx
     """
@@ -383,7 +386,7 @@ class GetItem(EWSPooledService):
     def call(self, folder, **kwargs):
         self.element_name = folder.item_model.response_tag()
         return self._pool_requests(account=folder.account, payload_func=folder.get_xml, items=kwargs['ids'],
-                                   with_extra=kwargs['with_extra'])
+                                   additional_fields=kwargs['additional_fields'])
 
 
 class CreateItem(EWSPooledService):
@@ -421,7 +424,7 @@ class DeleteItem(EWSPooledService):
     def call(self, folder, **kwargs):
         return self._pool_requests(
             account=folder.account, payload_func=folder.delete_xml, items=kwargs['ids'],
-            delete_type=kwargs['delete_type'], send_meeting_invitations=kwargs['send_meeting_invitations'],
+            delete_type=kwargs['delete_type'], send_meeting_cancellations=kwargs['send_meeting_cancellations'],
             affected_task_occurrences=kwargs['affected_task_occurrences'],
         )
 
@@ -445,7 +448,7 @@ class UpdateItem(EWSPooledService):
 
 class FindItem(PagingEWSService, EWSFolderService):
     """
-    Gets all items for 'account' in folder 'folder_id', optionally expanded with 'additional_fields' Element,
+    Gets all items for 'account' in folder 'folder_id', optionally expanded with 'additional_fields' fields,
     optionally restricted by a Restriction definition.
 
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa566370(v=exchg.150).aspx
@@ -457,15 +460,13 @@ class FindItem(PagingEWSService, EWSFolderService):
         self.element_name = folder.item_model.response_tag()
         return self._paged_call(folder=folder, **kwargs)
 
-    def _get_payload(self, folder, additional_fields=None, restriction=None, shape=IdOnly, depth=SHALLOW, offset=0):
+    def _get_payload(self, folder, additional_fields, restriction, shape, depth, offset=0):
         finditem = create_element('m:%s' % self.SERVICE_NAME, Traversal=depth)
         itemshape = create_element('m:ItemShape')
         add_xml_child(itemshape, 't:BaseShape', shape)
         if additional_fields:
-            additionalproperties = create_element('t:AdditionalProperties')
-            for field_uri in additional_fields:
-                additionalproperties.append(create_element('t:FieldURI', FieldURI=field_uri))
-            itemshape.append(additionalproperties)
+            add_xml_child(itemshape, 't:AdditionalProperties',
+                          folder.item_model.additional_property_elems(additional_fields))
         finditem.append(itemshape)
         indexedpageviewitem = create_element('m:IndexedPageItemView', Offset=str(offset), BasePoint='Beginning')
         finditem.append(indexedpageviewitem)
@@ -500,7 +501,7 @@ class FindFolder(PagingEWSService, EWSFolderService):
     def call(self, folder, **kwargs):
         return self._paged_call(folder=folder, **kwargs)
 
-    def _get_payload(self, folder, additional_fields=None, shape=IdOnly, depth=DEEP, offset=0):
+    def _get_payload(self, folder, additional_fields, shape, depth, offset=0):
         findfolder = create_element('m:%s' % self.SERVICE_NAME, Traversal=depth)
         foldershape = create_element('m:FolderShape')
         add_xml_child(foldershape, 't:BaseShape', shape)
@@ -539,10 +540,12 @@ class GetFolder(EWSFolderService):
         super().__init__(*args, **kwargs)
         self.element_name = '{%s}Folder' % TNS
 
-    def call(self, folder, **kwargs):
-        return self._get_elements(payload=self._get_payload(folder, **kwargs), account=folder.account)
+    def call(self, account, **kwargs):
+        return self._get_elements(payload=self._get_payload(account, **kwargs), account=account)
 
-    def _get_payload(self, folder, additional_fields=None, shape=IdOnly):
+    def _get_payload(self, account, distinguished_folder_id, additional_fields, shape):
+        from .credentials import DELEGATE
+        from .folders import Mailbox
         getfolder = create_element('m:%s' % self.SERVICE_NAME)
         foldershape = create_element('m:FolderShape')
         add_xml_child(foldershape, 't:BaseShape', shape)
@@ -553,7 +556,11 @@ class GetFolder(EWSFolderService):
             foldershape.append(additionalproperties)
         getfolder.append(foldershape)
         folderids = create_element('m:FolderIds')
-        folderids.append(folder.folderid_xml())
+        distinguishedfolderid = create_element('t:DistinguishedFolderId', Id=distinguished_folder_id)
+        if account.access_type == DELEGATE:
+            mailbox = Mailbox(email_address=account.primary_smtp_address)
+            set_xml_value(distinguishedfolderid, mailbox, account.version)
+        folderids.append(distinguishedfolderid)
         getfolder.append(folderids)
         return getfolder
 
