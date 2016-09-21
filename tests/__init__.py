@@ -420,7 +420,8 @@ class CommonTest(EWSTest):
         start = self.tz.localize(EWSDateTime(2011, 10, 12, 8))
         end = self.tz.localize(EWSDateTime(2011, 10, 12, 10))
         self.account.calendar.bulk_delete(
-            ids=self.account.calendar.filter(start__lt=end, end__gt=start, categories__contains=self.categories))
+            ids=self.account.calendar.filter(start__lt=end, end__gt=start, categories__contains=self.categories),
+            affected_task_occurrences=ALL_OCCURRENCIES)
         items = []
         for i in range(75):
             subject = 'Test Subject %s' % i
@@ -437,7 +438,7 @@ class CommonTest(EWSTest):
             self.assertEqual(item.end, end)
             self.assertEqual(item.subject, subject)
             self.assertEqual(item.categories, self.categories)
-        status = self.account.calendar.bulk_delete(ids)
+        status = self.account.calendar.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES)
         self.assertEqual(set(status), {(True, None)})
 
     def test_magic(self):
@@ -510,10 +511,12 @@ class BaseItemTest(EWSTest):
         super().setUp()
         self.test_folder = getattr(self.account, self.TEST_FOLDER)
         self.assertEqual(self.test_folder.DISTINGUISHED_FOLDER_ID, self.TEST_FOLDER)
-        self.test_folder.bulk_delete(ids=self.test_folder.filter(categories__contains=self.categories))
+        self.test_folder.bulk_delete(ids=self.test_folder.filter(categories__contains=self.categories),
+                                     affected_task_occurrences=ALL_OCCURRENCIES)
 
     def tearDown(self):
-        self.test_folder.bulk_delete(ids=self.test_folder.filter(categories__contains=self.categories))
+        self.test_folder.bulk_delete(ids=self.test_folder.filter(categories__contains=self.categories),
+                                     affected_task_occurrences=ALL_OCCURRENCIES)
 
     def get_random_insert_kwargs(self):
         insert_kwargs = {}
@@ -963,25 +966,31 @@ class BaseItemTest(EWSTest):
         self.assertEqual(len(items), 2)
         self.test_folder.bulk_delete(items, affected_task_occurrences=ALL_OCCURRENCIES)
 
-    def test_extra_fields(self):
+    def test_only_fields(self):
         item = self.get_test_item()
         self.test_folder.bulk_create(items=[item, item])
         ids = self.test_folder.filter(categories__contains=self.categories)
-        items = self.test_folder.get_items(ids=ids, with_extra=True)
+        items = self.test_folder.get_items(ids=ids, only_fields=None)
         for item in items:
             assert isinstance(item, self.ITEM_CLASS)
-            for f in self.ITEM_CLASS.fieldnames(with_extra=True):
+            for f in self.ITEM_CLASS.fieldnames():
                 self.assertTrue(hasattr(item, f))
-            for f in self.ITEM_CLASS.EXTRA_ITEM_FIELDS.keys():
-                self.assertTrue(getattr(item, f) is not None, (f, getattr(item, f)))
+                if f in ('optional_attendees', 'required_attendees', 'resources'):
+                    continue
+                elif f in self.ITEM_CLASS.readonly_fields():
+                    continue
+                self.assertIsNotNone(getattr(item, f), (f, getattr(item, f)))
         self.assertEqual(len(items), 2)
-        items = self.test_folder.get_items(ids=ids, with_extra=False)
+        only_fields = ('subject', 'body', 'categories')
+        items = self.test_folder.get_items(ids=ids, only_fields=only_fields)
         for item in items:
             assert isinstance(item, self.ITEM_CLASS)
-            for f in self.ITEM_CLASS.fieldnames(with_extra=False):
+            for f in self.ITEM_CLASS.fieldnames():
                 self.assertTrue(hasattr(item, f))
-            for f in self.ITEM_CLASS.EXTRA_ITEM_FIELDS.keys():
-                self.assertTrue(getattr(item, f) is None, (f, getattr(item, f)))
+                if f in only_fields:
+                    self.assertIsNotNone(getattr(item, f), (f, getattr(item, f)))
+                elif f not in self.ITEM_CLASS.required_fields():
+                    self.assertIsNone(getattr(item, f), (f, getattr(item, f)))
         self.assertEqual(len(items), 2)
         self.test_folder.bulk_delete(items, affected_task_occurrences=ALL_OCCURRENCIES)
 

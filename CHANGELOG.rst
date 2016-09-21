@@ -21,6 +21,8 @@ HEAD
   make it easier to create, update and delete single items.
 * Added helper method ``Folder.clear()`` that deletes all items in a folder, and ``Folder.add()`` that gets all items in
   a folder.
+* Removed ``get_items(.., with_extra=True)`` in favor of the more finegrained ``get_items(.., only_fields=[...])``
+
 
 1.6.2
 -----

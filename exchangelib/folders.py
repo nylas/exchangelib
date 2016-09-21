@@ -505,9 +505,6 @@ class Item(EWSElement):
         'reminder_is_set': ('ReminderIsSet', bool),
         'categories': ('Categories', [str]),
         'extern_id': (ExternId, ExternId),
-    }
-    # These are optional fields that we don't normally request, for performance reasons.
-    EXTRA_ITEM_FIELDS = {
         'datetime_created': ('DateTimeCreated', EWSDateTime),
         'datetime_sent': ('DateTimeSent', EWSDateTime),
         'datetime_received': ('DateTimeReceived', EWSDateTime),
@@ -524,10 +521,11 @@ class Item(EWSElement):
     # Item fields that are necessary to create an item
     REQUIRED_FIELDS = {'sensitivity', 'importance', 'reminder_is_set'}
     # Fields that are read-only in Exchange. Put mime_content here until it's properly supported
-    READONLY_FIELDS = {'is_draft'}
+    READONLY_FIELDS = {'is_draft', 'datetime_created', 'datetime_sent', 'datetime_received', 'last_modified_name',
+                       'last_modified_time'}
 
     # 'folder' is optional but allows calling 'save()' and 'delete()'
-    __slots__ = ('folder',) + tuple(ITEM_FIELDS) + tuple(EXTRA_ITEM_FIELDS)
+    __slots__ = ('folder',) + tuple(ITEM_FIELDS)
 
     def __init__(self, **kwargs):
         for k in Item.__slots__:
@@ -610,19 +608,13 @@ class Item(EWSElement):
             affected_task_occurrences=affected_task_occurrences)
 
     @classmethod
-    def fieldnames(cls, with_extra=False):
+    def fieldnames(cls):
         # Return non-ID field names
-        base_fields = tuple(f for f in cls.ITEM_FIELDS if f not in ('item_id', 'changekey'))
-        if with_extra:
-            return base_fields + tuple(cls.EXTRA_ITEM_FIELDS)
-        return base_fields
+        return tuple(f for f in cls.ITEM_FIELDS if f not in ('item_id', 'changekey'))
 
     @classmethod
     def uri_for_field(cls, fieldname):
-        try:
-            return cls.ITEM_FIELDS[fieldname][0]
-        except KeyError:
-            return cls.EXTRA_ITEM_FIELDS[fieldname][0]
+        return cls.ITEM_FIELDS[fieldname][0]
 
     @classmethod
     def fielduri_for_field(cls, fieldname):
@@ -670,10 +662,7 @@ class Item(EWSElement):
         try:
             return cls.ITEM_FIELDS[fieldname][1]
         except KeyError:
-            try:
-                return cls.EXTRA_ITEM_FIELDS[fieldname][1]
-            except KeyError:
-                raise ValueError("No type defined for fieldname '%s'" % fieldname)
+            raise ValueError("No type defined for fieldname '%s'" % fieldname)
 
     @classmethod
     def additional_property_elems(cls, fieldnames):
@@ -697,12 +686,12 @@ class Item(EWSElement):
         return id_elem.get('Id'), id_elem.get('ChangeKey')
 
     @classmethod
-    def from_xml(cls, elem, folder=None, with_extra=False):
+    def from_xml(cls, elem, folder=None):
         assert elem.tag == cls.response_tag()
         item_id, changekey = cls.id_from_xml(elem)
         kwargs = {}
         extended_properties = elem.findall(ExtendedProperty.response_tag())
-        for fieldname in cls.fieldnames(with_extra=with_extra):
+        for fieldname in cls.fieldnames():
             field_type = cls.type_for_field(fieldname)
             if field_type == EWSDateTime:
                 val = get_xml_attr(elem, cls.response_xml_elem_for_field(fieldname))
@@ -847,6 +836,10 @@ class Folder:
 
         # Define the extra properties we want on the return objects. 'body' field can only be fetched with GetItem.
         additional_fields = kwargs.pop('additional_fields', None)
+        if additional_fields:
+            allowed_field_names = self.item_model.fieldnames()
+            for f in additional_fields:
+                assert f in allowed_field_names
 
         # Build up any restrictions
         q = None
@@ -1017,22 +1010,26 @@ class Folder:
             folder=self, items=items, conflict_resolution=conflict_resolution, message_disposition=message_disposition,
             send_meeting_invitations_or_cancellations=send_meeting_invitations_or_cancellations)))
 
-    def get_items(self, ids, with_extra=True):
-        # 'with_extra' determines whether to get the extra fields defined in Item.EXTRA_ITEM_FIELDS. This is still a
-        # kludge - instead, the user should be able to specify the exact fields to get or ignore. See also filter()
+    def get_items(self, ids, only_fields=None):
+        # 'only_fields' specifies which fields to fetch, instead of all possible fields.
         if hasattr(self, 'with_extra_fields'):
             raise DeprecationWarning(
-                "'%(cls)s.with_extra_fields' is deprecated. Use '%(cls)s.get_items(ids, with_extra=True)' instead"
+                "'%(cls)s.with_extra_fields' is deprecated. Use 'get_items(ids, only_fields=[...])' instead"
                 % dict(cls=self.__class__.__name__))
         is_empty, ids = peek(ids)
         if is_empty:
             # We accept generators, so it's not always convenient for caller to know up-front if 'items' is empty. Allow
             # empty 'items' and return early.
             return []
-        additional_fields = self.item_model.fieldnames(with_extra=with_extra)
+        if only_fields:
+            allowed_field_names = self.item_model.fieldnames()
+            for f in only_fields:
+                assert f in allowed_field_names
+        else:
+            only_fields = self.item_model.fieldnames()
         return list(map(
-            lambda i: self.item_model.from_xml(elem=i, folder=self, with_extra=with_extra),
-            GetItem(self.account.protocol).call(folder=self, ids=ids, additional_fields=additional_fields)
+            lambda i: self.item_model.from_xml(elem=i, folder=self),
+            GetItem(self.account.protocol).call(folder=self, ids=ids, additional_fields=only_fields)
         ))
 
     def test_access(self):
@@ -1290,8 +1287,8 @@ class ItemMixIn(Item):
         return i
 
     @classmethod
-    def fieldnames(cls, with_extra=False):
-        return tuple(cls.ITEM_FIELDS) + Item.fieldnames(with_extra=with_extra)
+    def fieldnames(cls):
+        return tuple(cls.ITEM_FIELDS) + Item.fieldnames()
 
     @classmethod
     def fielduri_for_field(cls, fieldname):
@@ -1380,7 +1377,7 @@ class CalendarItem(ItemMixIn):
     REQUIRED_FIELDS = {'subject', 'start', 'end', 'legacy_free_busy_status'}
     READONLY_FIELDS = {'organizer'}
 
-    __slots__ = tuple(ITEM_FIELDS) + tuple(Item.ITEM_FIELDS) + tuple(Item.EXTRA_ITEM_FIELDS)
+    __slots__ = tuple(ITEM_FIELDS) + tuple(Item.ITEM_FIELDS)
 
     def __init__(self, **kwargs):
         for k in self.ITEM_FIELDS:
@@ -1449,7 +1446,7 @@ class Message(ItemMixIn):
                        'is_response_requested'}
     READONLY_FIELDS = {'sender'}
 
-    __slots__ = tuple(ITEM_FIELDS) + tuple(Item.ITEM_FIELDS) + tuple(Item.EXTRA_ITEM_FIELDS)
+    __slots__ = tuple(ITEM_FIELDS) + tuple(Item.ITEM_FIELDS)
 
     def __init__(self, **kwargs):
         for k in self.ITEM_FIELDS:
@@ -1595,7 +1592,7 @@ class Task(ItemMixIn):
     READONLY_FIELDS = {'is_recurring', 'is_complete', 'is_team_task', 'assigned_time', 'change_count',
                        'delegation_state', 'delegator', 'owner', 'status_description', 'complete_date'}
 
-    __slots__ = tuple(ITEM_FIELDS) + tuple(Item.ITEM_FIELDS) + tuple(Item.EXTRA_ITEM_FIELDS)
+    __slots__ = tuple(ITEM_FIELDS) + tuple(Item.ITEM_FIELDS)
 
     def __init__(self, **kwargs):
         for k in self.ITEM_FIELDS:
@@ -1708,7 +1705,7 @@ class Contact(ItemMixIn):
         'generation', 'job_title', 'manager', 'mileage', 'office', 'profession', 'surname',  # 'email_alias', 'notes',
     )
 
-    __slots__ = tuple(ITEM_FIELDS) + tuple(Item.ITEM_FIELDS) + tuple(Item.EXTRA_ITEM_FIELDS)
+    __slots__ = tuple(ITEM_FIELDS) + tuple(Item.ITEM_FIELDS)
 
     def __init__(self, **kwargs):
         for k in self.ITEM_FIELDS:
