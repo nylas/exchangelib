@@ -74,7 +74,7 @@ class Account:
             # Maybe we just don't have GetFolder access? Try FindItems instead
             log.debug('Testing default %s folder with FindItem', fld_class.__name__)
             fld = fld_class(self)
-            fld.find_items(subject='DUMMY')
+            fld.filter(subject='DUMMY')
             return fld
         except ErrorFolderNotFound as e:
             # There's no folder named fld_class.DISTINGUISHED_FOLDER_ID. Try to guess which folder is the default.

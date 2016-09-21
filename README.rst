@@ -71,22 +71,22 @@ Here is a simple example that inserts, retrieves and deletes calendar items in a
     print(res)
 
     # Get Exchange ID and changekey of the calendar items we just created. We filter by
-    # categories so we only get the items created by us. The syntax for find_items() is
+    # categories so we only get the items created by us. The syntax for filter() is
     # modeled after Django QuerySet filters.
     #
-    # If you need more complex filtering, find_items() also accepts a Python-like search expression:
+    # If you need more complex filtering, filter() also accepts a Python-like search expression:
     #
-    # ids = account.calendar.find_items(
+    # ids = account.calendar.filter(
     #       "start < '2016-01-02T03:04:05T' and end > '2016-01-01T03:04:05T' and categories in ('foo', 'bar')",
     #       shape=IdOnly
     # )
     #
-    # find_items() also support Q objects that are modeled after Django Q objects
+    # filter() also support Q objects that are modeled after Django Q objects
     #
     # q = (Q(subject__iexact='foo') | Q(subject__contains='bar')) & ~Q(subject__startswith='baz')
-    # ids = account.calendar.find_items(q, shape=IdOnly)
+    # ids = account.calendar.filter(q, shape=IdOnly)
     #
-    ids = account.calendar.find_items(
+    ids = account.calendar.filter(
         start__lt=tz.localize(EWSDateTime(year, month, day + 1)),
         end__gt=tz.localize(EWSDateTime(year, month, day)),
         categories__contains=['foo', 'bar'],

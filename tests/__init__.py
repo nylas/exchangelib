@@ -18,7 +18,7 @@ from exchangelib.errors import RelativeRedirect, ErrorItemNotFound
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, ExternId, Choice, Email, Contact, Task, \
     EmailAddress, PhysicalAddress, PhoneNumber, IndexedField, RoomList, Calendar, DeletedItems, Drafts, Inbox, Outbox, \
-    SentItems, JunkEmail, Tasks, Contacts, ALL_OCCURRENCIES
+    SentItems, JunkEmail, Tasks, Contacts, AnyURI, ALL_OCCURRENCIES
 from exchangelib.restriction import Restriction, Q
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms
 from exchangelib.util import xml_to_str, chunkify, peek, get_redirect_url
@@ -304,6 +304,8 @@ class EWSTest(unittest.TestCase):
             return get_random_string(255)
         if field_type == str:
             return get_random_string(255)
+        if field_type == AnyURI:
+            return get_random_url()
         if field_type == [str]:
             return [get_random_string(16) for _ in range(random.randint(1, 4))]
         if field_type == int:
@@ -423,7 +425,7 @@ class CommonTest(EWSTest):
             items.append(item)
         return_ids = self.account.calendar.add_items(items=items)
         self.assertEqual(len(return_ids), len(items))
-        ids = self.account.calendar.find_items(start__lt=end, end__gt=start, categories__contains=self.categories)
+        ids = self.account.calendar.filter(start__lt=end, end__gt=start, categories__contains=self.categories)
         self.assertEqual(len(ids), len(items))
         items = self.account.calendar.get_items(return_ids)
         for i, item in enumerate(items):
@@ -505,10 +507,10 @@ class BaseItemTest(EWSTest):
         super().setUp()
         self.test_folder = getattr(self.account, self.TEST_FOLDER)
         self.assertEqual(self.test_folder.DISTINGUISHED_FOLDER_ID, self.TEST_FOLDER)
-        self.test_folder.delete_items(ids=self.test_folder.find_items(categories__contains=self.categories))
+        self.test_folder.delete_items(ids=self.test_folder.filter(categories__contains=self.categories))
 
     def tearDown(self):
-        self.test_folder.delete_items(ids=self.test_folder.find_items(categories__contains=self.categories))
+        self.test_folder.delete_items(ids=self.test_folder.filter(categories__contains=self.categories))
 
     def get_random_insert_kwargs(self):
         insert_kwargs = {}
@@ -637,93 +639,93 @@ class BaseItemTest(EWSTest):
         ids = self.test_folder.add_items(items=[item])
         # No arguments. There may be leftover items in the folder, so just make sure there's at least one.
         self.assertGreaterEqual(
-            len(self.test_folder.find_items()),
+            len(self.test_folder.filter()),
             1
         )
         # Search expr
         self.assertEqual(
-            len(self.test_folder.find_items("subject == '%s'" % item.subject)),
+            len(self.test_folder.filter("subject == '%s'" % item.subject)),
             1
         )
         # Search expr with Q
         self.assertEqual(
-            len(self.test_folder.find_items("subject == '%s'" % item.subject, Q())),
+            len(self.test_folder.filter("subject == '%s'" % item.subject, Q())),
             1
         )
         # Search expr with kwargs
         self.assertEqual(
-            len(self.test_folder.find_items("subject == '%s'" % item.subject, categories__contains=self.categories)),
+            len(self.test_folder.filter("subject == '%s'" % item.subject, categories__contains=self.categories)),
             1
         )
         # Q object
         self.assertEqual(
-            len(self.test_folder.find_items(Q(subject=item.subject))),
+            len(self.test_folder.filter(Q(subject=item.subject))),
             1
         )
         # Multiple Q objects
         self.assertEqual(
-            len(self.test_folder.find_items(Q(subject=item.subject), ~Q(subject=item.subject + 'XXX'))),
+            len(self.test_folder.filter(Q(subject=item.subject), ~Q(subject=item.subject + 'XXX'))),
             1
         )
         # Multiple Q object and kwargs
         self.assertEqual(
-            len(self.test_folder.find_items(Q(subject=item.subject), categories__contains=self.categories)),
+            len(self.test_folder.filter(Q(subject=item.subject), categories__contains=self.categories)),
             1
         )
         self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
 
         # Test categories which are handled specially - only '__contains' and '__in' lookups are supported
         # First, delete any leftovers from last run. tearDown(doesn't do that since we're using non-devault categories)
-        ids = self.test_folder.find_items(categories__contains=['TestA', 'TestB'])
+        ids = self.test_folder.filter(categories__contains=['TestA', 'TestB'])
         self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
         item = self.get_test_item(categories=['TestA', 'TestB'])
         ids = self.test_folder.add_items(items=[item])
         self.assertEqual(
-            len(self.test_folder.find_items(categories__contains='ci6xahH1')),  # Plain string
+            len(self.test_folder.filter(categories__contains='ci6xahH1')),  # Plain string
             0
         )
         self.assertEqual(
-            len(self.test_folder.find_items(categories__contains=['ci6xahH1'])),  # Same, but as list
+            len(self.test_folder.filter(categories__contains=['ci6xahH1'])),  # Same, but as list
             0
         )
         self.assertEqual(
-            len(self.test_folder.find_items(categories__contains=['TestA', 'TestC'])),  # One wrong category
+            len(self.test_folder.filter(categories__contains=['TestA', 'TestC'])),  # One wrong category
             0
         )
         self.assertEqual(
-            len(self.test_folder.find_items(categories__contains=['TESTA'])),  # Test case insensitivity
+            len(self.test_folder.filter(categories__contains=['TESTA'])),  # Test case insensitivity
             1
         )
         self.assertEqual(
-            len(self.test_folder.find_items(categories__contains=['testa'])),  # Test case insensitivity
+            len(self.test_folder.filter(categories__contains=['testa'])),  # Test case insensitivity
             1
         )
         self.assertEqual(
-            len(self.test_folder.find_items(categories__contains=['TestA'])),  # Partial
+            len(self.test_folder.filter(categories__contains=['TestA'])),  # Partial
             1
         )
         self.assertEqual(
-            len(self.test_folder.find_items(categories__contains=item.categories)),  # Exact match
+            len(self.test_folder.filter(categories__contains=item.categories)),  # Exact match
             1
         )
         self.assertEqual(
-            len(self.test_folder.find_items(categories__in='ci6xahH1')),  # Plain string
+            len(self.test_folder.filter(categories__in='ci6xahH1')),  # Plain string
             0
         )
         self.assertEqual(
-            len(self.test_folder.find_items(categories__in=['ci6xahH1'])),  # Same, but as list
+            len(self.test_folder.filter(categories__in=['ci6xahH1'])),  # Same, but as list
             0
         )
         self.assertEqual(
-            len(self.test_folder.find_items(categories__in=['TestA', 'TestC'])),  # One wrong category
+            len(self.test_folder.filter(categories__in=['TestA', 'TestC'])),  # One wrong category
             1
         )
         self.assertEqual(
-            len(self.test_folder.find_items(categories__in=['TestA'])),  # Partial
+            len(self.test_folder.filter(categories__in=['TestA'])),  # Partial
             1
         )
         self.assertEqual(
-            len(self.test_folder.find_items(categories__in=item.categories)),  # Exact match
+            len(self.test_folder.filter(categories__in=item.categories)),  # Exact match
             1
         )
         self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
@@ -731,11 +733,11 @@ class BaseItemTest(EWSTest):
         # Test 'range'
         ids = self.test_folder.add_items(items=[self.get_test_item()])
         self.assertEqual(
-            len(self.test_folder.find_items(datetime_created__range=(now + datetime.timedelta(hours=1), now + datetime.timedelta(hours=2)), categories__contains=self.categories)),
+            len(self.test_folder.filter(datetime_created__range=(now + datetime.timedelta(hours=1), now + datetime.timedelta(hours=2)), categories__contains=self.categories)),
             0
         )
         self.assertEqual(
-            len(self.test_folder.find_items(datetime_created__range=(now - datetime.timedelta(hours=1), now + datetime.timedelta(hours=1)), categories__contains=self.categories)),
+            len(self.test_folder.filter(datetime_created__range=(now - datetime.timedelta(hours=1), now + datetime.timedelta(hours=1)), categories__contains=self.categories)),
             1
         )
         self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
@@ -743,11 +745,11 @@ class BaseItemTest(EWSTest):
         # Test '>'
         ids = self.test_folder.add_items(items=[self.get_test_item()])
         self.assertEqual(
-            len(self.test_folder.find_items(datetime_created__gt=now + datetime.timedelta(hours=1), categories__contains=self.categories)),
+            len(self.test_folder.filter(datetime_created__gt=now + datetime.timedelta(hours=1), categories__contains=self.categories)),
             0
         )
         self.assertEqual(
-            len(self.test_folder.find_items(datetime_created__gt=now - datetime.timedelta(hours=1), categories__contains=self.categories)),
+            len(self.test_folder.filter(datetime_created__gt=now - datetime.timedelta(hours=1), categories__contains=self.categories)),
             1
         )
         self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
@@ -755,11 +757,11 @@ class BaseItemTest(EWSTest):
         # Test '>='
         ids = self.test_folder.add_items(items=[self.get_test_item()])
         self.assertEqual(
-            len(self.test_folder.find_items(datetime_created__gte=now + datetime.timedelta(hours=1), categories__contains=self.categories)),
+            len(self.test_folder.filter(datetime_created__gte=now + datetime.timedelta(hours=1), categories__contains=self.categories)),
             0
         )
         self.assertEqual(
-            len(self.test_folder.find_items(datetime_created__gte=now - datetime.timedelta(hours=1), categories__contains=self.categories)),
+            len(self.test_folder.filter(datetime_created__gte=now - datetime.timedelta(hours=1), categories__contains=self.categories)),
             1
         )
         self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
@@ -767,11 +769,11 @@ class BaseItemTest(EWSTest):
         # Test '<'
         ids = self.test_folder.add_items(items=[self.get_test_item()])
         self.assertEqual(
-            len(self.test_folder.find_items(datetime_created__lt=now - datetime.timedelta(hours=1), categories__contains=self.categories)),
+            len(self.test_folder.filter(datetime_created__lt=now - datetime.timedelta(hours=1), categories__contains=self.categories)),
             0
         )
         self.assertEqual(
-            len(self.test_folder.find_items(datetime_created__lt=now + datetime.timedelta(hours=1), categories__contains=self.categories)),
+            len(self.test_folder.filter(datetime_created__lt=now + datetime.timedelta(hours=1), categories__contains=self.categories)),
             1
         )
         self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
@@ -779,11 +781,11 @@ class BaseItemTest(EWSTest):
         # Test '<='
         ids = self.test_folder.add_items(items=[self.get_test_item()])
         self.assertEqual(
-            len(self.test_folder.find_items(datetime_created__lte=now - datetime.timedelta(hours=1), categories__contains=self.categories)),
+            len(self.test_folder.filter(datetime_created__lte=now - datetime.timedelta(hours=1), categories__contains=self.categories)),
             0
         )
         self.assertEqual(
-            len(self.test_folder.find_items(datetime_created__lte=now + datetime.timedelta(hours=1), categories__contains=self.categories)),
+            len(self.test_folder.filter(datetime_created__lte=now + datetime.timedelta(hours=1), categories__contains=self.categories)),
             1
         )
         self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
@@ -793,11 +795,11 @@ class BaseItemTest(EWSTest):
         item.subject = get_random_string(16)
         ids = self.test_folder.add_items(items=[item])
         self.assertEqual(
-            len(self.test_folder.find_items(subject=item.subject + 'XXX', categories__contains=self.categories)),
+            len(self.test_folder.filter(subject=item.subject + 'XXX', categories__contains=self.categories)),
             0
         )
         self.assertEqual(
-            len(self.test_folder.find_items(subject=item.subject, categories__contains=self.categories)),
+            len(self.test_folder.filter(subject=item.subject, categories__contains=self.categories)),
             1
         )
         self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
@@ -807,11 +809,11 @@ class BaseItemTest(EWSTest):
         item.subject = get_random_string(16)
         ids = self.test_folder.add_items(items=[item])
         self.assertEqual(
-            len(self.test_folder.find_items(subject__not=item.subject, categories__contains=self.categories)),
+            len(self.test_folder.filter(subject__not=item.subject, categories__contains=self.categories)),
             0
         )
         self.assertEqual(
-            len(self.test_folder.find_items(subject__not=item.subject + 'XXX', categories__contains=self.categories)),
+            len(self.test_folder.filter(subject__not=item.subject + 'XXX', categories__contains=self.categories)),
             1
         )
         self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
@@ -821,19 +823,19 @@ class BaseItemTest(EWSTest):
         item.subject = get_random_string(16)
         ids = self.test_folder.add_items(items=[item])
         self.assertEqual(
-            len(self.test_folder.find_items(subject__iexact=item.subject + 'XXX', categories__contains=self.categories)),
+            len(self.test_folder.filter(subject__iexact=item.subject + 'XXX', categories__contains=self.categories)),
             0
         )
         self.assertEqual(
-            len(self.test_folder.find_items(subject__exact=item.subject.lower(), categories__contains=self.categories)),
+            len(self.test_folder.filter(subject__exact=item.subject.lower(), categories__contains=self.categories)),
             0
         )
         self.assertEqual(
-            len(self.test_folder.find_items(subject__exact=item.subject.upper(), categories__contains=self.categories)),
+            len(self.test_folder.filter(subject__exact=item.subject.upper(), categories__contains=self.categories)),
             0
         )
         self.assertEqual(
-            len(self.test_folder.find_items(subject__exact=item.subject, categories__contains=self.categories)),
+            len(self.test_folder.filter(subject__exact=item.subject, categories__contains=self.categories)),
             1
         )
         self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
@@ -843,19 +845,19 @@ class BaseItemTest(EWSTest):
         item.subject = get_random_string(16)
         ids = self.test_folder.add_items(items=[item])
         self.assertEqual(
-            len(self.test_folder.find_items(subject__iexact=item.subject + 'XXX', categories__contains=self.categories)),
+            len(self.test_folder.filter(subject__iexact=item.subject + 'XXX', categories__contains=self.categories)),
             0
         )
         self.assertEqual(
-            len(self.test_folder.find_items(subject__iexact=item.subject.lower(), categories__contains=self.categories)),
+            len(self.test_folder.filter(subject__iexact=item.subject.lower(), categories__contains=self.categories)),
             1
         )
         self.assertEqual(
-            len(self.test_folder.find_items(subject__iexact=item.subject.upper(), categories__contains=self.categories)),
+            len(self.test_folder.filter(subject__iexact=item.subject.upper(), categories__contains=self.categories)),
             1
         )
         self.assertEqual(
-            len(self.test_folder.find_items(subject__iexact=item.subject, categories__contains=self.categories)),
+            len(self.test_folder.filter(subject__iexact=item.subject, categories__contains=self.categories)),
             1
         )
         self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
@@ -865,19 +867,19 @@ class BaseItemTest(EWSTest):
         item.subject = get_random_string(16)
         ids = self.test_folder.add_items(items=[item])
         self.assertEqual(
-            len(self.test_folder.find_items(subject__contains=item.subject[2:14] + 'XXX', categories__contains=self.categories)),
+            len(self.test_folder.filter(subject__contains=item.subject[2:14] + 'XXX', categories__contains=self.categories)),
             0
         )
         self.assertEqual(
-            len(self.test_folder.find_items(subject__contains=item.subject[2:14].lower(), categories__contains=self.categories)),
+            len(self.test_folder.filter(subject__contains=item.subject[2:14].lower(), categories__contains=self.categories)),
             0
         )
         self.assertEqual(
-            len(self.test_folder.find_items(subject__contains=item.subject[2:14].upper(), categories__contains=self.categories)),
+            len(self.test_folder.filter(subject__contains=item.subject[2:14].upper(), categories__contains=self.categories)),
             0
         )
         self.assertEqual(
-            len(self.test_folder.find_items(subject__contains=item.subject[2:14], categories__contains=self.categories)),
+            len(self.test_folder.filter(subject__contains=item.subject[2:14], categories__contains=self.categories)),
             1
         )
         self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
@@ -887,19 +889,19 @@ class BaseItemTest(EWSTest):
         item.subject = get_random_string(16)
         ids = self.test_folder.add_items(items=[item])
         self.assertEqual(
-            len(self.test_folder.find_items(subject__icontains=item.subject[2:14] + 'XXX', categories__contains=self.categories)),
+            len(self.test_folder.filter(subject__icontains=item.subject[2:14] + 'XXX', categories__contains=self.categories)),
             0
         )
         self.assertEqual(
-            len(self.test_folder.find_items(subject__icontains=item.subject[2:14].lower(), categories__contains=self.categories)),
+            len(self.test_folder.filter(subject__icontains=item.subject[2:14].lower(), categories__contains=self.categories)),
             1
         )
         self.assertEqual(
-            len(self.test_folder.find_items(subject__icontains=item.subject[2:14].upper(), categories__contains=self.categories)),
+            len(self.test_folder.filter(subject__icontains=item.subject[2:14].upper(), categories__contains=self.categories)),
             1
         )
         self.assertEqual(
-            len(self.test_folder.find_items(subject__icontains=item.subject[2:14], categories__contains=self.categories)),
+            len(self.test_folder.filter(subject__icontains=item.subject[2:14], categories__contains=self.categories)),
             1
         )
         self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
@@ -909,19 +911,19 @@ class BaseItemTest(EWSTest):
         item.subject = get_random_string(16)
         ids = self.test_folder.add_items(items=[item])
         self.assertEqual(
-            len(self.test_folder.find_items(subject__startswith='XXX' + item.subject[:12], categories__contains=self.categories)),
+            len(self.test_folder.filter(subject__startswith='XXX' + item.subject[:12], categories__contains=self.categories)),
             0
         )
         self.assertEqual(
-            len(self.test_folder.find_items(subject__startswith=item.subject[:12].lower(), categories__contains=self.categories)),
+            len(self.test_folder.filter(subject__startswith=item.subject[:12].lower(), categories__contains=self.categories)),
             0
         )
         self.assertEqual(
-            len(self.test_folder.find_items(subject__startswith=item.subject[:12].upper(), categories__contains=self.categories)),
+            len(self.test_folder.filter(subject__startswith=item.subject[:12].upper(), categories__contains=self.categories)),
             0
         )
         self.assertEqual(
-            len(self.test_folder.find_items(subject__startswith=item.subject[:12], categories__contains=self.categories)),
+            len(self.test_folder.filter(subject__startswith=item.subject[:12], categories__contains=self.categories)),
             1
         )
         self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
@@ -931,19 +933,19 @@ class BaseItemTest(EWSTest):
         item.subject = get_random_string(16)
         ids = self.test_folder.add_items(items=[item])
         self.assertEqual(
-            len(self.test_folder.find_items(subject__istartswith='XXX' + item.subject[:12], categories__contains=self.categories)),
+            len(self.test_folder.filter(subject__istartswith='XXX' + item.subject[:12], categories__contains=self.categories)),
             0
         )
         self.assertEqual(
-            len(self.test_folder.find_items(subject__istartswith=item.subject[:12].lower(), categories__contains=self.categories)),
+            len(self.test_folder.filter(subject__istartswith=item.subject[:12].lower(), categories__contains=self.categories)),
             1
         )
         self.assertEqual(
-            len(self.test_folder.find_items(subject__istartswith=item.subject[:12].upper(), categories__contains=self.categories)),
+            len(self.test_folder.filter(subject__istartswith=item.subject[:12].upper(), categories__contains=self.categories)),
             1
         )
         self.assertEqual(
-            len(self.test_folder.find_items(subject__istartswith=item.subject[:12], categories__contains=self.categories)),
+            len(self.test_folder.filter(subject__istartswith=item.subject[:12], categories__contains=self.categories)),
             1
         )
         self.test_folder.delete_items(ids, affected_task_occurrences=ALL_OCCURRENCIES)
@@ -951,7 +953,7 @@ class BaseItemTest(EWSTest):
     def test_getitems(self):
         item = self.get_test_item()
         self.test_folder.add_items(items=[item, item])
-        ids = self.test_folder.find_items(categories__contains=self.categories)
+        ids = self.test_folder.filter(categories__contains=self.categories)
         items = self.test_folder.get_items(ids=ids)
         for item in items:
             assert isinstance(item, self.ITEM_CLASS)
@@ -961,7 +963,7 @@ class BaseItemTest(EWSTest):
     def test_extra_fields(self):
         item = self.get_test_item()
         self.test_folder.add_items(items=[item, item])
-        ids = self.test_folder.find_items(categories__contains=self.categories)
+        ids = self.test_folder.filter(categories__contains=self.categories)
         items = self.test_folder.get_items(ids=ids, with_extra=True)
         for item in items:
             assert isinstance(item, self.ITEM_CLASS)
@@ -1008,7 +1010,7 @@ class BaseItemTest(EWSTest):
             # It's gone from the account
             self.test_folder.get_items(ids=[item_id])
             # Really gone, not just changed ItemId
-            ids = self.test_folder.find_items(categories__contains=item.categories)
+            ids = self.test_folder.filter(categories__contains=item.categories)
             self.assertEqual(len(ids), 0)
 
     def test_soft_delete(self):
@@ -1022,11 +1024,11 @@ class BaseItemTest(EWSTest):
             # It's gone from the test folter
             self.test_folder.get_items(ids=[item_id])
         # Really gone, not just changed ItemId
-        self.assertEqual(len(self.test_folder.find_items(categories__contains=item.categories)), 0)
+        self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 0)
         # If the dumpster is enabled, we should be able to find the item again. It probably isn't on this test account.
-        self.assertEqual(len(self.test_folder.find_items(categories__contains=item.categories)), 0)
-        self.assertEqual(len(self.account.trash.find_items(categories__contains=item.categories)), 0)
-        self.assertEqual(len(self.account.recoverable_deleted_items.find_items(categories__contains=item.categories)), 0)
+        self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 0)
+        self.assertEqual(len(self.account.trash.filter(categories__contains=item.categories)), 0)
+        self.assertEqual(len(self.account.recoverable_deleted_items.filter(categories__contains=item.categories)), 0)
 
     def test_move_to_trash(self):
         # First, empty trash bin
@@ -1039,11 +1041,11 @@ class BaseItemTest(EWSTest):
             # Not in the test folder anymore
             self.test_folder.get_items(ids=[item_id])
         # Really gone, not just changed ItemId
-        self.assertEqual(len(self.test_folder.find_items(categories__contains=item.categories)), 0)
+        self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 0)
         # Test that the item moved to trash
         if isinstance(item, Message):
             # TODO: This only works for Messages?!
-            ids = self.account.trash.find_items(categories__contains=item.categories)
+            ids = self.account.trash.filter(categories__contains=item.categories)
             self.assertEqual(len(ids), 1)
             moved_item = self.account.trash.get_items(ids=ids)[0]
             # The item was copied, so the ItemId has changed. Let's compare the subject instead
@@ -1057,7 +1059,7 @@ class BaseItemTest(EWSTest):
         insert_ids = self.test_folder.add_items(items=(i for i in [item]))
         self.assertEqual(len(insert_ids), 1)
         assert isinstance(insert_ids[0], tuple)
-        find_ids = self.test_folder.find_items(categories__contains=item.categories)
+        find_ids = self.test_folder.filter(categories__contains=item.categories)
         self.assertEqual(len(find_ids), 1)
         self.assertEqual(len(find_ids[0]), 2)
         self.assertEqual(insert_ids, find_ids)
@@ -1159,7 +1161,7 @@ class MessagesTest(BaseItemTest):
         item.send()
         self.assertIsNone(item.item_id)
         self.assertIsNone(item.changekey)
-        self.assertEqual(len(self.test_folder.find_items(categories__contains=self.categories)), 0)
+        self.assertEqual(len(self.test_folder.filter(categories__contains=self.categories)), 0)
 
     def test_send_and_save(self):
         # Test that we can send_and_save Message items
@@ -1168,7 +1170,7 @@ class MessagesTest(BaseItemTest):
         self.assertIsNone(item.item_id)
         self.assertIsNone(item.changekey)
         time.sleep(1)  # Requests are supposed to be transactional, but apparently not...
-        ids = self.test_folder.find_items(categories__contains=self.categories)
+        ids = self.test_folder.filter(categories__contains=self.categories)
         self.assertEqual(len(ids), 1)
         item.item_id, item.changekey = ids[0]
         item.delete()
@@ -1203,8 +1205,10 @@ def get_random_choice(choices):
     return random.sample(choices, 1)[0]
 
 
-def get_random_string(length, spaces=True):
-    chars = string.ascii_letters + string.digits + ':.-_'
+def get_random_string(length, spaces=True, special=True):
+    chars = string.ascii_letters + string.digits
+    if special:
+        chars += ':.-_'
     if spaces:
         chars += ' '
     # We want random strings that don't end in spaces - Exchange strips these
@@ -1215,12 +1219,22 @@ def get_random_string(length, spaces=True):
     return res
 
 
+def get_random_url():
+    path_len = random.randint(1, 16)
+    domain_len = random.randint(1, 30)
+    tld_len = random.randint(2, 4)
+    return 'http://%s.%s/%s.html' % tuple(map(
+        lambda i: get_random_string(i, spaces=False, special=False).lower(),
+        (domain_len, tld_len, path_len)
+    ))
+
+
 def get_random_email():
     account_len = random.randint(1, 6)
     domain_len = random.randint(1, 30)
     tld_len = random.randint(2, 4)
     return '%s@%s.%s' % tuple(map(
-        lambda i: get_random_string(i, spaces=False).lower(),
+        lambda i: get_random_string(i, spaces=False, special=False).lower(),
         (account_len, domain_len, tld_len)
     ))
 

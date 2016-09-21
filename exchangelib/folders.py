@@ -8,8 +8,8 @@ automatically instead of taking advantage of Python SOAP libraries and the WSDL 
 from logging import getLogger
 from decimal import Decimal
 import functools
+import warnings
 
-from .credentials import DELEGATE
 from .ewsdatetime import EWSDateTime, UTC_NOW
 from .restriction import Restriction, Q
 from .services import TNS, FindItem, IdOnly, SHALLOW, DEEP, DeleteItem, CreateItem, UpdateItem, FindFolder, GetFolder, \
@@ -712,7 +712,7 @@ class Item(EWSElement):
                 val = get_xml_attr(elem, cls.response_xml_elem_for_field(fieldname))
                 if val is not None:
                     kwargs[fieldname] = True if val == 'true' else False
-            elif field_type in (str, Choice, Email):
+            elif field_type in (str, Choice, Email, AnyURI):
                 val = get_xml_attr(elem, cls.response_xml_elem_for_field(fieldname))
                 if val is not None:
                     kwargs[fieldname] = val
@@ -802,9 +802,13 @@ class Folder:
         return cls.item_model.response_xml_elem_for_field(fieldname)
 
     def all(self):
-        return self.find_items()
+        return self.filter()
 
     def find_items(self, *args, **kwargs):
+        warnings.warn('find_items() is deprecated. Use filter() instead', PendingDeprecationWarning)
+        return self.filter(*args, **kwargs)
+
+    def filter(self, *args, **kwargs):
         """
         Finds items in the folder.
 
@@ -824,12 +828,12 @@ class Folder:
 
         Examples:
 
-            my_account.inbox.find_items(datetime_received__gt=EWSDateTime(2016, 1, 1))
-            my_account.calendar.find_items(start__range=(EWSDateTime(2016, 1, 1), EWSDateTime(2017, 1, 1)))
-            my_account.tasks.find_items(subject='Hi mom')
-            my_account.tasks.find_items(subject__not='Hi mom')
-            my_account.tasks.find_items(subject__contains='Foo')
-            my_account.tasks.find_items(subject__icontains='foo')
+            my_account.inbox.filter(datetime_received__gt=EWSDateTime(2016, 1, 1))
+            my_account.calendar.filter(start__range=(EWSDateTime(2016, 1, 1), EWSDateTime(2017, 1, 1)))
+            my_account.tasks.filter(subject='Hi mom')
+            my_account.tasks.filter(subject__not='Hi mom')
+            my_account.tasks.filter(subject__contains='Foo')
+            my_account.tasks.filter(subject__icontains='foo')
 
         """
         # 'endswith' and 'iendswith' could be implemented by searching with 'contains' or 'icontains' and then
@@ -1003,7 +1007,7 @@ class Folder:
 
     def get_items(self, ids, with_extra=True):
         # 'with_extra' determines whether to get the extra fields defined in Item.EXTRA_ITEM_FIELDS. This is still a
-        # kludge - instead, the user should be able to specify the exact fields to get or ignore. See also find_items()
+        # kludge - instead, the user should be able to specify the exact fields to get or ignore. See also filter()
         if hasattr(self, 'with_extra_fields'):
             raise DeprecationWarning(
                 "'%(cls)s.with_extra_fields' is deprecated. Use '%(cls)s.get_items(ids, with_extra=True)' instead"
@@ -1024,7 +1028,7 @@ class Folder:
         Does a simple FindItem to test (read) access to the folder. Maybe the account doesn't exist, maybe the
         service user doesn't have access to the calendar. This will throw the most common errors.
         """
-        self.find_items(subject='DUMMY')
+        self.filter(subject='DUMMY')
         return True
 
     def folderid_xml(self):
@@ -1634,6 +1638,12 @@ class Tasks(Folder):
     }
 
 
+class AnyURI(str):
+    # Helper to mark strings that must conform to xsd:anyURI
+    # If we want an URI validator, see http://stackoverflow.com/questions/14466585/is-this-regex-correct-for-xsdanyuri
+    pass
+
+
 class Contact(ItemMixIn):
     # Supported attrs: see https://msdn.microsoft.com/en-us/library/office/aa581315(v=exchg.150).aspx
     ELEMENT_NAME = 'Contact'
@@ -1661,7 +1671,7 @@ class Contact(ItemMixIn):
         'phone_numbers': (PhoneNumber, [PhoneNumber]),
         'assistant_name': ('AssistantName', str),
         'birthday': ('Birthday', EWSDateTime),
-        'business_homepage': ('BusinessHomePage', str),
+        'business_homepage': ('BusinessHomePage', AnyURI),
         'companies': ('Companies', [str]),
         'department': ('Department', str),
         'generation': ('Generation', str),
