@@ -10,14 +10,17 @@ HEAD
   attributes.
 * Added support for distinguished folders ``Account.trash``, ``Account.drafts``, ``Account.outbox``,
   ``Account.sent`` and ``Account.junk``.
+* Renamed ``Folder.find_items()`` to ``Folder.filter()``
+* Renamed ``Folder.add_items()`` to ``Folder.bulk_create()``
+* Renamed ``Folder.update_items()`` to ``Folder.bulk_update()``
+* Renamed ``Folder.delete_items()`` to ``Folder.bulk_delete()``
 * Made various policies for message saving, meeting invitation sending, conflict resolution, task occurrences and
-  deletion available on ``add_items()``, ``update_items()`` and ``delete_items()``.
+  deletion available on ``bulk_create()``, ``bulk_update()`` and ``bulk_delete()``.
 * Added convenience methods ``Item.save()``, ``Item.delete()``, ``Item.soft_delete()``, ``Item.move_to_trash()``, and
   methods ``Message.send()`` and ``Message.send_and_save()`` that are specific to ``Message` objects. These methods
   make it easier to create, update and delete single items.
 * Added helper method ``Folder.clear()`` that deletes all items in a folder, and ``Folder.add()`` that gets all items in
   a folder.
-
 
 1.6.2
 -----

@@ -70,7 +70,7 @@ def perf_test(cbs, dbs, ps):
     config.protocol.poolsize = ps
     print(('Config: batch %s/%s pool %s' % (cbs, dbs, ps)))
 
-    ids = cal.add_items(items=calitems)
+    ids = cal.bulk_create(items=calitems)
 
     t3 = datetime.now()
     delta = t3 - t2
@@ -84,7 +84,7 @@ def perf_test(cbs, dbs, ps):
     delta = t4 - t3
     avg_fetch = avg(delta, n)
     print(('Time to fetch %s items: %s (%s / sec)' % (len(ids), delta, avg_fetch)))
-    result = cal.delete_items(ids)
+    result = cal.bulk_delete(ids)
     for stat, msg in result:
         if not stat:
             print(('ERROR: %s' % msg))

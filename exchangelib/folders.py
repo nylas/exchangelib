@@ -573,12 +573,12 @@ class Item(EWSElement):
         if self.item_id:
             assert self.changekey
             update_kwargs = {k: getattr(self, k) for k in self.fieldnames() if k not in self.readonly_fields()}
-            return self.folder.update_items(
+            return self.folder.bulk_update(
                 items=[(self, update_kwargs)], message_disposition=message_disposition,
                 conflict_resolution=conflict_resolution,
                 send_meeting_invitations_or_cancellations=send_meeting_invitations)
         else:
-            return self.folder.add_items(
+            return self.folder.bulk_create(
                 items=[self], message_disposition=message_disposition,
                 send_meeting_invitations=send_meeting_invitations)
 
@@ -605,7 +605,7 @@ class Item(EWSElement):
     def _delete(self, delete_type, send_meeting_cancellations, affected_task_occurrences):
         if not self.folder:
             raise ValueError('Item must have a folder')
-        self.folder.delete_items(
+        self.folder.bulk_delete(
             ids=[self], delete_type=delete_type, send_meeting_cancellations=send_meeting_cancellations,
             affected_task_occurrences=affected_task_occurrences)
 
@@ -923,7 +923,11 @@ class Folder:
             return list(map(self.item_model.id_from_xml, items))
         return list(map(lambda i: self.item_model.from_xml(elem=i, folder=self), items))
 
-    def add_items(self, items, message_disposition=SAVE_ONLY, send_meeting_invitations=SEND_TO_NONE):
+    def add_items(self, *args, **kwargs):
+        warnings.warn('add_items() is deprecated. Use bulk_create() instead', PendingDeprecationWarning)
+        return self.bulk_create(*args, **kwargs)
+
+    def bulk_create(self, items, message_disposition=SAVE_ONLY, send_meeting_invitations=SEND_TO_NONE):
         """
         Creates new items in the folder. 'items' is an iterable of Item objects. Returns a list of (id, changekey)
         tuples in the same order as the input.
@@ -948,10 +952,14 @@ class Folder:
 
     def clear(self):
         # Helper method that clears a folder of all objects. For tasks, make sure we can delete recurring tasks.
-        self.delete_items(ids=self.all(), delete_type=HARD_DELETE, affected_task_occurrences=ALL_OCCURRENCIES)
+        self.bulk_delete(ids=self.all(), delete_type=HARD_DELETE, affected_task_occurrences=ALL_OCCURRENCIES)
 
-    def delete_items(self, ids, delete_type=HARD_DELETE, send_meeting_cancellations=SEND_TO_NONE,
-                     affected_task_occurrences=SPECIFIED_OCCURRENCE_ONLY):
+    def delete_items(self, *args, **kwargs):
+        warnings.warn('delete_items() is deprecated. Use bulk_delete() instead', PendingDeprecationWarning)
+        return self.bulk_delete(*args, **kwargs)
+
+    def bulk_delete(self, ids, delete_type=HARD_DELETE, send_meeting_cancellations=SEND_TO_NONE,
+                    affected_task_occurrences=SPECIFIED_OCCURRENCE_ONLY):
         """
         Deletes items in the folder. 'ids' is an iterable of either (item_id, changekey) tuples or Item objects.
         'affected_task_occurrences' is only applicable for recurring Task items.
@@ -976,8 +984,12 @@ class Folder:
             folder=self, ids=ids, delete_type=delete_type, send_meeting_cancellations=send_meeting_cancellations,
             affected_task_occurrences=affected_task_occurrences)
 
-    def update_items(self, items, conflict_resolution=AUTO_RESOLVE, message_disposition=SAVE_ONLY,
-                     send_meeting_invitations_or_cancellations=SEND_TO_NONE):
+    def update_items(self, *args, **kwargs):
+        warnings.warn('update_items() is deprecated. Use bulk_update() instead', PendingDeprecationWarning)
+        return self.bulk_update(*args, **kwargs)
+
+    def bulk_update(self, items, conflict_resolution=AUTO_RESOLVE, message_disposition=SAVE_ONLY,
+                    send_meeting_invitations_or_cancellations=SEND_TO_NONE):
         """
         Updates items in the folder. 'items' is an iterable of tuples containing two elements:
 

@@ -67,7 +67,7 @@ Here is a simple example that inserts, retrieves and deletes calendar items in a
 
     # Create the calendar items in the user's standard calendar.  If you want to access a
     # non-standard calendar, choose a different one from account.folders[Calendar]
-    res = account.calendar.add_items(calendar_items)
+    res = account.calendar.bulk_create(calendar_items)
     print(res)
 
     # Get Exchange ID and changekey of the calendar items we just created. We filter by
@@ -100,5 +100,5 @@ Here is a simple example that inserts, retrieves and deletes calendar items in a
         print(item.start, item.end, item.subject, items.body, item.location)
 
     # Delete the calendar items again
-    res = account.calendar.delete_items(ids)
+    res = account.calendar.bulk_delete(ids)
     print(res)
