@@ -1048,9 +1048,11 @@ class Folder:
     def get_xml(self, ids, additional_fields):
         # Takes a list of (item_id, changekey) tuples or Item objects and returns the XML for a GetItem request.
         #
-        # The 'additional_properties' list should be configurable. 'body' element can only be fetched with GetItem.
-        # CalendarItem.from_xml() specifies the items we currently expect. For full list, see
-        # https://msdn.microsoft.com/en-us/library/office/aa494315(v=exchg.150).aspx
+        # We start with an IdOnly request. 'additional_properties' defines the additional fields we want. Supported
+        # fields are available in self.item_model.fieldnames().
+        #
+        # We can achieve almost the same in one single request with FindItems, but the 'body' element can only be
+        # fetched with GetItem.
         getitem = create_element('m:%s' % GetItem.SERVICE_NAME)
         itemshape = create_element('m:ItemShape')
         add_xml_child(itemshape, 't:BaseShape', IdOnly)
