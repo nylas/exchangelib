@@ -7,10 +7,10 @@ automatically instead of taking advantage of Python SOAP libraries and the WSDL 
 
 from logging import getLogger
 from decimal import Decimal
-import functools
 import warnings
 
 from .ewsdatetime import EWSDateTime, UTC_NOW
+from .queryset import QuerySet
 from .restriction import Restriction, Q
 from .services import TNS, FindItem, IdOnly, SHALLOW, DEEP, DeleteItem, CreateItem, UpdateItem, FindFolder, GetFolder, \
     GetItem, MNS, ITEM_TRAVERSAL_CHOICES, FOLDER_TRAVERSAL_CHOICES, SHAPE_CHOICES
@@ -842,7 +842,7 @@ class Folder:
 
         # Build up any restrictions
         q = Q.from_filter_args(self.item_model, *args, **kwargs)
-        if q:
+        if q and not q.is_empty():
             restriction = Restriction(q.translate_fields(item_model=self.item_model))
         else:
             restriction = None
@@ -858,7 +858,7 @@ class Folder:
         items = FindItem(self.account.protocol).call(folder=self, additional_fields=additional_fields,
                                                      restriction=restriction, shape=shape, depth=depth)
         log.debug('Found %s items', len(items))
-        if shape == IdOnly:
+        if shape == IdOnly and additional_fields is None:
             return list(map(self.item_model.id_from_xml, items))
         return map(lambda i: self.item_model.from_xml(elem=i, folder=self), items)
 
@@ -880,6 +880,8 @@ class Folder:
             message_disposition,
             send_meeting_invitations,
         )
+        if isinstance(items, QuerySet):
+            ids = iter(items)
         is_empty, items = peek(items)
         if is_empty:
             # We accept generators, so it's not always convenient for caller to know up-front if 'items' is empty. Allow
@@ -914,6 +916,8 @@ class Folder:
             send_meeting_cancellations,
             affected_task_occurrences,
         )
+        if isinstance(ids, QuerySet):
+            ids = iter(ids)
         is_empty, ids = peek(ids)
         if is_empty:
             # We accept generators, so it's not always convenient for caller to know up-front if 'items' is empty. Allow
@@ -947,6 +951,8 @@ class Folder:
             message_disposition,
             send_meeting_invitations_or_cancellations,
         )
+        if isinstance(items, QuerySet):
+            ids = iter(items)
         is_empty, items = peek(items)
         if is_empty:
             # We accept generators, so it's not always convenient for caller to know up-front if 'items' is empty. Allow
@@ -966,6 +972,8 @@ class Folder:
             raise DeprecationWarning(
                 "'%(cls)s.with_extra_fields' is deprecated. Use 'fetch(ids, only_fields=[...])' instead"
                 % dict(cls=self.__class__.__name__))
+        if isinstance(ids, QuerySet):
+            ids = iter(ids)
         is_empty, ids = peek(ids)
         if is_empty:
             # We accept generators, so it's not always convenient for caller to know up-front if 'items' is empty. Allow

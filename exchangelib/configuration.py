@@ -1,6 +1,5 @@
 import logging
 
-from .credentials import Credentials
 from .protocol import Protocol
 from .transport import AUTH_TYPE_MAP
 

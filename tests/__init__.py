@@ -19,6 +19,7 @@ from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_
 from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, ExternId, Choice, Email, Contact, Task, \
     EmailAddress, PhysicalAddress, PhoneNumber, IndexedField, RoomList, Calendar, DeletedItems, Drafts, Inbox, Outbox, \
     SentItems, JunkEmail, Tasks, Contacts, AnyURI, ALL_OCCURRENCIES
+from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.restriction import Restriction, Q
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms
 from exchangelib.util import xml_to_str, chunkify, peek, get_redirect_url
@@ -636,6 +637,76 @@ class BaseItemTest(EWSTest):
         self.test_folder.all()
         self.account.protocol.credentials.is_service_account = True
 
+    def test_querysets(self):
+        self.test_folder.clear()
+        test_items = []
+        for i in range(4):
+            item = self.get_test_item()
+            item.subject = 'Item %s' % i
+            test_items.append(item)
+        ids = self.test_folder.bulk_create(items=test_items)
+        qs = QuerySet(self.test_folder)
+        self.assertEqual(
+            set((i.subject, i.categories[0]) for i in qs.all()),
+            {('Item 0', 'Test'), ('Item 1', 'Test'), ('Item 2', 'Test'), ('Item 3', 'Test')}
+        )
+        self.assertEqual(
+            [(i.subject, i.categories[0]) for i in qs.none()],
+            []
+        )
+        self.assertEqual(
+            [(i.subject, i.categories[0]) for i in qs.filter(subject__startswith='Item 2')],
+            [('Item 2', 'Test')]
+        )
+        self.assertEqual(
+            set((i.subject, i.categories[0]) for i in qs.exclude(subject__startswith='Item 2')),
+            {('Item 0', 'Test'), ('Item 1', 'Test'), ('Item 3', 'Test')}
+        )
+        self.assertEqual(
+            set((i.subject, i.categories) for i in qs.all().only('subject')),
+            {('Item 0', None), ('Item 1', None), ('Item 2', None), ('Item 3', None)}
+        )
+        self.assertEqual(
+            [(i.subject, i.categories[0]) for i in qs.all().order_by('subject')],
+            [('Item 0', 'Test'), ('Item 1', 'Test'), ('Item 2', 'Test'), ('Item 3', 'Test')]
+        )
+        self.assertEqual(
+            [(i.subject, i.categories[0]) for i in qs.all().order_by('subject').reverse()],
+            [('Item 3', 'Test'), ('Item 2', 'Test'), ('Item 1', 'Test'), ('Item 0', 'Test')]
+        )
+        self.assertEqual(
+            [i for i in qs.order_by('subject').values('subject')],
+            [{'subject': 'Item 0'}, {'subject': 'Item 1'}, {'subject': 'Item 2'}, {'subject': 'Item 3'}]
+        )
+        self.assertEqual(
+            set(i for i in qs.values_list('subject')),
+            {('Item 0',), ('Item 1',), ('Item 2',), ('Item 3',)}
+        )
+        self.assertEqual(
+            set(i for i in qs.values_list('subject', flat=True)),
+            {'Item 0', 'Item 1', 'Item 2', 'Item 3'}
+        )
+        self.assertEqual(
+            set((i.subject, i.categories[0]) for i in qs.exclude(subject__startswith='Item 2')),
+            {('Item 0', 'Test'), ('Item 1', 'Test'), ('Item 3', 'Test')}
+        )
+        self.assertEqual(
+            set((i.subject, i.categories[0]) for i in qs.iterator()),
+            {('Item 0', 'Test'), ('Item 1', 'Test'), ('Item 2', 'Test'), ('Item 3', 'Test')}
+        )
+        self.assertEqual(qs.get(subject='Item 3').subject, 'Item 3')
+        with self.assertRaises(DoesNotExist):
+            qs.get(subject='Item XXX')
+        with self.assertRaises(MultipleObjectsReturned):
+            qs.get(subject__startswith='Item')
+        self.assertEqual(qs.count(), 4)
+        self.assertEqual(qs.exists(), True)
+        self.assertEqual(qs.filter(subject='Test XXX').exists(), False)
+        self.assertEqual(
+            qs.filter(subject__startswith='Item').delete(),
+            [(True, None), (True, None), (True, None), (True, None)]
+        )
+
     def test_finditems(self):
         now = UTC_NOW()
 
@@ -1057,7 +1128,7 @@ class BaseItemTest(EWSTest):
         self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 0)
         # Test that the item moved to trash
         if isinstance(item, Message):
-            # TODO: This only works for Messages?!
+            # TODO: This only works for Messages. Maybe our support for trash can only handle Message objects?
             ids = self.account.trash.filter(categories__contains=item.categories)
             self.assertEqual(len(ids), 1)
             moved_item = self.account.trash.fetch(ids=ids)[0]
@@ -1274,7 +1345,7 @@ def get_random_datetime_range():
 if __name__ == '__main__':
     import logging
     # loglevel = logging.DEBUG
-    loglevel = logging.INFO
+    loglevel = logging.WARNING
     logging.basicConfig(level=loglevel)
     logging.getLogger('exchangelib').setLevel(loglevel)
     unittest.main()

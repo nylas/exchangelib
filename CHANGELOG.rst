@@ -18,11 +18,15 @@ HEAD
 * Made various policies for message saving, meeting invitation sending, conflict resolution, task occurrences and
   deletion available on ``bulk_create()``, ``bulk_update()`` and ``bulk_delete()``.
 * Added convenience methods ``Item.save()``, ``Item.delete()``, ``Item.soft_delete()``, ``Item.move_to_trash()``, and
-  methods ``Message.send()`` and ``Message.send_and_save()`` that are specific to ``Message` objects. These methods
+  methods ``Message.send()`` and ``Message.send_and_save()`` that are specific to ``Message`` objects. These methods
   make it easier to create, update and delete single items.
 * Added helper method ``Folder.clear()`` that deletes all items in a folder, and ``Folder.add()`` that gets all items in
   a folder.
 * Removed ``fetch(.., with_extra=True)`` in favor of the more finegrained ``fetch(.., only_fields=[...])``
+* Added a ``QuerySet`` class that supports QuerySet-returning methods ``filter()``, ``exclude()``, ``only()``,
+  ``order_by()`` and ``reverse()`` that all allow for chaining. ``QuerySet`` also has methods ``values()``,
+  ``values_list()``, ``iterator()``, ``get()``, ``count()``, ``exists()`` and ``delete()``. All these methods behave
+  like their counterparts in Django.
 
 
 1.6.2

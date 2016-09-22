@@ -6,7 +6,6 @@ from threading import get_ident
 from datetime import datetime
 from copy import deepcopy
 import itertools
-from types import GeneratorType
 from decimal import Decimal
 
 from .errors import TransportError, RateLimitError, RedirectError, RelativeRedirect
@@ -43,16 +42,16 @@ def chunkify(iterable, chunksize):
 
 def peek(iterable):
     """
-    Checks if an iterable is empty and returns status and the rewinded generator
+    Checks if an iterable or iterator is empty and returns status and the rewinded iterable or iterator
     """
-    if isinstance(iterable, (GeneratorType, map)):
+    if hasattr(iterable, '__len__'):
+        return len(iterable) == 0, iterable
+    else:
         try:
             first = next(iterable)
         except StopIteration:
             return True, iterable
         return False, itertools.chain([first], iterable)
-    else:
-        return len(iterable) == 0, iterable
 
 
 def xml_to_str(tree, encoding='utf-8'):
