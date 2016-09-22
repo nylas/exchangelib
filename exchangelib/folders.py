@@ -802,7 +802,7 @@ class Folder:
         Finds items in the folder.
 
         'shape' controls the exact fields returned are governed by. Be aware that the 'body' element can only be fetched
-        with get_items().
+        with fetch().
         'depth' controls the search depth into sub-folders.
 
         Non-keyword args may be a search expression as supported by Restriction.from_source(), or a list of Q instances.
@@ -1010,11 +1010,15 @@ class Folder:
             folder=self, items=items, conflict_resolution=conflict_resolution, message_disposition=message_disposition,
             send_meeting_invitations_or_cancellations=send_meeting_invitations_or_cancellations)))
 
-    def get_items(self, ids, only_fields=None):
+    def get_items(self, *args, **kwargs):
+        warnings.warn('get_items() is deprecated. Use fetch() instead', PendingDeprecationWarning)
+        return self.fetch(*args, **kwargs)
+
+    def fetch(self, ids, only_fields=None):
         # 'only_fields' specifies which fields to fetch, instead of all possible fields.
         if hasattr(self, 'with_extra_fields'):
             raise DeprecationWarning(
-                "'%(cls)s.with_extra_fields' is deprecated. Use 'get_items(ids, only_fields=[...])' instead"
+                "'%(cls)s.with_extra_fields' is deprecated. Use 'fetch(ids, only_fields=[...])' instead"
                 % dict(cls=self.__class__.__name__))
         is_empty, ids = peek(ids)
         if is_empty:

@@ -14,6 +14,7 @@ HEAD
 * Renamed ``Folder.add_items()`` to ``Folder.bulk_create()``
 * Renamed ``Folder.update_items()`` to ``Folder.bulk_update()``
 * Renamed ``Folder.delete_items()`` to ``Folder.bulk_delete()``
+* Renamed ``Folder.get_items()`` to ``Folder.fetch()``
 * Made various policies for message saving, meeting invitation sending, conflict resolution, task occurrences and
   deletion available on ``bulk_create()``, ``bulk_update()`` and ``bulk_delete()``.
 * Added convenience methods ``Item.save()``, ``Item.delete()``, ``Item.soft_delete()``, ``Item.move_to_trash()``, and
@@ -21,7 +22,7 @@ HEAD
   make it easier to create, update and delete single items.
 * Added helper method ``Folder.clear()`` that deletes all items in a folder, and ``Folder.add()`` that gets all items in
   a folder.
-* Removed ``get_items(.., with_extra=True)`` in favor of the more finegrained ``get_items(.., only_fields=[...])``
+* Removed ``fetch(.., with_extra=True)`` in favor of the more finegrained ``fetch(.., only_fields=[...])``
 
 
 1.6.2

@@ -431,7 +431,7 @@ class CommonTest(EWSTest):
         self.assertEqual(len(return_ids), len(items))
         ids = self.account.calendar.filter(start__lt=end, end__gt=start, categories__contains=self.categories)
         self.assertEqual(len(ids), len(items))
-        items = self.account.calendar.get_items(return_ids)
+        items = self.account.calendar.fetch(return_ids)
         for i, item in enumerate(items):
             subject = 'Test Subject %s' % i
             self.assertEqual(item.start, start)
@@ -624,7 +624,7 @@ class BaseItemTest(EWSTest):
     def test_empty_args(self):
         # We allow empty sequences for these methods
         self.assertEqual(self.test_folder.bulk_create(items=[]), [])
-        self.assertEqual(self.test_folder.get_items(ids=[]), [])
+        self.assertEqual(self.test_folder.fetch(ids=[]), [])
         self.assertEqual(self.test_folder.bulk_update(items=[]), [])
         self.assertEqual(self.test_folder.bulk_delete(ids=[]), [])
 
@@ -960,7 +960,7 @@ class BaseItemTest(EWSTest):
         item = self.get_test_item()
         self.test_folder.bulk_create(items=[item, item])
         ids = self.test_folder.filter(categories__contains=self.categories)
-        items = self.test_folder.get_items(ids=ids)
+        items = self.test_folder.fetch(ids=ids)
         for item in items:
             assert isinstance(item, self.ITEM_CLASS)
         self.assertEqual(len(items), 2)
@@ -970,7 +970,7 @@ class BaseItemTest(EWSTest):
         item = self.get_test_item()
         self.test_folder.bulk_create(items=[item, item])
         ids = self.test_folder.filter(categories__contains=self.categories)
-        items = self.test_folder.get_items(ids=ids, only_fields=None)
+        items = self.test_folder.fetch(ids=ids, only_fields=None)
         for item in items:
             assert isinstance(item, self.ITEM_CLASS)
             for f in self.ITEM_CLASS.fieldnames():
@@ -982,7 +982,7 @@ class BaseItemTest(EWSTest):
                 self.assertIsNotNone(getattr(item, f), (f, getattr(item, f)))
         self.assertEqual(len(items), 2)
         only_fields = ('subject', 'body', 'categories')
-        items = self.test_folder.get_items(ids=ids, only_fields=only_fields)
+        items = self.test_folder.fetch(ids=items, only_fields=only_fields)
         for item in items:
             assert isinstance(item, self.ITEM_CLASS)
             for f in self.ITEM_CLASS.fieldnames():
@@ -1011,7 +1011,7 @@ class BaseItemTest(EWSTest):
         for k, v in update_kwargs.items():
             setattr(item, k, v)
         item.save()
-        updated_item = self.test_folder.get_items(ids=[item])[0]
+        updated_item = self.test_folder.fetch(ids=[item])[0]
         for k, v in update_kwargs.items():
             self.assertEqual(getattr(updated_item, k), v, (k, getattr(updated_item, k), v))
 
@@ -1020,7 +1020,7 @@ class BaseItemTest(EWSTest):
         item.delete(affected_task_occurrences=ALL_OCCURRENCIES)
         with self.assertRaises(ErrorItemNotFound):
             # It's gone from the account
-            self.test_folder.get_items(ids=[item_id])
+            self.test_folder.fetch(ids=[item_id])
             # Really gone, not just changed ItemId
             ids = self.test_folder.filter(categories__contains=item.categories)
             self.assertEqual(len(ids), 0)
@@ -1034,10 +1034,11 @@ class BaseItemTest(EWSTest):
         item.soft_delete(affected_task_occurrences=ALL_OCCURRENCIES)
         with self.assertRaises(ErrorItemNotFound):
             # It's gone from the test folter
-            self.test_folder.get_items(ids=[item_id])
+            self.test_folder.fetch(ids=[item_id])
         # Really gone, not just changed ItemId
         self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 0)
         # If the dumpster is enabled, we should be able to find the item again. It probably isn't on this test account.
+        # TODO: or maybe our support for recoverable_deleted_items can only handle Item objects?
         self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 0)
         self.assertEqual(len(self.account.trash.filter(categories__contains=item.categories)), 0)
         self.assertEqual(len(self.account.recoverable_deleted_items.filter(categories__contains=item.categories)), 0)
@@ -1051,7 +1052,7 @@ class BaseItemTest(EWSTest):
         item.move_to_trash(affected_task_occurrences=ALL_OCCURRENCIES)
         with self.assertRaises(ErrorItemNotFound):
             # Not in the test folder anymore
-            self.test_folder.get_items(ids=[item_id])
+            self.test_folder.fetch(ids=[item_id])
         # Really gone, not just changed ItemId
         self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 0)
         # Test that the item moved to trash
@@ -1059,7 +1060,7 @@ class BaseItemTest(EWSTest):
             # TODO: This only works for Messages?!
             ids = self.account.trash.filter(categories__contains=item.categories)
             self.assertEqual(len(ids), 1)
-            moved_item = self.account.trash.get_items(ids=ids)[0]
+            moved_item = self.account.trash.fetch(ids=ids)[0]
             # The item was copied, so the ItemId has changed. Let's compare the subject instead
             self.assertEqual(item.subject, moved_item.subject)
 
@@ -1076,7 +1077,7 @@ class BaseItemTest(EWSTest):
         self.assertEqual(len(find_ids[0]), 2)
         self.assertEqual(insert_ids, find_ids)
         # Test with generator as argument
-        item = self.test_folder.get_items(ids=(i for i in find_ids))[0]
+        item = self.test_folder.fetch(ids=(i for i in find_ids))[0]
         for f in self.ITEM_CLASS.fieldnames():
             if f in self.ITEM_CLASS.readonly_fields():
                 continue
@@ -1096,7 +1097,7 @@ class BaseItemTest(EWSTest):
         self.assertEqual(len(update_ids[0]), 2, update_ids)
         self.assertEqual(insert_ids[0][0], update_ids[0][0])  # ID should be the same
         self.assertNotEqual(insert_ids[0][1], update_ids[0][1])  # Changekey should not be the same when item is updated
-        item = self.test_folder.get_items(update_ids)[0]
+        item = self.test_folder.fetch(update_ids)[0]
         for f in self.ITEM_CLASS.fieldnames():
             if f in self.ITEM_CLASS.readonly_fields():
                 continue
@@ -1132,7 +1133,7 @@ class BaseItemTest(EWSTest):
         self.assertEqual(len(wipe_ids[0]), 2, wipe_ids)
         self.assertEqual(insert_ids[0][0], wipe_ids[0][0])  # ID should be the same
         self.assertNotEqual(insert_ids[0][1], wipe_ids[0][1])  # Changekey should not be the same when item is updated
-        item = self.test_folder.get_items(wipe_ids)[0]
+        item = self.test_folder.fetch(wipe_ids)[0]
         for f in self.ITEM_CLASS.fieldnames():
             if f in self.ITEM_CLASS.required_fields():
                 continue
@@ -1149,7 +1150,7 @@ class BaseItemTest(EWSTest):
         self.assertEqual(len(wipe2_ids[0]), 2, wipe2_ids)
         self.assertEqual(insert_ids[0][0], wipe2_ids[0][0])  # ID should be the same
         self.assertNotEqual(insert_ids[0][1], wipe2_ids[0][1])  # Changekey should not be the same when item is updated
-        item = self.test_folder.get_items(wipe2_ids)[0]
+        item = self.test_folder.fetch(wipe2_ids)[0]
         self.assertEqual(item.extern_id, extern_id)
 
         # Remove test item. Test with generator as argument
