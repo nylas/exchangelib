@@ -793,11 +793,10 @@ class Folder:
     def all(self):
         return self.filter()
 
-    def find_items(self, *args, **kwargs):
-        warnings.warn('find_items() is deprecated. Use filter() instead', PendingDeprecationWarning)
-        return self.filter(*args, **kwargs)
-
     def filter(self, *args, **kwargs):
+        return self.find_items(*args, **kwargs)
+
+    def find_items(self, *args, **kwargs):
         """
         Finds items in the folder.
 
@@ -842,60 +841,7 @@ class Folder:
                 assert f in allowed_field_names
 
         # Build up any restrictions
-        q = None
-        if args:
-            q_args = []
-            for arg in args:
-                # Convert all search expressions to q objects
-                if isinstance(arg, str):
-                    q_args.append(Restriction.from_source(args[0], item_model=self.item_model).q)
-                else:
-                    if not isinstance(arg, Q):
-                        raise ValueError("Non-keyword arg '%s' must be a Q object" % arg)
-                    q_args.append(arg)
-            # AND all the given Q objects together
-            q = functools.reduce(lambda a, b: a & b, q_args)
-        if kwargs:
-            kwargs_q = q or Q()
-            for key, value in kwargs.items():
-                if '__' in key:
-                    field, lookup = key.rsplit('__')
-                else:
-                    field, lookup = key, None
-                # Filtering by category is a bit quirky. The only lookup type I have found to work is:
-                #
-                #     item:Categories == 'foo' AND item:Categories == 'bar' AND ...
-                #
-                #     item:Categories == 'foo' OR item:Categories == 'bar' OR ...
-                #
-                # The former returns items that have these categories, but maybe also others. The latter returns
-                # items that have at least one of these categories. This translates to the 'contains' and 'in' lookups.
-                # Both versions are case-insensitive.
-                #
-                # Exact matching and case-sensitive or partial-string matching is not possible since that requires the
-                # 'Contains' element which only supports matching on string elements, not arrays.
-                #
-                # Exact matching of categories (i.e. match ['a', 'b'] but not ['a', 'b', 'c']) could be implemented by
-                # post-processing items. Fetch 'item:Categories' with additional_fields and remove the items that don't
-                # have an exact match, after the call to FindItems.
-                if field == 'categories':
-                    if lookup not in (Q.LOOKUP_CONTAINS, Q.LOOKUP_IN):
-                        raise ValueError(
-                            "Categories can only be filtered using 'categories__contains=['a', 'b', ...]' and "
-                            "'categories__in=['a', 'b', ...]'")
-                    if isinstance(value, str):
-                        kwargs_q &= Q(categories=value)
-                    else:
-                        children = [Q(categories=v) for v in value]
-                        if lookup == Q.LOOKUP_CONTAINS:
-                            kwargs_q &= Q(*children, conn_type=Q.AND)
-                        elif lookup == Q.LOOKUP_IN:
-                            kwargs_q &= Q(*children, conn_type=Q.OR)
-                        else:
-                            assert False
-                    continue
-                kwargs_q &= Q(**{key: value})
-            q = kwargs_q
+        q = Q.from_filter_args(self.item_model, *args, **kwargs)
         if q:
             restriction = Restriction(q.translate_fields(item_model=self.item_model))
         else:
@@ -914,7 +860,7 @@ class Folder:
         log.debug('Found %s items', len(items))
         if shape == IdOnly:
             return list(map(self.item_model.id_from_xml, items))
-        return list(map(lambda i: self.item_model.from_xml(elem=i, folder=self), items))
+        return map(lambda i: self.item_model.from_xml(elem=i, folder=self), items)
 
     def add_items(self, *args, **kwargs):
         warnings.warn('add_items() is deprecated. Use bulk_create() instead', PendingDeprecationWarning)

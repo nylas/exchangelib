@@ -1,3 +1,4 @@
+import functools
 import logging
 from threading import Lock
 
@@ -103,6 +104,65 @@ class Q:
                     self.value = value
             else:
                 self.children.append(Q(**{key: value}))
+
+    @classmethod
+    def from_filter_args(cls, item_model, *args, **kwargs):
+        # args and kwargs are Django-style q args and field lookups
+        q = None
+        if args:
+            q_args = []
+            for arg in args:
+                # Convert all search expressions to q objects
+                if isinstance(arg, str):
+                    q_args.append(Restriction.from_source(args[0], item_model=item_model).q)
+                else:
+                    if not isinstance(arg, Q):
+                        raise ValueError("Non-keyword arg '%s' must be a Q object" % arg)
+                    q_args.append(arg)
+            # AND all the given Q objects together
+            q = functools.reduce(lambda a, b: a & b, q_args)
+        if kwargs:
+            kwargs_q = q or Q()
+            for key, value in kwargs.items():
+                if '__' in key:
+                    field, lookup = key.rsplit('__')
+                else:
+                    field, lookup = key, None
+                # Filtering by category is a bit quirky. The only lookup type I have found to work is:
+                #
+                #     item:Categories == 'foo' AND item:Categories == 'bar' AND ...
+                #
+                #     item:Categories == 'foo' OR item:Categories == 'bar' OR ...
+                #
+                # The former returns items that have these categories, but maybe also others. The latter returns
+                # items that have at least one of these categories. This translates to the 'contains' and 'in' lookups.
+                # Both versions are case-insensitive.
+                #
+                # Exact matching and case-sensitive or partial-string matching is not possible since that requires the
+                # 'Contains' element which only supports matching on string elements, not arrays.
+                #
+                # Exact matching of categories (i.e. match ['a', 'b'] but not ['a', 'b', 'c']) could be implemented by
+                # post-processing items. Fetch 'item:Categories' with additional_fields and remove the items that don't
+                # have an exact match, after the call to FindItems.
+                if field == 'categories':
+                    if lookup not in (Q.LOOKUP_CONTAINS, Q.LOOKUP_IN):
+                        raise ValueError(
+                            "Categories can only be filtered using 'categories__contains=['a', 'b', ...]' and "
+                            "'categories__in=['a', 'b', ...]'")
+                    if isinstance(value, str):
+                        kwargs_q &= Q(categories=value)
+                    else:
+                        children = [Q(categories=v) for v in value]
+                        if lookup == Q.LOOKUP_CONTAINS:
+                            kwargs_q &= Q(*children, conn_type=Q.AND)
+                        elif lookup == Q.LOOKUP_IN:
+                            kwargs_q &= Q(*children, conn_type=Q.OR)
+                        else:
+                            assert False
+                    continue
+                kwargs_q &= Q(**{key: value})
+            q = kwargs_q
+        return q
 
     @classmethod
     def _lookup_to_op(cls, lookup):
@@ -277,15 +337,15 @@ class Q:
         return elem
 
     def __and__(self, other):
-        # Return a new Q with two children and conn_type AND
+        # & operator. Return a new Q with two children and conn_type AND
         return self.__class__(self, other, conn_type=self.AND)
 
     def __or__(self, other):
-        # Return a new Q with two children and conn_type OR
+        # | operator. Return a new Q with two children and conn_type OR
         return self.__class__(self, other, conn_type=self.OR)
 
     def __invert__(self):
-        # If this is a leaf and op has an inverse, change op. Else return a new Q with conn_type NOT
+        # ~ operator. If this is a leaf and op has an inverse, change op. Else return a new Q with conn_type NOT
         if self.conn_type == self.NOT:
             # This is NOT NOT. Change to AND
             self.conn_type = self.AND

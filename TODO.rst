@@ -9,9 +9,13 @@ Cool things to work on:
 * Password change for accounts: https://support.office.com/en-us/article/Change-password-in-Outlook-Web-App-50bb1309-6f53-4c24-8bfd-ed24ca9e872c
 * SendItem service to send draft emails: https://msdn.microsoft.com/en-us/library/office/aa580238(v=exchg.150).aspx
 * Make it possible to configure the returned item attributes with ``my_folder.filter(foo=bar).only('subject', 'body')``
-* Make ``my_folder.filter()`` lazy to support the above chaining.
+* Let filter() return full objects, unless explicitly told otherwise. Use FindItem if .only() is non-empty and doesn't
+  contain 'dangerous' fields (like 'body'), and fallback to GetItems otherwise.
+* Make ``my_folder.filter()`` lazy and support chaining.
+* Support chaining with ``filter()``, ``exclude()``, ``only()``, ``order_by()`` and ``reverse()``
+  and endpoints ``values()``, ``values_list()``, ``iterator()``, ``get()``, ``count()``, ``exists()`` and ``delete()``
 * Move ``Folder.fetch()`` to ``Account.fetch()`` where it logically belongs, since it gets items anywhere in
-  the mailbox, not just in the folder. To do this, ``.from_xml()`` must guess the correct item class (see
-  _get_elements_in_container() in services.py). Requires implementing ``.only()`` first since ``.get_xml()`` depends on
-``self.item_model.additional_property_elems``.
+  the mailbox, not just in the folder. To do this, ``.from_xml()`` must be prepared to handle all item classes (see
+  _get_elements_in_container() in services.py). Requires implementing ``.only()`` first since ``.GetItem`` payload XML
+  depends on ``self.item_model.additional_property_elems``.
 * Enforce SUBJECT_MAXLENGTH and LOCATION_MAXLENGTH (and other validations on item fields)
