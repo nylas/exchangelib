@@ -23,10 +23,11 @@ from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, 
     ErrorMailboxMoveInProgress, ErrorAccessDenied, ErrorConnectionFailed, RateLimitError, ErrorServerBusy, \
     ErrorTooManyObjectsOpened, ErrorInvalidLicense, ErrorInvalidSchemaVersionForMailboxVersion, \
     ErrorInvalidServerVersion, ErrorItemNotFound
+from .ewsdatetime import EWSDateTime
 from .transport import wrap, SOAPNS, TNS, MNS, ENS
 from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, ElementType, \
     xml_to_str, set_xml_value
-from .version import EXCHANGE_2010
+from .version import EXCHANGE_2010, EXCHANGE_2013
 
 log = logging.getLogger(__name__)
 
@@ -369,7 +370,7 @@ class EWSPooledService(EWSService):
         # Chop items list into suitable pieces and let worker threads chew on the work. The order of the output result
         # list must be the same as the input id list, so the caller knows which status message belongs to which ID.
         func = lambda n: self._get_elements(account=account, payload=payload_func(n, **kwargs))
-        return list(itertools.chain(*account.protocol.thread_pool.map(func, chunkify(items, self.CHUNKSIZE))))
+        return list(itertools.chain(*self.protocol.thread_pool.map(func, chunkify(items, self.CHUNKSIZE))))
 
 
 class GetItem(EWSPooledService):
@@ -385,8 +386,35 @@ class GetItem(EWSPooledService):
 
     def call(self, folder, **kwargs):
         self.element_name = folder.item_model.response_tag()
-        return self._pool_requests(account=folder.account, payload_func=folder.get_xml, items=kwargs['ids'],
-                                   additional_fields=kwargs['additional_fields'])
+        return self._pool_requests(account=folder.account, payload_func=self._get_payload, items=kwargs['ids'],
+                                   folder=folder, additional_fields=kwargs['additional_fields'])
+
+    def _get_payload(self, items, folder, additional_fields):
+        # Takes a list of (item_id, changekey) tuples or Item objects and returns the XML for a GetItem request.
+        #
+        # We start with an IdOnly request. 'additional_properties' defines the additional fields we want. Supported
+        # fields are available in self.item_model.fieldnames().
+        #
+        # We can achieve almost the same in one single request with FindItems, but the 'body' element can only be
+        # fetched with GetItem.
+        from .folders import ItemId
+        getitem = create_element('m:%s' % self.SERVICE_NAME)
+        itemshape = create_element('m:ItemShape')
+        add_xml_child(itemshape, 't:BaseShape', IdOnly)
+        if additional_fields:
+            add_xml_child(itemshape, 't:AdditionalProperties',
+                          folder.item_model.additional_property_elems(additional_fields))
+        getitem.append(itemshape)
+        item_ids = create_element('m:ItemIds')
+        n = 0
+        for item in items:
+            n += 1
+            item_id = ItemId(*item) if isinstance(item, tuple) else ItemId(item.item_id, item.changekey)
+            set_xml_value(item_ids, item_id, folder.account.version)
+        if not n:
+            raise AttributeError('"ids" must not be empty')
+        getitem.append(item_ids)
+        return getitem
 
 
 class CreateItem(EWSPooledService):
@@ -403,10 +431,37 @@ class CreateItem(EWSPooledService):
     def call(self, folder, **kwargs):
         self.element_name = folder.item_model.response_tag()
         return self._pool_requests(
-            account=folder.account, payload_func=folder.create_xml, items=kwargs['items'],
+            account=folder.account, payload_func=self._get_payload, items=kwargs['items'],
+            folder=folder,
             message_disposition=kwargs['message_disposition'],
             send_meeting_invitations=kwargs['send_meeting_invitations'],
         )
+
+    def _get_payload(self, items, folder, message_disposition, send_meeting_invitations):
+        # Takes a list of Item obejcts (CalendarItem, Message etc) and returns the XML for a CreateItem request.
+        # convert items to XML Elements
+        from .folders import Calendar, Messages
+        if isinstance(folder, Calendar):
+            # SendMeetingInvitations is required for calendar items. It is also applicable to tasks, meeting request
+            # responses (see https://msdn.microsoft.com/en-us/library/office/aa566464(v=exchg.150).aspx) and sharing
+            # invitation accepts (see https://msdn.microsoft.com/en-us/library/office/ee693280(v=exchg.150).aspx). The
+            # last two are not supported yet.
+            createitem = create_element('m:%s' % self.SERVICE_NAME,
+                                        SendMeetingInvitations=send_meeting_invitations)
+        elif isinstance(folder, Messages):
+            # MessageDisposition is only applicable to email messages, where it is required.
+            createitem = create_element('m:%s' % self.SERVICE_NAME, MessageDisposition=message_disposition)
+        else:
+            createitem = create_element('m:%s' % self.SERVICE_NAME)
+        add_xml_child(createitem, 'm:SavedItemFolderId', folder.folderid_xml())
+        item_elems = []
+        for item in items:
+            log.debug('Adding item %s', item)
+            item_elems.append(item.to_xml(folder.account.version))
+        if not item_elems:
+            raise AttributeError('"items" must not be empty')
+        add_xml_child(createitem, 'm:Items', item_elems)
+        return createitem
 
 
 class DeleteItem(EWSPooledService):
@@ -423,10 +478,38 @@ class DeleteItem(EWSPooledService):
 
     def call(self, folder, **kwargs):
         return self._pool_requests(
-            account=folder.account, payload_func=folder.delete_xml, items=kwargs['ids'],
+            account=folder.account, payload_func=self._get_payload, items=kwargs['ids'], folder=folder,
             delete_type=kwargs['delete_type'], send_meeting_cancellations=kwargs['send_meeting_cancellations'],
             affected_task_occurrences=kwargs['affected_task_occurrences'],
         )
+
+    def _get_payload(self, items, folder, delete_type, send_meeting_cancellations, affected_task_occurrences):
+        # Takes a list of (item_id, changekey) tuples or Item objects and returns the XML for a DeleteItem request.
+        from .folders import Calendar, Tasks, ItemId
+        if isinstance(folder, Calendar):
+            deleteitem = create_element(
+                'm:%s' % self.SERVICE_NAME, DeleteType=delete_type,
+                SendMeetingCancellations=send_meeting_cancellations)
+        elif isinstance(folder, Tasks):
+            deleteitem = create_element(
+                'm:%s' % self.SERVICE_NAME, DeleteType=delete_type,
+                AffectedTaskOccurrences=affected_task_occurrences)
+        else:
+            deleteitem = create_element('m:%s' % self.SERVICE_NAME, DeleteType=delete_type)
+        if folder.account.version.build >= EXCHANGE_2013:
+            deleteitem.set('SuppressReadReceipts', 'true')
+
+        item_ids = create_element('m:ItemIds')
+        n = 0
+        for item in items:
+            n += 1
+            item_id = ItemId(*item) if isinstance(item, tuple) else ItemId(item.item_id, item.changekey)
+            log.debug('Deleting item %s', item_id)
+            set_xml_value(item_ids, item_id, folder.account.version)
+        if not n:
+            raise AttributeError('"ids" must not be empty')
+        deleteitem.append(item_ids)
+        return deleteitem
 
 
 class UpdateItem(EWSPooledService):
@@ -440,10 +523,111 @@ class UpdateItem(EWSPooledService):
     def call(self, folder, **kwargs):
         self.element_name = folder.item_model.response_tag()
         return self._pool_requests(
-            account=folder.account, payload_func=folder.update_xml, items=kwargs['items'],
+            account=folder.account, payload_func=self._get_payload, items=kwargs['items'], folder=folder,
             conflict_resolution=kwargs['conflict_resolution'], message_disposition=kwargs['message_disposition'],
             send_meeting_invitations_or_cancellations=kwargs['send_meeting_invitations_or_cancellations'],
         )
+
+    def _get_payload(self, items, folder, conflict_resolution, message_disposition,
+                     send_meeting_invitations_or_cancellations):
+        # Takes a dict with an (item_id, changekey) tuple or Item object as the key, and a dict of
+        # field_name -> new_value as values. Returns the XML for a DeleteItem request.
+        from .folders import Calendar, Messages, ItemId, IndexedField, ExtendedProperty, ExternId, EWSElement
+        if isinstance(folder, Calendar):
+            updateitem = create_element('m:%s' % self.SERVICE_NAME, ConflictResolution=conflict_resolution,
+                                        SendMeetingInvitationsOrCancellations=send_meeting_invitations_or_cancellations)
+        elif isinstance(folder, Messages):
+            updateitem = create_element('m:%s' % self.SERVICE_NAME, ConflictResolution=conflict_resolution,
+                                        MessageDisposition=message_disposition)
+        else:
+            updateitem = create_element('m:%s' % self.SERVICE_NAME, ConflictResolution=conflict_resolution)
+        if folder.account.version.build >= EXCHANGE_2013:
+            updateitem.set('SuppressReadReceipts', 'true')
+
+        itemchanges = create_element('m:ItemChanges')
+        n = 0
+        for item, update_dict in items:
+            n += 1
+            if not update_dict:
+                raise AttributeError('"update_dict" must not be empty')
+            itemchange = create_element('t:ItemChange')
+            item_id = ItemId(*item) if isinstance(item, tuple) else ItemId(item.item_id, item.changekey)
+            log.debug('Updating item %s values %s', item_id, update_dict)
+            set_xml_value(itemchange, item_id, folder.account.version)
+            updates = create_element('t:Updates')
+            meeting_timezone_added = False
+            for fieldname, val in update_dict.items():
+                if fieldname in folder.item_model.readonly_fields():
+                    log.warning('%s is a read-only field. Skipping', fieldname)
+                    continue
+                if fieldname == 'extern_id' and val is not None:
+                    val = ExternId(val)
+                field_uri = folder.attr_to_fielduri(fieldname)
+                if isinstance(field_uri, str):
+                    fielduri = create_element('t:FieldURI', FieldURI=field_uri)
+                elif issubclass(field_uri, IndexedField):
+                    log.warning("Skipping update on fieldname '%s' (not supported yet)", fieldname)
+                    continue
+                    # TODO: we need to create a SetItemField for every item in the list, and possibly DeleteItemField
+                    # for every label not on the list
+                    # fielduri = field_uri.field_uri_xml(label=val.label)
+                elif issubclass(field_uri, ExtendedProperty):
+                    fielduri = field_uri.field_uri_xml()
+                else:
+                    assert False, 'Unknown field_uri type: %s' % field_uri
+                if val is None:
+                    # A value of None means we want to remove this field from the item
+                    if fieldname in folder.item_model.required_fields():
+                        log.warning('%s is a required field and may not be deleted. Skipping', fieldname)
+                        continue
+                    add_xml_child(updates, 't:DeleteItemField', fielduri)
+                    continue
+                setitemfield = create_element('t:SetItemField')
+                setitemfield.append(fielduri)
+                folderitem = create_element(folder.item_model.request_tag())
+
+                if isinstance(val, EWSElement):
+                    set_xml_value(folderitem, val, folder.account.version)
+                else:
+                    folderitem.append(
+                        set_xml_value(folder.item_model.elem_for_field(fieldname), val, folder.account.version)
+                    )
+                setitemfield.append(folderitem)
+                updates.append(setitemfield)
+
+                if isinstance(val, EWSDateTime):
+                    # Always set timezone explicitly when updating date fields. Exchange 2007 wants "MeetingTimeZone"
+                    # instead of explicit timezone on each datetime field.
+                    setitemfield_tz = create_element('t:SetItemField')
+                    folderitem_tz = create_element(folder.item_model.request_tag())
+                    if folder.account.version.build < EXCHANGE_2010:
+                        if meeting_timezone_added:
+                            # Let's hope that we're not changing timezone, or that both 'start' and 'end' are supplied.
+                            # Exchange 2007 doesn't support different timezone on start and end.
+                            continue
+                        fielduri_tz = create_element('t:FieldURI', FieldURI='calendar:MeetingTimeZone')
+                        timezone = create_element('t:MeetingTimeZone', TimeZoneName=val.tzinfo.ms_id)
+                        meeting_timezone_added = True
+                    else:
+                        if fieldname == 'start':
+                            fielduri_tz = create_element('t:FieldURI', FieldURI='calendar:StartTimeZone')
+                            timezone = create_element('t:StartTimeZone', Id=val.tzinfo.ms_id, Name=val.tzinfo.ms_name)
+                        elif fieldname == 'end':
+                            fielduri_tz = create_element('t:FieldURI', FieldURI='calendar:EndTimeZone')
+                            timezone = create_element('t:EndTimeZone', Id=val.tzinfo.ms_id, Name=val.tzinfo.ms_name)
+                        else:
+                            log.warning("Skipping timezone for field '%s'", fieldname)
+                            continue
+                    setitemfield_tz.append(fielduri_tz)
+                    folderitem_tz.append(timezone)
+                    setitemfield_tz.append(folderitem_tz)
+                    updates.append(setitemfield_tz)
+            itemchange.append(updates)
+            itemchanges.append(itemchange)
+        if not n:
+            raise AttributeError('"items" must not be empty')
+        updateitem.append(itemchanges)
+        return updateitem
 
 
 class FindItem(PagingEWSService, EWSFolderService):
@@ -511,7 +695,7 @@ class FindFolder(PagingEWSService, EWSFolderService):
                 additionalproperties.append(create_element('t:FieldURI', FieldURI=field_uri))
             foldershape.append(additionalproperties)
         findfolder.append(foldershape)
-        if folder.account.protocol.version.build >= EXCHANGE_2010:
+        if folder.account.version.build >= EXCHANGE_2010:
             indexedpageviewitem = create_element('m:IndexedPageFolderView', Offset=str(offset), BasePoint='Beginning')
             findfolder.append(indexedpageviewitem)
         else:
