@@ -636,6 +636,75 @@ class BaseItemTest(EWSTest):
         self.test_folder.all()
         self.account.protocol.credentials.is_service_account = True
 
+    def test_queryset_copy(self):
+        qs = QuerySet(self.test_folder)
+        qs.q = Q()
+        qs.only_fields = ('a', 'b')
+        qs.order_fields = ('c', 'd')
+        qs.reversed = True
+        qs.return_format = QuerySet.NONE
+
+        # Initially, immutable items have the same id()
+        new_qs = qs.copy()
+        self.assertNotEqual(id(qs), id(new_qs))
+        self.assertEqual(id(qs.folder), id(new_qs.folder))
+        self.assertEqual(id(qs._cache), id(new_qs._cache))
+        self.assertEqual(qs._cache, new_qs._cache)
+        self.assertNotEqual(id(qs.q), id(new_qs.q))
+        self.assertEqual(qs.q, new_qs.q)
+        self.assertEqual(id(qs.only_fields), id(new_qs.only_fields))
+        self.assertEqual(qs.only_fields, new_qs.only_fields)
+        self.assertEqual(id(qs.order_fields), id(new_qs.order_fields))
+        self.assertEqual(qs.order_fields, new_qs.order_fields)
+        self.assertEqual(id(qs.reversed), id(new_qs.reversed))
+        self.assertEqual(qs.reversed, new_qs.reversed)
+        self.assertEqual(id(qs.return_format), id(new_qs.return_format))
+        self.assertEqual(qs.return_format, new_qs.return_format)
+
+        # Set the same values, forcing a new id()
+        new_qs.q = Q()
+        new_qs.only_fields = ('a', 'b')
+        new_qs.order_fields = ('c', 'd')
+        new_qs.reversed = True
+        new_qs.return_format = QuerySet.NONE
+
+        self.assertNotEqual(id(qs), id(new_qs))
+        self.assertEqual(id(qs.folder), id(new_qs.folder))
+        self.assertEqual(id(qs._cache), id(new_qs._cache))
+        self.assertEqual(qs._cache, new_qs._cache)
+        self.assertNotEqual(id(qs.q), id(new_qs.q))
+        self.assertEqual(qs.q, new_qs.q)
+        self.assertNotEqual(id(qs.only_fields), id(new_qs.only_fields))
+        self.assertEqual(qs.only_fields, new_qs.only_fields)
+        self.assertNotEqual(id(qs.order_fields), id(new_qs.order_fields))
+        self.assertEqual(qs.order_fields, new_qs.order_fields)
+        self.assertEqual(id(qs.reversed), id(new_qs.reversed))  # True and False are singletons in Python
+        self.assertEqual(qs.reversed, new_qs.reversed)
+        self.assertEqual(id(qs.return_format), id(new_qs.return_format))  # String literals are also singletons
+        self.assertEqual(qs.return_format, new_qs.return_format)
+
+        # Set the new values, forcing a new id()
+        new_qs.q = Q(foo=5)
+        new_qs.only_fields = ('c', 'd')
+        new_qs.order_fields = ('e', 'f')
+        new_qs.reversed = False
+        new_qs.return_format = QuerySet.VALUES
+
+        self.assertNotEqual(id(qs), id(new_qs))
+        self.assertEqual(id(qs.folder), id(new_qs.folder))
+        self.assertEqual(id(qs._cache), id(new_qs._cache))
+        self.assertEqual(qs._cache, new_qs._cache)
+        self.assertNotEqual(id(qs.q), id(new_qs.q))
+        self.assertNotEqual(qs.q, new_qs.q)
+        self.assertNotEqual(id(qs.only_fields), id(new_qs.only_fields))
+        self.assertNotEqual(qs.only_fields, new_qs.only_fields)
+        self.assertNotEqual(id(qs.order_fields), id(new_qs.order_fields))
+        self.assertNotEqual(qs.order_fields, new_qs.order_fields)
+        self.assertNotEqual(id(qs.reversed), id(new_qs.reversed))
+        self.assertNotEqual(qs.reversed, new_qs.reversed)
+        self.assertNotEqual(id(qs.return_format), id(new_qs.return_format))
+        self.assertNotEqual(qs.return_format, new_qs.return_format)
+
     def test_querysets(self):
         self.test_folder.all().delete()
         test_items = []
@@ -643,7 +712,7 @@ class BaseItemTest(EWSTest):
             item = self.get_test_item()
             item.subject = 'Item %s' % i
             test_items.append(item)
-        ids = self.test_folder.bulk_create(items=test_items)
+        self.test_folder.bulk_create(items=test_items)
         qs = QuerySet(self.test_folder)
         self.assertEqual(
             set((i.subject, i.categories[0]) for i in qs.all()),

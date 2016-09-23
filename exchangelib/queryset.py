@@ -1,4 +1,5 @@
 import logging
+from copy import deepcopy
 
 from .restriction import Q
 from .services import IdOnly, AllProperties
@@ -38,13 +39,20 @@ class QuerySet:
         self._cache = None
 
     def copy(self):
+        # TODO: should we support copy'ing QuerySet where the cache has been filled? What does that even mean?
+        assert self._cache is None
+        assert isinstance(self.q, (type(None), Q))
+        assert isinstance(self.only_fields, (type(None), tuple))
+        assert isinstance(self.order_fields, (type(None), tuple))
+        assert self.reversed in (True, False)
+        assert self.return_format in self.RETURN_TYPES
+        # Only mutable objects need to be deepcopied. Folder should be the same object
         new_qs = self.__class__(self.folder)
-        new_qs.q = self.q
+        new_qs.q = None if self.q is None else deepcopy(self.q)
         new_qs.only_fields = self.only_fields
         new_qs.order_fields = self.order_fields
         new_qs.reversed = self.reversed
         new_qs.return_format = self.return_format
-        new_qs._cache = self._cache
         return new_qs
 
     def _check_fields(self, field_names):
@@ -58,6 +66,7 @@ class QuerySet:
             # The list of fields was not restricted. Get all fields we support
             additional_fields = self.folder.item_model.fieldnames()
         else:
+            assert isinstance(self.only_fields, tuple)
             # Remove ItemId and ChangeKey. We get them unconditionally
             additional_fields = tuple(f for f in self.only_fields if f not in {'item_id', 'changekey'})
         complex_fields_requested = bool(set(additional_fields) & set(self.folder.item_model.complex_fields()))
@@ -78,6 +87,7 @@ class QuerySet:
         else:
             items = self.folder.find_items(self.q, additional_fields=additional_fields, shape=IdOnly)
         if self.order_fields:
+            assert isinstance(self.order_fields, tuple)
             items = sorted(items, key=lambda i: tuple(getattr(i, f) for f in self.order_fields))
         if self.reversed:
             items = reversed(items)
@@ -93,14 +103,12 @@ class QuerySet:
                 # TODO: This is still eager processing
                 self._cache = list(self._query())
         cache_iter = iter(self._cache)
-        if self.return_format == self.VALUES:
-            return self.as_values(cache_iter)
-        if self.return_format == self.VALUES_LIST:
-            return self.as_values_list(cache_iter)
-        if self.return_format == self.FLAT:
-            return self.as_flat_values_list(cache_iter)
-        assert self.return_format == self.NONE
-        return cache_iter
+        return {
+            self.VALUES: lambda: self.as_values(cache_iter),
+            self.VALUES_LIST: lambda: self.as_values_list(cache_iter),
+            self.FLAT: lambda: self.as_flat_values_list(cache_iter),
+            self.NONE: lambda: cache_iter,
+        }[self.return_format]()
 
     def __len__(self):
         self.__iter__()  # Make sure cache is full

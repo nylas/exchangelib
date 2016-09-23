@@ -370,6 +370,9 @@ class Q:
                 return self
         return self.__class__(self, conn_type=self.NOT)
 
+    def __eq__(self, other):
+        return repr(self) == repr(other)
+
     def __str__(self):
         return self.expr()
 
