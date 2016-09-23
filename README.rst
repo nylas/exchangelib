@@ -47,8 +47,9 @@ Here is a simple example that inserts, retrieves and deletes calendar items in a
     # Username in WINDOMAIN\username format. Office365 wants usernames in PrimarySMTPAddress
     # ('myusername@example.com') format. UPN format is also supported.
     #
-    # By default, fault-tolerant error handling is used. This means that calls may block for a long time if the server
-    # is unavailable. If you need immediate failures, add 'is_service_account=False' to Credentials.
+    # By default, fault-tolerant error handling is used. This means that calls may block for a long time
+    # if the server is unavailable. If you need immediate failures, add 'is_service_account=False' to
+    # Credentials.
     credentials = Credentials(username='MYWINDOMAIN\\myusername', password='topsecret')
 
     # If your credentials have been given impersonation access to the target account, use
@@ -58,9 +59,11 @@ Here is a simple example that inserts, retrieves and deletes calendar items in a
 
     # If the server doesn't support autodiscover, use a Configuration object to set the
     # server location:
-    # config = Configuration(server='mail.example.com',
-    #                        credentials=Credentials(username='MYWINDOMAIN\\myusername', password='topsecret'),
-    #                        auth_type=NTLM)
+    # config = Configuration(
+    #     server='mail.example.com',
+    #     credentials=Credentials(username='MYWINDOMAIN\\myusername', password='topsecret'),
+    #     auth_type=NTLM
+    # )
     # account = Account(primary_smtp_address='john@example.com', config=config,
     #                   access_type=DELEGATE)
 
@@ -70,8 +73,8 @@ Here is a simple example that inserts, retrieves and deletes calendar items in a
     res = account.calendar.bulk_create(calendar_items)
     print(res)
 
-    # Get the calendar items we just created. We filter by categories so we only get the items created by us. The syntax
-    # for filter() is modeled after Django QuerySet filters.
+    # Get the calendar items we just created. We filter by categories so we only get the items created by
+    # us. The syntax for filter() is modeled after Django QuerySet filters.
     #
     # If you need more complex filtering, filter() also accepts a Python-like search expression:
     #
@@ -92,8 +95,8 @@ Here is a simple example that inserts, retrieves and deletes calendar items in a
     # items = my_folder.all().delete()
     # items = my_folder.get(subject='unique_string')
     # items = my_folder.all().order_by('subject')
-    # items = my_folder.all().count()
-    # items = my_folder.all().exists()
+    # n = my_folder.all().count()
+    # is_empty = not my_folder.all().exists()
     # ids = my_folder.all().values('item_id', 'changekey')
     # ids = my_folder.all().values_list('item_id', 'changekey')
     # subjects = my_folder.all().values_list('subject', flat=True)
