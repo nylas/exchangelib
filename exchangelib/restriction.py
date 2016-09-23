@@ -69,7 +69,7 @@ class Q:
                 if isinstance(q, Restriction):
                     q = q.q
                 else:
-                    raise AttributeError("'%s' must be a Q or Restriction instance")
+                    raise AttributeError("'%s' must be a Q or Restriction instance" % q)
             if not q.is_empty():
                 self.children.append(q)
 

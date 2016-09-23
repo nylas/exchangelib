@@ -70,35 +70,49 @@ Here is a simple example that inserts, retrieves and deletes calendar items in a
     res = account.calendar.bulk_create(calendar_items)
     print(res)
 
-    # Get Exchange ID and changekey of the calendar items we just created. We filter by
-    # categories so we only get the items created by us. The syntax for filter() is
-    # modeled after Django QuerySet filters.
+    # Get the calendar items we just created. We filter by categories so we only get the items created by us. The syntax
+    # for filter() is modeled after Django QuerySet filters.
     #
     # If you need more complex filtering, filter() also accepts a Python-like search expression:
     #
-    # ids = account.calendar.filter(
-    #       "start < '2016-01-02T03:04:05T' and end > '2016-01-01T03:04:05T' and categories in ('foo', 'bar')",
-    #       shape=IdOnly
+    # items = my_folder.filter(
+    #       "start < '2016-01-02T03:04:05T' and end > '2016-01-01T03:04:05T' and categories in ('foo', 'bar')"
     # )
     #
     # filter() also support Q objects that are modeled after Django Q objects
     #
     # q = (Q(subject__iexact='foo') | Q(subject__contains='bar')) & ~Q(subject__startswith='baz')
-    # ids = account.calendar.filter(q, shape=IdOnly)
+    # items = my_folder.filter(q)
     #
-    ids = account.calendar.filter(
+    # A large part of the Django QuerySet API is supported:
+    #
+    # items = my_folder.filter(subject__contains='foo').exclude(categories__contains='bar')
+    # items = my_folder.all()
+    # items = my_folder.all().only('subject', 'start')
+    # items = my_folder.all().delete()
+    # items = my_folder.get(subject='unique_string')
+    # items = my_folder.all().order_by('subject')
+    # items = my_folder.all().count()
+    # items = my_folder.all().exists()
+    # ids = my_folder.all().values('item_id', 'changekey')
+    # ids = my_folder.all().values_list('item_id', 'changekey')
+    # subjects = my_folder.all().values_list('subject', flat=True)
+    #
+    items = account.calendar.filter(
         start__lt=tz.localize(EWSDateTime(year, month, day + 1)),
         end__gt=tz.localize(EWSDateTime(year, month, day)),
         categories__contains=['foo', 'bar'],
-        shape=IdOnly,
     )
-    print(ids)
-
-    # Get the rest of the attributes on the calendar items we just created. Most attributes from EWS are supported.
-    items = account.calendar.fetch(ids)
     for item in items:
         print(item.start, item.end, item.subject, items.body, item.location)
 
     # Delete the calendar items again
-    res = account.calendar.bulk_delete(ids)
+    res = items.delete()
     print(res)
+
+    # You can also create, update and delete single items
+    item = CalendarItem(folder=account.calendar, subject='foo')
+    item.save()
+    item.subject = 'bar'
+    item.save()
+    item.delete()

@@ -394,9 +394,6 @@ class GetItem(EWSPooledService):
         #
         # We start with an IdOnly request. 'additional_properties' defines the additional fields we want. Supported
         # fields are available in self.item_model.fieldnames().
-        #
-        # We can achieve almost the same in one single request with FindItems, but the 'body' element can only be
-        # fetched with GetItem.
         from .folders import ItemId
         getitem = create_element('m:%s' % self.SERVICE_NAME)
         itemshape = create_element('m:ItemShape')

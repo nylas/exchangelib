@@ -66,6 +66,19 @@ class Email(str):
     pass
 
 
+class AnyURI(str):
+    # Helper to mark strings that must conform to xsd:anyURI
+    # If we want an URI validator, see http://stackoverflow.com/questions/14466585/is-this-regex-correct-for-xsdanyuri
+    pass
+
+
+class BodyType(str):
+    # Helper to mark the 'body' field as a complex attribute.
+    # TODO: The body element supports both text and HTML representations. We should support that.
+    # See http://stackoverflow.com/questions/20982851/how-to-get-the-email-body-in-html-and-text-from-exchange-using-ews-in-c
+    pass
+
+
 class EWSElement:
     ELEMENT_NAME = None
 
@@ -501,7 +514,7 @@ class Item(EWSElement):
         'importance': ('Importance', Choice),
         'is_draft': ('IsDraft', bool),
         'subject': ('Subject', str),
-        'body': ('Body', str),
+        'body': ('Body', BodyType),
         'reminder_is_set': ('ReminderIsSet', bool),
         'categories': ('Categories', [str]),
         'extern_id': (ExternId, ExternId),
@@ -545,7 +558,8 @@ class Item(EWSElement):
                     for item in v:
                         if not isinstance(item, elem_type):
                             raise TypeError('Field %s value "%s" must be of type %s' % (k, v, field_type))
-                elif k != 'extern_id' and field_type != Choice and not isinstance(v, field_type):
+                elif k != 'extern_id' and field_type != BodyType and field_type != Choice \
+                        and not isinstance(v, field_type):
                     raise TypeError('Field %s value "%s" must be of type %s' % (k, v, field_type))
             setattr(self, k, v)
         for k, v in kwargs.items():
@@ -658,6 +672,13 @@ class Item(EWSElement):
         return Item.READONLY_FIELDS
 
     @classmethod
+    def complex_fields(cls):
+        # Return fields that are not complex EWS types. The FindItems service can only handle certain field types, not
+        # fields like 'body' (that have TextBody and HTMLBody magic), 'optional_attendees' etc.
+        simple_types = (bool, int, str, [str], AnyURI, Choice, EWSDateTime)
+        return tuple(f for f in cls.fieldnames() if cls.type_for_field(f) not in simple_types)
+
+    @classmethod
     def type_for_field(cls, fieldname):
         try:
             return cls.ITEM_FIELDS[fieldname][1]
@@ -701,7 +722,7 @@ class Item(EWSElement):
                 val = get_xml_attr(elem, cls.response_xml_elem_for_field(fieldname))
                 if val is not None:
                     kwargs[fieldname] = True if val == 'true' else False
-            elif field_type in (str, Choice, Email, AnyURI):
+            elif field_type in (str, Choice, Email, AnyURI, BodyType):
                 val = get_xml_attr(elem, cls.response_xml_elem_for_field(fieldname))
                 if val is not None:
                     kwargs[fieldname] = val
@@ -791,18 +812,28 @@ class Folder:
         return cls.item_model.response_xml_elem_for_field(fieldname)
 
     def all(self):
-        return self.filter()
+        return QuerySet(self).all()
+
+    def none(self):
+        return QuerySet(self).none()
 
     def filter(self, *args, **kwargs):
-        return self.find_items(*args, **kwargs)
+        return QuerySet(self).filter(*args, **kwargs)
+
+    def exclude(self, *args, **kwargs):
+        return QuerySet(self).exclude(*args, **kwargs)
+
+    def get(self, *args, **kwargs):
+        return QuerySet(self).get(*args, **kwargs)
 
     def find_items(self, *args, **kwargs):
         """
         Finds items in the folder.
 
-        'shape' controls the exact fields returned are governed by. Be aware that the 'body' element can only be fetched
+        'shape' controls the exact fields returned are governed by. Be aware that complex elements can only be fetched
         with fetch().
-        'depth' controls the search depth into sub-folders.
+
+        'depth' controls the whether to return soft-deleted items or not.
 
         Non-keyword args may be a search expression as supported by Restriction.from_source(), or a list of Q instances.
 
@@ -833,12 +864,16 @@ class Folder:
         assert shape in SHAPE_CHOICES
         assert depth in ITEM_TRAVERSAL_CHOICES
 
-        # Define the extra properties we want on the return objects. 'body' field can only be fetched with GetItem.
-        additional_fields = kwargs.pop('additional_fields', None)
+        # Define the extra properties we want on the return objects
+        additional_fields = kwargs.pop('additional_fields', tuple())
         if additional_fields:
-            allowed_field_names = self.item_model.fieldnames()
+            allowed_field_names = set(self.item_model.fieldnames())
+            complex_field_names = set(self.item_model.complex_fields())
             for f in additional_fields:
-                assert f in allowed_field_names
+                if f not in allowed_field_names:
+                    raise ValueError("'%s' is not a field on %s" % (f, self.item_model))
+                if f in complex_field_names:
+                    raise ValueError("find_items() does not support field '%s'. Use fetch() instead" % f)
 
         # Build up any restrictions
         q = Q.from_filter_args(self.item_model, *args, **kwargs)
@@ -880,8 +915,6 @@ class Folder:
             message_disposition,
             send_meeting_invitations,
         )
-        if isinstance(items, QuerySet):
-            ids = iter(items)
         is_empty, items = peek(items)
         if is_empty:
             # We accept generators, so it's not always convenient for caller to know up-front if 'items' is empty. Allow
@@ -890,10 +923,6 @@ class Folder:
         return list(map(self.item_model.id_from_xml, CreateItem(self.account.protocol).call(
             folder=self, items=items, message_disposition=message_disposition,
             send_meeting_invitations=send_meeting_invitations)))
-
-    def clear(self):
-        # Helper method that clears a folder of all objects. For tasks, make sure we can delete recurring tasks.
-        self.bulk_delete(ids=self.all(), delete_type=HARD_DELETE, affected_task_occurrences=ALL_OCCURRENCIES)
 
     def delete_items(self, *args, **kwargs):
         warnings.warn('delete_items() is deprecated. Use bulk_delete() instead', PendingDeprecationWarning)
@@ -916,8 +945,6 @@ class Folder:
             send_meeting_cancellations,
             affected_task_occurrences,
         )
-        if isinstance(ids, QuerySet):
-            ids = iter(ids)
         is_empty, ids = peek(ids)
         if is_empty:
             # We accept generators, so it's not always convenient for caller to know up-front if 'items' is empty. Allow
@@ -951,8 +978,6 @@ class Folder:
             message_disposition,
             send_meeting_invitations_or_cancellations,
         )
-        if isinstance(items, QuerySet):
-            ids = iter(items)
         is_empty, items = peek(items)
         if is_empty:
             # We accept generators, so it's not always convenient for caller to know up-front if 'items' is empty. Allow
@@ -972,8 +997,6 @@ class Folder:
             raise DeprecationWarning(
                 "'%(cls)s.with_extra_fields' is deprecated. Use 'fetch(ids, only_fields=[...])' instead"
                 % dict(cls=self.__class__.__name__))
-        if isinstance(ids, QuerySet):
-            ids = iter(ids)
         is_empty, ids = peek(ids)
         if is_empty:
             # We accept generators, so it's not always convenient for caller to know up-front if 'items' is empty. Allow
@@ -1014,12 +1037,13 @@ class Folder:
         return cls(account=account, name=display_name, folder_class=folder_class, folder_id=fld_id, changekey=changekey)
 
     def get_folders(self, shape=IdOnly, depth=DEEP):
+        # 'depth' controls whether to return direct children or recurse into sub-folders
         assert shape in SHAPE_CHOICES
         assert depth in FOLDER_TRAVERSAL_CHOICES
         folders = []
         for elem in FindFolder(self.account.protocol).call(
                 folder=self,
-                additional_fields=['folder:DisplayName', 'folder:FolderClass'],
+                additional_fields=('folder:DisplayName', 'folder:FolderClass'),
                 shape=shape,
                 depth=depth
         ):
@@ -1033,7 +1057,7 @@ class Folder:
         for elem in GetFolder(account.protocol).call(
                 account=account,
                 distinguished_folder_id=cls.DISTINGUISHED_FOLDER_ID,
-                additional_fields=['folder:DisplayName', 'folder:FolderClass'],
+                additional_fields=('folder:DisplayName', 'folder:FolderClass'),
                 shape=shape
         ):
             folders.append(cls.from_xml(account=account, elem=elem))
@@ -1428,12 +1452,6 @@ class Tasks(Folder):
     LOCALIZED_NAMES = {
         'da_DK': ('Opgaver',)
     }
-
-
-class AnyURI(str):
-    # Helper to mark strings that must conform to xsd:anyURI
-    # If we want an URI validator, see http://stackoverflow.com/questions/14466585/is-this-regex-correct-for-xsdanyuri
-    pass
 
 
 class Contact(ItemMixIn):

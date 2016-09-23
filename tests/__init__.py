@@ -18,7 +18,7 @@ from exchangelib.errors import RelativeRedirect, ErrorItemNotFound
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, ExternId, Choice, Email, Contact, Task, \
     EmailAddress, PhysicalAddress, PhoneNumber, IndexedField, RoomList, Calendar, DeletedItems, Drafts, Inbox, Outbox, \
-    SentItems, JunkEmail, Tasks, Contacts, AnyURI, ALL_OCCURRENCIES
+    SentItems, JunkEmail, Tasks, Contacts, AnyURI, BodyType, ALL_OCCURRENCIES
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.restriction import Restriction, Q
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms
@@ -305,6 +305,8 @@ class EWSTest(unittest.TestCase):
             return get_random_string(255)
         if field_type == str:
             return get_random_string(255)
+        if field_type == BodyType:
+            return get_random_string(255)
         if field_type == AnyURI:
             return get_random_url()
         if field_type == [str]:
@@ -420,9 +422,7 @@ class CommonTest(EWSTest):
         # First, empty the calendar
         start = self.tz.localize(EWSDateTime(2011, 10, 12, 8))
         end = self.tz.localize(EWSDateTime(2011, 10, 12, 10))
-        self.account.calendar.bulk_delete(
-            ids=self.account.calendar.filter(start__lt=end, end__gt=start, categories__contains=self.categories),
-            affected_task_occurrences=ALL_OCCURRENCIES)
+        self.account.calendar.filter(start__lt=end, end__gt=start, categories__contains=self.categories).delete()
         items = []
         for i in range(75):
             subject = 'Test Subject %s' % i
@@ -430,7 +430,8 @@ class CommonTest(EWSTest):
             items.append(item)
         return_ids = self.account.calendar.bulk_create(items=items)
         self.assertEqual(len(return_ids), len(items))
-        ids = self.account.calendar.filter(start__lt=end, end__gt=start, categories__contains=self.categories)
+        ids = self.account.calendar.filter(start__lt=end, end__gt=start, categories__contains=self.categories)\
+            .values_list('item_id', 'changekey')
         self.assertEqual(len(ids), len(items))
         items = self.account.calendar.fetch(return_ids)
         for i, item in enumerate(items):
@@ -512,12 +513,10 @@ class BaseItemTest(EWSTest):
         super().setUp()
         self.test_folder = getattr(self.account, self.TEST_FOLDER)
         self.assertEqual(self.test_folder.DISTINGUISHED_FOLDER_ID, self.TEST_FOLDER)
-        self.test_folder.bulk_delete(ids=self.test_folder.filter(categories__contains=self.categories),
-                                     affected_task_occurrences=ALL_OCCURRENCIES)
+        self.test_folder.filter(categories__contains=self.categories).delete()
 
     def tearDown(self):
-        self.test_folder.bulk_delete(ids=self.test_folder.filter(categories__contains=self.categories),
-                                     affected_task_occurrences=ALL_OCCURRENCIES)
+        self.test_folder.filter(categories__contains=self.categories).delete()
 
     def get_random_insert_kwargs(self):
         insert_kwargs = {}
@@ -638,7 +637,7 @@ class BaseItemTest(EWSTest):
         self.account.protocol.credentials.is_service_account = True
 
     def test_querysets(self):
-        self.test_folder.clear()
+        self.test_folder.all().delete()
         test_items = []
         for i in range(4):
             item = self.get_test_item()
@@ -1040,8 +1039,7 @@ class BaseItemTest(EWSTest):
     def test_only_fields(self):
         item = self.get_test_item()
         self.test_folder.bulk_create(items=[item, item])
-        ids = self.test_folder.filter(categories__contains=self.categories)
-        items = self.test_folder.fetch(ids=ids, only_fields=None)
+        items = self.test_folder.filter(categories__contains=self.categories)
         for item in items:
             assert isinstance(item, self.ITEM_CLASS)
             for f in self.ITEM_CLASS.fieldnames():
@@ -1053,7 +1051,7 @@ class BaseItemTest(EWSTest):
                 self.assertIsNotNone(getattr(item, f), (f, getattr(item, f)))
         self.assertEqual(len(items), 2)
         only_fields = ('subject', 'body', 'categories')
-        items = self.test_folder.fetch(ids=items, only_fields=only_fields)
+        items = self.test_folder.filter(categories__contains=self.categories).only(*only_fields)
         for item in items:
             assert isinstance(item, self.ITEM_CLASS)
             for f in self.ITEM_CLASS.fieldnames():
@@ -1093,12 +1091,12 @@ class BaseItemTest(EWSTest):
             # It's gone from the account
             self.test_folder.fetch(ids=[item_id])
             # Really gone, not just changed ItemId
-            ids = self.test_folder.filter(categories__contains=item.categories)
-            self.assertEqual(len(ids), 0)
+            items = self.test_folder.filter(categories__contains=item.categories)
+            self.assertEqual(len(items), 0)
 
     def test_soft_delete(self):
         # First, empty trash bin
-        self.account.trash.clear()
+        self.account.trash.all().delete()
         item = self.get_test_item().save()
         item_id = (item.item_id, item.changekey)
         # Soft delete
@@ -1116,7 +1114,7 @@ class BaseItemTest(EWSTest):
 
     def test_move_to_trash(self):
         # First, empty trash bin
-        self.account.trash.clear()
+        self.account.trash.all().delete()
         item = self.get_test_item().save()
         item_id = (item.item_id, item.changekey)
         # Move to trash
@@ -1129,9 +1127,8 @@ class BaseItemTest(EWSTest):
         # Test that the item moved to trash
         if isinstance(item, Message):
             # TODO: This only works for Messages. Maybe our support for trash can only handle Message objects?
-            ids = self.account.trash.filter(categories__contains=item.categories)
-            self.assertEqual(len(ids), 1)
-            moved_item = self.account.trash.fetch(ids=ids)[0]
+            item = self.account.trash.get(categories__contains=item.categories)
+            moved_item = self.account.trash.fetch(ids=[item])[0]
             # The item was copied, so the ItemId has changed. Let's compare the subject instead
             self.assertEqual(item.subject, moved_item.subject)
 
@@ -1143,10 +1140,10 @@ class BaseItemTest(EWSTest):
         insert_ids = self.test_folder.bulk_create(items=(i for i in [item]))
         self.assertEqual(len(insert_ids), 1)
         assert isinstance(insert_ids[0], tuple)
-        find_ids = self.test_folder.filter(categories__contains=item.categories)
+        find_ids = self.test_folder.filter(categories__contains=item.categories).values_list('item_id', 'changekey')
         self.assertEqual(len(find_ids), 1)
         self.assertEqual(len(find_ids[0]), 2)
-        self.assertEqual(insert_ids, find_ids)
+        self.assertEqual(insert_ids, list(find_ids))
         # Test with generator as argument
         item = self.test_folder.fetch(ids=(i for i in find_ids))[0]
         for f in self.ITEM_CLASS.fieldnames():
@@ -1254,7 +1251,7 @@ class MessagesTest(BaseItemTest):
         self.assertIsNone(item.item_id)
         self.assertIsNone(item.changekey)
         time.sleep(1)  # Requests are supposed to be transactional, but apparently not...
-        ids = self.test_folder.filter(categories__contains=self.categories)
+        ids = self.test_folder.filter(categories__contains=self.categories).values_list('item_id', 'changekey')
         self.assertEqual(len(ids), 1)
         item.item_id, item.changekey = ids[0]
         item.delete()
