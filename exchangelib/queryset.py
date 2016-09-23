@@ -71,11 +71,14 @@ class QuerySet:
             additional_fields = tuple(f for f in self.only_fields if f not in {'item_id', 'changekey'})
         complex_fields_requested = bool(set(additional_fields) & set(self.folder.item_model.complex_fields()))
         if self.order_fields:
-            for f in self.order_fields:
-                if f not in additional_fields:
-                    # TODO: Also fetch the order_by fields but remove them afterwards if they are not in additional_fields
-                    raise ValueError("order_by field '%s' must be one of the fields to fetch (%s)" % (f, additional_fields))
+            extra_order_fields = set(self.order_fields) - set(additional_fields)
+        else:
+            extra_order_fields = set()
+        if extra_order_fields:
+            # Also fetch order_by fields that we don't otherwise need to fetch
+            additional_fields += tuple(extra_order_fields)
         if not additional_fields and not self.order_fields:
+            # TODO: if self.order_fields only contain item_id or changekey, we can still take this shortcut
             # We requested no additional fields and we need to do no sorting, so we can take a shortcut by setting
             # additional_fields=None. Thi tells find_items() to do less work
             assert not complex_fields_requested
@@ -89,6 +92,13 @@ class QuerySet:
         if self.order_fields:
             assert isinstance(self.order_fields, tuple)
             items = sorted(items, key=lambda i: tuple(getattr(i, f) for f in self.order_fields))
+            if extra_order_fields:
+                # Nullify the fields we only needed for sorting
+                def clean_item(i):
+                    for f in extra_order_fields:
+                        setattr(i, f, None)
+                    return i
+                items = map(clean_item, items)
         if self.reversed:
             items = reversed(items)
         return items

@@ -755,8 +755,17 @@ class BaseItemTest(EWSTest):
             {'Item 0', 'Item 1', 'Item 2', 'Item 3'}
         )
         self.assertEqual(
+            qs.values_list('subject', flat=True).get(subject='Item 2'),
+            'Item 2'
+        )
+        self.assertEqual(
             set((i.subject, i.categories[0]) for i in qs.exclude(subject__startswith='Item 2')),
             {('Item 0', 'Test'), ('Item 1', 'Test'), ('Item 3', 'Test')}
+        )
+        # Test that we can sort on a field that we don't want
+        self.assertEqual(
+            [i.categories[0] for i in qs.all().only('categories').order_by('subject')],
+            ['Test', 'Test', 'Test', 'Test']
         )
         self.assertEqual(
             set((i.subject, i.categories[0]) for i in qs.iterator()),

@@ -894,7 +894,7 @@ class Folder:
                                                      restriction=restriction, shape=shape, depth=depth)
         log.debug('Found %s items', len(items))
         if shape == IdOnly and additional_fields is None:
-            return list(map(self.item_model.id_from_xml, items))
+            return map(self.item_model.id_from_xml, items)
         return map(lambda i: self.item_model.from_xml(elem=i, folder=self), items)
 
     def add_items(self, *args, **kwargs):
