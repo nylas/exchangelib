@@ -2,8 +2,8 @@
 Change Log
 ==========
 
-HEAD
-----
+1.7.0
+-----
 * Added the ``is_service_account`` flag to ``Credentials``. ``is_service_account=False`` disables the fault-tolerant error
   handling policy and enables immediate failures.
 * ``Configuration`` now expects a single ``credentials`` attribute instead of separate ``username`` and ``password``
