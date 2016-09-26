@@ -112,7 +112,7 @@ Here is a simple example that inserts, retrieves and deletes calendar items in a
     for item in items:
         print(item.start, item.end, item.subject, items.body, item.location)
 
-    # Delete the calendar items again
+    # Delete the calendar items we found
     res = items.delete()
     print(res)
 

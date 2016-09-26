@@ -12,8 +12,8 @@ import warnings
 from .ewsdatetime import EWSDateTime, UTC_NOW
 from .queryset import QuerySet
 from .restriction import Restriction, Q
-from .services import TNS, FindItem, IdOnly, SHALLOW, DEEP, DeleteItem, CreateItem, UpdateItem, FindFolder, GetFolder, \
-    GetItem, MNS, ITEM_TRAVERSAL_CHOICES, FOLDER_TRAVERSAL_CHOICES, SHAPE_CHOICES
+from .services import TNS, FindItem, IdOnly, SHALLOW, DEEP, CreateItem, FindFolder, GetFolder, GetItem, \
+    MNS, ITEM_TRAVERSAL_CHOICES, FOLDER_TRAVERSAL_CHOICES, SHAPE_CHOICES
 from .util import create_element, add_xml_child, get_xml_attrs, get_xml_attr, set_xml_value, peek
 from .version import EXCHANGE_2010
 
@@ -585,7 +585,7 @@ class Item(EWSElement):
         if self.item_id:
             assert self.changekey
             update_kwargs = {k: getattr(self, k) for k in self.fieldnames() if k not in self.readonly_fields()}
-            return self.folder.bulk_update(
+            return self.folder.account.bulk_update(
                 items=[(self, update_kwargs)], message_disposition=message_disposition,
                 conflict_resolution=conflict_resolution,
                 send_meeting_invitations_or_cancellations=send_meeting_invitations)
@@ -619,7 +619,7 @@ class Item(EWSElement):
     def _delete(self, delete_type, send_meeting_cancellations, affected_task_occurrences, suppress_read_receipts):
         if not self.folder:
             raise ValueError('Item must have a folder')
-        self.folder.bulk_delete(
+        self.folder.account.bulk_delete(
             ids=[self], delete_type=delete_type, send_meeting_cancellations=send_meeting_cancellations,
             affected_task_occurrences=affected_task_occurrences, suppress_read_receipts=suppress_read_receipts)
 
@@ -1298,6 +1298,8 @@ class Folder:
         """
         Creates new items in the folder. 'items' is an iterable of Item objects. Returns a list of (id, changekey)
         tuples in the same order as the input.
+        'message_disposition' is only applicable to Message items.
+        'send_meeting_invitations' is only applicable to CalendarItem items.
         """
         assert message_disposition in MESSAGE_DISPOSITION_CHOICES
         assert send_meeting_invitations in SEND_MEETING_INVITATIONS_CHOICES
@@ -1326,77 +1328,16 @@ class Folder:
         warnings.warn('delete_items() is deprecated. Use bulk_delete() instead', PendingDeprecationWarning)
         return self.bulk_delete(*args, **kwargs)
 
-    def bulk_delete(self, ids, delete_type=HARD_DELETE, send_meeting_cancellations=SEND_TO_NONE,
-                    affected_task_occurrences=SPECIFIED_OCCURRENCE_ONLY, suppress_read_receipts=True):
-        """
-        Deletes items in the folder. 'ids' is an iterable of either (item_id, changekey) tuples or Item objects.
-        'affected_task_occurrences' is only applicable for recurring Task items.
-        'suppress_read_receipts' is only supported from Exchange 2013.
-        """
-        assert delete_type in DELETE_TYPE_CHOICES
-        assert send_meeting_cancellations in SEND_MEETING_CANCELLATIONS_CHOICES
-        assert affected_task_occurrences in AFFECTED_TASK_OCCURRENCES_CHOICES
-        assert suppress_read_receipts in (True, False)
-        log.debug(
-            'Deleting %s items for %s (delete_type: %s, send_meeting_invitations: %s, affected_task_occurences: %s)',
-            self.DISTINGUISHED_FOLDER_ID,
-            self.account,
-            delete_type,
-            send_meeting_cancellations,
-            affected_task_occurrences,
-        )
-        is_empty, ids = peek(ids)
-        if is_empty:
-            # We accept generators, so it's not always convenient for caller to know up-front if 'items' is empty. Allow
-            # empty 'items' and return early.
-            return []
-        return list(DeleteItem(account=self.account).call(
-            items=ids,
-            delete_type=delete_type,
-            send_meeting_cancellations=send_meeting_cancellations,
-            affected_task_occurrences=affected_task_occurrences,
-            suppress_read_receipts=suppress_read_receipts,
-        ))
+    def bulk_delete(self, *args, **kwargs):
+        return self.account.bulk_delete(*args, **kwargs)
 
     def update_items(self, *args, **kwargs):
         warnings.warn('update_items() is deprecated. Use bulk_update() instead', PendingDeprecationWarning)
         return self.bulk_update(*args, **kwargs)
 
-    def bulk_update(self, items, conflict_resolution=AUTO_RESOLVE, message_disposition=SAVE_ONLY,
-                    send_meeting_invitations_or_cancellations=SEND_TO_NONE, suppress_read_receipts=True):
-        """
-        Updates items in the folder. 'items' is an iterable of tuples containing two elements:
+    def bulk_update(self, *args, **kwargs):
+        return self.account.bulk_update(*args, **kwargs)
 
-            1. either an (item_id, changekey) tuple or an Item object
-            2. a dict containing the Item attributes to change
-
-        """
-        assert conflict_resolution in CONFLICT_RESOLUTION_CHOICES
-        assert message_disposition in MESSAGE_DISPOSITION_CHOICES
-        assert send_meeting_invitations_or_cancellations in SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES
-        assert suppress_read_receipts in (True, False)
-        log.debug(
-            'Updating items for %s (conflict_resolution %s, message_disposition: %s, send_meeting_invitations: %s)',
-            self.account,
-            conflict_resolution,
-            message_disposition,
-            send_meeting_invitations_or_cancellations,
-        )
-        is_empty, items = peek(items)
-        if is_empty:
-            # We accept generators, so it's not always convenient for caller to know up-front if 'items' is empty. Allow
-            # empty 'items' and return early.
-            return []
-        return list(map(
-            Item.id_from_xml,
-            UpdateItem(account=self.account).call(
-                items=items,
-                conflict_resolution=conflict_resolution,
-                message_disposition=message_disposition,
-                send_meeting_invitations_or_cancellations=send_meeting_invitations_or_cancellations,
-                suppress_read_receipts=suppress_read_receipts,
-            )
-        ))
 
     def get_items(self, *args, **kwargs):
         warnings.warn('get_items() is deprecated. Use fetch() instead', PendingDeprecationWarning)

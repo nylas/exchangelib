@@ -311,4 +311,4 @@ class QuerySet:
         new_qs.order_fields = None
         new_qs.reversed = False
         from .folders import ALL_OCCURRENCIES
-        return self.folder.bulk_delete(ids=new_qs, affected_task_occurrences=ALL_OCCURRENCIES)
+        return self.folder.account.bulk_delete(ids=new_qs, affected_task_occurrences=ALL_OCCURRENCIES)
