@@ -39,8 +39,15 @@ class QuerySet:
         self._cache = None
 
     def copy(self):
-        # TODO: should we support copy'ing QuerySet where the cache has been filled? What does that even mean?
-        assert self._cache is None
+        # When we copy a queryset where the cache has already been filled, we don't copy the cache. Thus, a copied
+        # queryset will fetch results from the server again.
+        #
+        # All other behaviour would be awkward:
+        #
+        # qs = QuerySet(f).filter(foo='bar')
+        # items = list(qs)
+        # new_qs = qs.exclude(bar='baz')  # This should work, and should fetch from the server
+        #
         assert isinstance(self.q, (type(None), Q))
         assert isinstance(self.only_fields, (type(None), tuple))
         assert isinstance(self.order_fields, (type(None), tuple))
@@ -125,6 +132,7 @@ class QuerySet:
         return len(self._cache)
 
     def __getitem__(self, key):
+        # Support indexing and slicing
         self.__iter__()  # Make sure cache is full
         return self._cache[key]
 
@@ -290,7 +298,7 @@ class QuerySet:
         new_qs = self.copy()
         new_qs.only_fields = tuple()
         new_qs.order_fields = None
-        new_qs.reverse = False
+        new_qs.reversed = False
         return len(list(new_qs))
 
     def exists(self):
@@ -301,6 +309,6 @@ class QuerySet:
         new_qs = self.copy()
         new_qs.only_fields = tuple()
         new_qs.order_fields = None
-        new_qs.reverse = False
+        new_qs.reversed = False
         from .folders import ALL_OCCURRENCIES
         return self.folder.bulk_delete(ids=new_qs, affected_task_occurrences=ALL_OCCURRENCIES)

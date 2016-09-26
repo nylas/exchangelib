@@ -2,6 +2,13 @@
 Change Log
 ==========
 
+
+HEAD
+----
+* Fix bug where fetching items from a folder that can contain multiple item types (e.g. the Deleted Items folder) would
+  only return one item type.
+
+
 1.7.0
 -----
 * Added the ``is_service_account`` flag to ``Credentials``. ``is_service_account=False`` disables the fault-tolerant error
