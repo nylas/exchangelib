@@ -2,7 +2,7 @@ import logging
 from copy import deepcopy
 
 from .restriction import Q
-from .services import IdOnly, AllProperties
+from .services import IdOnly
 
 log = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ class QuerySet:
         return new_qs
 
     def _check_fields(self, field_names):
-        allowed_field_names = set(self.folder.item_model.fieldnames()) | {'item_id', 'changekey'}
+        allowed_field_names = set(self.folder.allowed_field_names()) | {'item_id', 'changekey'}
         for f in field_names:
             if f not in allowed_field_names:
                 raise ValueError("Unknown fieldname '%s'" % f)
@@ -71,12 +71,12 @@ class QuerySet:
     def _query(self):
         if self.only_fields is None:
             # The list of fields was not restricted. Get all fields we support
-            additional_fields = self.folder.item_model.fieldnames()
+            additional_fields = self.folder.allowed_field_names()
         else:
             assert isinstance(self.only_fields, tuple)
             # Remove ItemId and ChangeKey. We get them unconditionally
             additional_fields = tuple(f for f in self.only_fields if f not in {'item_id', 'changekey'})
-        complex_fields_requested = bool(set(additional_fields) & set(self.folder.item_model.complex_fields()))
+        complex_fields_requested = bool(set(additional_fields) & set(self.folder.complex_field_names()))
         if self.order_fields:
             extra_order_fields = set(self.order_fields) - set(additional_fields)
         else:
@@ -219,13 +219,13 @@ class QuerySet:
 
     def filter(self, *args, **kwargs):
         new_qs = self.copy()
-        q = Q.from_filter_args(self.folder.item_model, *args, **kwargs) or Q()
+        q = Q.from_filter_args(self.folder.__class__, *args, **kwargs) or Q()
         new_qs.q = q if new_qs.q is None else new_qs.q & q
         return new_qs
 
     def exclude(self, *args, **kwargs):
         new_qs = self.copy()
-        q = ~Q.from_filter_args(self.folder.item_model, *args, **kwargs) or Q()
+        q = ~Q.from_filter_args(self.folder.__class__, *args, **kwargs) or Q()
         new_qs.q = q if new_qs.q is None else new_qs.q & q
         return new_qs
 

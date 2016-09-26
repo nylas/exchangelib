@@ -360,8 +360,10 @@ class EWSPooledMixIn(EWSService):
         log.debug('Processing items in chunks of %s', self.CHUNKSIZE)
         # Chop items list into suitable pieces and let worker threads chew on the work. The order of the output result
         # list must be the same as the input id list, so the caller knows which status message belongs to which ID.
-        func = lambda n: self._get_elements(payload=payload_func(n, **kwargs))
-        return itertools.chain(*self.protocol.thread_pool.map(func, chunkify(items, self.CHUNKSIZE)))
+        return itertools.chain(*self.protocol.thread_pool.map(
+            lambda chunk: self._get_elements(payload=payload_func(chunk, **kwargs)),
+            chunkify(items, self.CHUNKSIZE)
+        ))
 
 
 class EWSPooledAccountService(EWSAccountService, EWSPooledMixIn):
@@ -393,17 +395,16 @@ class GetItem(EWSPooledFolderService):
         # Takes a list of (item_id, changekey) tuples or Item objects and returns the XML for a GetItem request.
         #
         # We start with an IdOnly request. 'additional_properties' defines the additional fields we want. Supported
-        # fields are available in self.item_model.fieldnames().
+        # fields are available in self.folder.allowed_field_names().
         from .folders import ItemId
         getitem = create_element('m:%s' % self.SERVICE_NAME)
         itemshape = create_element('m:ItemShape')
         add_xml_child(itemshape, 't:BaseShape', IdOnly)
         if additional_fields:
-            # TODO: we could require a full Item object here. Then we are not dependent on the folder but can do
-            # item.__class__ instead of self.folder.item_model. We would need to assert that either all items are the
-            # same type or that all items support the requested properties.
-            add_xml_child(itemshape, 't:AdditionalProperties',
-                          self.folder.item_model.additional_property_elems(additional_fields))
+            additional_property_elems = []
+            for f in additional_fields:
+                additional_property_elems.extend(self.folder.additional_property_elems(f))
+            add_xml_child(itemshape, 't:AdditionalProperties', additional_property_elems)
         getitem.append(itemshape)
         item_ids = create_element('m:ItemIds')
         n = 0
@@ -447,7 +448,7 @@ class CreateItem(EWSPooledFolderService):
         item_elems = []
         for item in items:
             log.debug('Adding item %s', item)
-            item_elems.append(item.to_xml(self.account.version))
+            item_elems.append(item.to_xml(version=self.account.version))
         if not item_elems:
             raise AttributeError('"items" must not be empty')
         add_xml_child(createitem, 'm:Items', item_elems)
@@ -499,7 +500,7 @@ class DeleteItem(EWSPooledAccountService):
         return deleteitem
 
 
-class UpdateItem(EWSPooledFolderService):
+class UpdateItem(EWSPooledAccountService):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa580254(v=exchg.150).aspx
     """
@@ -509,8 +510,8 @@ class UpdateItem(EWSPooledFolderService):
 
     def _get_payload(self, items, conflict_resolution, message_disposition,
                      send_meeting_invitations_or_cancellations, suppress_read_receipts):
-        # Takes a dict with an (item_id, changekey) tuple or Item object as the key, and a dict of
-        # field_name -> new_value as values. Returns the XML for a DeleteItem request.
+        # Takes a dict with an Item object as the key, and a list of field names that were updated. Returns the XML for
+        # an UpdateItem request.
         from .folders import ItemId, IndexedField, ExtendedProperty, ExternId, EWSElement
         if self.account.version.build >= EXCHANGE_2013:
             updateitem = create_element(
@@ -530,24 +531,26 @@ class UpdateItem(EWSPooledFolderService):
 
         itemchanges = create_element('m:ItemChanges')
         n = 0
-        for item, update_dict in items:
+        for item, fieldnames in items:
             n += 1
-            if not update_dict:
-                raise AttributeError('"update_dict" must not be empty')
+            if not fieldnames:
+                raise AttributeError('"fieldnames" must not be empty')
+            item_model = item.__class__
+            readonly_fields = item_model.readonly_fields()
             itemchange = create_element('t:ItemChange')
-            # TODO: we could require a full Item object here. Then we are not dependent on the folder
-            item_id = ItemId(*item) if isinstance(item, tuple) else ItemId(item.item_id, item.changekey)
-            log.debug('Updating item %s values %s', item_id, update_dict)
+            item_id = ItemId(item.item_id, item.changekey)
+            log.debug('Updating item %s values %s', item_id, fieldnames)
             set_xml_value(itemchange, item_id, self.account.version)
             updates = create_element('t:Updates')
             meeting_timezone_added = False
-            for fieldname, val in update_dict.items():
-                if fieldname in self.folder.item_model.readonly_fields():
+            for fieldname in fieldnames:
+                if fieldname in readonly_fields:
                     log.warning('%s is a read-only field. Skipping', fieldname)
                     continue
+                val = getattr(item, fieldname)
                 if fieldname == 'extern_id' and val is not None:
                     val = ExternId(val)
-                field_uri = self.folder.item_model.fielduri_for_field(fieldname)
+                field_uri = item_model.fielduri_for_field(fieldname)
                 if isinstance(field_uri, str):
                     fielduri = create_element('t:FieldURI', FieldURI=field_uri)
                 elif issubclass(field_uri, IndexedField):
@@ -562,20 +565,20 @@ class UpdateItem(EWSPooledFolderService):
                     assert False, 'Unknown field_uri type: %s' % field_uri
                 if val is None:
                     # A value of None means we want to remove this field from the item
-                    if fieldname in self.folder.item_model.required_fields():
+                    if fieldname in item_model.required_fields():
                         log.warning('%s is a required field and may not be deleted. Skipping', fieldname)
                         continue
                     add_xml_child(updates, 't:DeleteItemField', fielduri)
                     continue
                 setitemfield = create_element('t:SetItemField')
                 setitemfield.append(fielduri)
-                folderitem = create_element(self.folder.item_model.request_tag())
+                folderitem = create_element(item_model.request_tag())
 
                 if isinstance(val, EWSElement):
                     set_xml_value(folderitem, val, self.account.version)
                 else:
                     folderitem.append(
-                        set_xml_value(self.folder.item_model.elem_for_field(fieldname), val, self.account.version)
+                        set_xml_value(item_model.elem_for_field(fieldname), val, self.account.version)
                     )
                 setitemfield.append(folderitem)
                 updates.append(setitemfield)
@@ -584,7 +587,7 @@ class UpdateItem(EWSPooledFolderService):
                     # Always set timezone explicitly when updating date fields. Exchange 2007 wants "MeetingTimeZone"
                     # instead of explicit timezone on each datetime field.
                     setitemfield_tz = create_element('t:SetItemField')
-                    folderitem_tz = create_element(self.folder.item_model.request_tag())
+                    folderitem_tz = create_element(item_model.request_tag())
                     if self.account.version.build < EXCHANGE_2010:
                         if meeting_timezone_added:
                             # Let's hope that we're not changing timezone, or that both 'start' and 'end' are supplied.
@@ -635,8 +638,10 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
         itemshape = create_element('m:ItemShape')
         add_xml_child(itemshape, 't:BaseShape', shape)
         if additional_fields:
-            add_xml_child(itemshape, 't:AdditionalProperties',
-                          self.folder.item_model.additional_property_elems(additional_fields))
+            additional_property_elems = []
+            for f in additional_fields:
+                additional_property_elems.extend(self.folder.additional_property_elems(f))
+            add_xml_child(itemshape, 't:AdditionalProperties', additional_property_elems)
         finditem.append(itemshape)
         indexedpageviewitem = create_element('m:IndexedPageItemView', Offset=str(offset), BasePoint='Beginning')
         finditem.append(indexedpageviewitem)

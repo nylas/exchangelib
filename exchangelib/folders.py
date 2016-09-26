@@ -15,7 +15,7 @@ from .restriction import Restriction, Q
 from .services import TNS, FindItem, IdOnly, SHALLOW, DEEP, DeleteItem, CreateItem, UpdateItem, FindFolder, GetFolder, \
     GetItem, MNS, ITEM_TRAVERSAL_CHOICES, FOLDER_TRAVERSAL_CHOICES, SHAPE_CHOICES
 from .util import create_element, add_xml_child, get_xml_attrs, get_xml_attr, set_xml_value, peek
-from .version import EXCHANGE_2010, EXCHANGE_2013
+from .version import EXCHANGE_2010
 
 log = getLogger(__name__)
 
@@ -688,19 +688,18 @@ class Item(EWSElement):
             raise ValueError("No type defined for fieldname '%s'" % fieldname)
 
     @classmethod
-    def additional_property_elems(cls, fieldnames):
+    def additional_property_elems(cls, fieldname):
         fields = []
-        for f in fieldnames:
-            field_uri = cls.fielduri_for_field(f)
-            if isinstance(field_uri, str):
-                fields.append(create_element('t:FieldURI', FieldURI=field_uri))
-            elif issubclass(field_uri, IndexedField):
-                for l in field_uri.LABELS:
-                    fields.append(field_uri.field_uri_xml(label=l))
-            elif issubclass(field_uri, ExtendedProperty):
-                fields.append(field_uri.field_uri_xml())
-            else:
-                assert False, 'Unknown field_uri type: %s' % field_uri
+        field_uri = cls.fielduri_for_field(fieldname)
+        if isinstance(field_uri, str):
+            fields.append(create_element('t:FieldURI', FieldURI=field_uri))
+        elif issubclass(field_uri, IndexedField):
+            for l in field_uri.LABELS:
+                fields.append(field_uri.field_uri_xml(label=l))
+        elif issubclass(field_uri, ExtendedProperty):
+            fields.append(field_uri.field_uri_xml())
+        else:
+            assert False, 'Unknown field_uri type: %s' % field_uri
         return fields
 
     @classmethod
@@ -1137,17 +1136,15 @@ class Contact(ItemMixIn):
         super().__init__(**kwargs)
 
 
+ITEM_CLASSES = (CalendarItem, Contact, Message, Task)
+
+
 class Folder:
     DISTINGUISHED_FOLDER_ID = None  # See https://msdn.microsoft.com/en-us/library/office/aa580808(v=exchg.150).aspx
     # CONTAINER_CLASS = None  # See http://msdn.microsoft.com/en-us/library/hh354773(v=exchg.80).aspx
-    item_model = Item
+    supported_item_models = tuple()  # The Item types that this folder can contain
     LOCALIZED_NAMES = dict()
-    ITEM_MODEL_MAP = {
-            CalendarItem.response_tag(): CalendarItem,
-            Message.response_tag(): Message,
-            Task.response_tag(): Task,
-            Contact.response_tag(): Contact,
-        }
+    ITEM_MODEL_MAP = {cls.response_tag(): cls for cls in ITEM_CLASSES}
 
     def __init__(self, account, name=None, folder_class=None, folder_id=None, changekey=None):
         self.account = account
@@ -1168,6 +1165,38 @@ class Folder:
     @classmethod
     def item_model_from_tag(cls, tag):
         return cls.ITEM_MODEL_MAP[tag]
+
+    @classmethod
+    def allowed_field_names(cls):
+        field_names = set()
+        for item_model in cls.supported_item_models:
+            field_names.update(item_model.fieldnames())
+        return field_names
+
+    @classmethod
+    def complex_field_names(cls):
+        field_names = set()
+        for item_model in cls.supported_item_models:
+            field_names.update(item_model.complex_fields())
+        return field_names
+
+    @classmethod
+    def additional_property_elems(cls, fieldname):
+        for item_model in cls.supported_item_models:
+            try:
+                return item_model.additional_property_elems(fieldname=fieldname)
+            except ValueError:
+                pass
+        raise ValueError("No fielduri defined for fieldname '%s'" % fieldname)
+
+    @classmethod
+    def fielduri_for_field(cls, fieldname):
+        for item_model in cls.supported_item_models:
+            try:
+                return item_model.fielduri_for_field(fieldname=fieldname)
+            except ValueError:
+                pass
+        raise ValueError("No fielduri defined for fieldname '%s'" % fieldname)
 
     def all(self):
         return QuerySet(self).all()
@@ -1225,18 +1254,18 @@ class Folder:
         # Define the extra properties we want on the return objects
         additional_fields = kwargs.pop('additional_fields', tuple())
         if additional_fields:
-            allowed_field_names = set(self.item_model.fieldnames())
-            complex_field_names = set(self.item_model.complex_fields())
+            allowed_field_names = self.allowed_field_names()
+            complex_field_names = self.complex_field_names()
             for f in additional_fields:
                 if f not in allowed_field_names:
-                    raise ValueError("'%s' is not a field on %s" % (f, self.item_model))
+                    raise ValueError("'%s' is not a field on %s" % (f, self.supported_item_models))
                 if f in complex_field_names:
                     raise ValueError("find_items() does not support field '%s'. Use fetch() instead" % f)
 
         # Build up any restrictions
-        q = Q.from_filter_args(self.item_model, *args, **kwargs)
+        q = Q.from_filter_args(self.__class__, *args, **kwargs)
         if q and not q.is_empty():
-            restriction = Restriction(q.translate_fields(item_model=self.item_model))
+            restriction = Restriction(q.translate_fields(folder_class=self.__class__))
         else:
             restriction = None
         log.debug(
@@ -1347,8 +1376,7 @@ class Folder:
         assert send_meeting_invitations_or_cancellations in SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES
         assert suppress_read_receipts in (True, False)
         log.debug(
-            'Updating %s items for %s (conflict_resolution %s, message_disposition: %s, send_meeting_invitations: %s)',
-            self.DISTINGUISHED_FOLDER_ID,
+            'Updating items for %s (conflict_resolution %s, message_disposition: %s, send_meeting_invitations: %s)',
             self.account,
             conflict_resolution,
             message_disposition,
@@ -1361,7 +1389,7 @@ class Folder:
             return []
         return list(map(
             Item.id_from_xml,
-            UpdateItem(folder=self).call(
+            UpdateItem(account=self.account).call(
                 items=items,
                 conflict_resolution=conflict_resolution,
                 message_disposition=message_disposition,
@@ -1386,11 +1414,11 @@ class Folder:
             # empty 'items' and return early.
             return []
         if only_fields:
-            allowed_field_names = self.item_model.fieldnames()
+            allowed_field_names = self.allowed_field_names()
             for f in only_fields:
                 assert f in allowed_field_names
         else:
-            only_fields = self.item_model.fieldnames()
+            only_fields = self.allowed_field_names()
         items = GetItem(folder=self).call(items=ids, additional_fields=only_fields)
         return list(map(
             lambda i: self.item_model_from_tag(i.tag).from_xml(elem=i, folder=self),
@@ -1463,7 +1491,7 @@ class Calendar(Folder):
     An interface for the Exchange calendar
     """
     DISTINGUISHED_FOLDER_ID = 'calendar'
-    item_model = CalendarItem
+    supported_item_models = (CalendarItem,)
 
     # These must be capitalized
     LOCALIZED_NAMES = {
@@ -1473,14 +1501,14 @@ class Calendar(Folder):
 
 class DeletedItems(Folder):
     DISTINGUISHED_FOLDER_ID = 'deleteditems'
-    item_model = Item
+    supported_item_models = ITEM_CLASSES
 
     LOCALIZED_NAMES = {
     }
 
 
 class Messages(Folder):
-    item_model = Message
+    supported_item_models = (Message,)
 
 
 class Drafts(Messages):
@@ -1521,7 +1549,7 @@ class JunkEmail(Messages):
 
 class RecoverableItemsDeletions(Folder):
     DISTINGUISHED_FOLDER_ID = 'recoverableitemsdeletions'
-    item_model = Item
+    supported_item_models = ITEM_CLASSES
 
     LOCALIZED_NAMES = {
     }
@@ -1529,7 +1557,7 @@ class RecoverableItemsDeletions(Folder):
 
 class RecoverableItemsRoot(Folder):
     DISTINGUISHED_FOLDER_ID = 'recoverableitemsroot'
-    item_model = Item
+    supported_item_models = ITEM_CLASSES
 
     LOCALIZED_NAMES = {
     }
@@ -1537,7 +1565,7 @@ class RecoverableItemsRoot(Folder):
 
 class Tasks(Folder):
     DISTINGUISHED_FOLDER_ID = 'tasks'
-    item_model = Task
+    supported_item_models = (Task,)
 
     # These must be capitalized
     LOCALIZED_NAMES = {
@@ -1547,7 +1575,7 @@ class Tasks(Folder):
 
 class Contacts(Folder):
     DISTINGUISHED_FOLDER_ID = 'contacts'
-    item_model = Contact
+    supported_item_models = (Contact,)
 
     # These must be capitalized
     LOCALIZED_NAMES = {
