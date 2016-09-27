@@ -280,6 +280,8 @@ class Q:
         if self.translated:
             return self
         if self.field is not None:
+            if self.field in folder_class.complex_field_names():
+                raise ValueError("Complex field '%s' does not support filtering" % self.field)
             self.field = folder_class.fielduri_for_field(self.field)
         for c in self.children:
             c.translate_fields(folder_class=folder_class)
