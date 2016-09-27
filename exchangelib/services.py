@@ -544,7 +544,7 @@ class UpdateItem(EWSPooledAccountService):
             updates = create_element('t:Updates')
             meeting_timezone_added = False
             for fieldname in fieldnames:
-                if fieldname in readonly_fields:
+                if fieldname in readonly_fields or fieldname in ('item_id', 'changekey'):
                     log.warning('%s is a read-only field. Skipping', fieldname)
                     continue
                 val = getattr(item, fieldname)
