@@ -507,7 +507,7 @@ class Item(EWSElement):
     # 'extern_id' is not a native EWS Item field. We use it for identification when item originates in an external
     # system. The field is implemented as an extended property on the Item.
     ITEM_FIELDS = {
-        'item_id': ('Id', str),
+        'item_id': ('ItemId', str),
         'changekey': ('ChangeKey', str),
         # 'mime_content': ('MimeContent', str),
         'sensitivity': ('Sensitivity', Choice),
@@ -558,9 +558,17 @@ class Item(EWSElement):
                     for item in v:
                         if not isinstance(item, elem_type):
                             raise TypeError('Field %s value "%s" must be of type %s' % (k, v, field_type))
-                elif k != 'extern_id' and field_type != BodyType and field_type != Choice \
-                        and not isinstance(v, field_type):
-                    raise TypeError('Field %s value "%s" must be of type %s' % (k, v, field_type))
+                else:
+                    if k == 'extern_id':
+                        valid_field_types = (ExternId, str)
+                    elif k == 'body':
+                        valid_field_types = (BodyType, str)
+                    elif field_type == Choice:
+                        valid_field_types = (Choice, str)
+                    else:
+                        valid_field_types = (field_type,)
+                    if not isinstance(v, valid_field_types):
+                        raise TypeError('Field %s value "%s" must be of type %s' % (k, v, field_type))
             setattr(self, k, v)
         for k, v in kwargs.items():
             raise TypeError("'%s' is an invalid keyword argument for this function" % k)
@@ -599,15 +607,16 @@ class Item(EWSElement):
         # Delete and move to the trash folder.
         self._delete(delete_type=MOVE_TO_DELETED_ITEMS, send_meeting_cancellations=send_meeting_cancellations,
                      affected_task_occurrences=affected_task_occurrences, suppress_read_receipts=suppress_read_receipts)
+        self.item_id, self.changekey = None, None
         self.folder = self.folder.account.trash
-        self.item_id, self.changekey, self.folder = None, None, None
 
     def soft_delete(self, send_meeting_cancellations=SEND_TO_NONE, affected_task_occurrences=SPECIFIED_OCCURRENCE_ONLY,
                     suppress_read_receipts=True):
         # Delete and move to the dumpster, if it is enabled.
         self._delete(delete_type=SOFT_DELETE, send_meeting_cancellations=send_meeting_cancellations,
                      affected_task_occurrences=affected_task_occurrences, suppress_read_receipts=suppress_read_receipts)
-        self.item_id, self.changekey, self.folder = None, None, None
+        self.item_id, self.changekey = None, None
+        self.folder = self.folder.account.recoverable_deleted_items
 
     def delete(self, send_meeting_cancellations=SEND_TO_NONE, affected_task_occurrences=SPECIFIED_OCCURRENCE_ONLY,
                suppress_read_receipts=True):
@@ -675,10 +684,14 @@ class Item(EWSElement):
 
     @classmethod
     def complex_fields(cls):
-        # Return fields that are not complex EWS types. The FindItems service can only handle certain field types, not
-        # fields like 'body' (that have TextBody and HTMLBody magic), 'optional_attendees' etc.
+        # Return fields that are not complex EWS types. Quoting the EWS FindItem docs:
+        #
+        #   The FindItem operation returns only the first 512 bytes of any streamable property. For Unicode, it returns
+        #   the first 255 characters by using a null-terminated Unicode string. It does not return any of the message
+        #   body formats or the recipient lists.
+        #
         simple_types = (bool, int, str, [str], AnyURI, Choice, EWSDateTime)
-        return tuple(f for f in cls.fieldnames() if cls.type_for_field(f) not in simple_types)
+        return tuple(f for f in cls.fieldnames() if cls.type_for_field(f) not in simple_types) + ('item_id', 'changekey')
 
     @classmethod
     def type_for_field(cls, fieldname):
@@ -959,9 +972,12 @@ class Message(ItemMixIn):
 
     def send(self, conflict_resolution=AUTO_RESOLVE, send_meeting_invitations=SEND_TO_NONE):
         # Only sends a Message. Does not save it and thus does not return an ItemId.
+        # We require self.folder even though the item is not saved to a folder. This is because the EWS request XML
+        # requires a SavedItemFolderId element even though message disposition is SendOnly.
         res = self._save(message_disposition=SEND_ONLY, conflict_resolution=conflict_resolution,
                          send_meeting_invitations=send_meeting_invitations)
         if self.item_id:
+            # TODO: Send an existing item using the SendItem service
             assert len(res) == 1
             assert (self.item_id, self.changekey) == res[0]
         else:

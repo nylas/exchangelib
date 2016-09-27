@@ -10,5 +10,3 @@ Cool things to work on:
 * SendItem service to send draft emails: https://msdn.microsoft.com/en-us/library/office/aa580238(v=exchg.150).aspx
 * Support HTML body content. See http://stackoverflow.com/questions/20982851/how-to-get-the-email-body-in-html-and-text-from-exchange-using-ews-in-c
 * Enforce SUBJECT_MAXLENGTH and LOCATION_MAXLENGTH (and other validations on item fields)
-* Support lookups on ItemId and ChangeKey values: ``my_folder.get(item_id='xxx', changekey='yyy')` and
-  ``my_folder.filter(item_id__in=['xxx', 'yyy'])`
