@@ -313,7 +313,9 @@ class Q:
             elem = self._op_to_xml(self.op)
             field = create_element('t:FieldURI', FieldURI=self.field)
             elem.append(field)
-            constant = create_element('t:Constant', Value=value_to_xml_text(self.value))
+            constant = create_element('t:Constant')
+            # Use .set() to not fill up the create_element() cache with unique values
+            constant.set('Value', value_to_xml_text(self.value))
             if self.op in self.CONTAINS_OPS:
                 elem.append(constant)
             else:
