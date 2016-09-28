@@ -12,7 +12,7 @@ import warnings
 from .ewsdatetime import EWSDateTime, UTC_NOW
 from .queryset import QuerySet
 from .restriction import Restriction, Q
-from .services import TNS, FindItem, IdOnly, SHALLOW, DEEP, CreateItem, FindFolder, GetFolder, GetItem, \
+from .services import TNS, FindItem, IdOnly, SHALLOW, DEEP, CreateItem, FindFolder, GetFolder, GetItem, SendItem, \
     MNS, ITEM_TRAVERSAL_CHOICES, FOLDER_TRAVERSAL_CHOICES, SHAPE_CHOICES
 from .util import create_element, add_xml_child, get_xml_attrs, get_xml_attr, set_xml_value, peek
 from .version import EXCHANGE_2010
@@ -113,8 +113,8 @@ class ItemId(EWSElement):
         self.changekey = changekey
 
     def to_xml(self, version):
-        # Don't use create_element with extra args. It caches results and Id is always unique.
         elem = create_element(self.request_tag())
+        # Use .set() to not fill up the create_element() cache with unique values
         elem.set('Id', self.id)
         elem.set('ChangeKey', self.changekey)
         return elem
@@ -537,8 +537,9 @@ class Item(EWSElement):
     READONLY_FIELDS = {'is_draft', 'datetime_created', 'datetime_sent', 'datetime_received', 'last_modified_name',
                        'last_modified_time'}
 
+    # 'account' is optional but allows calling 'send()'
     # 'folder' is optional but allows calling 'save()' and 'delete()'
-    __slots__ = ('folder',) + tuple(ITEM_FIELDS)
+    __slots__ = ('account', 'folder') + tuple(ITEM_FIELDS)
 
     def __init__(self, **kwargs):
         for k in Item.__slots__:
@@ -548,7 +549,10 @@ class Item(EWSElement):
                 # Test if arguments have the correct type. 'extern_id' is special because we implement it internally as
                 # the ExternId class but want to keep the attribute as a simple str for simplicity and ease of use.
                 # 'field_type' may be a list with a single type. In that case we want to check all list members
-                if k == 'folder':
+                if k == 'account':
+                    from .account import Account
+                    field_type = Account
+                elif k == 'folder':
                     field_type = Folder
                 else:
                     field_type = self.type_for_field(k)
@@ -574,33 +578,50 @@ class Item(EWSElement):
             raise TypeError("'%s' is an invalid keyword argument for this function" % k)
 
     def save(self, conflict_resolution=AUTO_RESOLVE, send_meeting_invitations=SEND_TO_NONE):
-        res = self._save(message_disposition=SAVE_ONLY, conflict_resolution=conflict_resolution,
-                         send_meeting_invitations=send_meeting_invitations)
+        item_id, changekey = self._save(message_disposition=SAVE_ONLY, conflict_resolution=conflict_resolution,
+                                        send_meeting_invitations=send_meeting_invitations)
         if self.item_id:
-            assert len(res) == 1
-            item_id, changekey = res[0]
             assert self.item_id == item_id
             assert self.changekey != changekey
             self.changekey = changekey
         else:
-            assert len(res) == 1
-            self.item_id, self.changekey = res[0]
+            self.item_id, self.changekey = item_id, changekey
         return self
 
     def _save(self, message_disposition, conflict_resolution, send_meeting_invitations):
-        if not self.folder:
-            raise ValueError('Item must have a folder')
+        if not self.account:
+            raise ValueError('Item must have an account')
         if self.item_id:
             assert self.changekey
-            update_kwargs = {k: getattr(self, k) for k in self.fieldnames() if k not in self.readonly_fields()}
-            return self.folder.account.bulk_update(
-                items=[(self, update_kwargs)], message_disposition=message_disposition,
+            update_fields = []
+            for f in self.fieldnames():
+                if f in self.readonly_fields():
+                    continue
+                if f in self.required_fields() and getattr(self, f) is None:
+                    continue
+                update_fields.append(f)
+            res = self.account.bulk_update(
+                items=[(self, update_fields)], message_disposition=message_disposition,
                 conflict_resolution=conflict_resolution,
                 send_meeting_invitations_or_cancellations=send_meeting_invitations)
+            if message_disposition == SEND_AND_SAVE_COPY:
+                assert len(res) == 0
+                return None
+            else:
+                if not res:
+                    raise ValueError('Item disappeared')
+                assert len(res) == 1, res
+                return res[0]
         else:
-            return self.folder.bulk_create(
-                items=[self], message_disposition=message_disposition,
+            res = self.account.bulk_create(
+                items=[self], folder=self.folder, message_disposition=message_disposition,
                 send_meeting_invitations=send_meeting_invitations)
+            if message_disposition in (SEND_ONLY, SEND_AND_SAVE_COPY):
+                assert len(res) == 0
+                return None
+            else:
+                assert len(res) == 1, res
+                return res[0]
 
     def move_to_trash(self, send_meeting_cancellations=SEND_TO_NONE,
                       affected_task_occurrences=SPECIFIED_OCCURRENCE_ONLY, suppress_read_receipts=True):
@@ -626,9 +647,9 @@ class Item(EWSElement):
         self.item_id, self.changekey, self.folder = None, None, None
 
     def _delete(self, delete_type, send_meeting_cancellations, affected_task_occurrences, suppress_read_receipts):
-        if not self.folder:
-            raise ValueError('Item must have a folder')
-        self.folder.account.bulk_delete(
+        if not self.account:
+            raise ValueError('Item must have an account')
+        self.account.bulk_delete(
             ids=[self], delete_type=delete_type, send_meeting_cancellations=send_meeting_cancellations,
             affected_task_occurrences=affected_task_occurrences, suppress_read_receipts=suppress_read_receipts)
 
@@ -702,18 +723,18 @@ class Item(EWSElement):
 
     @classmethod
     def additional_property_elems(cls, fieldname):
-        fields = []
+        elems = []
         field_uri = cls.fielduri_for_field(fieldname)
         if isinstance(field_uri, str):
-            fields.append(create_element('t:FieldURI', FieldURI=field_uri))
+            elems.append(create_element('t:FieldURI', FieldURI=field_uri))
         elif issubclass(field_uri, IndexedField):
             for l in field_uri.LABELS:
-                fields.append(field_uri.field_uri_xml(label=l))
+                elems.append(field_uri.field_uri_xml(label=l))
         elif issubclass(field_uri, ExtendedProperty):
-            fields.append(field_uri.field_uri_xml())
+            elems.append(field_uri.field_uri_xml())
         else:
             assert False, 'Unknown field_uri type: %s' % field_uri
-        return fields
+        return elems
 
     @classmethod
     def id_from_xml(cls, elem):
@@ -721,7 +742,7 @@ class Item(EWSElement):
         return id_elem.get('Id'), id_elem.get('ChangeKey')
 
     @classmethod
-    def from_xml(cls, elem, folder=None):
+    def from_xml(cls, elem, account=None, folder=None):
         assert elem.tag == cls.response_tag()
         item_id, changekey = cls.id_from_xml(elem)
         kwargs = {}
@@ -778,7 +799,7 @@ class Item(EWSElement):
                         kwargs[fieldname] = field_type.from_xml(sub_elem)
             else:
                 assert False, 'Field %s type %s not supported' % (fieldname, field_type)
-        return cls(item_id=item_id, changekey=changekey, folder=folder, **kwargs)
+        return cls(item_id=item_id, changekey=changekey, account=account, folder=folder, **kwargs)
 
     def __eq__(self, other):
         if isinstance(other, tuple):
@@ -970,28 +991,45 @@ class Message(ItemMixIn):
             setattr(self, k, v)
         super().__init__(**kwargs)
 
-    def send(self, conflict_resolution=AUTO_RESOLVE, send_meeting_invitations=SEND_TO_NONE):
-        # Only sends a Message. Does not save it and thus does not return an ItemId.
-        # We require self.folder even though the item is not saved to a folder. This is because the EWS request XML
-        # requires a SavedItemFolderId element even though message disposition is SendOnly.
-        res = self._save(message_disposition=SEND_ONLY, conflict_resolution=conflict_resolution,
-                         send_meeting_invitations=send_meeting_invitations)
+    def send(self, save_copy=True, copy_to_folder=None, conflict_resolution=AUTO_RESOLVE,
+             send_meeting_invitations=SEND_TO_NONE):
+        # Only sends a message. The message can either be an existing draft stored in EWS or a new message that does
+        # not yet exist in EWS.
+        if not self.account:
+            raise ValueError('Item must have an account')
+        if copy_to_folder and not save_copy:
+            raise AttributeError("'save_copy' must be True when 'copy_to_folder' is set")
+        if save_copy and not copy_to_folder:
+            copy_to_folder = self.account.sent  # 'Sent' is default EWS behaviour
         if self.item_id:
-            # TODO: Send an existing item using the SendItem service
-            assert len(res) == 1
-            assert (self.item_id, self.changekey) == res[0]
+            # Send existing draft message. If requested, save a copy in 'copy_to_folder'
+            res = list(SendItem(account=self.account).call(items=[self], save_item_to_folder=save_copy,
+                                                           saved_item_folder=copy_to_folder))
+            if not res:
+                raise ValueError('Item disappeared')
+            assert len(res) == 1, res
+            if not res[0][0]:
+                raise ValueError('Error sending message: %s', res[0][1])
+            # The item will be deleted from the original folder
+            self.item_id, self.changekey = None, None
+            self.folder = copy_to_folder
         else:
-            assert len(res) == 0
+            # New message
+            if copy_to_folder:
+                # This would better be done via send_and_save() but lets just support it here
+                self.folder = copy_to_folder
+                return self.send_and_save(conflict_resolution=conflict_resolution,
+                                          send_meeting_invitations=send_meeting_invitations)
+            assert copy_to_folder is None
+            res = self._save(message_disposition=SEND_ONLY, conflict_resolution=conflict_resolution,
+                             send_meeting_invitations=send_meeting_invitations)
+            assert res is None
 
     def send_and_save(self, conflict_resolution=AUTO_RESOLVE, send_meeting_invitations=SEND_TO_NONE):
         # Sends Message and saves a copy in the parent folder. Does not return an ItemId.
         res = self._save(message_disposition=SEND_AND_SAVE_COPY, conflict_resolution=conflict_resolution,
                          send_meeting_invitations=send_meeting_invitations)
-        if self.item_id:
-            assert len(res) == 1
-            assert (self.item_id, self.changekey) == res[0]
-        else:
-            assert len(res) == 0
+        assert res is None
 
 
 class Task(ItemMixIn):
@@ -1158,8 +1196,8 @@ ITEM_CLASSES = (CalendarItem, Contact, Message, Task)
 class Folder:
     DISTINGUISHED_FOLDER_ID = None  # See https://msdn.microsoft.com/en-us/library/office/aa580808(v=exchg.150).aspx
     # CONTAINER_CLASS = None  # See http://msdn.microsoft.com/en-us/library/hh354773(v=exchg.80).aspx
-    supported_item_models = tuple()  # The Item types that this folder can contain
-    LOCALIZED_NAMES = dict()
+    supported_item_models = ITEM_CLASSES  # The Item types that this folder can contain. Default is all
+    LOCALIZED_NAMES = dict()  # A map of (str)locale: (tuple)localized_folder_names
     ITEM_MODEL_MAP = {cls.response_tag(): cls for cls in ITEM_CLASSES}
 
     def __init__(self, account, name=None, folder_class=None, folder_id=None, changekey=None):
@@ -1197,13 +1235,21 @@ class Folder:
         return field_names
 
     @classmethod
-    def additional_property_elems(cls, fieldname):
-        for item_model in cls.supported_item_models:
-            try:
-                return item_model.additional_property_elems(fieldname=fieldname)
-            except ValueError:
-                pass
-        raise ValueError("No fielduri defined for fieldname '%s'" % fieldname)
+    def additional_property_elems(cls, fieldnames):
+        # Some field names have more than one FieldURI. For example, for 'mileage' field is present on both Contact and
+        # Task, as contacts:Mileage and tasks:Mileage.
+        elems = []
+        for f in fieldnames:
+            is_valid = False
+            for item_model in cls.supported_item_models:
+                try:
+                    elems.extend(item_model.additional_property_elems(fieldname=f))
+                    is_valid = True
+                except ValueError:
+                    pass
+            if not is_valid:
+                raise ValueError("No fielduri defined for fieldname '%s'" % f)
+        return elems
 
     @classmethod
     def fielduri_for_field(cls, fieldname):
@@ -1302,7 +1348,7 @@ class Folder:
         if shape == IdOnly and additional_fields is None:
             return map(Item.id_from_xml, items)
         return map(
-            lambda i: self.item_model_from_tag(i.tag).from_xml(elem=i, folder=self),
+            lambda i: self.item_model_from_tag(i.tag).from_xml(elem=i, account=self.account, folder=self),
             items
         )
 
@@ -1310,41 +1356,15 @@ class Folder:
         warnings.warn('add_items() is deprecated. Use bulk_create() instead', PendingDeprecationWarning)
         return self.bulk_create(*args, **kwargs)
 
-    def bulk_create(self, items, message_disposition=SAVE_ONLY, send_meeting_invitations=SEND_TO_NONE):
-        """
-        Creates new items in the folder. 'items' is an iterable of Item objects. Returns a list of (id, changekey)
-        tuples in the same order as the input.
-        'message_disposition' is only applicable to Message items.
-        'send_meeting_invitations' is only applicable to CalendarItem items.
-        """
-        assert message_disposition in MESSAGE_DISPOSITION_CHOICES
-        assert send_meeting_invitations in SEND_MEETING_INVITATIONS_CHOICES
-        log.debug(
-            'Adding %s items for %s (message_disposition: %s, send_meeting_invitations: %s)',
-            self.DISTINGUISHED_FOLDER_ID,
-            self.account,
-            message_disposition,
-            send_meeting_invitations,
-        )
-        is_empty, items = peek(items)
-        if is_empty:
-            # We accept generators, so it's not always convenient for caller to know up-front if 'items' is empty. Allow
-            # empty 'items' and return early.
-            return []
-        return list(map(
-            Item.id_from_xml,
-            CreateItem(folder=self).call(
-                items=items,
-                message_disposition=message_disposition,
-                send_meeting_invitations=send_meeting_invitations,
-            )
-        ))
+    def bulk_create(self, *args, **kwargs):
+        return self.account.bulk_create(folder=self, *args, **kwargs)
 
     def delete_items(self, *args, **kwargs):
         warnings.warn('delete_items() is deprecated. Use bulk_delete() instead', PendingDeprecationWarning)
         return self.bulk_delete(*args, **kwargs)
 
     def bulk_delete(self, *args, **kwargs):
+        warnings.warn('Folder.bulk_delete() is deprecated. Use Account.bulk_delete() instead', PendingDeprecationWarning)
         return self.account.bulk_delete(*args, **kwargs)
 
     def update_items(self, *args, **kwargs):
@@ -1352,35 +1372,19 @@ class Folder:
         return self.bulk_update(*args, **kwargs)
 
     def bulk_update(self, *args, **kwargs):
+        warnings.warn('Folder.bulk_update() is deprecated. Use Account.bulk_update() instead', PendingDeprecationWarning)
         return self.account.bulk_update(*args, **kwargs)
-
 
     def get_items(self, *args, **kwargs):
         warnings.warn('get_items() is deprecated. Use fetch() instead', PendingDeprecationWarning)
         return self.fetch(*args, **kwargs)
 
-    def fetch(self, ids, only_fields=None):
-        # 'only_fields' specifies which fields to fetch, instead of all possible fields.
+    def fetch(self, *args, **kwargs):
         if hasattr(self, 'with_extra_fields'):
             raise DeprecationWarning(
                 "'%(cls)s.with_extra_fields' is deprecated. Use 'fetch(ids, only_fields=[...])' instead"
                 % dict(cls=self.__class__.__name__))
-        is_empty, ids = peek(ids)
-        if is_empty:
-            # We accept generators, so it's not always convenient for caller to know up-front if 'items' is empty. Allow
-            # empty 'items' and return early.
-            return []
-        if only_fields:
-            allowed_field_names = self.allowed_field_names()
-            for f in only_fields:
-                assert f in allowed_field_names
-        else:
-            only_fields = self.allowed_field_names()
-        items = GetItem(folder=self).call(items=ids, additional_fields=only_fields)
-        return list(map(
-            lambda i: self.item_model_from_tag(i.tag).from_xml(elem=i, folder=self),
-            items
-        ))
+        return self.account.fetch(folder=self, *args, **kwargs)
 
     def test_access(self):
         """
@@ -1393,7 +1397,11 @@ class Folder:
     def folderid_xml(self):
         assert self.folder_id
         assert self.changekey
-        return create_element('t:FolderId', Id=self.folder_id, ChangeKey=self.changekey)
+        elem = create_element('t:FolderId')
+        # Use .set() to not fill up the create_element() cache with unique values
+        elem.set('Id', self.folder_id)
+        elem.set('ChangeKey', self.changekey)
+        return elem
 
     @classmethod
     def from_xml(cls, account, elem):
@@ -1450,7 +1458,6 @@ class Calendar(Folder):
     DISTINGUISHED_FOLDER_ID = 'calendar'
     supported_item_models = (CalendarItem,)
 
-    # These must be capitalized
     LOCALIZED_NAMES = {
         'da_DK': ('Kalender',)
     }
@@ -1461,6 +1468,7 @@ class DeletedItems(Folder):
     supported_item_models = ITEM_CLASSES
 
     LOCALIZED_NAMES = {
+        'da_DK': ('Slettet post',),
     }
 
 
@@ -1472,6 +1480,7 @@ class Drafts(Messages):
     DISTINGUISHED_FOLDER_ID = 'drafts'
 
     LOCALIZED_NAMES = {
+        'da_DK': ('Kladder',)
     }
 
 
@@ -1487,6 +1496,7 @@ class Outbox(Messages):
     DISTINGUISHED_FOLDER_ID = 'outbox'
 
     LOCALIZED_NAMES = {
+        'da_DK': ('Udbakke',),
     }
 
 
@@ -1494,6 +1504,7 @@ class SentItems(Messages):
     DISTINGUISHED_FOLDER_ID = 'sentitems'
 
     LOCALIZED_NAMES = {
+        'da_DK': ('Sendt post',)
     }
 
 
@@ -1524,7 +1535,6 @@ class Tasks(Folder):
     DISTINGUISHED_FOLDER_ID = 'tasks'
     supported_item_models = (Task,)
 
-    # These must be capitalized
     LOCALIZED_NAMES = {
         'da_DK': ('Opgaver',)
     }
@@ -1534,7 +1544,6 @@ class Contacts(Folder):
     DISTINGUISHED_FOLDER_ID = 'contacts'
     supported_item_models = (Contact,)
 
-    # These must be capitalized
     LOCALIZED_NAMES = {
         'da_DK': ('Kontaktpersoner',)
     }

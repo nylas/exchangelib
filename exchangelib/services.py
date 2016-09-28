@@ -300,8 +300,10 @@ class GetServerTimeZones(EWSService):
         return list(super().call(**kwargs))
 
     def _get_payload(self, returnfulltimezonedata=False):
-        return create_element('m:%s' % self.SERVICE_NAME, ReturnFullTimeZoneData=(
-            'true' if returnfulltimezonedata else 'false'))
+        return create_element(
+            'm:%s' % self.SERVICE_NAME,
+            ReturnFullTimeZoneData='true' if returnfulltimezonedata else 'false',
+        )
 
     def _get_elements_in_container(self, container):
         timezones = []
@@ -380,7 +382,7 @@ class EWSPooledFolderService(EWSFolderService, EWSPooledMixIn):
         return self._pool_requests(payload_func=self._get_payload, **kwargs)
 
 
-class GetItem(EWSPooledFolderService):
+class GetItem(EWSPooledAccountService):
     """
     Take a list of (id, changekey) tuples and returns all items in 'account', optionally expanded with
     'additional_fields' fields, in stable order.
@@ -391,7 +393,7 @@ class GetItem(EWSPooledFolderService):
     SERVICE_NAME = 'GetItem'
     element_container_name = '{%s}Items' % MNS
 
-    def _get_payload(self, items, additional_fields):
+    def _get_payload(self, items, folder, additional_fields):
         # Takes a list of (item_id, changekey) tuples or Item objects and returns the XML for a GetItem request.
         #
         # We start with an IdOnly request. 'additional_properties' defines the additional fields we want. Supported
@@ -401,24 +403,26 @@ class GetItem(EWSPooledFolderService):
         itemshape = create_element('m:ItemShape')
         add_xml_child(itemshape, 't:BaseShape', IdOnly)
         if additional_fields:
-            additional_property_elems = []
-            for f in additional_fields:
-                additional_property_elems.extend(self.folder.additional_property_elems(f))
+            additional_property_elems = folder.additional_property_elems(additional_fields)
             add_xml_child(itemshape, 't:AdditionalProperties', additional_property_elems)
         getitem.append(itemshape)
         item_ids = create_element('m:ItemIds')
         n = 0
         for item in items:
             n += 1
-            item_id = ItemId(*item) if isinstance(item, tuple) else ItemId(item.item_id, item.changekey)
-            set_xml_value(item_ids, item_id, self.account.version)
+            item_id, changekey = item if isinstance(item, tuple) else (item.item_id, item.changekey)
+            if not isinstance(item_id, str):
+                raise ValueError("item_id '%s' must be a string" % item_id)
+            if not isinstance(changekey, str):
+                raise ValueError("changekey '%s' must be a string" % changekey)
+            set_xml_value(item_ids, ItemId(item_id, changekey), self.account.version)
         if not n:
             raise AttributeError('"ids" must not be empty')
         getitem.append(item_ids)
         return getitem
 
 
-class CreateItem(EWSPooledFolderService):
+class CreateItem(EWSPooledAccountService):
     """
     Takes folder and a list of items. Returns result of creation as a list of tuples (success[True|False],
     errormessage), in the same order as the input list.
@@ -429,7 +433,7 @@ class CreateItem(EWSPooledFolderService):
     SERVICE_NAME = 'CreateItem'
     element_container_name = '{%s}Items' % MNS
 
-    def _get_payload(self, items, message_disposition, send_meeting_invitations):
+    def _get_payload(self, items, folder, message_disposition, send_meeting_invitations):
         # Takes a list of Item obejcts (CalendarItem, Message etc) and returns the XML for a CreateItem request.
         # convert items to XML Elements
         #
@@ -444,7 +448,8 @@ class CreateItem(EWSPooledFolderService):
             MessageDisposition=message_disposition,
             SendMeetingInvitations=send_meeting_invitations,
         )
-        add_xml_child(createitem, 'm:SavedItemFolderId', self.folder.folderid_xml())
+        if folder:
+            add_xml_child(createitem, 'm:SavedItemFolderId', folder.folderid_xml())
         item_elems = []
         for item in items:
             log.debug('Adding item %s', item)
@@ -453,51 +458,6 @@ class CreateItem(EWSPooledFolderService):
             raise AttributeError('"items" must not be empty')
         add_xml_child(createitem, 'm:Items', item_elems)
         return createitem
-
-
-class DeleteItem(EWSPooledAccountService):
-    """
-    Takes a folder and a list of (id, changekey) tuples. Returns result of deletion as a list of tuples
-    (success[True|False], errormessage), in the same order as the input list.
-
-    MSDN: https://msdn.microsoft.com/en-us/library/office/aa562961(v=exchg.150).aspx
-
-    """
-    CHUNKSIZE = 25
-    SERVICE_NAME = 'DeleteItem'
-    element_container_name = None  # DeleteItem doesn't return a response object, just status in XML attrs
-
-    def _get_payload(self, items, delete_type, send_meeting_cancellations, affected_task_occurrences,
-                     suppress_read_receipts):
-        # Takes a list of (item_id, changekey) tuples or Item objects and returns the XML for a DeleteItem request.
-        from .folders import ItemId
-        if self.account.version.build >= EXCHANGE_2013:
-            deleteitem = create_element(
-                'm:%s' % self.SERVICE_NAME,
-                DeleteType=delete_type,
-                SendMeetingCancellations=send_meeting_cancellations,
-                AffectedTaskOccurrences=affected_task_occurrences,
-                SuppressReadReceipts='true' if suppress_read_receipts else 'false',
-            )
-        else:
-            deleteitem = create_element(
-                'm:%s' % self.SERVICE_NAME,
-                DeleteType=delete_type,
-                SendMeetingCancellations=send_meeting_cancellations,
-                AffectedTaskOccurrences=affected_task_occurrences,
-            )
-
-        item_ids = create_element('m:ItemIds')
-        n = 0
-        for item in items:
-            n += 1
-            item_id = ItemId(*item) if isinstance(item, tuple) else ItemId(item.item_id, item.changekey)
-            log.debug('Deleting item %s', item_id)
-            set_xml_value(item_ids, item_id, self.account.version)
-        if not n:
-            raise AttributeError('"ids" must not be empty')
-        deleteitem.append(item_ids)
-        return deleteitem
 
 
 class UpdateItem(EWSPooledAccountService):
@@ -510,7 +470,8 @@ class UpdateItem(EWSPooledAccountService):
 
     def _get_payload(self, items, conflict_resolution, message_disposition,
                      send_meeting_invitations_or_cancellations, suppress_read_receipts):
-        # Takes a dict with an Item object as the key, and a list of field names that were updated. Returns the XML for
+        # Takes a list of (Item, fieldnames) tuples where 'Item' is a instance of a subclass of Item and 'fieldnames'
+        # are the attribute names that were updated. Returns the XML for an UpdateItem call.
         # an UpdateItem request.
         from .folders import ItemId, IndexedField, ExtendedProperty, ExternId, EWSElement
         if self.account.version.build >= EXCHANGE_2013:
@@ -620,6 +581,51 @@ class UpdateItem(EWSPooledAccountService):
         return updateitem
 
 
+class DeleteItem(EWSPooledAccountService):
+    """
+    Takes a folder and a list of (id, changekey) tuples. Returns result of deletion as a list of tuples
+    (success[True|False], errormessage), in the same order as the input list.
+
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa562961(v=exchg.150).aspx
+
+    """
+    CHUNKSIZE = 25
+    SERVICE_NAME = 'DeleteItem'
+    element_container_name = None  # DeleteItem doesn't return a response object, just status in XML attrs
+
+    def _get_payload(self, items, delete_type, send_meeting_cancellations, affected_task_occurrences,
+                     suppress_read_receipts):
+        # Takes a list of (item_id, changekey) tuples or Item objects and returns the XML for a DeleteItem request.
+        from .folders import ItemId
+        if self.account.version.build >= EXCHANGE_2013:
+            deleteitem = create_element(
+                'm:%s' % self.SERVICE_NAME,
+                DeleteType=delete_type,
+                SendMeetingCancellations=send_meeting_cancellations,
+                AffectedTaskOccurrences=affected_task_occurrences,
+                SuppressReadReceipts='true' if suppress_read_receipts else 'false',
+            )
+        else:
+            deleteitem = create_element(
+                'm:%s' % self.SERVICE_NAME,
+                DeleteType=delete_type,
+                SendMeetingCancellations=send_meeting_cancellations,
+                AffectedTaskOccurrences=affected_task_occurrences,
+            )
+
+        item_ids = create_element('m:ItemIds')
+        n = 0
+        for item in items:
+            n += 1
+            item_id = ItemId(*item) if isinstance(item, tuple) else ItemId(item.item_id, item.changekey)
+            log.debug('Deleting item %s', item_id)
+            set_xml_value(item_ids, item_id, self.account.version)
+        if not n:
+            raise AttributeError('"ids" must not be empty')
+        deleteitem.append(item_ids)
+        return deleteitem
+
+
 class FindItem(EWSFolderService, PagingEWSMixIn):
     """
     Gets all items for 'account' in folder 'folder_id', optionally expanded with 'additional_fields' fields,
@@ -638,9 +644,7 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
         itemshape = create_element('m:ItemShape')
         add_xml_child(itemshape, 't:BaseShape', shape)
         if additional_fields:
-            additional_property_elems = []
-            for f in additional_fields:
-                additional_property_elems.extend(self.folder.additional_property_elems(f))
+            additional_property_elems = self.folder.additional_property_elems(additional_fields)
             add_xml_child(itemshape, 't:AdditionalProperties', additional_property_elems)
         finditem.append(itemshape)
         indexedpageviewitem = create_element('m:IndexedPageItemView', Offset=str(offset), BasePoint='Beginning')
@@ -715,6 +719,35 @@ class GetFolder(EWSAccountService):
         return getfolder
 
 
+class SendItem(EWSAccountService):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa580238(v=exchg.150).aspx
+    """
+    SERVICE_NAME = 'SendItem'
+    element_container_name = None  # SendItem doesn't return a response object, just status in XML attrs
+
+    def _get_payload(self, items, save_item_to_folder, saved_item_folder):
+        if saved_item_folder and not save_item_to_folder:
+            raise AttributeError("'save_item_to_folder' must be True when 'saved_item_folder' is set")
+        from .folders import ItemId
+        senditem = create_element(
+            'm:%s' % self.SERVICE_NAME,
+            SaveItemToFolder='true' if save_item_to_folder else 'false',
+        )
+        item_ids = create_element('m:ItemIds')
+        n = 0
+        for item in items:
+            n += 1
+            item_id = ItemId(*item) if isinstance(item, tuple) else ItemId(item.item_id, item.changekey)
+            set_xml_value(item_ids, item_id, self.account.version)
+        if not n:
+            raise AttributeError('"ids" must not be empty')
+        senditem.append(item_ids)
+        if saved_item_folder:
+            add_xml_child(senditem, 'm:SavedItemFolderId', saved_item_folder.folderid_xml())
+        return senditem
+
+
 class ResolveNames(EWSService):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa565329(v=exchg.150).aspx
@@ -722,11 +755,13 @@ class ResolveNames(EWSService):
     SERVICE_NAME = 'ResolveNames'
     element_container_name = '{%s}ResolutionSet' % MNS
 
-    def _get_payload(self, unresolvedentries, returnfullcontactdata=False):
-        payload = create_element('m:%s' % self.SERVICE_NAME, ReturnFullContactData=(
-            'true' if returnfullcontactdata else 'false'))
+    def _get_payload(self, unresolved_entries, return_full_contact_data=False):
+        payload = create_element(
+            'm:%s' % self.SERVICE_NAME,
+            ReturnFullContactData='true' if return_full_contact_data else 'false',
+        )
         n = 0
-        for entry in unresolvedentries:
+        for entry in unresolved_entries:
             n += 1
             add_xml_child(payload, 'm:UnresolvedEntry', entry)
         if not n:

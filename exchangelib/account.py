@@ -1,15 +1,17 @@
 from logging import getLogger
+from locale import getlocale
 
 from .autodiscover import discover
 from .credentials import DELEGATE, IMPERSONATION
 from .errors import ErrorFolderNotFound, ErrorAccessDenied
 from .folders import Root, Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Tasks, Contacts, \
-    RecoverableItemsRoot, RecoverableItemsDeletions, Item, SHALLOW, DEEP, WELLKNOWN_FOLDERS, HARD_DELETE, \
-    AUTO_RESOLVE, SEND_TO_NONE, SAVE_ONLY, SPECIFIED_OCCURRENCE_ONLY, DELETE_TYPE_CHOICES, \
-    CONFLICT_RESOLUTION_CHOICES, SEND_MEETING_CANCELLATIONS_CHOICES, AFFECTED_TASK_OCCURRENCES_CHOICES, \
-    MESSAGE_DISPOSITION_CHOICES, SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES
+    RecoverableItemsRoot, RecoverableItemsDeletions, Folder, Item, SHALLOW, DEEP, WELLKNOWN_FOLDERS, HARD_DELETE, \
+    AUTO_RESOLVE, SEND_TO_NONE, SAVE_ONLY, SEND_AND_SAVE_COPY, SEND_ONLY, SPECIFIED_OCCURRENCE_ONLY, \
+    DELETE_TYPE_CHOICES, MESSAGE_DISPOSITION_CHOICES, CONFLICT_RESOLUTION_CHOICES, AFFECTED_TASK_OCCURRENCES_CHOICES, \
+    SEND_MEETING_INVITATIONS_CHOICES, SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES, \
+    SEND_MEETING_CANCELLATIONS_CHOICES
 from .protocol import Protocol
-from .services import DeleteItem, UpdateItem
+from .services import GetItem, CreateItem, UpdateItem, DeleteItem
 from .util import get_domain, peek
 
 log = getLogger(__name__)
@@ -20,12 +22,12 @@ class Account:
     Models an Exchange server user account. The primary key for an account is its PrimarySMTPAddress
     """
     def __init__(self, primary_smtp_address, fullname=None, access_type=None, autodiscover=False, credentials=None,
-                 config=None, verify_ssl=True, locale='da_DK'):
+                 config=None, verify_ssl=True, locale=None):
         if '@' not in primary_smtp_address:
             raise ValueError("primary_smtp_address '%s' is not an email address" % primary_smtp_address)
         self.primary_smtp_address = primary_smtp_address
         self.fullname = fullname
-        self.locale = locale
+        self.locale = locale or getlocale()
         # Assume delegate access if individual credentials are provided. Else, assume service user with impersonation
         self.access_type = access_type or (DELEGATE if credentials else IMPERSONATION)
         assert self.access_type in (DELEGATE, IMPERSONATION)
@@ -190,6 +192,47 @@ class Account:
     def domain(self):
         return get_domain(self.primary_smtp_address)
 
+    def bulk_create(self, folder, items, message_disposition=SAVE_ONLY, send_meeting_invitations=SEND_TO_NONE):
+        """
+        Creates new items in the folder. 'items' is an iterable of Item objects. Returns a list of (id, changekey)
+        tuples in the same order as the input.
+        'message_disposition' is only applicable to Message items.
+        'send_meeting_invitations' is only applicable to CalendarItem items.
+        """
+        assert message_disposition in MESSAGE_DISPOSITION_CHOICES
+        assert send_meeting_invitations in SEND_MEETING_INVITATIONS_CHOICES
+        if folder is not None:
+            assert isinstance(folder, Folder)
+            if folder.account != self:
+                raise ValueError('"Folder must belong to this account')
+        if message_disposition == SAVE_ONLY and folder is None:
+            raise AttributeError("Folder must be supplied when in send-only mode")
+        if message_disposition == SEND_AND_SAVE_COPY and folder is None:
+            folder = self.sent  # 'Sent' is default EWS behaviour
+        if message_disposition == SEND_ONLY and folder is not None:
+            raise AttributeError("Folder must be None in send-ony mode")
+        log.debug(
+            'Adding items for %s (folder %s, message_disposition: %s, send_meeting_invitations: %s)',
+            self,
+            folder,
+            message_disposition,
+            send_meeting_invitations,
+        )
+        is_empty, items = peek(items)
+        if is_empty:
+            # We accept generators, so it's not always convenient for caller to know up-front if 'items' is empty. Allow
+            # empty 'items' and return early.
+            return []
+        return list(map(
+            Item.id_from_xml,
+            CreateItem(account=self).call(
+                items=items,
+                folder=folder,
+                message_disposition=message_disposition,
+                send_meeting_invitations=send_meeting_invitations,
+            )
+        ))
+
     def bulk_update(self, items, conflict_resolution=AUTO_RESOLVE, message_disposition=SAVE_ONLY,
                     send_meeting_invitations_or_cancellations=SEND_TO_NONE, suppress_read_receipts=True):
         """
@@ -206,6 +249,8 @@ class Account:
         assert message_disposition in MESSAGE_DISPOSITION_CHOICES
         assert send_meeting_invitations_or_cancellations in SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES
         assert suppress_read_receipts in (True, False)
+        if message_disposition == SEND_ONLY:
+            raise ValueError('Cannot send-only existing objects. Use SendItem service instead')
         log.debug(
             'Updating items for %s (conflict_resolution %s, message_disposition: %s, send_meeting_invitations: %s)',
             self,
@@ -260,6 +305,27 @@ class Account:
             send_meeting_cancellations=send_meeting_cancellations,
             affected_task_occurrences=affected_task_occurrences,
             suppress_read_receipts=suppress_read_receipts,
+        ))
+
+    def fetch(self, ids, folder=None, only_fields=None):
+        # 'folder' is used for validating only_fields
+        # 'only_fields' specifies which fields to fetch, instead of all possible fields.
+        validation_folder = folder or Folder  # Use a folder type that supports all item types
+        is_empty, ids = peek(ids)
+        if is_empty:
+            # We accept generators, so it's not always convenient for caller to know up-front if 'items' is empty. Allow
+            # empty 'items' and return early.
+            return []
+        if only_fields:
+            allowed_field_names = validation_folder.allowed_field_names()
+            for f in only_fields:
+                assert f in allowed_field_names
+        else:
+            only_fields = validation_folder.allowed_field_names()
+        items = GetItem(account=self).call(items=ids, folder=validation_folder, additional_fields=only_fields)
+        return list(map(
+            lambda i: validation_folder.item_model_from_tag(i.tag).from_xml(elem=i, account=self, folder=folder),
+            items
         ))
 
     def __str__(self):
