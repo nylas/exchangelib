@@ -217,18 +217,11 @@ class FileAttachment(EWSElement):
         if elem is None:
             return None
         assert elem.tag == cls.response_tag()
-        item = None
-        for item_cls in ITEM_CLASSES:
-            item_elem = elem.find(item_cls.response_tag())
-            if item_elem is not None:
-                item = item_cls.from_xml(item_elem)
-                break
-        assert item
         content_location = get_xml_attr(elem, '{%s}ContentLocation' % TNS)
         size = get_xml_attr(elem, '{%s}ContentLocation' % TNS)
         last_modified_time = get_xml_attr(elem, '{%s}LastModifiedTime' % TNS)
         return cls(
-            item=item,
+            content=get_xml_attr(elem, '{%s}Content' % TNS),
             name=get_xml_attr(elem, '{%s}Name' % TNS),
             content_type=get_xml_attr(elem, '{%s}ContentType' % TNS),
             attachment_id=AttachmentId.from_xml(elem.find(AttachmentId.response_tag())),
