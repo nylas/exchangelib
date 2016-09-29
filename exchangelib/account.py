@@ -1,6 +1,8 @@
 from logging import getLogger
 from locale import getlocale
 
+from cached_property import threaded_cached_property
+
 from .autodiscover import discover
 from .credentials import DELEGATE, IMPERSONATION
 from .errors import ErrorFolderNotFound, ErrorAccessDenied
@@ -50,10 +52,8 @@ class Account:
         assert isinstance(self.protocol, Protocol)
         log.debug('Added account: %s', self)
 
-    @property
+    @threaded_cached_property
     def folders(self):
-        if hasattr(self, '_folders'):
-            return self._folders
         # 'Top of Information Store' is a folder available in some Exchange accounts. It only contains folders
         # owned by the account.
         folders = self.root.get_folders(depth=SHALLOW)  # Start by searching top-level folders.
@@ -66,10 +66,10 @@ class Account:
         if not has_tois:
             # We need to dig deeper. Get everything.
             folders = self.root.get_folders(depth=DEEP)
-        self._folders = dict((m, []) for m in WELLKNOWN_FOLDERS.values())
+        _folders = dict((m, []) for m in WELLKNOWN_FOLDERS.values())
         for f in folders:
-            self._folders[f.__class__].append(f)
-        return self._folders
+            _folders[f.__class__].append(f)
+        return _folders
 
     def _get_default_folder(self, fld_class):
         try:
@@ -108,85 +108,52 @@ class Account:
                 fld_class.__name__, [str(f) for f in flds])
             return flds[0]
 
-    @property
+    @threaded_cached_property
     def calendar(self):
-        if hasattr(self, '_calendar'):
-            return self._calendar
         # If the account contains a shared calendar from a different user, that calendar will be in the folder list.
         # Attempt not to return one of those. An account may not always have a calendar called "Calendar", but a
         # Calendar folder with a localized name instead. Return that, if it's available.
-        self._calendar = self._get_default_folder(Calendar)
-        return self._calendar
+        return self._get_default_folder(Calendar)
 
-    @property
+    @threaded_cached_property
     def trash(self):
-        if hasattr(self, '_trash'):
-            return self._trash
-        self._trash = self._get_default_folder(DeletedItems)
-        return self._trash
+        return self._get_default_folder(DeletedItems)
 
-    @property
+    @threaded_cached_property
     def drafts(self):
-        if hasattr(self, '_drafts'):
-            return self._drafts
-        self._drafts = self._get_default_folder(Drafts)
-        return self._drafts
+        return self._get_default_folder(Drafts)
 
-    @property
+    @threaded_cached_property
     def inbox(self):
-        if hasattr(self, '_inbox'):
-            return self._inbox
-        self._inbox = self._get_default_folder(Inbox)
-        return self._inbox
+        return self._get_default_folder(Inbox)
 
-    @property
+    @threaded_cached_property
     def outbox(self):
-        if hasattr(self, '_outbox'):
-            return self._outbox
-        self._outbox = self._get_default_folder(Outbox)
-        return self._outbox
+        return self._get_default_folder(Outbox)
 
-    @property
+    @threaded_cached_property
     def sent(self):
-        if hasattr(self, '_sent'):
-            return self._sent
-        self._sent = self._get_default_folder(SentItems)
-        return self._sent
+        return self._get_default_folder(SentItems)
 
-    @property
+    @threaded_cached_property
     def junk(self):
-        if hasattr(self, '_junk'):
-            return self._junk
-        self._junk = self._get_default_folder(JunkEmail)
-        return self._junk
+        return self._get_default_folder(JunkEmail)
 
-    @property
+    @threaded_cached_property
     def tasks(self):
-        if hasattr(self, '_tasks'):
-            return self._tasks
-        self._tasks = self._get_default_folder(Tasks)
-        return self._tasks
+        return self._get_default_folder(Tasks)
 
-    @property
+    @threaded_cached_property
     def contacts(self):
-        if hasattr(self, '_contacts'):
-            return self._contacts
-        self._contacts = self._get_default_folder(Contacts)
-        return self._contacts
+        return self._get_default_folder(Contacts)
 
-    @property
+    @threaded_cached_property
     def recoverable_items_root(self):
-        if hasattr(self, '_recoverable_items_root'):
-            return self._recoverable_items_root
-        self._recoverable_items_root = self._get_default_folder(RecoverableItemsRoot)
-        return self._recoverable_items_root
+        return self._get_default_folder(RecoverableItemsRoot)
 
-    @property
+    @threaded_cached_property
     def recoverable_deleted_items(self):
-        if hasattr(self, '_recoverable_deleted_items'):
-            return self._recoverable_deleted_items
-        self._recoverable_deleted_items = self._get_default_folder(RecoverableItemsDeletions)
-        return self._recoverable_deleted_items
+        return self._get_default_folder(RecoverableItemsDeletions)
 
     @property
     def domain(self):
