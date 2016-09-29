@@ -3,8 +3,8 @@ Change Log
 ==========
 
 
-HEAD
-----
+1.7.1
+-----
 * Fix bug where fetching items from a folder that can contain multiple item types (e.g. the Deleted Items folder) would
   only return one item type.
 * Added ``Item.move(to_folder=...)`` that moves an item to another folder, and ``Item.refresh()`` that updates the
