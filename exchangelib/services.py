@@ -410,12 +410,9 @@ class GetItem(EWSPooledAccountService):
         n = 0
         for item in items:
             n += 1
-            item_id, changekey = item if isinstance(item, tuple) else (item.item_id, item.changekey)
-            if not isinstance(item_id, str):
-                raise ValueError("item_id '%s' must be a string" % item_id)
-            if not isinstance(changekey, str):
-                raise ValueError("changekey '%s' must be a string" % changekey)
-            set_xml_value(item_ids, ItemId(item_id, changekey), self.account.version)
+            item_id = ItemId(*(item if isinstance(item, tuple) else (item.item_id, item.changekey)))
+            log.debug('Getting item %s', item)
+            set_xml_value(item_ids, item_id, self.account.version)
         if not n:
             raise AttributeError('"ids" must not be empty')
         getitem.append(item_ids)
@@ -449,7 +446,7 @@ class CreateItem(EWSPooledAccountService):
             SendMeetingInvitations=send_meeting_invitations,
         )
         if folder:
-            add_xml_child(createitem, 'm:SavedItemFolderId', folder.folderid_xml())
+            add_xml_child(createitem, 'm:SavedItemFolderId', folder.to_xml(version=self.account.version))
         item_elems = []
         for item in items:
             log.debug('Adding item %s', item)
@@ -617,8 +614,8 @@ class DeleteItem(EWSPooledAccountService):
         n = 0
         for item in items:
             n += 1
-            item_id = ItemId(*item) if isinstance(item, tuple) else ItemId(item.item_id, item.changekey)
-            log.debug('Deleting item %s', item_id)
+            item_id = ItemId(*(item if isinstance(item, tuple) else (item.item_id, item.changekey)))
+            log.debug('Deleting item %s', item)
             set_xml_value(item_ids, item_id, self.account.version)
         if not n:
             raise AttributeError('"ids" must not be empty')
@@ -652,7 +649,7 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
         if restriction:
             finditem.append(restriction.xml)
         parentfolderids = create_element('m:ParentFolderIds')
-        parentfolderids.append(self.folder.folderid_xml())
+        parentfolderids.append(self.folder.to_xml(version=self.account.version))
         finditem.append(parentfolderids)
         return finditem
 
@@ -685,7 +682,7 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
         else:
             assert offset == 0, 'Offset is %s' % offset
         parentfolderids = create_element('m:ParentFolderIds')
-        parentfolderids.append(self.folder.folderid_xml())
+        parentfolderids.append(self.folder.to_xml(version=self.account.version))
         findfolder.append(parentfolderids)
         return findfolder
 
@@ -738,13 +735,14 @@ class SendItem(EWSAccountService):
         n = 0
         for item in items:
             n += 1
-            item_id = ItemId(*item) if isinstance(item, tuple) else ItemId(item.item_id, item.changekey)
+            item_id = ItemId(*(item if isinstance(item, tuple) else (item.item_id, item.changekey)))
+            log.debug('Sending item %s', item)
             set_xml_value(item_ids, item_id, self.account.version)
         if not n:
             raise AttributeError('"ids" must not be empty')
         senditem.append(item_ids)
         if saved_item_folder:
-            add_xml_child(senditem, 'm:SavedItemFolderId', saved_item_folder.folderid_xml())
+            add_xml_child(senditem, 'm:SavedItemFolderId', saved_item_folder.to_xml(version=self.account.version))
         return senditem
 
 
@@ -766,4 +764,86 @@ class ResolveNames(EWSService):
             add_xml_child(payload, 'm:UnresolvedEntry', entry)
         if not n:
             raise AttributeError('"unresolvedentries" must not be empty')
+        return payload
+
+
+class GetAttachment(EWSAccountService):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa494316(v=exchg.150).aspx
+    """
+    SERVICE_NAME = 'GetAttachment'
+    element_container_name = '{%s}Attachments' % MNS
+
+    def call(self, **kwargs):
+        if self.protocol.version.build < EXCHANGE_2010:
+            raise NotImplementedError('%s is only supported for Exchange 2010 servers and later' % self.SERVICE_NAME)
+        elements = super().call(**kwargs)
+        assert False, xml_to_str(elements)
+
+    def _get_payload(self, items):
+        from .folders import AttachmentId
+        payload = create_element('m:%s' % self.SERVICE_NAME)
+        # TODO: Also support AttachmentShape. See https://msdn.microsoft.com/en-us/library/office/aa563727(v=exchg.150).aspx
+        attachment_shape = create_element('m:AttachmentShape')
+        attachment_ids = create_element('m:AttachmentIds')
+        n = 0
+        for item in items:
+            n += 1
+            attachment_id = AttachmentId(*(item if isinstance(item, tuple) else (item.item_id, item.changekey)))
+            set_xml_value(attachment_ids, attachment_id, self.account.version)
+        if not n:
+            raise AttributeError('"ids" must not be empty')
+        payload.append(attachment_ids)
+        return payload
+
+
+class CreateAttachment(EWSAccountService):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa565877(v=exchg.150).aspx
+    """
+    SERVICE_NAME = 'CreateAttachment'
+
+    def call(self, **kwargs):
+        if self.protocol.version.build < EXCHANGE_2010:
+            raise NotImplementedError('%s is only supported for Exchange 2010 servers and later' % self.SERVICE_NAME)
+        elements = super().call(**kwargs)
+        assert False, xml_to_str(elements)
+
+    def _get_payload(self, attachments):
+        payload = create_element('m:%s' % self.SERVICE_NAME)
+        attachments = create_element('m:Attachments')
+        n = 0
+        for attachment in attachments:
+            n += 1
+            attachments.append(attachment.to_xml(version=self.account.version))
+        if not n:
+            raise AttributeError('"attachments" must not be empty')
+        payload.append(attachments)
+        return payload
+
+
+class DeleteAttachment(EWSAccountService):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa580782(v=exchg.150).aspx
+    """
+    SERVICE_NAME = 'DeleteAttachment'
+
+    def call(self, **kwargs):
+        if self.protocol.version.build < EXCHANGE_2010:
+            raise NotImplementedError('%s is only supported for Exchange 2010 servers and later' % self.SERVICE_NAME)
+        elements = super().call(**kwargs)
+        assert False, xml_to_str(elements)
+
+    def _get_payload(self, items):
+        from .folders import AttachmentId
+        payload = create_element('m:%s' % self.SERVICE_NAME)
+        attachment_ids = create_element('m:AttachmentIds')
+        n = 0
+        for item in items:
+            n += 1
+            attachment_id = AttachmentId(*(item if isinstance(item, tuple) else (item.item_id, item.changekey)))
+            set_xml_value(attachment_ids, attachment_id, self.account.version)
+        if not n:
+            raise AttributeError('"ids" must not be empty')
+        payload.append(attachment_ids)
         return payload
