@@ -11,7 +11,7 @@ from .folders import Root, Calendar, DeletedItems, Drafts, Inbox, Outbox, SentIt
     SEND_MEETING_INVITATIONS_CHOICES, SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES, \
     SEND_MEETING_CANCELLATIONS_CHOICES
 from .protocol import Protocol
-from .services import GetItem, CreateItem, UpdateItem, DeleteItem
+from .services import GetItem, CreateItem, UpdateItem, DeleteItem, MoveItem, SendItem
 from .util import get_domain, peek
 
 log = getLogger(__name__)
@@ -305,6 +305,23 @@ class Account:
             send_meeting_cancellations=send_meeting_cancellations,
             affected_task_occurrences=affected_task_occurrences,
             suppress_read_receipts=suppress_read_receipts,
+        ))
+
+    def bulk_send(self, ids, save_copy=True, copy_to_folder=None):
+        # Send existing draft messages. If requested, save a copy in 'copy_to_folder'
+        if copy_to_folder and not save_copy:
+            raise AttributeError("'save_copy' must be True when 'copy_to_folder' is set")
+        if save_copy and not copy_to_folder:
+            copy_to_folder = self.sent  # 'Sent' is default EWS behaviour
+        return list(SendItem(account=self).call(items=ids, save_item_to_folder=save_copy,
+                                                saved_item_folder=copy_to_folder))
+
+    def bulk_move(self, ids, to_folder):
+        # Move items to another folder. Returns new IDs for the items that were moved
+        assert isinstance(to_folder, Folder)
+        return list(map(
+            Item.id_from_xml,
+            MoveItem(account=self).call(items=ids, to_folder=to_folder)
         ))
 
     def fetch(self, ids, folder=None, only_fields=None):
