@@ -12,9 +12,9 @@ import warnings
 from .ewsdatetime import EWSDateTime, UTC_NOW
 from .queryset import QuerySet
 from .restriction import Restriction, Q
-from .services import TNS, FindItem, IdOnly, SHALLOW, DEEP, CreateItem, FindFolder, GetFolder, GetItem, SendItem, \
+from .services import TNS, IdOnly, SHALLOW, DEEP, FindFolder, GetFolder, FindItem, \
     MNS, ITEM_TRAVERSAL_CHOICES, FOLDER_TRAVERSAL_CHOICES, SHAPE_CHOICES
-from .util import create_element, add_xml_child, get_xml_attrs, get_xml_attr, set_xml_value, peek
+from .util import create_element, add_xml_child, get_xml_attrs, get_xml_attr, set_xml_value
 from .version import EXCHANGE_2010
 
 log = getLogger(__name__)
@@ -805,6 +805,28 @@ class Item(EWSElement):
                 assert len(res) == 1, res
                 return res[0]
 
+    def refresh(self):
+        # Updates the item based on fresh data from EWS
+        if not self.account:
+            raise ValueError('Item must have an account')
+        res = self.account.fetch(ids=[self])
+        if not res:
+            raise ValueError('Item disappeared')
+        assert len(res) == 1, res
+        fresh_item = res[0]
+        for k in self.__slots__:
+            setattr(self, k, getattr(fresh_item, k))
+
+    def move(self, to_folder):
+        if not self.account:
+            raise ValueError('Item must have an account')
+        res = self.account.bulk_move(ids=[self], to_folder=to_folder)
+        if not res:
+            raise ValueError('Item disappeared')
+        assert len(res) == 1, res
+        self.item_id, self.changekey = res[0]
+        self.folder = to_folder
+
     def move_to_trash(self, send_meeting_cancellations=SEND_TO_NONE,
                       affected_task_occurrences=SPECIFIED_OCCURRENCE_ONLY, suppress_read_receipts=True):
         # Delete and move to the trash folder.
@@ -831,9 +853,14 @@ class Item(EWSElement):
     def _delete(self, delete_type, send_meeting_cancellations, affected_task_occurrences, suppress_read_receipts):
         if not self.account:
             raise ValueError('Item must have an account')
-        self.account.bulk_delete(
+        res = self.account.bulk_delete(
             ids=[self], delete_type=delete_type, send_meeting_cancellations=send_meeting_cancellations,
             affected_task_occurrences=affected_task_occurrences, suppress_read_receipts=suppress_read_receipts)
+        if not res:
+            raise ValueError('Item disappeared')
+        assert len(res) == 1, res
+        if not res[0][0]:
+            raise ValueError('Error deleting message: %s', res[0][1])
 
     @classmethod
     def fieldnames(cls):
@@ -1179,14 +1206,8 @@ class Message(ItemMixIn):
         # not yet exist in EWS.
         if not self.account:
             raise ValueError('Item must have an account')
-        if copy_to_folder and not save_copy:
-            raise AttributeError("'save_copy' must be True when 'copy_to_folder' is set")
-        if save_copy and not copy_to_folder:
-            copy_to_folder = self.account.sent  # 'Sent' is default EWS behaviour
         if self.item_id:
-            # Send existing draft message. If requested, save a copy in 'copy_to_folder'
-            res = list(SendItem(account=self.account).call(items=[self], save_item_to_folder=save_copy,
-                                                           saved_item_folder=copy_to_folder))
+            res = self.account.bulk_send(ids=[self], save_copy=save_copy, copy_to_folder=copy_to_folder)
             if not res:
                 raise ValueError('Item disappeared')
             assert len(res) == 1, res
@@ -1198,6 +1219,8 @@ class Message(ItemMixIn):
         else:
             # New message
             if copy_to_folder:
+                if not save_copy:
+                    raise AttributeError("'save_copy' must be True when 'copy_to_folder' is set")
                 # This would better be done via send_and_save() but lets just support it here
                 self.folder = copy_to_folder
                 return self.send_and_save(conflict_resolution=conflict_resolution,

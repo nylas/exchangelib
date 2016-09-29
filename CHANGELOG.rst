@@ -7,6 +7,8 @@ HEAD
 ----
 * Fix bug where fetching items from a folder that can contain multiple item types (e.g. the Deleted Items folder) would
   only return one item type.
+* Added ``Item.move(to_folder=...)`` that moves an item to another folder, and ``Item.refresh()`` that updates the
+  Item with data from EWS.
 * Support reverse sort on individual fields in ``order_by()``, e.g. ``my_folder.all().order_by('subject', '-start')``
 * ``Account.bulk_create()`` was added to create items that don't need a folder, e.g. ``Message.send()``
 * ``Account.fetch()`` was added to fetch items without knowing the containing folder.

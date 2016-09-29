@@ -1208,11 +1208,28 @@ class BaseItemTest(EWSTest):
         # Really gone, not just changed ItemId
         self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 0)
         # Test that the item moved to trash
-        # TODO: This only works for Messages. Maybe our support for trash can only handle Message objects?
         item = self.account.trash.get(categories__contains=item.categories)
         moved_item = self.account.fetch(ids=[item])[0]
         # The item was copied, so the ItemId has changed. Let's compare the subject instead
         self.assertEqual(item.subject, moved_item.subject)
+
+    def test_move(self):
+        # First, empty trash bin
+        self.account.trash.all().delete()
+        item = self.get_test_item().save()
+        item_id = (item.item_id, item.changekey)
+        # Move to trash. We use trash because it can contain all item types. This changes the ItemId
+        item.move(to_folder=self.account.trash)
+        with self.assertRaises(ErrorItemNotFound):
+            # original item ID no longer exists
+            self.account.fetch(ids=[item_id])
+        # Test that the item moved to trash
+        self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 0)
+        moved_item = self.account.trash.get(categories__contains=item.categories)
+        self.assertEqual(item.item_id, moved_item.item_id)
+        self.assertEqual(item.changekey, moved_item.changekey)
+        # Test that the original item self.updated its ItemId
+        moved_item = self.account.fetch(ids=[item])[0]
 
     def test_item(self):
         # Test insert
@@ -1328,6 +1345,7 @@ class MessagesTest(BaseItemTest):
     def test_send(self):
         # Test that we can send (only) Message items
         item = self.get_test_item()
+        item.folder = None
         item.send()
         self.assertIsNone(item.item_id)
         self.assertIsNone(item.changekey)
@@ -1430,8 +1448,8 @@ def get_random_datetime_range():
 
 if __name__ == '__main__':
     import logging
-    # loglevel = logging.DEBUG
-    loglevel = logging.WARNING
+    loglevel = logging.DEBUG
+    # loglevel = logging.WARNING
     logging.basicConfig(level=loglevel)
     logging.getLogger('exchangelib').setLevel(loglevel)
     unittest.main()
