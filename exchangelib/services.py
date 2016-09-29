@@ -746,6 +746,31 @@ class SendItem(EWSAccountService):
         return senditem
 
 
+class MoveItem(EWSAccountService):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa565781(v=exchg.150).aspx
+    """
+    SERVICE_NAME = 'MoveItem'
+    element_container_name = '{%s}Items' % MNS
+
+    def _get_payload(self, items, to_folder):
+        # Takes a list of items and returns their new item IDs
+        from .folders import ItemId
+        moveeitem = create_element('m:%s' % self.SERVICE_NAME)
+        add_xml_child(moveeitem, 'm:ToFolderId', to_folder.to_xml(version=self.account.version))
+        item_ids = create_element('m:ItemIds')
+        n = 0
+        for item in items:
+            n += 1
+            item_id = ItemId(*(item if isinstance(item, tuple) else (item.item_id, item.changekey)))
+            log.debug('Moving item %s to %s', item, to_folder)
+            set_xml_value(item_ids, item_id, self.account.version)
+        if not n:
+            raise AttributeError('"ids" must not be empty')
+        moveeitem.append(item_ids)
+        return moveeitem
+
+
 class ResolveNames(EWSService):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa565329(v=exchg.150).aspx
@@ -815,7 +840,7 @@ class CreateAttachment(EWSAccountService):
         n = 0
         for attachment in attachments:
             n += 1
-            attachments.append(attachment.to_xml(version=self.account.version))
+            set_xml_value(attachments, attachment, self.account.version)
         if not n:
             raise AttributeError('"attachments" must not be empty')
         payload.append(attachments)
