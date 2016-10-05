@@ -66,6 +66,8 @@ class QuerySet:
     def _check_fields(self, field_names):
         allowed_field_names = set(self.folder.allowed_field_names()) | {'item_id', 'changekey'}
         for f in field_names:
+            if not isinstance(f, str):
+                raise ValueError("Fieldname '%s' must be a string" % f)
             if f not in allowed_field_names:
                 raise ValueError("Unknown fieldname '%s'" % f)
 
