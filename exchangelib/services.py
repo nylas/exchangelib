@@ -22,7 +22,7 @@ from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, 
     ErrorInternalServerTransientError, ErrorNoRespondingCASInDestinationSite, ErrorImpersonationFailed, \
     ErrorMailboxMoveInProgress, ErrorAccessDenied, ErrorConnectionFailed, RateLimitError, ErrorServerBusy, \
     ErrorTooManyObjectsOpened, ErrorInvalidLicense, ErrorInvalidSchemaVersionForMailboxVersion, \
-    ErrorInvalidServerVersion, ErrorItemNotFound
+    ErrorInvalidServerVersion, ErrorItemNotFound, EWSError
 from .ewsdatetime import EWSDateTime
 from .transport import wrap, SOAPNS, TNS, MNS, ENS
 from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, ElementType, \
@@ -51,6 +51,7 @@ FOLDER_TRAVERSAL_CHOICES = (SHALLOW, DEEP, SOFT_DELETED)
 class EWSService:
     SERVICE_NAME = None  # The name of the SOAP service
     element_container_name = None  # The name of the XML element wrapping the collection of returned items
+    ERRORS_TO_CATCH_IN_RESPONSE = EWSWarning # Treat the following errors as warnings when contained in an element
 
     def __init__(self, protocol):
         self.protocol = protocol
@@ -231,7 +232,7 @@ class EWSService:
                     yield (container, None)
             except (ErrorTimeoutExpired, ErrorBatchProcessingStopped):
                 raise
-            except EWSWarning as e:
+            except self.ERRORS_TO_CATCH_IN_RESPONSE as e:
                 yield (False, '%s' % e.value)
 
     def _get_elements_in_container(self, container):
@@ -286,6 +287,10 @@ class PagingEWSMixIn(EWSService):
         log.debug('%s: Got page with next offset %s (last_page %s)', log_prefix, next_offset, is_last_page)
         return rootfolder, next_offset
 
+
+class ExpectResponseErrorsMixin(EWSService):
+    """Don't raise errors in the response, just return them as if they're warnings"""
+    ERRORS_TO_CATCH_IN_RESPONSE = EWSError
 
 class GetServerTimeZones(EWSService):
     """
@@ -872,3 +877,75 @@ class DeleteAttachment(EWSAccountService):
             raise AttributeError('"ids" must not be empty')
         payload.append(attachment_ids)
         return payload
+
+
+class ExportItems(EWSPooledAccountService, ExpectResponseErrorsMixin):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/ff709523(v=exchg.150).aspx
+    """
+    CHUNKSIZE = 100
+    SERVICE_NAME = 'ExportItems'
+    element_container_name = "{%s}Data" % MNS
+
+    def call(self, item_ids):
+        return self._pool_requests(
+            payload_func=self._get_payload, items=item_ids, version=self.account.version
+        )
+
+    def _get_payload(self, items, version):
+        from .folders import ItemId
+        exportitems = create_element('m:%s' % self.SERVICE_NAME)
+        itemids = create_element('m:ItemIds')
+        exportitems.append(itemids)
+        for item in items:
+            item_id = ItemId(*(item if isinstance(item, tuple) else (item.item_id, item.changekey)))
+            set_xml_value(itemids, item_id, self.account.version)
+
+        return exportitems
+
+    # We need to override this since ExportItemsResponseMessage is formated a
+    #  little bit differently. Namely, all we want is the 64bit string in the
+    #  Data tag.
+    def _get_elements_in_container(self, container):
+        return [container.text]
+
+class UploadItems(EWSPooledAccountService):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/ff709490(v=exchg.150).aspx
+
+    This currently has the existing limitation of only being able to upload
+    items that do not yet exist in the database. The full spec also allows
+    actions "Update" and "UpdateOrCreate".
+    """
+    CHUNKSIZE = 100
+    SERVICE_NAME = 'UploadItems'
+    element_container_name = '{%s}ItemId' % MNS
+
+    def call(self, data):
+        """Upload given items to given account
+
+        data is an iterable of tuples where the first element is a Folder
+        instance representing the ParentFolder that the item will be placed in
+        and the second element is a Data string returned from an ExportItems
+        call.
+        """
+        return self._pool_requests(
+            payload_func=self._get_payload, items=data
+        )
+
+    def _get_payload(self, items):
+        uploaditems = create_element('m:%s' % self.SERVICE_NAME)
+        itemselement = create_element('m:Items')
+        uploaditems.append(itemselement)
+        for parent_folder, data_str in items:
+            item = create_element("t:Item", CreateAction="CreateNew")
+            parentfolderid = create_element('t:ParentFolderId')
+            parentfolderid.attrib['Id'] = parent_folder.folder_id
+            parentfolderid.attrib['ChangeKey'] = parent_folder.changekey
+            item.append(parentfolderid)
+            add_xml_child(item, 't:Data', data_str)
+            itemselement.append(item)
+        return uploaditems
+
+    def _get_elements_in_container(self, container):
+        return [(container.attrib['Id'], container.attrib['ChangeKey'])]
