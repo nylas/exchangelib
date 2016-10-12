@@ -12,6 +12,7 @@ from .folders import Root, Calendar, DeletedItems, Drafts, Inbox, Outbox, SentIt
     DELETE_TYPE_CHOICES, MESSAGE_DISPOSITION_CHOICES, CONFLICT_RESOLUTION_CHOICES, AFFECTED_TASK_OCCURRENCES_CHOICES, \
     SEND_MEETING_INVITATIONS_CHOICES, SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES, \
     SEND_MEETING_CANCELLATIONS_CHOICES
+from .services import ExportItems, UploadItems
 from .protocol import Protocol
 from .services import GetItem, CreateItem, UpdateItem, DeleteItem, MoveItem, SendItem
 from .util import get_domain, peek
@@ -158,6 +159,37 @@ class Account:
     @property
     def domain(self):
         return get_domain(self.primary_smtp_address)
+
+    def export(self, items):
+        """
+        Return export strings of the given items
+
+        Arguments:
+        'items' is an iterable containing the Items we want to export
+
+        Returns:
+        A list strings, the exported representation of the object
+        """
+        return list(ExportItems(self).call(items))
+
+    def upload(self, upload_data):
+        """
+        Adds objects retrieved from export into the given folders
+
+        Arguments:
+        'upload_data' is an iterable of tuples containing the folder we want to upload the data to and the
+            string outputs of exports.
+
+        Returns:
+        A list of tuples with the new ids and changekeys
+
+        Example:
+        account.upload([(account.inbox, "AABBCC..."),
+                        (account.inbox, "XXYYZZ..."),
+                        (account.calendar, "ABCXYZ...")])
+        -> [("idA", "changekey"), ("idB", "changekey"), ("idC", "changekey")]
+        """
+        return list(UploadItems(self).call(upload_data))
 
     def bulk_create(self, folder, items, message_disposition=SAVE_ONLY, send_meeting_invitations=SEND_TO_NONE):
         """
