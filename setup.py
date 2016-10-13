@@ -20,7 +20,7 @@ setup(
     long_description=read('README.rst'),
     license='BSD',
     keywords='Exchange EWS autodiscover',
-    install_requires=['requests>=2.7', 'requests_ntlm>=0.2.0', 'dnspython3>=1.12.0', 'pytz', 'lxml', 'cached_property'],
+    install_requires=['requests>=2.7', 'requests_ntlm>=0.2.0', 'dnspython>=1.14.0', 'pytz', 'lxml', 'cached_property'],
     packages=['exchangelib'],
     tests_require=['PyYAML'],
     test_suite='tests',
