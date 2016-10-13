@@ -8,7 +8,7 @@ from .autodiscover import discover
 from .credentials import DELEGATE, IMPERSONATION
 from .errors import ErrorFolderNotFound, ErrorAccessDenied
 from .folders import Root, Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Tasks, Contacts, \
-    RecoverableItemsRoot, RecoverableItemsDeletions, Folder, Item, SHALLOW, DEEP, WELLKNOWN_FOLDERS, HARD_DELETE, \
+    RecoverableItemsRoot, RecoverableItemsDeletions, Folder, Item, SHALLOW, DEEP, HARD_DELETE, \
     AUTO_RESOLVE, SEND_TO_NONE, SAVE_ONLY, SEND_AND_SAVE_COPY, SEND_ONLY, SPECIFIED_OCCURRENCE_ONLY, \
     DELETE_TYPE_CHOICES, MESSAGE_DISPOSITION_CHOICES, CONFLICT_RESOLUTION_CHOICES, AFFECTED_TASK_OCCURRENCES_CHOICES, \
     SEND_MEETING_INVITATIONS_CHOICES, SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES, \
@@ -31,7 +31,7 @@ class Account:
             raise ValueError("primary_smtp_address '%s' is not an email address" % primary_smtp_address)
         self.primary_smtp_address = primary_smtp_address
         self.fullname = fullname
-        self.locale = locale or getlocale()
+        self.locale = locale or getlocale()[0]
         # Assume delegate access if individual credentials are provided. Else, assume service user with impersonation
         self.access_type = access_type or (DELEGATE if credentials else IMPERSONATION)
         assert self.access_type in (DELEGATE, IMPERSONATION)
@@ -79,29 +79,14 @@ class Account:
         except ErrorAccessDenied:
             # Maybe we just don't have GetFolder access? Try FindItems instead
             log.debug('Testing default %s folder with FindItem', fld_class.__name__)
-            fld = fld_class(self)
-            fld.filter(subject='DUMMY')
+            fld = fld_class(account=self)  # Creates a folder instance with default distinguished folder name
+            list(fld.filter(subject='DUMMY'))  # Test if the folder exists
             return fld
         except ErrorFolderNotFound as e:
             # There's no folder named fld_class.DISTINGUISHED_FOLDER_ID. Try to guess which folder is the default.
             # Exchange makes this unnecessarily difficult.
             log.debug('Searching default %s folder in full folder list', fld_class.__name__)
-            flds = []
-            for folder in self.folders[fld_class]:
-                # Apparently default folder names can be renamed to a set of localized names using a PowerShell command:
-                # https://technet.microsoft.com/da-dk/library/dd351103(v=exchg.160).aspx
-                #
-                # Search for a folder wth a localized name. This is a hack because I can't find a way to get the
-                # default Calendar, Inbox, etc. folders without looking at the folder name, which could be localized.
-                #
-                # TODO: fld_class.LOCALIZED_NAMES is most definitely neither complete nor authoritative
-                if folder.name.lower() in {name.lower() for name in fld_class.LOCALIZED_NAMES.get(self.locale, [])}:
-                    flds.append(folder)
-            if not flds:
-                # There was no folder with a localized name. Use the distinguished folder instead.
-                for folder in self.folders[fld_class]:
-                    if folder.is_distinguished:
-                        flds.append(folder)
+            flds = self.folders[fld_class]
             if not flds:
                 raise ErrorFolderNotFound('No useable default %s folders' % fld_class.__name__) from e
             assert len(flds) == 1, 'Multiple possible default %s folders: %s' % (

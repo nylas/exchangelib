@@ -1393,7 +1393,8 @@ ITEM_CLASSES = (CalendarItem, Contact, Message, Task)
 
 class Folder(EWSElement):
     DISTINGUISHED_FOLDER_ID = None  # See https://msdn.microsoft.com/en-us/library/office/aa580808(v=exchg.150).aspx
-    # CONTAINER_CLASS = None  # See http://msdn.microsoft.com/en-us/library/hh354773(v=exchg.80).aspx
+    # Default item type for this folder. See http://msdn.microsoft.com/en-us/library/hh354773(v=exchg.80).aspx
+    CONTAINER_CLASS = None
     supported_item_models = ITEM_CLASSES  # The Item types that this folder can contain. Default is all
     LOCALIZED_NAMES = dict()  # A map of (str)locale: (tuple)localized_folder_names
     ITEM_MODEL_MAP = {cls.response_tag(): cls for cls in ITEM_CLASSES}
@@ -1412,7 +1413,28 @@ class Folder(EWSElement):
 
     @property
     def is_distinguished(self):
-        return self.name.lower() == self.DISTINGUISHED_FOLDER_ID
+        if not self.name or not self.DISTINGUISHED_FOLDER_ID:
+            return False
+        return self.name.lower() == self.DISTINGUISHED_FOLDER_ID.lower()
+
+    @staticmethod
+    def folder_cls_from_container_class(container_class):
+        """Returns a reasonable folder class given a container class, e.g. 'IPF.Note'
+        """
+        return {cls.CONTAINER_CLASS: cls for cls in (Calendar, Contacts, Messages, Tasks)}.get(container_class, Folder)
+
+    @staticmethod
+    def folder_cls_from_folder_name(folder_name, locale):
+        """Returns the folder class that matches a localized folder name.
+
+        locale is a string, e.g. 'da_DK'
+        """
+        folder_classes = set(WELLKNOWN_FOLDERS.values())
+        for folder_cls in folder_classes:
+            for localized_name in folder_cls.LOCALIZED_NAMES.get(locale, []):
+                if folder_name.lower() == localized_name.lower():
+                    return folder_cls
+        raise KeyError()
 
     @classmethod
     def item_model_from_tag(cls, tag):
@@ -1616,7 +1638,25 @@ class Folder(EWSElement):
                 shape=shape,
                 depth=depth
         ):
-            folders.append(self.from_xml(elem=elem, account=self.account))
+            # The "FolderClass" element value is the only indication we have in the FindFolder return values of which
+            # folder class we should create the folder has.
+            #
+            # We should be able to just use the name, but apparently default folder names can be renamed to a set of
+            # localized names using a PowerShell command:
+            #     https://technet.microsoft.com/da-dk/library/dd351103(v=exchg.160).aspx
+            #
+            # Search for a folder wth a localized name. If none are found, fall back to getting the folder class by
+            # "FolderClass" value.
+            #
+            # TODO: fld_class.LOCALIZED_NAMES is most definitely neither complete nor authoritative
+            dummy_fld = Folder.from_xml(elem=elem, account=self.account)  # We use from_xml() only to parse elem
+            try:
+                folder_cls = self.folder_cls_from_folder_name(folder_name=dummy_fld.name, locale=self.account.locale)
+                log.debug('Folder class %s matches localized folder name %s', folder_cls, dummy_fld.name)
+            except KeyError:
+                folder_cls = self.folder_cls_from_container_class(dummy_fld.folder_class)
+                log.debug('Folder class %s matches container class %s (%s)', folder_cls, dummy_fld.folder_class, dummy_fld.name)
+            folders.append(folder_cls(**dummy_fld.__dict__))
         return folders
 
     @classmethod
@@ -1649,6 +1689,7 @@ class Calendar(Folder):
     An interface for the Exchange calendar
     """
     DISTINGUISHED_FOLDER_ID = 'calendar'
+    CONTAINER_CLASS = 'IPF.Appointment'
     supported_item_models = (CalendarItem,)
 
     LOCALIZED_NAMES = {
@@ -1658,6 +1699,7 @@ class Calendar(Folder):
 
 class DeletedItems(Folder):
     DISTINGUISHED_FOLDER_ID = 'deleteditems'
+    CONTAINER_CLASS = 'IPF.Note'
     supported_item_models = ITEM_CLASSES
 
     LOCALIZED_NAMES = {
@@ -1666,6 +1708,7 @@ class DeletedItems(Folder):
 
 
 class Messages(Folder):
+    CONTAINER_CLASS = 'IPF.Note'
     supported_item_models = (Message,)
 
 
@@ -1705,6 +1748,7 @@ class JunkEmail(Messages):
     DISTINGUISHED_FOLDER_ID = 'junkemail'
 
     LOCALIZED_NAMES = {
+        'da_DK': ('Uønsket e-mail',),
     }
 
 
@@ -1726,6 +1770,7 @@ class RecoverableItemsRoot(Folder):
 
 class Tasks(Folder):
     DISTINGUISHED_FOLDER_ID = 'tasks'
+    CONTAINER_CLASS = 'IPF.Task'
     supported_item_models = (Task,)
 
     LOCALIZED_NAMES = {
@@ -1735,6 +1780,7 @@ class Tasks(Folder):
 
 class Contacts(Folder):
     DISTINGUISHED_FOLDER_ID = 'contacts'
+    CONTAINER_CLASS = 'IPF.Contact'
     supported_item_models = (Contact,)
 
     LOCALIZED_NAMES = {

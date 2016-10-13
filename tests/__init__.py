@@ -18,7 +18,7 @@ from exchangelib.errors import RelativeRedirect, ErrorItemNotFound
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, ExternId, Choice, Email, Contact, Task, \
     EmailAddress, PhysicalAddress, PhoneNumber, IndexedField, RoomList, Calendar, DeletedItems, Drafts, Inbox, Outbox, \
-    SentItems, JunkEmail, Tasks, Contacts, AnyURI, BodyType, ALL_OCCURRENCIES
+    SentItems, JunkEmail, Messages, Tasks, Contacts, Root, AnyURI, BodyType, ALL_OCCURRENCIES
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.restriction import Restriction, Q
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms
@@ -393,31 +393,6 @@ class CommonTest(EWSTest):
         roomlists = ws.call(roomlist=roomlist)
         self.assertEqual(roomlists, [])
 
-    def test_folders(self):
-        folders = self.account.folders
-        for fld in (Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Tasks, Contacts):
-            self.assertTrue(fld in folders)
-        for folder_cls, cls_folders in folders.items():
-            for f in cls_folders:
-                f.test_access()
-        # Test shortcuts
-        for f, cls in (
-                (self.account.trash, DeletedItems),
-                (self.account.drafts, Drafts),
-                (self.account.inbox, Inbox),
-                (self.account.outbox, Outbox),
-                (self.account.sent, SentItems),
-                (self.account.junk, JunkEmail),
-                (self.account.contacts, Contacts),
-                (self.account.tasks, Tasks),
-                (self.account.calendar, Calendar),
-        ):
-            self.assertIsInstance(f, cls)
-
-    def test_getfolders(self):
-        folders = self.account.root.get_folders()
-        self.assertEqual(len(folders), 61, sorted(f.name for f in folders))
-
     def test_sessionpool(self):
         # First, empty the calendar
         start = self.tz.localize(EWSDateTime(2011, 10, 12, 8))
@@ -497,6 +472,53 @@ class CommonTest(EWSTest):
         del _autodiscover_cache[key]
         self.assertFalse(key in _autodiscover_cache)
         del _autodiscover_cache
+
+
+class FolderTest(EWSTest):
+    def test_folders(self):
+        folders = self.account.folders
+        for folder_cls, cls_folders in folders.items():
+            for f in cls_folders:
+                f.test_access()
+        # Test shortcuts
+        for f, cls in (
+                (self.account.trash, DeletedItems),
+                (self.account.drafts, Drafts),
+                (self.account.inbox, Inbox),
+                (self.account.outbox, Outbox),
+                (self.account.sent, SentItems),
+                (self.account.junk, JunkEmail),
+                (self.account.contacts, Contacts),
+                (self.account.tasks, Tasks),
+                (self.account.calendar, Calendar),
+        ):
+            self.assertIsInstance(f, cls)
+            f.test_access()
+
+    def test_getfolders(self):
+        folders = self.account.root.get_folders()
+        self.assertGreater(len(folders), 60, sorted(f.name for f in folders))
+
+    def test_folder_grouping(self):
+        folders = self.account.folders
+        # If you get errors here, you probably need to fill out [folder class].LOCALIZED_NAMES for your locale.
+        self.assertEqual(len(folders[Inbox]), 1)
+        self.assertEqual(len(folders[SentItems]), 1)
+        self.assertEqual(len(folders[Outbox]), 1)
+        self.assertEqual(len(folders[DeletedItems]), 1)
+        self.assertEqual(len(folders[JunkEmail]), 1)
+        self.assertEqual(len(folders[Drafts]), 1)
+        self.assertGreaterEqual(len(folders[Contacts]), 1)
+        self.assertGreaterEqual(len(folders[Calendar]), 1)
+        self.assertGreaterEqual(len(folders[Tasks]), 1)
+        for f in folders[Messages]:
+            self.assertEqual(f.folder_class, 'IPF.Note')
+        for f in folders[Contacts]:
+            self.assertEqual(f.folder_class, 'IPF.Contact')
+        for f in folders[Calendar]:
+            self.assertEqual(f.folder_class, 'IPF.Appointment')
+        for f in folders[Tasks]:
+            self.assertEqual(f.folder_class, 'IPF.Task')
 
 
 class BaseItemTest(EWSTest):
