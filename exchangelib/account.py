@@ -1,5 +1,6 @@
 from logging import getLogger
 from locale import getlocale
+from collections import defaultdict
 
 from cached_property import threaded_cached_property
 
@@ -58,19 +59,17 @@ class Account:
         # 'Top of Information Store' is a folder available in some Exchange accounts. It only contains folders
         # owned by the account.
         folders = self.root.get_folders(depth=SHALLOW)  # Start by searching top-level folders.
-        has_tois = False
         for folder in folders:
             if folder.name == 'Top of Information Store':
-                has_tois = True
                 folders = folder.get_folders(depth=SHALLOW)
                 break
-        if not has_tois:
+        else:
             # We need to dig deeper. Get everything.
             folders = self.root.get_folders(depth=DEEP)
-        _folders = dict((m, []) for m in WELLKNOWN_FOLDERS.values())
+        mapped_folders = defaultdict(list)
         for f in folders:
-            _folders[f.__class__].append(f)
-        return _folders
+            mapped_folders[f.__class__].append(f)
+        return mapped_folders
 
     def _get_default_folder(self, fld_class):
         try:
@@ -96,7 +95,7 @@ class Account:
                 # default Calendar, Inbox, etc. folders without looking at the folder name, which could be localized.
                 #
                 # TODO: fld_class.LOCALIZED_NAMES is most definitely neither complete nor authoritative
-                if folder.name.title() in fld_class.LOCALIZED_NAMES.get(self.locale, []):
+                if folder.name.lower() in {name.lower() for name in fld_class.LOCALIZED_NAMES.get(self.locale, [])}:
                     flds.append(folder)
             if not flds:
                 # There was no folder with a localized name. Use the distinguished folder instead.
