@@ -1638,15 +1638,15 @@ class Folder(EWSElement):
                 shape=shape,
                 depth=depth
         ):
-            # The "FolderClass" element value is the only indication we have in the FindFolder return values of which
-            # folder class we should create the folder has.
+            # The "FolderClass" element value is the only indication we have in the FindFolder response of which
+            # folder class we should create the folder with.
             #
             # We should be able to just use the name, but apparently default folder names can be renamed to a set of
             # localized names using a PowerShell command:
             #     https://technet.microsoft.com/da-dk/library/dd351103(v=exchg.160).aspx
             #
-            # Search for a folder wth a localized name. If none are found, fall back to getting the folder class by
-            # "FolderClass" value.
+            # Instead, search for a folder class using the localized name. If none are found, fall back to getting the
+            # folder class by the "FolderClass" value.
             #
             # TODO: fld_class.LOCALIZED_NAMES is most definitely neither complete nor authoritative
             dummy_fld = Folder.from_xml(elem=elem, account=self.account)  # We use from_xml() only to parse elem

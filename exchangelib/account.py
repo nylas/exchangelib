@@ -32,6 +32,7 @@ class Account:
         self.primary_smtp_address = primary_smtp_address
         self.fullname = fullname
         self.locale = locale or getlocale()[0]
+        assert isinstance(self.locale, str)
         # Assume delegate access if individual credentials are provided. Else, assume service user with impersonation
         self.access_type = access_type or (DELEGATE if credentials else IMPERSONATION)
         assert self.access_type in (DELEGATE, IMPERSONATION)

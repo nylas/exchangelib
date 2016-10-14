@@ -22,7 +22,7 @@ from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, 
     ErrorInternalServerTransientError, ErrorNoRespondingCASInDestinationSite, ErrorImpersonationFailed, \
     ErrorMailboxMoveInProgress, ErrorAccessDenied, ErrorConnectionFailed, RateLimitError, ErrorServerBusy, \
     ErrorTooManyObjectsOpened, ErrorInvalidLicense, ErrorInvalidSchemaVersionForMailboxVersion, \
-    ErrorInvalidServerVersion, ErrorItemNotFound, EWSError
+    ErrorInvalidServerVersion, ErrorItemNotFound, ErrorADUnavailable, EWSError
 from .ewsdatetime import EWSDateTime
 from .transport import wrap, SOAPNS, TNS, MNS, ENS
 from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, ElementType, \
@@ -74,7 +74,8 @@ class EWSService:
                 ErrorFolderNotFound, ErrorNonExistentMailbox, ErrorMailboxStoreUnavailable, ErrorImpersonateUserDenied,
                 ErrorInternalServerError, ErrorInternalServerTransientError, ErrorNoRespondingCASInDestinationSite,
                 ErrorImpersonationFailed, ErrorMailboxMoveInProgress, ErrorAccessDenied, ErrorConnectionFailed,
-                RateLimitError, ErrorServerBusy, ErrorTooManyObjectsOpened, ErrorInvalidLicense, ErrorItemNotFound):
+                RateLimitError, ErrorServerBusy, ErrorTooManyObjectsOpened, ErrorInvalidLicense, ErrorItemNotFound,
+                ErrorADUnavailable):
             # These are known and understood, and don't require a backtrace
             # TODO: ErrorTooManyObjectsOpened means there are too many connections to the database. We should be able to
             # act on this by lowering the self.protocol connection pool size.
