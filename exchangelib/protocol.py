@@ -65,7 +65,7 @@ class BaseProtocol:
         while True:
             try:
                 self._session_pool.get(block=False).close_socket(self.service_endpoint)
-            except (queue.Empty, ReferenceError):
+            except (queue.Empty, ReferenceError, AttributeError):
                 break
 
     def get_session(self):
