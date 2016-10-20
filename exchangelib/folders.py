@@ -318,9 +318,16 @@ class IndexedField(EWSElement):
     ELEMENT_NAME = None
     LABELS = ()
     FIELD_URI = None
+    SUB_FIELD_ELEMENT_NAMES = {}
 
     @classmethod
     def field_uri_xml(cls, label):
+        if cls.SUB_FIELD_ELEMENT_NAMES:
+            return [create_element(
+                't:IndexedFieldURI',
+                FieldURI='%s:%s' % (cls.FIELD_URI, field),
+                FieldIndex=label,
+            ) for field in cls.SUB_FIELD_ELEMENT_NAMES.values()]
         return create_element(
             't:IndexedFieldURI',
             FieldURI=cls.FIELD_URI,
@@ -418,17 +425,30 @@ class PhysicalAddress(IndexedField):
     LABELS = {'Business', 'Home', 'Other'}
     FIELD_URI = 'contacts:PhysicalAddress'
 
+    SUB_FIELD_ELEMENT_NAMES = {
+        'street': 'Street',
+        'city': 'City',
+        'state': 'State',
+        'country': 'CountryOrRegion',
+        'zipcode': 'PostalCode',
+    }
+
     __slots__ = ('label', 'street', 'city', 'state', 'country', 'zipcode')
 
-    def __init__(self, street, city, state, country, zipcode, label='Business'):
+    def __init__(self, street=None, city=None, state=None, country=None, zipcode=None, label='Business'):
         assert label in self.LABELS, label
-        assert isinstance(street, str), street
-        assert isinstance(city, str), city
-        assert isinstance(state, str), state
-        assert isinstance(country, str), country
-        assert isinstance(zipcode, (str, int)), zipcode
+        if street is not None:
+            assert isinstance(street, str), street
+        if city is not None:
+            assert isinstance(city, str), city
+        if state is not None:
+            assert isinstance(state, str), state
+        if country is not None:
+            assert isinstance(country, str), country
+        if zipcode is not None:
+            assert isinstance(zipcode, (str, int)), zipcode
         self.label = label
-        self.street = street  # Street *and* house number (and other labels)
+        self.street = street  # Street *and* house number (and similar info)
         self.city = city
         self.state = state
         self.country = country
@@ -436,11 +456,12 @@ class PhysicalAddress(IndexedField):
 
     def to_xml(self, version):
         entry = create_element(self.request_tag(), Key=self.label)
-        add_xml_child(entry, 't:Street', self.street)
-        add_xml_child(entry, 't:City', self.city)
-        add_xml_child(entry, 't:State', self.state)
-        add_xml_child(entry, 't:CountryOrRegion', self.country)
-        add_xml_child(entry, 't:PostalCode', str(self.zipcode))
+        for attr in self.__slots__:
+            if attr == 'label':
+                continue
+            val = getattr(self, attr)
+            if val is not None:
+                add_xml_child(entry, 't:%s' % self.SUB_FIELD_ELEMENT_NAMES[attr], val)
         return entry
 
     @classmethod
@@ -868,22 +889,24 @@ class Item(EWSElement):
     def fielduri_for_field(cls, fieldname):
         # See all valid FieldURI values at https://msdn.microsoft.com/en-us/library/office/aa494315(v=exchg.150).aspx
         try:
-            field_uri = cls.uri_for_field(fieldname)
-            if isinstance(field_uri, str):
-                return '%s:%s' % (cls.FIELDURI_PREFIX, field_uri)
-            return field_uri
+            uri = cls.uri_for_field(fieldname)
         except KeyError:
             raise ValueError("No fielduri defined for fieldname '%s'" % fieldname)
+        if isinstance(uri, str):
+            return '%s:%s' % (cls.FIELDURI_PREFIX, uri)
+        return uri
 
     @classmethod
     def elem_for_field(cls, fieldname):
         assert isinstance(fieldname, str)
         try:
-            if fieldname == 'body':
-                return create_element('t:%s' % cls.uri_for_field(fieldname), BodyType='Text')
-            return create_element('t:%s' % cls.uri_for_field(fieldname))
+            uri = cls.uri_for_field(fieldname)
         except KeyError:
             raise ValueError("No fielduri defined for fieldname '%s'" % fieldname)
+        assert isinstance(uri, str)
+        if fieldname == 'body':
+            return create_element('t:%s' % uri, BodyType='Text')
+        return create_element('t:%s' % uri)
 
     @classmethod
     def response_xml_elem_for_field(cls, fieldname):
@@ -931,7 +954,11 @@ class Item(EWSElement):
             elems.append(create_element('t:FieldURI', FieldURI=field_uri))
         elif issubclass(field_uri, IndexedField):
             for l in field_uri.LABELS:
-                elems.append(field_uri.field_uri_xml(label=l))
+                field_uri_xml = field_uri.field_uri_xml(label=l)
+                if hasattr(field_uri_xml, '__iter__'):
+                    elems.extend(field_uri_xml)
+                else:
+                    elems.append(field_uri_xml)
         elif issubclass(field_uri, ExtendedProperty):
             elems.append(field_uri.field_uri_xml())
         else:
@@ -1047,19 +1074,20 @@ class ItemMixIn(Item):
     def fielduri_for_field(cls, fieldname):
         try:
             field_uri = cls.ITEM_FIELDS[fieldname][0]
-            if isinstance(field_uri, str):
-                return '%s:%s' % (cls.FIELDURI_PREFIX, field_uri)
-            return field_uri
         except KeyError:
             return Item.fielduri_for_field(fieldname)
+        if isinstance(field_uri, str):
+            return '%s:%s' % (cls.FIELDURI_PREFIX, field_uri)
+        return field_uri
 
     @classmethod
     def elem_for_field(cls, fieldname):
-        assert isinstance(fieldname, str)
         try:
-            return create_element('t:%s' % cls.uri_for_field(fieldname))
+            uri = cls.uri_for_field(fieldname)
         except KeyError:
             return Item.elem_for_field(fieldname)
+        assert isinstance(uri, str)
+        return create_element('t:%s' % uri)
 
     @classmethod
     def response_xml_elem_for_field(cls, fieldname):
@@ -1346,7 +1374,7 @@ class Contact(ItemMixIn):
         'nickname': ('Nickname', str),
         'company_name': ('CompanyName', str),
         'email_addresses': (EmailAddress, [EmailAddress]),
-        # 'physical_addresses': (PhysicalAddress, [PhysicalAddress]),
+        'physical_addresses': (PhysicalAddress, [PhysicalAddress]),
         'phone_numbers': (PhoneNumber, [PhoneNumber]),
         'assistant_name': ('AssistantName', str),
         'birthday': ('Birthday', EWSDateTime),
@@ -1369,7 +1397,7 @@ class Contact(ItemMixIn):
         'subject', 'sensitivity', 'body', 'categories', 'importance', 'reminder_is_set', 'extern_id',
         'file_as', 'file_as_mapping',
         'display_name', 'given_name',  'initials', 'middle_name', 'nickname', 'company_name',
-        'email_addresses',  # 'physical_addresses',
+        'email_addresses',  'physical_addresses',
         'phone_numbers',
         'assistant_name', 'birthday', 'business_homepage', 'companies', 'department',
         'generation', 'job_title', 'manager', 'mileage', 'office', 'profession', 'surname',  # 'email_alias', 'notes',
@@ -1456,20 +1484,27 @@ class Folder(EWSElement):
 
     @classmethod
     def additional_property_elems(cls, fieldnames):
-        # Some field names have more than one FieldURI. For example, for 'mileage' field is present on both Contact and
+        # Some field names have more than one FieldURI. For example, 'mileage' field is present on both Contact and
         # Task, as contacts:Mileage and tasks:Mileage.
-        elems = []
+        elem_attrs = set()
+        unique_elems = []
         for f in fieldnames:
             is_valid = False
             for item_model in cls.supported_item_models:
                 try:
-                    elems.extend(item_model.additional_property_elems(fieldname=f))
+                    # Make sure to remove duplicate FieldURI elements
+                    for elem in item_model.additional_property_elems(fieldname=f):
+                        attrs = tuple(elem.items())
+                        if attrs in elem_attrs:
+                            continue
+                        elem_attrs.add(attrs)
+                        unique_elems.append(elem)
                     is_valid = True
                 except ValueError:
                     pass
             if not is_valid:
                 raise ValueError("No fielduri defined for fieldname '%s'" % f)
-        return elems
+        return unique_elems
 
     @classmethod
     def fielduri_for_field(cls, fieldname):

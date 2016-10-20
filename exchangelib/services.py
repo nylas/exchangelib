@@ -471,12 +471,62 @@ class UpdateItem(EWSPooledAccountService):
     SERVICE_NAME = 'UpdateItem'
     element_container_name = '{%s}Items' % MNS
 
+    def _add_delete_item_elem(self, item_model, parent_elem, fieldname, fielduri):
+        if fieldname in item_model.required_fields():
+            log.warning('%s is a required field and may not be deleted. Skipping', fieldname)
+            return
+        add_xml_child(parent_elem, 't:DeleteItemField', fielduri)
+
+    def _add_set_item_elem(self, item_model, parent_elem, fieldname, fielduri, value, meeting_timezone_added):
+        from .folders import EWSElement
+        setitemfield = create_element('t:SetItemField')
+        setitemfield.append(fielduri)
+        folderitem = create_element(item_model.request_tag())
+        if isinstance(value, (EWSElement, ElementType)):
+            set_xml_value(folderitem, value, self.account.version)
+        else:
+            folderitem.append(
+                set_xml_value(item_model.elem_for_field(fieldname), value, self.account.version)
+            )
+        setitemfield.append(folderitem)
+        parent_elem.append(setitemfield)
+        if isinstance(value, EWSDateTime):
+            # Always set timezone explicitly when updating date fields. Exchange 2007 wants "MeetingTimeZone"
+            # instead of explicit timezone on each datetime field.
+            setitemfield_tz = create_element('t:SetItemField')
+            folderitem_tz = create_element(item_model.request_tag())
+            if self.account.version.build < EXCHANGE_2010:
+                if meeting_timezone_added:
+                    # Let's hope that we're not changing timezone, or that both 'start' and 'end' are supplied.
+                    # Exchange 2007 doesn't support different timezone on start and end.
+                    return
+                fielduri_tz = create_element('t:FieldURI', FieldURI='calendar:MeetingTimeZone')
+                timezone = create_element('t:MeetingTimeZone', TimeZoneName=value.tzinfo.ms_id)
+                meeting_timezone_added = True
+            else:
+                if fieldname == 'start':
+                    fielduri_tz = create_element('t:FieldURI', FieldURI='calendar:StartTimeZone')
+                    timezone = create_element('t:StartTimeZone', Id=value.tzinfo.ms_id, Name=value.tzinfo.ms_name)
+                elif fieldname == 'end':
+                    fielduri_tz = create_element('t:FieldURI', FieldURI='calendar:EndTimeZone')
+                    timezone = create_element('t:EndTimeZone', Id=value.tzinfo.ms_id, Name=value.tzinfo.ms_name)
+                else:
+                    # EWS does not support updating the timezone for fields that are not the 'start' or 'end'
+                    # field. Either supply the date in UTC or in the same timezone as originally created.
+                    log.warning("Skipping timezone for field '%s'", fieldname)
+                    return
+            setitemfield_tz.append(fielduri_tz)
+            folderitem_tz.append(timezone)
+            setitemfield_tz.append(folderitem_tz)
+            parent_elem.append(setitemfield_tz)
+        return meeting_timezone_added
+
     def _get_payload(self, items, conflict_resolution, message_disposition,
                      send_meeting_invitations_or_cancellations, suppress_read_receipts):
         # Takes a list of (Item, fieldnames) tuples where 'Item' is a instance of a subclass of Item and 'fieldnames'
         # are the attribute names that were updated. Returns the XML for an UpdateItem call.
         # an UpdateItem request.
-        from .folders import ItemId, IndexedField, ExtendedProperty, ExternId, EWSElement
+        from .folders import ItemId, IndexedField, ExtendedProperty, ExternId
         if self.account.version.build >= EXCHANGE_2013:
             updateitem = create_element(
                 'm:%s' % self.SERVICE_NAME,
@@ -492,8 +542,8 @@ class UpdateItem(EWSPooledAccountService):
                 MessageDisposition=message_disposition,
                 SendMeetingInvitationsOrCancellations=send_meeting_invitations_or_cancellations,
             )
-
         itemchanges = create_element('m:ItemChanges')
+
         n = 0
         for item, fieldnames in items:
             n += 1
@@ -517,65 +567,53 @@ class UpdateItem(EWSPooledAccountService):
                 field_uri = item_model.fielduri_for_field(fieldname)
                 if isinstance(field_uri, str):
                     fielduri = create_element('t:FieldURI', FieldURI=field_uri)
-                elif issubclass(field_uri, IndexedField):
-                    log.warning("Skipping update on fieldname '%s' (not supported yet)", fieldname)
-                    continue
-                    # TODO: we need to create a SetItemField for every item in the list, and possibly DeleteItemField
-                    # for every label not on the list
-                    # fielduri = field_uri.field_uri_xml(label=val.label)
                 elif issubclass(field_uri, ExtendedProperty):
                     fielduri = field_uri.field_uri_xml()
+                elif issubclass(field_uri, IndexedField):
+                    # TODO: Maybe the set/delete logic should extend into each attribute of a complex type like e.g.
+                    # PhysicalAddress and not just the whole item.
+                    if not val:
+                        # An empty value means we want to remove this value list from the item
+                        for label in field_uri.LABELS:
+                            field_uri_xml = field_uri.field_uri_xml(label=label)
+                            if hasattr(field_uri_xml, '__iter__'):
+                                fielduris = field_uri_xml
+                            else:
+                                fielduris = [field_uri_xml]
+                            for fielduri in fielduris:
+                                self._add_delete_item_elem(
+                                    item_model=item_model, parent_elem=updates, fieldname=fieldname, fielduri=fielduri)
+                    else:
+                        for v in val:
+                            field_uri_xml = field_uri.field_uri_xml(label=v.label)
+                            if hasattr(field_uri_xml, '__iter__'):
+                                fielduris = field_uri_xml
+                                wrapped_vs = []
+                                for k in v.SUB_FIELD_ELEMENT_NAMES.keys():
+                                    # SetItem only accepts items that have the one value set that we want to change.
+                                    # Create a new IndexedField object that has the only one value set.
+                                    simple_v = field_uri(**{'label': v.label, k: getattr(v, k)})
+                                    wrapped_vs.append(set_xml_value(create_element('t:%s' % v.PARENT_ELEMENT_NAME),
+                                                                    simple_v, self.account.version))
+                            else:
+                                fielduris = [field_uri_xml]
+                                wrapped_vs = [set_xml_value(create_element('t:%s' % v.PARENT_ELEMENT_NAME), v,
+                                                            self.account.version)]
+                            for fielduri, wrapped_v in zip(fielduris, wrapped_vs):
+                                meeting_timezone_added = self._add_set_item_elem(
+                                    item_model=item_model, parent_elem=updates, fieldname=fieldname, fielduri=fielduri,
+                                    value=wrapped_v, meeting_timezone_added=meeting_timezone_added)
+                    continue
                 else:
                     assert False, 'Unknown field_uri type: %s' % field_uri
                 if val is None:
                     # A value of None means we want to remove this field from the item
-                    if fieldname in item_model.required_fields():
-                        log.warning('%s is a required field and may not be deleted. Skipping', fieldname)
-                        continue
-                    add_xml_child(updates, 't:DeleteItemField', fielduri)
+                    self._add_delete_item_elem(
+                        item_model=item_model, parent_elem=updates, fieldname=fieldname, fielduri=fielduri)
                     continue
-                setitemfield = create_element('t:SetItemField')
-                setitemfield.append(fielduri)
-                folderitem = create_element(item_model.request_tag())
-
-                if isinstance(val, EWSElement):
-                    set_xml_value(folderitem, val, self.account.version)
-                else:
-                    folderitem.append(
-                        set_xml_value(item_model.elem_for_field(fieldname), val, self.account.version)
-                    )
-                setitemfield.append(folderitem)
-                updates.append(setitemfield)
-
-                if isinstance(val, EWSDateTime):
-                    # Always set timezone explicitly when updating date fields. Exchange 2007 wants "MeetingTimeZone"
-                    # instead of explicit timezone on each datetime field.
-                    setitemfield_tz = create_element('t:SetItemField')
-                    folderitem_tz = create_element(item_model.request_tag())
-                    if self.account.version.build < EXCHANGE_2010:
-                        if meeting_timezone_added:
-                            # Let's hope that we're not changing timezone, or that both 'start' and 'end' are supplied.
-                            # Exchange 2007 doesn't support different timezone on start and end.
-                            continue
-                        fielduri_tz = create_element('t:FieldURI', FieldURI='calendar:MeetingTimeZone')
-                        timezone = create_element('t:MeetingTimeZone', TimeZoneName=val.tzinfo.ms_id)
-                        meeting_timezone_added = True
-                    else:
-                        if fieldname == 'start':
-                            fielduri_tz = create_element('t:FieldURI', FieldURI='calendar:StartTimeZone')
-                            timezone = create_element('t:StartTimeZone', Id=val.tzinfo.ms_id, Name=val.tzinfo.ms_name)
-                        elif fieldname == 'end':
-                            fielduri_tz = create_element('t:FieldURI', FieldURI='calendar:EndTimeZone')
-                            timezone = create_element('t:EndTimeZone', Id=val.tzinfo.ms_id, Name=val.tzinfo.ms_name)
-                        else:
-                            # EWS does not support updating the timezone for fields that are not the 'start' or 'end'
-                            # field. Either supply the date in UTC or in the same timezone as originally created.
-                            log.warning("Skipping timezone for field '%s'", fieldname)
-                            continue
-                    setitemfield_tz.append(fielduri_tz)
-                    folderitem_tz.append(timezone)
-                    setitemfield_tz.append(folderitem_tz)
-                    updates.append(setitemfield_tz)
+                meeting_timezone_added = self._add_set_item_elem(
+                    item_model=item_model, parent_elem=updates, fieldname=fieldname, fielduri=fielduri,
+                    value=val, meeting_timezone_added=meeting_timezone_added)
             itemchange.append(updates)
             itemchanges.append(itemchange)
         if not n:
