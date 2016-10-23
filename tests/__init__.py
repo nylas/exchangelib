@@ -1168,7 +1168,11 @@ class BaseItemTest(EWSTest):
 
     def test_save_and_delete(self):
         # Test that we can create, update and delete single items using methods directly on the item
+        # For CalendarItem instances, the 'is_all_day' attribute affects the 'start' and 'end' values. Changing from
+        # 'false' to 'true' removes the time part of these datetimes.
         insert_kwargs = self.get_random_insert_kwargs()
+        if 'is_all_day' in insert_kwargs:
+            insert_kwargs['is_all_day'] = False
         item = self.ITEM_CLASS(account=self.account, folder=self.test_folder, **insert_kwargs)
         self.assertIsNone(item.item_id)
         self.assertIsNone(item.changekey)
@@ -1180,6 +1184,10 @@ class BaseItemTest(EWSTest):
 
         # Update
         update_kwargs = self.get_random_update_kwargs(insert_kwargs)
+        if 'is_all_day' in update_kwargs:
+            assert update_kwargs['is_all_day'] == True
+            update_kwargs['start'] = update_kwargs['start'].replace(hour=0, minute=0, second=0, microsecond=0)
+            update_kwargs['end'] = update_kwargs['end'].replace(hour=0, minute=0, second=0, microsecond=0)
         for k, v in update_kwargs.items():
             setattr(item, k, v)
         item.save()
@@ -1255,7 +1263,11 @@ class BaseItemTest(EWSTest):
 
     def test_item(self):
         # Test insert
+        # For CalendarItem instances, the 'is_all_day' attribute affects the 'start' and 'end' values. Changing from
+        # 'false' to 'true' removes the time part of these datetimes.
         insert_kwargs = self.get_random_insert_kwargs()
+        if 'is_all_day' in insert_kwargs:
+            insert_kwargs['is_all_day'] = False
         item = self.ITEM_CLASS(**insert_kwargs)
         # Test with generator as argument
         insert_ids = self.test_folder.bulk_create(items=(i for i in [item]))
@@ -1280,6 +1292,10 @@ class BaseItemTest(EWSTest):
 
         # Test update
         update_kwargs = self.get_random_update_kwargs(insert_kwargs)
+        if 'is_all_day' in update_kwargs:
+            assert update_kwargs['is_all_day'] == True
+            update_kwargs['start'] = update_kwargs['start'].replace(hour=0, minute=0, second=0, microsecond=0)
+            update_kwargs['end'] = update_kwargs['end'].replace(hour=0, minute=0, second=0, microsecond=0)
         update_fieldnames = update_kwargs.keys()
         for k, v in update_kwargs.items():
             setattr(item, k, v)

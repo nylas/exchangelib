@@ -3,6 +3,8 @@ Change Log
 ==========
 
 
+
+
 1.7.1
 -----
 * Fix bug where fetching items from a folder that can contain multiple item types (e.g. the Deleted Items folder) would
