@@ -3,6 +3,14 @@ Change Log
 ==========
 
 
+HEAD
+----
+* Implement for ``Contact.physical_addresses`` attribute. This is a list of ``exchangelib.folders.PhysicalAddress``
+  items.
+* Implement the ``CalendarItem.is_all_day`` boolean to create all-day appointments.
+* Implement ``my_folder.export()`` and ``my_folder.upload()``. Thanks to @SamCB!
+* Fixed ``Account.folders`` for non-distinguished folders
+* Added ``Folder.get_folder_by_name()`` to make it easier to get subfolders by name.
 
 
 1.7.1
