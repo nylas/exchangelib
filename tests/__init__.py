@@ -520,6 +520,10 @@ class FolderTest(EWSTest):
         for f in folders[Tasks]:
             self.assertEqual(f.folder_class, 'IPF.Task')
 
+    def test_get_folder_by_name(self):
+        folder_name = Calendar.LOCALIZED_NAMES[self.account.locale][0]
+        f = self.account.root.get_folder_by_name(folder_name)
+        self.assertEqual(f.name, folder_name)
 
 class BaseItemTest(EWSTest):
     TEST_FOLDER = None

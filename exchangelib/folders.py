@@ -1647,7 +1647,7 @@ class Folder(EWSElement):
         Does a simple FindItem to test (read) access to the folder. Maybe the account doesn't exist, maybe the
         service user doesn't have access to the calendar. This will throw the most common errors.
         """
-        self.filter(subject='DUMMY')
+        list(self.filter(subject='DUMMY'))
         return True
 
     @classmethod
@@ -1694,6 +1694,21 @@ class Folder(EWSElement):
                 log.debug('Folder class %s matches container class %s (%s)', folder_cls, dummy_fld.folder_class, dummy_fld.name)
             folders.append(folder_cls(**dummy_fld.__dict__))
         return folders
+
+    def get_folder_by_name(self, name):
+        """Takes a case-sensitive folder name and returns an instance of that folder, if a folder with that name exists
+        as a direct or indirect subfolder of this folder.
+        """
+        assert isinstance(name, str)
+        matching_folders = []
+        for f in self.get_folders(depth=DEEP):
+            if f.name == name:
+                matching_folders.append(f)
+        if not matching_folders:
+            raise ValueError('No subfolders found with name %s' % name)
+        if len(matching_folders) > 1:
+            raise ValueError('Multiple subfolders found with name %s' % name)
+        return matching_folders[0]
 
     @classmethod
     def get_distinguished(cls, account, shape=IdOnly):
