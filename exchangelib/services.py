@@ -256,36 +256,52 @@ class PagingEWSMixIn(EWSService):
     def _paged_call(self, **kwargs):
         account = self.account if isinstance(self, EWSAccountService) else None
         log_prefix = 'EWS %s, account %s, service %s' % (self.protocol.service_endpoint, account, self.SERVICE_NAME)
-        offset = 0
+        last_offset, next_offset = 0, 0
+        calendar_view = kwargs.get('calendar_view')
+        max_items = None if calendar_view is None else calendar_view.max_items  # Hack, see below
+        item_count = 0
         while True:
-            log.debug('%s: Getting items at offset %s', log_prefix, offset)
-            kwargs['offset'] = offset
+            log.debug('%s: Getting items at offset %s', log_prefix, next_offset)
+            kwargs['offset'] = next_offset
             payload = self._get_payload(**kwargs)
             response = self._get_response_xml(payload=payload)
-            page, offset = self._get_page(response)
-            if isinstance(page, ElementType):
-                container = page.find(self.element_container_name)
+            last_offset = next_offset
+            rootfolder, next_offset = self._get_page(response)
+            if isinstance(rootfolder, ElementType):
+                container = rootfolder.find(self.element_container_name)
                 if container is None:
                     raise TransportError('No %s elements in ResponseMessage (%s)' % (self.element_container_name,
-                                                                                     xml_to_str(page)))
-                yield from self._get_elements_in_container(container=container)
-            if not offset:
+                                                                                     xml_to_str(rootfolder)))
+                for elem in self._get_elements_in_container(container=container):
+                    item_count += 1
+                    yield elem
+                if max_items and item_count >= max_items:
+                    # With CalendarViews where max_count is smaller than the actual item count in the view, it's
+                    # difficult to find out if pagination is finished - IncludesLastItemInRange is false, and
+                    # IndexedPagingOffset is not set. This hack is the least messy solution.
+                    log.debug("'max_items' count reached")
+                    break
+            if not next_offset:
+                break
+            if next_offset != 1 + last_offset:
+                # Guard against endless loop
+                log.warning('Unexpected next offset: %s -> %s', last_offset, next_offset)
                 break
 
     def _get_page(self, response):
         assert len(response) == 1
-        log_prefix = 'EWS %s, service %s' % (self.protocol.service_endpoint, self.SERVICE_NAME)
         rootfolder = self._get_element_container(message=response[0], name='{%s}RootFolder' % MNS)
         is_last_page = rootfolder.get('IncludesLastItemInRange').lower() in ('true', '0')
         offset = rootfolder.get('IndexedPagingOffset')
         if offset is None and not is_last_page:
-            log.warning("Not last page in range, but Exchange didn't send a page offset. Assuming first page")
+            log.debug("Not last page in range, but Exchange didn't send a page offset. Assuming first page")
             offset = '1'
-        next_offset = 0 if is_last_page else int(offset)
-        if not int(rootfolder.get('TotalItemsInView')):
-            assert next_offset == 0
+        next_offset = None if is_last_page else int(offset)
+        item_count = int(rootfolder.get('TotalItemsInView'))
+        if not item_count:
+            assert next_offset is None
             rootfolder = None
-        log.debug('%s: Got page with next offset %s (last_page %s)', log_prefix, next_offset, is_last_page)
+        log.debug('%s: Got page with next offset %s (last_page %s)', self.SERVICE_NAME, next_offset, is_last_page)
         return rootfolder, next_offset
 
 
@@ -680,7 +696,7 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
     def call(self, **kwargs):
         return self._paged_call(**kwargs)
 
-    def _get_payload(self, additional_fields, restriction, shape, depth, offset=0):
+    def _get_payload(self, additional_fields, restriction, shape, depth, calendar_view, offset=0):
         finditem = create_element('m:%s' % self.SERVICE_NAME, Traversal=depth)
         itemshape = create_element('m:ItemShape')
         add_xml_child(itemshape, 't:BaseShape', shape)
@@ -688,8 +704,11 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
             additional_property_elems = self.folder.additional_property_elems(additional_fields)
             add_xml_child(itemshape, 't:AdditionalProperties', additional_property_elems)
         finditem.append(itemshape)
-        indexedpageviewitem = create_element('m:IndexedPageItemView', Offset=str(offset), BasePoint='Beginning')
-        finditem.append(indexedpageviewitem)
+        if calendar_view is None:
+            view_type = create_element('m:IndexedPageItemView', Offset=str(offset), BasePoint='Beginning')
+        else:
+            view_type = calendar_view.to_xml(version=self.account.version)
+        finditem.append(view_type)
         if restriction:
             finditem.append(restriction.xml)
         parentfolderids = create_element('m:ParentFolderIds')

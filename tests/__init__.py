@@ -14,7 +14,7 @@ from exchangelib.account import Account
 from exchangelib.autodiscover import discover
 from exchangelib.configuration import Configuration
 from exchangelib.credentials import DELEGATE, Credentials
-from exchangelib.errors import RelativeRedirect, ErrorItemNotFound
+from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalidOperation
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, ExternId, Choice, Email, Contact, Task, \
     EmailAddress, PhysicalAddress, PhoneNumber, IndexedField, RoomList, Calendar, DeletedItems, Drafts, Inbox, Outbox, \
@@ -524,6 +524,7 @@ class FolderTest(EWSTest):
         folder_name = Calendar.LOCALIZED_NAMES[self.account.locale][0]
         f = self.account.root.get_folder_by_name(folder_name)
         self.assertEqual(f.name, folder_name)
+
 
 class BaseItemTest(EWSTest):
     TEST_FOLDER = None
@@ -1444,9 +1445,64 @@ class BaseItemTest(EWSTest):
         del ids[3]  # Sending the deleted one through will cause an error
         self.account.bulk_delete(ids=ids, affected_task_occurrences=ALL_OCCURRENCIES)
 
+
 class CalendarTest(BaseItemTest):
     TEST_FOLDER = 'calendar'
     ITEM_CLASS = CalendarItem
+
+    def test_view(self):
+        item1 = self.ITEM_CLASS(
+            account=self.account,
+            folder=self.test_folder,
+            subject='TEST1',
+            start=self.tz.localize(EWSDateTime(2016, 1, 1, 8)),
+            end=self.tz.localize(EWSDateTime(2016, 1, 1, 10)),
+            categories=self.categories,
+            is_all_day=False,
+        )
+        item2 = self.ITEM_CLASS(
+            account=self.account,
+            folder=self.test_folder,
+            subject='TEST2',
+            start=self.tz.localize(EWSDateTime(2016, 2, 1, 8)),
+            end=self.tz.localize(EWSDateTime(2016, 2, 1, 10)),
+            categories=self.categories,
+            is_all_day=False,
+        )
+        ids = self.test_folder.bulk_create(items=[item1, item2])
+
+        # Test missing args
+        with self.assertRaises(TypeError):
+            self.test_folder.view()
+        # Test bad args
+        with self.assertRaises(AttributeError):
+            self.test_folder.view(start=item1.end, end=item1.start)
+        with self.assertRaises(ValueError):
+            self.test_folder.view(start='xxx', end=item1.end)
+        with self.assertRaises(ValueError):
+            self.test_folder.view(start=item1.start, end=item1.end, max_items=0)
+
+        # Test dates
+        self.assertEqual(len(self.test_folder.view(start=item1.start, end=item1.end)), 1)
+        self.assertEqual(len(self.test_folder.view(start=item1.start, end=item2.end)), 2)
+        # Edge cases. Get view from end of item1 to start of item2. Should logically return 0 items, but Exchange wants
+        # it differently and returns item1 even though there is no overlap.
+        self.assertEqual(len(self.test_folder.view(start=item1.end, end=item2.start)), 1)
+        self.assertEqual(len(self.test_folder.view(start=item1.start, end=item2.start)), 1)
+
+        # Test max_items
+        self.assertEqual(len(self.test_folder.view(start=item1.start, end=item2.end, max_items=10)), 2)
+        self.assertEqual(len(self.test_folder.view(start=item1.start, end=item2.end, max_items=1)), 1)
+
+        # Test chaining
+        qs = self.test_folder.view(start=item1.start, end=item2.end)
+        self.assertEqual(qs.count(), 2)
+        with self.assertRaises(ErrorInvalidOperation):
+            qs.filter(subject=item1.subject).count()  # EWS does not allow restrictions
+        self.assertListEqual(
+            [i for i in qs.order_by('subject').values('subject')],
+            [{'subject': item1.subject}, {'subject': item2.subject}]
+        )
 
 
 class MessagesTest(BaseItemTest):

@@ -11,6 +11,9 @@ HEAD
 * Implement ``my_folder.export()`` and ``my_folder.upload()``. Thanks to @SamCB!
 * Fixed ``Account.folders`` for non-distinguished folders
 * Added ``Folder.get_folder_by_name()`` to make it easier to get subfolders by name.
+* Implement ``CalendarView`` searches as ``my_calendar.view(start=..., end=...)``. A view differs from a normal search
+  in that a view expands recurring items and returns recurring item occuccences that are valid in the time span of the
+  view.
 
 
 1.7.1

@@ -9,12 +9,12 @@ from logging import getLogger
 from decimal import Decimal
 import warnings
 
-from .ewsdatetime import EWSDateTime, UTC_NOW
+from .ewsdatetime import EWSDateTime, UTC, UTC_NOW
 from .queryset import QuerySet
 from .restriction import Restriction, Q
 from .services import TNS, IdOnly, SHALLOW, DEEP, FindFolder, GetFolder, FindItem, \
     MNS, ITEM_TRAVERSAL_CHOICES, FOLDER_TRAVERSAL_CHOICES, SHAPE_CHOICES
-from .util import create_element, add_xml_child, get_xml_attrs, get_xml_attr, set_xml_value
+from .util import create_element, add_xml_child, get_xml_attrs, get_xml_attr, set_xml_value, value_to_xml_text
 from .version import EXCHANGE_2010
 
 log = getLogger(__name__)
@@ -1545,7 +1545,7 @@ class Folder(EWSElement):
         Optional extra keyword arguments follow a Django-like QuerySet filter syntax (see
            https://docs.djangoproject.com/en/1.10/ref/models/querysets/#field-lookups).
 
-        We don't support '__year' and other data-related lookups. We also don't support '__endswith' or '__iendswith'.
+        We don't support '__year' and other date-related lookups. We also don't support '__endswith' or '__iendswith'.
 
         We support the additional '__not' lookup in place of Django's exclude() for simple cases. For more complicated
         cases you need to create a Q object and use ~Q().
@@ -1580,6 +1580,9 @@ class Folder(EWSElement):
                 if f in complex_field_names:
                     raise ValueError("find_items() does not support field '%s'. Use fetch() instead" % f)
 
+        # Get the CalendarView, if any
+        calendar_view = kwargs.pop('calendar_view', None)
+
         # Build up any restrictions
         q = Q.from_filter_args(self.__class__, *args, **kwargs)
         if q and not q.is_empty():
@@ -1599,7 +1602,8 @@ class Folder(EWSElement):
             additional_fields=additional_fields,
             restriction=restriction,
             shape=shape,
-            depth=depth
+            depth=depth,
+            calendar_view=calendar_view,
         )
         if shape == IdOnly and additional_fields is None:
             return map(Item.id_from_xml, items)
@@ -1735,6 +1739,45 @@ class Root(Folder):
     DISTINGUISHED_FOLDER_ID = 'root'
 
 
+class CalendarView(EWSElement):
+    """
+    MSDN: https://msdn.microsoft.com/en-US/library/office/aa564515%28v=exchg.150%29.aspx
+    """
+    ELEMENT_NAME = 'CalendarView'
+
+    __slots__ = ('start', 'end', 'max_items')
+
+    def __init__(self, start, end, max_items=None):
+        if not isinstance(start, EWSDateTime):
+            raise ValueError("'start' must be an EWSDateTime")
+        if not isinstance(end, EWSDateTime):
+            raise ValueError("'end' must be an EWSDateTime")
+        if not isinstance(end, EWSDateTime):
+            raise ValueError("'end' must be an EWSDateTime")
+        if end < start:
+            raise AttributeError("'start' must be before 'end'")
+        if max_items is not None:
+            if not isinstance(max_items, int):
+                raise ValueError("'max_items' must be an int")
+            if max_items < 1:
+                raise ValueError("'max_items' must be a positive integer")
+        self.start = start
+        self.end = end
+        self.max_items = max_items
+
+    def request_tag(cls):
+        return 'm:%s' % cls.ELEMENT_NAME
+
+    def to_xml(self, version):
+        elem = create_element(self.request_tag())
+        # Use .set() to not fill up the create_element() cache with unique values
+        elem.set('StartDate', value_to_xml_text(self.start.astimezone(UTC)))
+        elem.set('EndDate', value_to_xml_text(self.end.astimezone(UTC)))
+        if self.max_items is not None:
+            elem.set('MaxEntriesReturned', value_to_xml_text(self.max_items))
+        return elem
+
+
 class Calendar(Folder):
     """
     An interface for the Exchange calendar
@@ -1746,6 +1789,23 @@ class Calendar(Folder):
     LOCALIZED_NAMES = {
         'da_DK': ('Kalender',)
     }
+
+    def view(self, start, end, max_items=None, *args, **kwargs):
+        """ Implements the CalendarView option to FindItem. The difference between filter() and view() is that filter()
+        only returns the master CalendarItem for recurring items, while view() unfolds recurring items and returns all
+        CalendarItem occurrences as one would normally expect when presenting a calendar.
+
+        Supports the same semantics as filter, except for 'start' and 'end' keyword attributes which are both required
+        and behave differently than filter. Here, they denote the start and end of the timespan of the view. All items
+        the overlap the timespan are returned (items that end exactly on 'start' are also returned, for some reason).
+
+        EWS does not allow combining CalendarView with search restrictions (filter and exclude).
+
+        'max_items' defines the maximum number of items returned in this view. Optional.
+        """
+        qs = QuerySet(self).filter(*args, **kwargs)
+        qs.calendar_view = CalendarView(start=start, end=end, max_items=max_items)
+        return qs
 
 
 class DeletedItems(Folder):

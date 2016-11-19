@@ -36,6 +36,7 @@ class QuerySet:
         self.order_fields = None
         self.reversed = False
         self.return_format = self.NONE
+        self.calendar_view = None
 
         self._cache = None
 
@@ -61,6 +62,7 @@ class QuerySet:
         new_qs.order_fields = self.order_fields
         new_qs.reversed = self.reversed
         new_qs.return_format = self.return_format
+        new_qs.calendar_view = self.calendar_view
         return new_qs
 
     def _check_fields(self, field_names):
@@ -92,13 +94,16 @@ class QuerySet:
             # We requested no additional fields and we need to do no sorting, so we can take a shortcut by setting
             # additional_fields=None. Thi tells find_items() to do less work
             assert not complex_fields_requested
-            return self.folder.find_items(self.q, additional_fields=None, shape=IdOnly)
+            return self.folder.find_items(
+                self.q, additional_fields=None, shape=IdOnly, calendar_view=self.calendar_view)
         if complex_fields_requested:
             # The FindItems service does not support complex field types. Fallback to getting ids and calling GetItems
-            ids = self.folder.find_items(self.q, additional_fields=None, shape=IdOnly)
+            ids = self.folder.find_items(
+                self.q, additional_fields=None, shape=IdOnly, calendar_view=self.calendar_view)
             items = self.folder.fetch(ids=ids, only_fields=additional_fields)
         else:
-            items = self.folder.find_items(self.q, additional_fields=additional_fields, shape=IdOnly)
+            items = self.folder.find_items(
+                self.q, additional_fields=additional_fields, shape=IdOnly, calendar_view=self.calendar_view)
         if self.order_fields:
             assert isinstance(self.order_fields, tuple)
             # Sorting in Python is stable. Do a sort on each of the given fields in reverse order. Reverse the sort if
