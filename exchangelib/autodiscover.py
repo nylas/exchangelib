@@ -13,6 +13,8 @@ import logging
 from threading import Lock
 import queue
 import shelve
+import os
+import tempfile
 
 import dns.resolver
 import requests.exceptions
@@ -35,7 +37,7 @@ RESPONSE_NS = 'http://schemas.microsoft.com/exchange/autodiscover/outlook/respon
 TIMEOUT = 10  # Seconds
 
 
-AUTODISCOVER_PERSISTENT_STORAGE = '/tmp/exchangelib.cache'
+AUTODISCOVER_PERSISTENT_STORAGE = os.path.join(tempfile.gettempdir(), 'exchangelib.cache')
 
 
 class AutodiscoverCache:

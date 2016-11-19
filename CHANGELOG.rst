@@ -14,6 +14,7 @@ HEAD
 * Implement ``CalendarView`` searches as ``my_calendar.view(start=..., end=...)``. A view differs from a normal search
   in that a view expands recurring items and returns recurring item occuccences that are valid in the time span of the
   view.
+* Persistent storage location for autodiscover cache is now platform independent
 
 
 1.7.1
