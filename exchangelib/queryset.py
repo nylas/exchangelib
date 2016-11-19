@@ -139,8 +139,12 @@ class QuerySet:
         }[self.return_format]()
 
     def __len__(self):
-        self.__iter__()  # Make sure cache is full
-        return len(self._cache)
+        if self._cache is None:
+            # This queryset has no cache yet. Call the optimized counting implementation
+            return self.count()
+        else:
+            self.__iter__()
+            return len(self._cache)
 
     def __getitem__(self, key):
         # Support indexing and slicing
@@ -309,6 +313,7 @@ class QuerySet:
         new_qs.only_fields = tuple()
         new_qs.order_fields = None
         new_qs.reversed = False
+        new_qs.return_format = self.NONE
         return len(list(new_qs))
 
     def exists(self):
@@ -320,5 +325,6 @@ class QuerySet:
         new_qs.only_fields = tuple()
         new_qs.order_fields = None
         new_qs.reversed = False
+        new_qs.return_format = self.NONE
         from .folders import ALL_OCCURRENCIES
         return self.folder.account.bulk_delete(ids=new_qs, affected_task_occurrences=ALL_OCCURRENCIES)
