@@ -1546,6 +1546,8 @@ class MessagesTest(BaseItemTest):
         item.item_id, item.changekey = ids[0]
         item.delete()
 
+    # TODO: test if we can update existing, non-draft items in the test folder
+
 
 class TasksTest(BaseItemTest):
     TEST_FOLDER = 'tasks'

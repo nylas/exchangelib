@@ -84,6 +84,10 @@ class EWSElement:
 
     __slots__ = tuple()
 
+    def set_field_xml(self, field_name):
+        raise NotImplementedError()
+
+
     def to_xml(self, version):
         raise NotImplementedError()
 
@@ -537,6 +541,13 @@ class Mailbox(EWSElement):
             item_id=ItemId.from_xml(elem=elem.find(ItemId.response_tag())),
         )
 
+    def set_field_xml(self, field_name):
+        mailbox = create_element(self.request_tag())
+        add_xml_child(mailbox, 't:EmailAddress', self.email_address)
+        field = create_element('t:%s' % field_name)
+        field.append(mailbox)
+        return field
+
     def __eq__(self, other):
         return hash(self) == hash(other)
 
@@ -732,6 +743,9 @@ class Item(EWSElement):
     # Fields that are read-only in Exchange. Put mime_content here until it's properly supported
     READONLY_FIELDS = {'is_draft', 'datetime_created', 'datetime_sent', 'datetime_received', 'last_modified_name',
                        'last_modified_time'}
+    # Fields that are readonly when an item is no longer a draft. Updating these would result in
+    # ErrorInvalidPropertyUpdateSentMessage
+    READONLY_AFTER_SEND_FIELDS = set()
 
     # 'account' is optional but allows calling 'send()'
     # 'folder' is optional but allows calling 'save()' and 'delete()'
@@ -792,6 +806,8 @@ class Item(EWSElement):
             update_fields = []
             for f in self.fieldnames():
                 if f in self.readonly_fields():
+                    continue
+                if not self.is_draft and f in self.readonly_after_send_fields():
                     continue
                 if f in self.required_fields() and getattr(self, f) is None:
                     continue
@@ -927,6 +943,10 @@ class Item(EWSElement):
     @classmethod
     def readonly_fields(cls):
         return Item.READONLY_FIELDS
+
+    @classmethod
+    def readonly_after_send_fields(cls):
+        return Item.READONLY_AFTER_SEND_FIELDS
 
     @classmethod
     def complex_fields(cls):
@@ -1110,6 +1130,10 @@ class ItemMixIn(Item):
         return cls.READONLY_FIELDS | Item.readonly_fields()
 
     @classmethod
+    def readonly_after_send_fields(cls):
+        return cls.READONLY_AFTER_SEND_FIELDS | Item.readonly_after_send_fields()
+
+    @classmethod
     def choices_for_field(cls, fieldname):
         try:
             return cls.CHOICES[fieldname]
@@ -1209,6 +1233,8 @@ class Message(ItemMixIn):
     REQUIRED_FIELDS = {'subject', 'is_read', 'is_delivery_receipt_requested', 'is_read_receipt_requested',
                        'is_response_requested'}
     READONLY_FIELDS = {'sender'}
+    READONLY_AFTER_SEND_FIELDS = {'is_read_receipt_requested', 'is_delivery_receipt_requested', 'from', 'sender',
+                                  'reply_to', 'to_recipients', 'cc_recipients', 'bcc_recipients'}
 
     __slots__ = tuple(ITEM_FIELDS) + tuple(Item.ITEM_FIELDS)
 

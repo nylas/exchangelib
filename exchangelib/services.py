@@ -498,7 +498,8 @@ class UpdateItem(EWSPooledAccountService):
         setitemfield = create_element('t:SetItemField')
         setitemfield.append(fielduri)
         folderitem = create_element(item_model.request_tag())
-        if isinstance(value, (EWSElement, ElementType)):
+        if isinstance(value, (EWSElement, ElementType)) \
+                or (isinstance(value, (tuple, list)) and isinstance(value[0], (EWSElement, ElementType))):
             set_xml_value(folderitem, value, self.account.version)
         else:
             folderitem.append(
@@ -542,7 +543,7 @@ class UpdateItem(EWSPooledAccountService):
         # Takes a list of (Item, fieldnames) tuples where 'Item' is a instance of a subclass of Item and 'fieldnames'
         # are the attribute names that were updated. Returns the XML for an UpdateItem call.
         # an UpdateItem request.
-        from .folders import ItemId, IndexedField, ExtendedProperty, ExternId
+        from .folders import ItemId, IndexedField, ExtendedProperty, ExternId, EWSElement
         if self.account.version.build >= EXCHANGE_2013:
             updateitem = create_element(
                 'm:%s' % self.SERVICE_NAME,
@@ -580,6 +581,10 @@ class UpdateItem(EWSPooledAccountService):
                 val = getattr(item, fieldname)
                 if fieldname == 'extern_id' and val is not None:
                     val = ExternId(val)
+                elif isinstance(val, EWSElement) and val is not None:
+                    val = val.set_field_xml(field_name=item_model.uri_for_field(fieldname))
+                elif isinstance(val, (tuple, list)) and isinstance(val[0], EWSElement):
+                    val = [v.set_field_xml(field_name=item_model.uri_for_field(fieldname)) for v in val]
                 field_uri = item_model.fielduri_for_field(fieldname)
                 if isinstance(field_uri, str):
                     fielduri = create_element('t:FieldURI', FieldURI=field_uri)
