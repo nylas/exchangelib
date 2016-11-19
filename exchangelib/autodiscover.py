@@ -111,7 +111,11 @@ class AutodiscoverCache:
         self._protocols.clear()
 
     def __del__(self):
-        self.close()
+        try:
+            self.close()
+        except:
+            # __del__ should never fail
+            pass
 
     def __str__(self):
         return str(self._protocols)

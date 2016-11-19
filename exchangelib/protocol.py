@@ -58,7 +58,11 @@ class BaseProtocol:
         self._session_pool = None  # Consumers need to fill the session pool themselves
 
     def __del__(self):
-        self.close()
+        try:
+            self.close()
+        except:
+            # __del__ should never fail
+            pass
 
     def close(self):
         log.debug('Server %s: Closing sessions', self.server)
