@@ -83,7 +83,7 @@ class QuerySet:
             additional_fields = {f for f in self.only_fields if f not in {'item_id', 'changekey'}}
         complex_fields_requested = bool(additional_fields & self.folder.complex_field_names())
         if self.order_fields:
-            extra_order_fields = set(self.order_fields) - additional_fields
+            extra_order_fields = {f.lstrip('-') for f in self.order_fields} - additional_fields
         else:
             extra_order_fields = set()
         if extra_order_fields:
@@ -106,8 +106,8 @@ class QuerySet:
                 self.q, additional_fields=additional_fields, shape=IdOnly, calendar_view=self.calendar_view)
         if self.order_fields:
             assert isinstance(self.order_fields, tuple)
-            # Sorting in Python is stable. Do a sort on each of the given fields in reverse order. Reverse the sort if
-            # the field is prefixed with '-'
+            # Sorting in Python is stable, so when we search on multiple fields, we can do a sort on each of the
+            # requested fields in reverse order. Reverse each sort operation if the field is prefixed with '-'
             for f in reversed(self.order_fields):
                 items = sorted(items, key=attrgetter(f.lstrip('-')), reverse=f.startswith('-'))
             if self.reversed:

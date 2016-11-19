@@ -765,6 +765,14 @@ class BaseItemTest(EWSTest):
             [(i.subject, i.categories[0]) for i in qs.order_by('subject')],
             [('Item 0', 'Test'), ('Item 1', 'Test'), ('Item 2', 'Test'), ('Item 3', 'Test')]
         )
+        self.assertEqual(  # Test '-some_field' syntax for reverse sorting
+            [(i.subject, i.categories[0]) for i in qs.order_by('-subject')],
+            [('Item 3', 'Test'), ('Item 2', 'Test'), ('Item 1', 'Test'), ('Item 0', 'Test')]
+        )
+        self.assertEqual(  # Test ordering on a field that we don't need to fetch
+            [(i.subject, i.categories[0]) for i in qs.order_by('-subject').only('categories')],
+            [(None, 'Test'), (None, 'Test'), (None, 'Test'), (None, 'Test')]
+        )
         self.assertEqual(
             [(i.subject, i.categories[0]) for i in qs.order_by('subject').reverse()],
             [('Item 3', 'Test'), ('Item 2', 'Test'), ('Item 1', 'Test'), ('Item 0', 'Test')]
