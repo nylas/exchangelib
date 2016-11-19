@@ -75,24 +75,24 @@ class QuerySet:
 
     def _query(self):
         if self.only_fields is None:
-            # The list of fields was not restricted. Get all fields we support
+            # The list of fields was not restricted. Get all fields we support, as a set
             additional_fields = self.folder.allowed_field_names()
         else:
             assert isinstance(self.only_fields, tuple)
             # Remove ItemId and ChangeKey. We get them unconditionally
-            additional_fields = tuple(f for f in self.only_fields if f not in {'item_id', 'changekey'})
-        complex_fields_requested = bool(set(additional_fields) & set(self.folder.complex_field_names()))
+            additional_fields = {f for f in self.only_fields if f not in {'item_id', 'changekey'}}
+        complex_fields_requested = bool(additional_fields & self.folder.complex_field_names())
         if self.order_fields:
-            extra_order_fields = set(self.order_fields) - set(additional_fields)
+            extra_order_fields = set(self.order_fields) - additional_fields
         else:
             extra_order_fields = set()
         if extra_order_fields:
-            # Also fetch order_by fields that we don't otherwise need to fetch
-            additional_fields += tuple(extra_order_fields)
+            # Also fetch order_by fields that we only need for sorting
+            additional_fields.update(extra_order_fields)
         if not additional_fields and not self.order_fields:
             # TODO: if self.order_fields only contain item_id or changekey, we can still take this shortcut
             # We requested no additional fields and we need to do no sorting, so we can take a shortcut by setting
-            # additional_fields=None. Thi tells find_items() to do less work
+            # additional_fields=None. This tells find_items() to do less work
             assert not complex_fields_requested
             return self.folder.find_items(
                 self.q, additional_fields=None, shape=IdOnly, calendar_view=self.calendar_view)
