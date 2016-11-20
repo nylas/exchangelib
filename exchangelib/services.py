@@ -543,7 +543,7 @@ class UpdateItem(EWSPooledAccountService):
         # Takes a list of (Item, fieldnames) tuples where 'Item' is a instance of a subclass of Item and 'fieldnames'
         # are the attribute names that were updated. Returns the XML for an UpdateItem call.
         # an UpdateItem request.
-        from .folders import ItemId, IndexedField, ExtendedProperty, ExternId, EWSElement
+        from .folders import ItemId, IndexedField, ExtendedProperty, EWSElement
         if self.account.version.build >= EXCHANGE_2013:
             updateitem = create_element(
                 'm:%s' % self.SERVICE_NAME,
@@ -579,8 +579,12 @@ class UpdateItem(EWSPooledAccountService):
                     log.warning('%s is a read-only field. Skipping', fieldname)
                     continue
                 val = getattr(item, fieldname)
-                if fieldname == 'extern_id' and val is not None:
-                    val = ExternId(val)
+                field_uri = item_model.fielduri_for_field(fieldname)
+                if not isinstance(field_uri, str) and issubclass(field_uri, ExtendedProperty) and val is not None \
+                        and not isinstance(val, field_uri.__class__):
+                    # For convenience, item attributes implemented as an extended property can be assigned their
+                    # internal value instead of wrapping them in an ExtendedProperty class.
+                    val = field_uri(val)
                 elif isinstance(val, EWSElement) and not isinstance(val, IndexedField) and val is not None:
                     val = val.__class__.set_field_xml(
                         items=[val], field_name=item_model.uri_for_field(fieldname), version=self.account.version)
@@ -588,7 +592,6 @@ class UpdateItem(EWSPooledAccountService):
                         and not isinstance(val[0], IndexedField):
                     val = val[0].__class__.set_field_xml(
                         items=val, field_name=item_model.uri_for_field(fieldname), version=self.account.version)
-                field_uri = item_model.fielduri_for_field(fieldname)
                 if isinstance(field_uri, str):
                     fielduri = create_element('t:FieldURI', FieldURI=field_uri)
                 elif issubclass(field_uri, ExtendedProperty):
@@ -630,8 +633,8 @@ class UpdateItem(EWSPooledAccountService):
                     continue
                 else:
                     assert False, 'Unknown field_uri type: %s' % field_uri
-                if val is None:
-                    # A value of None means we want to remove this field from the item
+                if val is None or isinstance(val, (tuple, list)) and not len(val):
+                    # A value of None or [] means we want to remove this field from the item
                     self._add_delete_item_elem(
                         item_model=item_model, parent_elem=updates, fieldname=fieldname, fielduri=fielduri)
                     continue

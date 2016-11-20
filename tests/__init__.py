@@ -16,9 +16,9 @@ from exchangelib.configuration import Configuration
 from exchangelib.credentials import DELEGATE, Credentials
 from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalidOperation
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
-from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, ExternId, Choice, Email, Contact, Task, \
-    EmailAddress, PhysicalAddress, PhoneNumber, IndexedField, RoomList, Calendar, DeletedItems, Drafts, Inbox, Outbox, \
-    SentItems, JunkEmail, Messages, Tasks, Contacts, Root, AnyURI, BodyType, ALL_OCCURRENCIES
+from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, ExtendedProperty, Choice, Email, Contact, \
+    Task, EmailAddress, PhysicalAddress, PhoneNumber, IndexedField, RoomList, Calendar, DeletedItems, Drafts, Inbox, \
+    Outbox, SentItems, JunkEmail, Messages, Tasks, Contacts, Root, AnyURI, BodyType, ALL_OCCURRENCIES
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.restriction import Restriction, Q
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms
@@ -301,8 +301,8 @@ class EWSTest(unittest.TestCase):
         self.maxDiff = None
 
     def random_val(self, field_type):
-        if field_type == ExternId:
-            return get_random_string(255)
+        if not isinstance(field_type, list) and issubclass(field_type, ExtendedProperty):
+            field_type = field_type.python_type()
         if field_type == str:
             return get_random_string(255)
         if field_type == BodyType:
@@ -1349,10 +1349,14 @@ class BaseItemTest(EWSTest):
             if f in self.ITEM_CLASS.readonly_fields():
                 # These cannot be changed
                 continue
+            if f == 'percent_complete':
+                continue
             field_type = self.ITEM_CLASS.type_for_field(f)
-            if field_type == ExternId:
+            if isinstance(field_type, list):
+                wipe_kwargs[f] = []
+            elif issubclass(field_type, ExtendedProperty):
                 wipe_kwargs[f] = ''
-            elif field_type in (bool, str, int, Choice, Email):
+            else:
                 wipe_kwargs[f] = None
         update_fieldnames = wipe_kwargs.keys()
         for k, v in wipe_kwargs.items():
@@ -1368,9 +1372,11 @@ class BaseItemTest(EWSTest):
                 continue
             if f in self.ITEM_CLASS.readonly_fields():
                 continue
-            field_type = self.ITEM_CLASS.type_for_field(f)
-            if field_type in (str, ExternId, bool, int, Choice, Email):
-                self.assertEqual(getattr(item, f), wipe_kwargs[f], (f, repr(item), insert_kwargs))
+            if f == 'percent_complete':
+                continue
+            if isinstance(wipe_kwargs[f], list) and not wipe_kwargs[f]:
+                wipe_kwargs[f] = None
+            self.assertEqual(getattr(item, f), wipe_kwargs[f], (f, repr(item), insert_kwargs))
 
         # Test extern_id = None, which deletes the extended property entirely
         extern_id = None

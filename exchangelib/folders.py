@@ -588,7 +588,38 @@ class Room(Mailbox):
 
 
 class ExtendedProperty(EWSElement):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa566405(v=exchg.150).aspx
+    """
     ELEMENT_NAME = 'ExtendedProperty'
+    PROPERTY_TYPES = {
+        'ApplicationTime',
+        'Binary',
+        'BinaryArray',
+        'Boolean',
+        'CLSID',
+        'CLSIDArray',
+        'Currency',
+        'CurrencyArray',
+        'Double',
+        'DoubleArray',
+        # 'Error',
+        'Float',
+        'FloatArray',
+        'Integer',
+        'IntegerArray',
+        'Long',
+        'LongArray',
+        # 'Null',
+        # 'Object',
+        # 'ObjectArray',
+        'Short',
+        'ShortArray',
+        # 'SystemTime',  # Not implemented yet
+        # 'SystemTimeArray',  # Not implemented yet
+        'String',
+        'StringArray',
+    }  # The commented-out types cannot be used for setting or getting (see docs) and are thus not very useful here
 
     property_id = None
     property_name = None
@@ -597,11 +628,40 @@ class ExtendedProperty(EWSElement):
     __slots__ = ('value',)
 
     def __init__(self, value):
-        assert isinstance(value, str)
+        python_type = self.python_type()
+        if self.is_array_type():
+            for v in value:
+                assert isinstance(v, python_type)
+        else:
+            assert isinstance(value, python_type)
         self.value = value
 
     @classmethod
+    def is_array_type(cls):
+        return cls.property_type.endswith('Array')
+
+    @classmethod
+    def python_type(cls):
+        # Return the best equivalent for a Python type for the property type of this class
+        base_type = cls.property_type[:-5] if cls.is_array_type() else cls.property_type
+        return {
+            'ApplicationTime': Decimal,
+            'Binary': bytes,
+            'Boolean': bool,
+            'CLSID': str,
+            'Currency': int,
+            'Double': Decimal,
+            'Float': Decimal,
+            'Integer': int,
+            'Long': int,
+            'Short': int,
+            # 'SystemTime': int,
+            'String': str,
+        }[base_type]
+
+    @classmethod
     def field_uri_xml(cls):
+        assert cls.property_type in cls.PROPERTY_TYPES
         return create_element(
             't:ExtendedFieldURI',
             PropertySetId=cls.property_id,
@@ -612,7 +672,13 @@ class ExtendedProperty(EWSElement):
     def to_xml(self, version):
         extended_property = create_element(self.request_tag())
         set_xml_value(extended_property, self.field_uri_xml(), version)
-        add_xml_child(extended_property, 't:Value', self.value)
+        if self.is_array_type():
+            values = create_element('t:Values')
+            for v in self.value:
+                add_xml_child(values, 't:Value', v)
+            extended_property.append(values)
+        else:
+            add_xml_child(extended_property, 't:Value', self.value)
         return extended_property
 
     @classmethod
@@ -641,15 +707,11 @@ class ExtendedProperty(EWSElement):
 
 
 class ExternId(ExtendedProperty):
-    # 'c11ff724-aa03-4555-9952-8fa248a11c3e' is arbirtary. We just want a unique UUID.
-    property_id = 'c11ff724-aa03-4555-9952-8fa248a11c3e'
+    property_id = 'c11ff724-aa03-4555-9952-8fa248a11c3e'  # This is arbirtary. We just want a unique UUID.
     property_name = 'External ID'
     property_type = 'String'
 
-    __slots__ = ('value',)
-
-    def __init__(self, extern_id):
-        super().__init__(value=extern_id)
+    __slots__ = ExtendedProperty.__slots__
 
 
 class Attendee(EWSElement):
@@ -780,8 +842,8 @@ class Item(EWSElement):
                         if not isinstance(item, elem_type):
                             raise TypeError('Field %s value "%s" must be of type %s' % (k, v, field_type))
                 else:
-                    if k == 'extern_id':
-                        valid_field_types = (ExternId, str)
+                    if issubclass(field_type, ExtendedProperty):
+                        valid_field_types = (field_type, field_type.python_type())
                     elif k == 'body':
                         valid_field_types = (BodyType, str)
                     elif field_type == Choice:
@@ -1090,7 +1152,7 @@ class ItemMixIn(Item):
                 elif issubclass(field_uri, IndexedField):
                     i.append(set_xml_value(create_element('t:%s' % field_uri.PARENT_ELEMENT_NAME), v, version))
                 elif issubclass(field_uri, ExtendedProperty):
-                    set_xml_value(i, ExternId(getattr(self, f)), version)
+                    set_xml_value(i, field_uri(getattr(self, f)), version)
                 else:
                     assert False, 'Unknown field_uri type: %s' % field_uri
         return i
