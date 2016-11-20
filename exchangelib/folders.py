@@ -825,9 +825,10 @@ class Item(EWSElement):
             default = False if k == 'reminder_is_set' else None
             v = kwargs.pop(k, default)
             if v is not None:
-                # Test if arguments have the correct type. 'extern_id' is special because we implement it internally as
-                # the ExternId class but want to keep the attribute as a simple str for simplicity and ease of use.
-                # 'field_type' may be a list with a single type. In that case we want to check all list members
+                # Test if arguments have the correct type. ExtendedProperty instances are special because we want to
+                # keep the attribute as a simple Python type for simplicity and ease of use, while keeping the internal
+                # implementation as an ExtendedProperty.
+                # 'field_type' may be a list with a single type. In that case we want to check all list members.
                 if k == 'account':
                     from .account import Account
                     field_type = Account
