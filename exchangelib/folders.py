@@ -84,9 +84,13 @@ class EWSElement:
 
     __slots__ = tuple()
 
-    def set_field_xml(self, field_name):
-        raise NotImplementedError()
-
+    @classmethod
+    def set_field_xml(cls, items, field_name, version):
+        # Builds the XML for a SetItemField element
+        field = create_element('t:%s' % field_name)
+        for item in items:
+            field.append(item.to_xml(version=version))
+        return field
 
     def to_xml(self, version):
         raise NotImplementedError()
@@ -541,13 +545,6 @@ class Mailbox(EWSElement):
             item_id=ItemId.from_xml(elem=elem.find(ItemId.response_tag())),
         )
 
-    def set_field_xml(self, field_name):
-        mailbox = create_element(self.request_tag())
-        add_xml_child(mailbox, 't:EmailAddress', self.email_address)
-        field = create_element('t:%s' % field_name)
-        field.append(mailbox)
-        return field
-
     def __eq__(self, other):
         return hash(self) == hash(other)
 
@@ -690,6 +687,16 @@ class Attendee(EWSElement):
             last_response_time=EWSDateTime.from_string(last_response_time) if last_response_time else None,
         )
 
+    @classmethod
+    def set_field_xml(cls, items, field_name, version):
+        # Builds the XML for a SetItemField element
+        field = create_element('t:%s' % field_name)
+        for item in items:
+            attendee = create_element(cls.request_tag())
+            set_xml_value(attendee, item.mailbox, version)
+            field.append(attendee)
+        return field
+
     def __eq__(self, other):
         return hash(self) == hash(other)
 
@@ -806,8 +813,10 @@ class Item(EWSElement):
             update_fields = []
             for f in self.fieldnames():
                 if f in self.readonly_fields():
+                    # These cannot be changed
                     continue
                 if not self.is_draft and f in self.readonly_after_send_fields():
+                    # These cannot be changed when the item is no longer a draft
                     continue
                 if f in self.required_fields() and getattr(self, f) is None:
                     continue

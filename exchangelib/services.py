@@ -581,10 +581,13 @@ class UpdateItem(EWSPooledAccountService):
                 val = getattr(item, fieldname)
                 if fieldname == 'extern_id' and val is not None:
                     val = ExternId(val)
-                elif isinstance(val, EWSElement) and val is not None:
-                    val = val.set_field_xml(field_name=item_model.uri_for_field(fieldname))
-                elif isinstance(val, (tuple, list)) and isinstance(val[0], EWSElement):
-                    val = [v.set_field_xml(field_name=item_model.uri_for_field(fieldname)) for v in val]
+                elif isinstance(val, EWSElement) and not isinstance(val, IndexedField) and val is not None:
+                    val = val.__class__.set_field_xml(
+                        items=[val], field_name=item_model.uri_for_field(fieldname), version=self.account.version)
+                elif isinstance(val, (tuple, list)) and len(val) and isinstance(val[0], EWSElement) \
+                        and not isinstance(val[0], IndexedField):
+                    val = val[0].__class__.set_field_xml(
+                        items=val, field_name=item_model.uri_for_field(fieldname), version=self.account.version)
                 field_uri = item_model.fielduri_for_field(fieldname)
                 if isinstance(field_uri, str):
                     fielduri = create_element('t:FieldURI', FieldURI=field_uri)

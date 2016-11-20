@@ -584,12 +584,15 @@ class BaseItemTest(EWSTest):
             insert_kwargs[f] = self.random_val(field_type)
         return insert_kwargs
 
-    def get_random_update_kwargs(self, insert_kwargs):
+    def get_random_update_kwargs(self, item, insert_kwargs):
         update_kwargs = {}
         now = UTC_NOW()
         for f in self.ITEM_CLASS.fieldnames():
             if f in self.ITEM_CLASS.readonly_fields():
                 # These cannot be changed
+                continue
+            if not item.is_draft and f in self.ITEM_CLASS.readonly_after_send_fields():
+                # These cannot be changed when the item is no longer a draft
                 continue
             if f == 'resources':
                 # The test server doesn't have any resources
@@ -636,6 +639,9 @@ class BaseItemTest(EWSTest):
                     update_kwargs[f] = None
                 continue
             update_kwargs[f] = self.random_val(field_type)
+        if update_kwargs.get('is_all_day', False):
+            update_kwargs['start'] = update_kwargs['start'].replace(hour=0, minute=0, second=0, microsecond=0)
+            update_kwargs['end'] = update_kwargs['end'].replace(hour=0, minute=0, second=0, microsecond=0)
         return update_kwargs
 
     def get_test_item(self, folder=None, categories=None):
@@ -1187,7 +1193,7 @@ class BaseItemTest(EWSTest):
         self.account.bulk_delete(items, affected_task_occurrences=ALL_OCCURRENCIES)
 
     def test_save_and_delete(self):
-        # Test that we can create, update and delete single items using methods directly on the item
+        # Test that we can create, update and delete single items using methods directly on the item.
         # For CalendarItem instances, the 'is_all_day' attribute affects the 'start' and 'end' values. Changing from
         # 'false' to 'true' removes the time part of these datetimes.
         insert_kwargs = self.get_random_insert_kwargs()
@@ -1203,11 +1209,7 @@ class BaseItemTest(EWSTest):
         self.assertIsNotNone(item.changekey)
 
         # Update
-        update_kwargs = self.get_random_update_kwargs(insert_kwargs)
-        if 'is_all_day' in update_kwargs:
-            assert update_kwargs['is_all_day'] == True
-            update_kwargs['start'] = update_kwargs['start'].replace(hour=0, minute=0, second=0, microsecond=0)
-            update_kwargs['end'] = update_kwargs['end'].replace(hour=0, minute=0, second=0, microsecond=0)
+        update_kwargs = self.get_random_update_kwargs(item=item, insert_kwargs=insert_kwargs)
         for k, v in update_kwargs.items():
             setattr(item, k, v)
         item.save()
@@ -1311,11 +1313,7 @@ class BaseItemTest(EWSTest):
                 self.assertEqual(getattr(item, f), insert_kwargs[f], (f, repr(item), insert_kwargs))
 
         # Test update
-        update_kwargs = self.get_random_update_kwargs(insert_kwargs)
-        if 'is_all_day' in update_kwargs:
-            assert update_kwargs['is_all_day'] == True
-            update_kwargs['start'] = update_kwargs['start'].replace(hour=0, minute=0, second=0, microsecond=0)
-            update_kwargs['end'] = update_kwargs['end'].replace(hour=0, minute=0, second=0, microsecond=0)
+        update_kwargs = self.get_random_update_kwargs(item=item, insert_kwargs=insert_kwargs)
         update_fieldnames = update_kwargs.keys()
         for k, v in update_kwargs.items():
             setattr(item, k, v)
