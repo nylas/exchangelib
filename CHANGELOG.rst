@@ -11,10 +11,26 @@ HEAD
 * Implement ``my_folder.export()`` and ``my_folder.upload()``. Thanks to @SamCB!
 * Fixed ``Account.folders`` for non-distinguished folders
 * Added ``Folder.get_folder_by_name()`` to make it easier to get subfolders by name.
-* Implement ``CalendarView`` searches as ``my_calendar.view(start=..., end=...)``. A view differs from a normal search
-  in that a view expands recurring items and returns recurring item occuccences that are valid in the time span of the
-  view.
+* Implement ``CalendarView`` searches as ``my_calendar.view(start=..., end=...)``. A view differs from a normal
+  ``filter()`` in that a view expands recurring items and returns recurring item occuccences that are valid in the time
+  span of the view.
 * Persistent storage location for autodiscover cache is now platform independent
+* Implemented custom extended properties. To add support for your own custom property, subclass
+  ``exchangelibfolders.ExtendedProperty`` and call ``register()`` on the item class you want to use the extended
+  property with. When you have registered your extended property, you can use it exactly like you would use any other
+  attribute on this item type. If you change your mind, you can remove the extended property again with ``deregister()``:
+
+  .. code-block:: python
+
+      class LunchMenu(ExtendedProperty):
+          property_id = '12345678-1234-1234-1234-123456781234'
+          property_name = 'Catering from the cafeteria'
+          property_type = 'String'
+
+      CalendarItem.register('lunch_menu', LunchMenu)
+      item = CalendarItem(..., lunch_menu='Foie gras et consommé de légumes')
+      item.save()
+      CalendarItem.deregister('lunch_menu')
 
 
 1.7.1
@@ -29,7 +45,7 @@ HEAD
 * Implemented ``SendItem`` service to send existing messages.
 * ``Folder.bulk_delete()`` was moved to ``Account.bulk_delete()``
 * ``Folder.bulk_update()`` was moved to ``Account.bulk_update()`` and changed to expect a list of ``(Item, fieldnames)``
-  tuples where Item is e.g. a ``Message`` instance and ``fieldnames``is a list of attributes names that need updating.
+  tuples where Item is e.g. a ``Message`` instance and ``fieldnames`` is a list of attributes names that need updating.
   E.g.:
 
   .. code-block:: python

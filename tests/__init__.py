@@ -1464,6 +1464,51 @@ class BaseItemTest(EWSTest):
         del ids[3]  # Sending the deleted one through will cause an error
         self.account.bulk_delete(ids=ids, affected_task_occurrences=ALL_OCCURRENCIES)
 
+    def test_register(self):
+        # Tests that we can register and de-register custom extended properties
+        class TestProp(ExtendedProperty):
+            property_id = 'deadbeaf-cafe-cafe-cafe-deadbeefcafe'
+            property_name = 'Test Property'
+            property_type = 'Integer'
+
+        attr_name = 'dead_beef'
+
+        # Before register
+        self.assertNotIn(attr_name, self.ITEM_CLASS.fieldnames())
+        with self.assertRaises(ValueError):
+            self.ITEM_CLASS.fielduri_for_field(attr_name)
+        with self.assertRaises(ValueError):
+            self.ITEM_CLASS.type_for_field(attr_name)
+
+        self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=TestProp)
+
+        # After register
+        self.assertEqual(TestProp.python_type(), int)
+        self.assertIn('dead_beef', self.ITEM_CLASS.fieldnames())
+        self.assertEqual(self.ITEM_CLASS.fielduri_for_field(attr_name), TestProp)
+        self.assertEqual(self.ITEM_CLASS.type_for_field(attr_name), TestProp)
+
+        # Test item creation, refresh, and update
+        item = self.get_test_item(folder=self.test_folder)
+        prop_val = item.dead_beef
+        self.assertTrue(isinstance(prop_val, int))
+        item.save()
+        item = self.account.fetch(ids=[(item.item_id, item.changekey)])[0]
+        self.assertEqual(prop_val, item.dead_beef)
+        new_prop_val = get_random_int()
+        item.dead_beef = new_prop_val
+        item.save()
+        item = self.account.fetch(ids=[(item.item_id, item.changekey)])[0]
+        self.assertEqual(new_prop_val, item.dead_beef)
+
+        # Test deregister
+        self.ITEM_CLASS.deregister(attr_name=attr_name)
+        self.assertNotIn(attr_name, self.ITEM_CLASS.fieldnames())
+        with self.assertRaises(ValueError):
+            self.ITEM_CLASS.fielduri_for_field(attr_name)
+        with self.assertRaises(ValueError):
+            self.ITEM_CLASS.type_for_field(attr_name)
+
 
 class CalendarTest(BaseItemTest):
     TEST_FOLDER = 'calendar'

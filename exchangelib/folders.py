@@ -14,7 +14,8 @@ from .queryset import QuerySet
 from .restriction import Restriction, Q
 from .services import TNS, IdOnly, SHALLOW, DEEP, FindFolder, GetFolder, FindItem, \
     MNS, ITEM_TRAVERSAL_CHOICES, FOLDER_TRAVERSAL_CHOICES, SHAPE_CHOICES
-from .util import create_element, add_xml_child, get_xml_attrs, get_xml_attr, set_xml_value, value_to_xml_text
+from .util import create_element, add_xml_child, get_xml_attrs, get_xml_attr, set_xml_value, value_to_xml_text, \
+    xml_text_to_value
 from .version import EXCHANGE_2010
 
 log = getLogger(__name__)
@@ -590,8 +591,22 @@ class Room(Mailbox):
 class ExtendedProperty(EWSElement):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa566405(v=exchg.150).aspx
+
+    Property_* values: https://msdn.microsoft.com/en-us/library/office/aa564843(v=exchg.150).aspx
     """
+    # TODO: Property sets, tags and distinguished set ID are not implemented yet
     ELEMENT_NAME = 'ExtendedProperty'
+
+    DISTINGUISHED_SETS = {
+        'Meeting',
+        'Appointment',
+        'Common',
+        'PublicStrings',
+        'Address',
+        'InternetHeaders',
+        'CalendarAssistant',
+        'UnifiedMessaging',
+    }
     PROPERTY_TYPES = {
         'ApplicationTime',
         'Binary',
@@ -684,6 +699,7 @@ class ExtendedProperty(EWSElement):
     @classmethod
     def get_value(cls, elem):
         # Gets value of this specific ExtendedProperty from a list of 'ExtendedProperty' XML elements
+        python_type = cls.python_type()
         extended_field_value = None
         for e in elem:
             extended_field_uri = e.find('{%s}ExtendedFieldURI' % TNS)
@@ -698,7 +714,19 @@ class ExtendedProperty(EWSElement):
                     match = False
                     break
             if match:
-                extended_field_value = get_xml_attr(e, '{%s}Value' % TNS) or ''
+                if cls.is_array_type():
+                    extended_field_value = [
+                        xml_text_to_value(value=val, field_type=python_type)
+                        for val in get_xml_attrs(e, '{%s}Value' % TNS)
+                    ]
+                else:
+                    extended_field_value = xml_text_to_value(
+                        value=get_xml_attr(e, '{%s}Value' % TNS), field_type=python_type)
+                    if python_type == str and not extended_field_value:
+                        # For string types, we want to return the empty string instead of None if the element was
+                        # actually found, but there was no XML value. For other types, it would be more problematic
+                        # to make that distinction, e.g. return False for bool, 0 for int, etc.
+                        extended_field_value = ''
                 break
         return extended_field_value
 
@@ -805,6 +833,8 @@ class Item(EWSElement):
         'sensitivity': {'Normal', 'Personal', 'Private', 'Confidential'},
         'importance': {'Low', 'Normal', 'High'},
     }
+    # Container for extended properties registered by the user
+    EXTENDED_PROPERTIES = []
     # The order in which fields must be added to the XML output
     ORDERED_FIELDS = ()
     # Item fields that are necessary to create an item
@@ -825,9 +855,9 @@ class Item(EWSElement):
             default = False if k == 'reminder_is_set' else None
             v = kwargs.pop(k, default)
             if v is not None:
-                # Test if arguments have the correct type. ExtendedProperty instances are special because we want to
-                # keep the attribute as a simple Python type for simplicity and ease of use, while keeping the internal
-                # implementation as an ExtendedProperty.
+                # Test if arguments have the correct type. ExtendedProperty, BodyType and Choice instances are special
+                # because we want to allow setting the attribute as a simple Python type for simplicity and ease of use,
+                # while allowing the actual class instances.
                 # 'field_type' may be a list with a single type. In that case we want to check all list members.
                 if k == 'account':
                     from .account import Account
@@ -970,6 +1000,17 @@ class Item(EWSElement):
         return tuple(f for f in cls.ITEM_FIELDS if f not in ('item_id', 'changekey'))
 
     @classmethod
+    def ordered_fieldnames(cls):
+        res = []
+        for f in cls.ORDERED_FIELDS:
+            if isinstance(f, list):
+                # This is the EXTENDED_PROPERTIES element which can be modified by register(). Expand the list
+                res.extend(f)
+            else:
+                res.append(f)
+        return res
+
+    @classmethod
     def uri_for_field(cls, fieldname):
         return cls.ITEM_FIELDS[fieldname][0]
 
@@ -1070,32 +1111,15 @@ class Item(EWSElement):
         extended_properties = elem.findall(ExtendedProperty.response_tag())
         for fieldname in cls.fieldnames():
             field_type = cls.type_for_field(fieldname)
-            if field_type == EWSDateTime:
-                val = get_xml_attr(elem, cls.response_xml_elem_for_field(fieldname))
-                if val is not None:
-                    kwargs[fieldname] = EWSDateTime.from_string(val)
-            elif field_type == bool:
-                val = get_xml_attr(elem, cls.response_xml_elem_for_field(fieldname))
-                if val is not None:
-                    kwargs[fieldname] = True if val == 'true' else False
-            elif field_type in (str, Choice, Email, AnyURI, BodyType):
-                val = get_xml_attr(elem, cls.response_xml_elem_for_field(fieldname))
-                if val is not None:
-                    kwargs[fieldname] = val
-            elif field_type == int:
-                val = get_xml_attr(elem, cls.response_xml_elem_for_field(fieldname))
-                if val:
-                    try:
-                        kwargs[fieldname] = int(val)
-                    except ValueError:
-                        pass
-            elif field_type == Decimal:
+            if field_type in (EWSDateTime, bool, int, Decimal, str, Choice, Email, AnyURI, BodyType):
                 val = get_xml_attr(elem, cls.response_xml_elem_for_field(fieldname))
                 if val is not None:
                     try:
-                        kwargs[fieldname] = Decimal(val)
+                        kwargs[fieldname] = xml_text_to_value(value=val, field_type=field_type)
                     except ValueError:
                         pass
+                    except KeyError:
+                        assert False, 'Field %s type %s not supported' % (fieldname, field_type)
             elif isinstance(field_type, list):
                 list_type = field_type[0]
                 if list_type == str:
@@ -1113,7 +1137,7 @@ class Item(EWSElement):
             elif issubclass(field_type, EWSElement):
                 sub_elem = elem.find(cls.response_xml_elem_for_field(fieldname))
                 if sub_elem is not None:
-                    if fieldname in ('organizer', 'sender', 'from'):
+                    if field_type == Mailbox:
                         # We want the nested Mailbox, not the wrapper element
                         kwargs[fieldname] = field_type.from_xml(sub_elem.find(Mailbox.response_tag()))
                     else:
@@ -1129,7 +1153,8 @@ class Item(EWSElement):
         return self.item_id == other.item_id and self.changekey == other.changekey
 
     def __str__(self):
-        return '\n'.join('%s: %s' % (f, getattr(self, f)) for f in ('item_id', 'changekey') + self.ORDERED_FIELDS)
+        return '\n'.join('%s: %s' % (f, getattr(self, f))
+                         for f in ('item_id', 'changekey') + tuple(self.ordered_fieldnames()))
 
     def __repr__(self):
         return self.__class__.__name__ + '(%s)' % ', '.join(
@@ -1141,9 +1166,8 @@ class ItemMixIn(Item):
     def to_xml(self, version):
         # WARNING: The order of addition of XML elements is VERY important. Exchange expects XML elements in a
         # specific, non-documented order and will fail with meaningless errors if the order is wrong.
-        assert self.ORDERED_FIELDS
         i = create_element(self.request_tag())
-        for f in self.ORDERED_FIELDS:
+        for f in self.ordered_fieldnames():
             assert f not in self.readonly_fields(), (f, self.readonly_fields())
             field_uri = self.fielduri_for_field(f)
             v = getattr(self, f)
@@ -1157,6 +1181,33 @@ class ItemMixIn(Item):
                 else:
                     assert False, 'Unknown field_uri type: %s' % field_uri
         return i
+
+    @classmethod
+    def register(cls, attr_name, attr_cls):
+        """
+        Register a custom extended property in this item class so they can be accessed just like any other attribute
+        """
+        if attr_name in cls.fieldnames():
+            raise AttributeError("%s' is already registered" % attr_name)
+        if not issubclass(attr_cls, ExtendedProperty):
+            raise ValueError("'%s' must be a subclass of ExtendedProperty" % attr_cls)
+        assert attr_name not in cls.EXTENDED_PROPERTIES
+        cls.ITEM_FIELDS[attr_name] = (attr_cls, attr_cls)
+        cls.EXTENDED_PROPERTIES.append(attr_name)
+
+    @classmethod
+    def deregister(cls, attr_name):
+        """
+        De-register an extended property that has been registered with register()
+        """
+        if attr_name not in cls.fieldnames():
+            raise AttributeError("%s' is not registered" % attr_name)
+        attr_cls = cls.type_for_field(attr_name)
+        if not issubclass(attr_cls, ExtendedProperty):
+            raise AttributeError("'%s' is not registered as an ExtendedProperty")
+        assert attr_name in cls.EXTENDED_PROPERTIES
+        cls.EXTENDED_PROPERTIES.remove(attr_name)
+        del cls.ITEM_FIELDS[attr_name]
 
     @classmethod
     def fieldnames(cls):
@@ -1243,8 +1294,9 @@ class CalendarItem(ItemMixIn):
         'resources': ('Resources', [Attendee]),
         'is_all_day': ('IsAllDayEvent', bool),
     }
+    EXTENDED_PROPERTIES = ['extern_id']
     ORDERED_FIELDS = (
-        'subject', 'sensitivity', 'body', 'categories', 'importance', 'reminder_is_set', 'extern_id',
+        'subject', 'sensitivity', 'body', 'categories', 'importance', 'reminder_is_set', EXTENDED_PROPERTIES,
         'start', 'end',
         'is_all_day', 'legacy_free_busy_status', 'location', 'required_attendees', 'optional_attendees', 'resources'
     )
@@ -1295,8 +1347,9 @@ class Message(ItemMixIn):
         'cc_recipients': ('CcRecipients', [Mailbox]),
         'bcc_recipients': ('BccRecipients', [Mailbox]),
     }
+    EXTENDED_PROPERTIES = ['extern_id']
     ORDERED_FIELDS = (
-        'subject', 'sensitivity', 'body', 'categories', 'importance', 'reminder_is_set', 'extern_id',
+        'subject', 'sensitivity', 'body', 'categories', 'importance', 'reminder_is_set', EXTENDED_PROPERTIES,
         # 'sender',
         'to_recipients', 'cc_recipients', 'bcc_recipients',
         'is_read_receipt_requested', 'is_delivery_receipt_requested',
@@ -1391,8 +1444,9 @@ class Task(ItemMixIn):
         'total_work': ('TotalWork', int),
     }
     REQUIRED_FIELDS = {'subject', 'status'}
+    EXTENDED_PROPERTIES = ['extern_id']
     ORDERED_FIELDS = (
-        'subject', 'sensitivity', 'body', 'categories', 'importance', 'reminder_is_set', 'extern_id',
+        'subject', 'sensitivity', 'body', 'categories', 'importance', 'reminder_is_set', EXTENDED_PROPERTIES,
         'actual_work',  # 'assigned_time',
         'billing_information',  # 'change_count',
         'companies',  # 'complete_date',
@@ -1492,8 +1546,9 @@ class Contact(ItemMixIn):
         # 'notes': ('Notes', str),  # Only available from Exchange 2010 SP2
     }
     REQUIRED_FIELDS = {'display_name'}
+    EXTENDED_PROPERTIES = ['extern_id']
     ORDERED_FIELDS = (
-        'subject', 'sensitivity', 'body', 'categories', 'importance', 'reminder_is_set', 'extern_id',
+        'subject', 'sensitivity', 'body', 'categories', 'importance', 'reminder_is_set', EXTENDED_PROPERTIES,
         'file_as', 'file_as_mapping',
         'display_name', 'given_name',  'initials', 'middle_name', 'nickname', 'company_name',
         'email_addresses',  'physical_addresses',

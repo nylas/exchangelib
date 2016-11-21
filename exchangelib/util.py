@@ -86,6 +86,22 @@ def value_to_xml_text(value):
     raise ValueError('Unsupported type: %s (%s)' % (type(value), value))
 
 
+def xml_text_to_value(value, field_type):
+    if value is None:
+        return None
+    from .ewsdatetime import EWSDateTime
+    from .folders import Choice, Email, AnyURI, BodyType
+    if field_type in (str, Choice, Email, AnyURI, BodyType):
+        # Return string types unprocessed
+        return value
+    return {
+        bool: lambda v: True if v == 'true' else False,
+        int: lambda v: int(v),
+        Decimal: lambda v: Decimal(v),
+        EWSDateTime: lambda v: EWSDateTime.from_string(v),
+    }[field_type](value)
+
+
 def set_xml_value(elem, value, version):
     from .folders import EWSElement
     from .ewsdatetime import EWSDateTime
