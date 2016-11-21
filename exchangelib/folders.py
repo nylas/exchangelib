@@ -800,6 +800,8 @@ class Attendee(EWSElement):
 
 class Item(EWSElement):
     ELEMENT_NAME = 'Item'
+    # The prefix part of the FieldURI for items of this type. See
+    # https://msdn.microsoft.com/en-us/library/office/aa494315(v=exchg.150).aspx
     FIELDURI_PREFIX = 'item'
 
     SUBJECT_MAXLENGTH = 255
@@ -1570,7 +1572,97 @@ class Contact(ItemMixIn):
         super().__init__(**kwargs)
 
 
-ITEM_CLASSES = (CalendarItem, Contact, Message, Task)
+class MeetingRequest(ItemMixIn):
+    # Supported attrs: https://msdn.microsoft.com/en-us/library/office/aa565229(v=exchg.150).aspx
+    # TODO: Untested and unfinished. Only the bare minimum supported to allow reading a folder that contains meeting
+    # requests.
+    ELEMENT_NAME = 'MeetingRequest'
+    FIELDURI_PREFIX = 'meetingRequest'
+    ITEM_FIELDS = {
+        'from': ('From', Mailbox),
+        'is_read': ('IsRead', bool),
+        'start': ('Start', EWSDateTime),
+        'end': ('End', EWSDateTime),
+    }
+    EXTENDED_PROPERTIES = []
+    ORDERED_FIELDS = (
+        'subject', EXTENDED_PROPERTIES, 'from', 'is_read', 'start', 'end'
+    )
+    REQUIRED_FIELDS = {'subject'}
+    READONLY_FIELDS = {'from'}
+
+    __slots__ = tuple(ITEM_FIELDS) + tuple(Item.ITEM_FIELDS)
+
+    def __init__(self, **kwargs):
+        for k in self.ITEM_FIELDS:
+            field_type = self.ITEM_FIELDS[k][1]
+            default = False if (k in self.required_fields() and field_type == bool) else None
+            v = kwargs.pop(k, default)
+            setattr(self, k, v)
+        super().__init__(**kwargs)
+
+
+class MeetingResponse(ItemMixIn):
+    # Supported attrs: https://msdn.microsoft.com/en-us/library/office/aa564337(v=exchg.150).aspx
+    # TODO: Untested and unfinished. Only the bare minimum supported to allow reading a folder that contains meeting
+    # requests.
+    ELEMENT_NAME = 'MeetingResponse'
+    FIELDURI_PREFIX = 'meetingRequest'
+    ITEM_FIELDS = {
+        'from': ('From', Mailbox),
+        'is_read': ('IsRead', bool),
+        'start': ('Start', EWSDateTime),
+        'end': ('End', EWSDateTime),
+    }
+    EXTENDED_PROPERTIES = []
+    ORDERED_FIELDS = (
+        'subject', EXTENDED_PROPERTIES, 'from', 'is_read', 'start', 'end'
+    )
+    REQUIRED_FIELDS = {'subject'}
+    READONLY_FIELDS = {'from'}
+
+    __slots__ = tuple(ITEM_FIELDS) + tuple(Item.ITEM_FIELDS)
+
+    def __init__(self, **kwargs):
+        for k in self.ITEM_FIELDS:
+            field_type = self.ITEM_FIELDS[k][1]
+            default = False if (k in self.required_fields() and field_type == bool) else None
+            v = kwargs.pop(k, default)
+            setattr(self, k, v)
+        super().__init__(**kwargs)
+
+
+class MeetingCancellation(ItemMixIn):
+    # Supported attrs: https://msdn.microsoft.com/en-us/library/office/aa564685(v=exchg.150).aspx
+    # TODO: Untested and unfinished. Only the bare minimum supported to allow reading a folder that contains meeting
+    # cancellations.
+    ELEMENT_NAME = 'MeetingCancellation'
+    FIELDURI_PREFIX = 'meetingRequest'
+    ITEM_FIELDS = {
+        'from': ('From', Mailbox),
+        'is_read': ('IsRead', bool),
+        'start': ('Start', EWSDateTime),
+        'end': ('End', EWSDateTime),
+    }
+    EXTENDED_PROPERTIES = []
+    ORDERED_FIELDS = (
+        'subject', EXTENDED_PROPERTIES, 'from', 'is_read', 'start', 'end'
+    )
+    REQUIRED_FIELDS = {'subject'}
+    READONLY_FIELDS = {'from'}
+
+    __slots__ = tuple(ITEM_FIELDS) + tuple(Item.ITEM_FIELDS)
+
+    def __init__(self, **kwargs):
+        for k in self.ITEM_FIELDS:
+            field_type = self.ITEM_FIELDS[k][1]
+            default = False if (k in self.required_fields() and field_type == bool) else None
+            v = kwargs.pop(k, default)
+            setattr(self, k, v)
+        super().__init__(**kwargs)
+
+
+ITEM_CLASSES = (CalendarItem, Contact, Message, Task, MeetingRequest, MeetingResponse, MeetingCancellation)
 
 
 class Folder(EWSElement):
@@ -1973,7 +2065,7 @@ class DeletedItems(Folder):
 
 class Messages(Folder):
     CONTAINER_CLASS = 'IPF.Note'
-    supported_item_models = (Message,)
+    supported_item_models = (Message, MeetingRequest, MeetingResponse, MeetingCancellation)
 
 
 class Drafts(Messages):
