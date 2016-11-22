@@ -3,8 +3,8 @@ Change Log
 ==========
 
 
-HEAD
-----
+1.7.2
+-----
 * Implement for ``Contact.physical_addresses`` attribute. This is a list of ``exchangelib.folders.PhysicalAddress``
   items.
 * Implement the ``CalendarItem.is_all_day`` boolean to create all-day appointments.

@@ -13,7 +13,7 @@ def read(fname):
 
 setup(
     name='exchangelib',
-    version='1.7.1',
+    version='1.7.2',
     author='Erik Cederstrand',
     author_email='erik@cederstrand.dk',
     description='Client for Microsoft Exchange Web Services (EWS)',
