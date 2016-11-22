@@ -18,7 +18,7 @@ from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalid
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, ExtendedProperty, Choice, Email, Contact, \
     Task, EmailAddress, PhysicalAddress, PhoneNumber, IndexedField, RoomList, Calendar, DeletedItems, Drafts, Inbox, \
-    Outbox, SentItems, JunkEmail, Messages, Tasks, Contacts, Root, AnyURI, BodyType, ALL_OCCURRENCIES
+    Outbox, SentItems, JunkEmail, Messages, Tasks, Contacts, Root, AnyURI, Body, HTMLBody, ALL_OCCURRENCIES
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.restriction import Restriction, Q
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms
@@ -305,7 +305,9 @@ class EWSTest(unittest.TestCase):
             field_type = field_type.python_type()
         if field_type == str:
             return get_random_string(255)
-        if field_type == BodyType:
+        if field_type == Body:
+            return get_random_string(255)
+        if field_type == HTMLBody:
             return get_random_string(255)
         if field_type == AnyURI:
             return get_random_url()

@@ -494,7 +494,7 @@ class UpdateItem(EWSPooledAccountService):
         add_xml_child(parent_elem, 't:DeleteItemField', fielduri)
 
     def _add_set_item_elem(self, item_model, parent_elem, fieldname, fielduri, value, meeting_timezone_added):
-        from .folders import EWSElement
+        from .folders import EWSElement, Body, HTMLBody
         setitemfield = create_element('t:SetItemField')
         setitemfield.append(fielduri)
         folderitem = create_element(item_model.request_tag())
@@ -502,8 +502,12 @@ class UpdateItem(EWSPooledAccountService):
                 or (isinstance(value, (tuple, list)) and isinstance(value[0], (EWSElement, ElementType))):
             set_xml_value(folderitem, value, self.account.version)
         else:
+            field_elem = item_model.elem_for_field(fieldname)
+            if fieldname == 'body':
+                body_type = HTMLBody.body_type if isinstance(value, HTMLBody) else Body.body_type
+                field_elem.set('BodyType', body_type)
             folderitem.append(
-                set_xml_value(item_model.elem_for_field(fieldname), value, self.account.version)
+                set_xml_value(field_elem, value, self.account.version)
             )
         setitemfield.append(folderitem)
         parent_elem.append(setitemfield)

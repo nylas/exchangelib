@@ -90,8 +90,8 @@ def xml_text_to_value(value, field_type):
     if value is None:
         return None
     from .ewsdatetime import EWSDateTime
-    from .folders import Choice, Email, AnyURI, BodyType
-    if field_type in (str, Choice, Email, AnyURI, BodyType):
+    from .folders import Choice, Email, AnyURI, Body, HTMLBody
+    if field_type in (str, Choice, Email, AnyURI, Body, HTMLBody):
         # Return string types unprocessed
         return value
     return {

@@ -73,11 +73,16 @@ class AnyURI(str):
     pass
 
 
-class BodyType(str):
+class Body(str):
     # Helper to mark the 'body' field as a complex attribute.
-    # TODO: The body element supports both text and HTML representations. We should support that.
-    # See http://stackoverflow.com/questions/20982851/how-to-get-the-email-body-in-html-and-text-from-exchange-using-ews-in-c
-    pass
+    # MSDN: https://msdn.microsoft.com/en-us/library/office/jj219983(v=exchg.150).aspx
+    body_type = 'Text'
+
+
+class HTMLBody(Body):
+    # Helper to mark the 'body' field as a complex attribute.
+    # MSDN: https://msdn.microsoft.com/en-us/library/office/jj219983(v=exchg.150).aspx
+    body_type = 'HTML'
 
 
 class EWSElement:
@@ -820,7 +825,7 @@ class Item(EWSElement):
         'importance': ('Importance', Choice),
         'is_draft': ('IsDraft', bool),
         'subject': ('Subject', str),
-        'body': ('Body', BodyType),
+        'body': ('Body', Body),  # Or HTMLBody, which is a subclass of Body
         'reminder_is_set': ('ReminderIsSet', bool),
         'categories': ('Categories', [str]),
         'extern_id': (ExternId, ExternId),
@@ -857,7 +862,7 @@ class Item(EWSElement):
             default = False if k == 'reminder_is_set' else None
             v = kwargs.pop(k, default)
             if v is not None:
-                # Test if arguments have the correct type. ExtendedProperty, BodyType and Choice instances are special
+                # Test if arguments have the correct type. Some types, e.g. ExtendedProperty and Body, are special
                 # because we want to allow setting the attribute as a simple Python type for simplicity and ease of use,
                 # while allowing the actual class instances.
                 # 'field_type' may be a list with a single type. In that case we want to check all list members.
@@ -877,10 +882,8 @@ class Item(EWSElement):
                 else:
                     if issubclass(field_type, ExtendedProperty):
                         valid_field_types = (field_type, field_type.python_type())
-                    elif k == 'body':
-                        valid_field_types = (BodyType, str)
-                    elif field_type == Choice:
-                        valid_field_types = (Choice, str)
+                    elif field_type in (Body, HTMLBody, Choice):
+                        valid_field_types = (field_type, str)
                     else:
                         valid_field_types = (field_type,)
                     if not isinstance(v, valid_field_types):
@@ -1035,8 +1038,6 @@ class Item(EWSElement):
         except KeyError:
             raise ValueError("No fielduri defined for fieldname '%s'" % fieldname)
         assert isinstance(uri, str)
-        if fieldname == 'body':
-            return create_element('t:%s' % uri, BodyType='Text')
         return create_element('t:%s' % uri)
 
     @classmethod
@@ -1113,15 +1114,26 @@ class Item(EWSElement):
         extended_properties = elem.findall(ExtendedProperty.response_tag())
         for fieldname in cls.fieldnames():
             field_type = cls.type_for_field(fieldname)
-            if field_type in (EWSDateTime, bool, int, Decimal, str, Choice, Email, AnyURI, BodyType):
-                val = get_xml_attr(elem, cls.response_xml_elem_for_field(fieldname))
+            if field_type in (EWSDateTime, bool, int, Decimal, str, Choice, Email, AnyURI, Body, HTMLBody):
+                field_elem = elem.find(cls.response_xml_elem_for_field(fieldname))
+                val = None if field_elem is None else field_elem.text.strip() if field_elem.text else None
                 if val is not None:
                     try:
-                        kwargs[fieldname] = xml_text_to_value(value=val, field_type=field_type)
+                        val = xml_text_to_value(value=val, field_type=field_type)
                     except ValueError:
                         pass
                     except KeyError:
                         assert False, 'Field %s type %s not supported' % (fieldname, field_type)
+                    if fieldname == 'body':
+                        body_type = field_elem.get('BodyType')
+                        try:
+                            val = {
+                                Body.body_type: lambda v: Body(v),
+                                HTMLBody.body_type: lambda v: HTMLBody(v),
+                            }[body_type](val)
+                        except KeyError:
+                            assert False, "Unknown BodyType '%s'" % body_type
+                    kwargs[fieldname] = val
             elif isinstance(field_type, list):
                 list_type = field_type[0]
                 if list_type == str:
@@ -1175,7 +1187,11 @@ class ItemMixIn(Item):
             v = getattr(self, f)
             if v is not None:
                 if isinstance(field_uri, str):
-                    i.append(set_xml_value(self.elem_for_field(f), v, version))
+                    field_elem = self.elem_for_field(f)
+                    if f == 'body':
+                        body_type = HTMLBody.body_type if isinstance(v, HTMLBody) else Body.body_type
+                        field_elem.set('BodyType', body_type)
+                    i.append(set_xml_value(field_elem, v, version))
                 elif issubclass(field_uri, IndexedField):
                     i.append(set_xml_value(create_element('t:%s' % field_uri.PARENT_ELEMENT_NAME), v, version))
                 elif issubclass(field_uri, ExtendedProperty):
@@ -1579,10 +1595,6 @@ class MeetingRequest(ItemMixIn):
     ELEMENT_NAME = 'MeetingRequest'
     FIELDURI_PREFIX = 'meetingRequest'
     ITEM_FIELDS = {
-        'from': ('From', Mailbox),
-        'is_read': ('IsRead', bool),
-        'start': ('Start', EWSDateTime),
-        'end': ('End', EWSDateTime),
     }
     EXTENDED_PROPERTIES = []
     ORDERED_FIELDS = (
@@ -1609,10 +1621,6 @@ class MeetingResponse(ItemMixIn):
     ELEMENT_NAME = 'MeetingResponse'
     FIELDURI_PREFIX = 'meetingRequest'
     ITEM_FIELDS = {
-        'from': ('From', Mailbox),
-        'is_read': ('IsRead', bool),
-        'start': ('Start', EWSDateTime),
-        'end': ('End', EWSDateTime),
     }
     EXTENDED_PROPERTIES = []
     ORDERED_FIELDS = (
@@ -1639,10 +1647,6 @@ class MeetingCancellation(ItemMixIn):
     ELEMENT_NAME = 'MeetingCancellation'
     FIELDURI_PREFIX = 'meetingRequest'
     ITEM_FIELDS = {
-        'from': ('From', Mailbox),
-        'is_read': ('IsRead', bool),
-        'start': ('Start', EWSDateTime),
-        'end': ('End', EWSDateTime),
     }
     EXTENDED_PROPERTIES = []
     ORDERED_FIELDS = (

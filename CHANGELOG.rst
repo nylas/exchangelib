@@ -32,6 +32,20 @@ HEAD
       item.save()
       CalendarItem.deregister('lunch_menu')
 
+* Fixed a bug on folder items where an existing HTML body would be converted to text when calling ``save()``. When
+  creating or updating an item body, you can use the two new helper classes ``exchangelib.Body`` and
+  ``exchangelib.HTMLBody`` to specify if your body should be saved as HTML or text. E.g.:
+
+  .. code-block:: python
+
+      item = CalendarItem(...)
+      # Plain-text body
+      item.body = Body('Hello UNIX-beard pine user!')
+      # Also plain-text body, works as before
+      item.body = 'Hello UNIX-beard pine user!'
+      # Exchange will see this as an HTML body and display nicely in clients
+      item.body = HTMLBody('<html><body>Hello happy <blink>OWA user!</blink></body></html>')
+      item.save()
 
 1.7.1
 -----
