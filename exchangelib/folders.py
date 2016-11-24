@@ -169,15 +169,12 @@ class AttachmentId(ItemId):
     ELEMENT_NAME = 'AttachmentId'
 
 
-class FileAttachment(EWSElement):
+class Attachment(EWSElement):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/office/aa580492(v=exchg.150).aspx
+    Parent class for FileAttachment and ItemAttachment
     """
-    ELEMENT_NAME = 'FileAttachment'
-
-    def __init__(self, content, name, content_type, attachment_id=None, content_id=None, content_location=None,
-                 size=None, last_modified_time=None, is_inline=None, is_contact_photo=None):
-        assert isinstance(content, bytes)
+    def __init__(self, name, content_type, attachment_id=None, content_id=None, content_location=None,
+                 size=None, last_modified_time=None, is_inline=None):
         assert isinstance(name, str)
         assert isinstance(content_type, str)
         if attachment_id is not None:
@@ -192,9 +189,6 @@ class FileAttachment(EWSElement):
             assert isinstance(last_modified_time, EWSDateTime)
         if is_inline is not None:
             assert is_inline in (True, False)
-        if is_contact_photo is not None:
-            assert is_contact_photo in (True, False)
-        self.content = content
         self.name = name
         self.content_type = content_type
         self.attachment_id = attachment_id
@@ -202,7 +196,21 @@ class FileAttachment(EWSElement):
         self.content_location = content_location
         self.size = size
         self.last_modified_time = last_modified_time
-        self.is_inline = self.is_inline
+        self.is_inline = is_inline
+
+
+class FileAttachment(Attachment):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa580492(v=exchg.150).aspx
+    """
+    ELEMENT_NAME = 'FileAttachment'
+
+    def __init__(self, content, is_contact_photo=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        assert isinstance(content, bytes)
+        if is_contact_photo is not None:
+            assert is_contact_photo in (True, False)
+        self.content = content
         self.is_contact_photo = is_contact_photo
 
     def to_xml(self, version):
@@ -232,7 +240,7 @@ class FileAttachment(EWSElement):
             return None
         assert elem.tag == cls.response_tag()
         content_location = get_xml_attr(elem, '{%s}ContentLocation' % TNS)
-        size = get_xml_attr(elem, '{%s}ContentLocation' % TNS)
+        size = get_xml_attr(elem, '{%s}Size' % TNS)
         last_modified_time = get_xml_attr(elem, '{%s}LastModifiedTime' % TNS)
         return cls(
             content=get_xml_attr(elem, '{%s}Content' % TNS),
@@ -243,42 +251,20 @@ class FileAttachment(EWSElement):
             content_location=AnyURI(content_location) if content_location else None,
             size=int(size) if size else None,
             last_modified_time=EWSDateTime.from_string(last_modified_time) if last_modified_time else None,
-            is_inline=get_xml_attr(elem, '{%s}ContentLocation' % TNS),
+            is_inline=get_xml_attr(elem, '{%s}IsInline' % TNS),
         )
 
 
-class ItemAttachment(EWSElement):
+class ItemAttachment(Attachment):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa562997(v=exchg.150).aspx
     """
     ELEMENT_NAME = 'ItemAttachment'
 
-    def __init__(self, item, name, content_type, attachment_id=None, content_id=None, content_location=None, size=None,
-                 last_modified_time=None, is_inline=None):
+    def __init__(self, item, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         assert isinstance(item, Item)
-        assert isinstance(name, str)
-        assert isinstance(content_type, str)
-        if attachment_id is not None:
-            assert isinstance(attachment_id, AttachmentId)
-        if content_id is not None:
-            assert isinstance(content_id, str)
-        if content_location is not None:
-            assert isinstance(content_location, AnyURI)
-        if size is not None:
-            assert isinstance(size, int)  # Size in bytes
-        if last_modified_time is not None:
-            assert isinstance(last_modified_time, EWSDateTime)
-        if is_inline is not None:
-            assert is_inline in (True, False)
         self.item = item
-        self.name = name
-        self.content_type = content_type
-        self.attachment_id = attachment_id
-        self.content_id = content_id
-        self.content_location = content_location
-        self.size = size
-        self.last_modified_time = last_modified_time
-        self.is_inline = self.is_inline
 
     def to_xml(self, version):
         entry = create_element(self.request_tag())
@@ -312,7 +298,7 @@ class ItemAttachment(EWSElement):
                 break
         assert item
         content_location = get_xml_attr(elem, '{%s}ContentLocation' % TNS)
-        size = get_xml_attr(elem, '{%s}ContentLocation' % TNS)
+        size = get_xml_attr(elem, '{%s}Size' % TNS)
         last_modified_time = get_xml_attr(elem, '{%s}LastModifiedTime' % TNS)
         return cls(
             item=item,
@@ -323,7 +309,7 @@ class ItemAttachment(EWSElement):
             content_location=AnyURI(content_location) if content_location else None,
             size=int(size) if size else None,
             last_modified_time=EWSDateTime.from_string(last_modified_time) if last_modified_time else None,
-            is_inline=get_xml_attr(elem, '{%s}ContentLocation' % TNS),
+            is_inline=get_xml_attr(elem, '{%s}IsInline' % TNS),
         )
 
 
