@@ -1209,15 +1209,36 @@ class BaseItemTest(EWSTest):
         item.save()
         self.assertIsNotNone(item.item_id)
         self.assertIsNotNone(item.changekey)
+        for k, v in insert_kwargs.items():
+            self.assertEqual(getattr(item, k), v, (k, getattr(item, k), v))
+        # Test that whatever we have locally also matches whatever is in the DB
+        fresh_item = self.account.fetch(ids=[item])[0]
+        for f in item.fieldnames():
+            old, new = getattr(item, f), getattr(fresh_item, f)
+            if f in self.ITEM_CLASS.readonly_fields() and old is None:
+                # Some fields are automatically set server-side
+                continue
+            if isinstance(old, (tuple, list)):
+                old, new = set(old), set(new)
+            self.assertEqual(old, new, (f, old, new))
 
         # Update
         update_kwargs = self.get_random_update_kwargs(item=item, insert_kwargs=insert_kwargs)
         for k, v in update_kwargs.items():
             setattr(item, k, v)
         item.save()
-        updated_item = self.account.fetch(ids=[item])[0]
         for k, v in update_kwargs.items():
-            self.assertEqual(getattr(updated_item, k), v, (k, getattr(updated_item, k), v))
+            self.assertEqual(getattr(item, k), v, (k, getattr(item, k), v))
+        # Test that whatever we have locally also matches whatever is in the DB
+        fresh_item = self.account.fetch(ids=[item])[0]
+        for f in item.fieldnames():
+            old, new = getattr(item, f), getattr(fresh_item, f)
+            if f in self.ITEM_CLASS.readonly_fields() and old is None:
+                # Some fields are automatically updated server-side
+                continue
+            if isinstance(old, (tuple, list)):
+                old, new = set(old), set(new)
+            self.assertEqual(old, new, (f, old, new))
 
         # Hard delete
         item_id = (item.item_id, item.changekey)
