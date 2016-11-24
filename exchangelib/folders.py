@@ -469,14 +469,10 @@ class PhysicalAddress(IndexedField):
         if elem is None:
             return None
         assert elem.tag == cls.response_tag()
-        return cls(
-            label=elem.get('Key'),
-            street=get_xml_attr(elem, '{%s}Street' % TNS),
-            city=get_xml_attr(elem, '{%s}City' % TNS),
-            state=get_xml_attr(elem, '{%s}State' % TNS),
-            country=get_xml_attr(elem, '{%s}CountryOrRegion' % TNS),
-            zipcode=get_xml_attr(elem, '{%s}PostalCode' % TNS),
-        )
+        kwargs = dict(label=elem.get('Key'))
+        for k, v in cls.SUB_FIELD_ELEMENT_NAMES.items():
+            kwargs[k] = get_xml_attr(elem, '{%s}%s' % (TNS, v))
+        return cls(**kwargs)
 
     def __eq__(self, other):
         return hash(self) == hash(other)
@@ -828,7 +824,8 @@ class Item(EWSElement):
     }
     # Container for extended properties registered by the user
     EXTENDED_PROPERTIES = []
-    # The order in which fields must be added to the XML output
+    # The order in which fields must be added to the XML output. It seems the same ordering is needed as the order in
+    # which fields are listed at e.g. https://msdn.microsoft.com/en-us/library/office/aa580790(v=exchg.150).aspx
     ORDERED_FIELDS = ()
     # Item fields that are necessary to create an item
     REQUIRED_FIELDS = {'sensitivity', 'importance', 'reminder_is_set'}
