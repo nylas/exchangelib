@@ -5,6 +5,8 @@ import random
 import string
 from decimal import Decimal
 import time
+from tempfile import TemporaryFile
+import io
 
 import requests
 from yaml import load
@@ -18,7 +20,8 @@ from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalid
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, ExtendedProperty, Choice, Email, Contact, \
     Task, EmailAddress, PhysicalAddress, PhoneNumber, IndexedField, RoomList, Calendar, DeletedItems, Drafts, Inbox, \
-    Outbox, SentItems, JunkEmail, Messages, Tasks, Contacts, Root, AnyURI, Body, HTMLBody, ALL_OCCURRENCIES
+    Outbox, SentItems, JunkEmail, Messages, Tasks, Contacts, Root, AnyURI, Body, HTMLBody, FileAttachment, \
+    ItemAttachment, ALL_OCCURRENCIES
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.restriction import Restriction, Q
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms
@@ -553,6 +556,9 @@ class BaseItemTest(EWSTest):
             if f in self.ITEM_CLASS.readonly_fields():
                 # These cannot be created
                 continue
+            if f == 'attachments':
+                # We'll test attachments separately
+                continue
             if f == 'resources':
                 # The test server doesn't have any resources
                 continue
@@ -598,6 +604,9 @@ class BaseItemTest(EWSTest):
                 continue
             if f == 'resources':
                 # The test server doesn't have any resources
+                continue
+            if f == 'attachments':
+                # Attachments are handled separately
                 continue
             field_type = self.ITEM_CLASS.type_for_field(f)
             if isinstance(field_type, list):
@@ -1190,7 +1199,11 @@ class BaseItemTest(EWSTest):
                 if f in only_fields:
                     self.assertIsNotNone(getattr(item, f), (f, getattr(item, f)))
                 elif f not in self.ITEM_CLASS.required_fields():
-                    self.assertIsNone(getattr(item, f), (f, getattr(item, f)))
+                    v = getattr(item, f)
+                    if f == 'attachments':
+                        self.assertTrue(v is None or v == [], (f, v))
+                    else:
+                        self.assertIsNone(v, (f, v))
         self.assertEqual(len(items), 2)
         self.account.bulk_delete(items, affected_task_occurrences=ALL_OCCURRENCIES)
 
@@ -1328,6 +1341,10 @@ class BaseItemTest(EWSTest):
             if f in self.ITEM_CLASS.readonly_fields():
                 continue
             if f == 'resources':
+                # The test server doesn't have any resources
+                continue
+            if f == 'attachments':
+                # Attachments are handled separately
                 continue
             if isinstance(self.ITEM_CLASS.type_for_field(f), list):
                 if not (getattr(item, f) is None and insert_kwargs[f] is None):
@@ -1353,6 +1370,9 @@ class BaseItemTest(EWSTest):
             if f == 'resources':
                 # The test server doesn't have any resources
                 continue
+            if f == 'attachments':
+                # Attachments are handled separately
+                continue
             field_type = self.ITEM_CLASS.type_for_field(f)
             if isinstance(field_type, list):
                 if issubclass(field_type[0], IndexedField):
@@ -1371,6 +1391,8 @@ class BaseItemTest(EWSTest):
                 continue
             if f in self.ITEM_CLASS.readonly_fields():
                 # These cannot be changed
+                continue
+            if f == 'attachments':
                 continue
             if f == 'percent_complete':
                 continue
@@ -1394,6 +1416,8 @@ class BaseItemTest(EWSTest):
             if f in self.ITEM_CLASS.required_fields():
                 continue
             if f in self.ITEM_CLASS.readonly_fields():
+                continue
+            if f == 'attachments':
                 continue
             if f == 'percent_complete':
                 continue
@@ -1531,6 +1555,41 @@ class BaseItemTest(EWSTest):
             self.ITEM_CLASS.fielduri_for_field(attr_name)
         with self.assertRaises(ValueError):
             self.ITEM_CLASS.type_for_field(attr_name)
+
+    def test_attachments(self):
+        item = self.get_test_item(folder=self.test_folder)
+        binary_file_content = 'Hello from unicode æøå'.encode('utf-8')
+        with TemporaryFile() as f:
+            f.write(binary_file_content)
+            f.seek(0)
+            item.attachments.append(FileAttachment(account=self.account, name='my_file.txt', content=f.read()))
+        item.save()
+        fresh_item = self.account.fetch(ids=[item])[0]
+        self.assertEqual(len(fresh_item.attachments), 1)
+        for attachment in fresh_item.attachments:
+            self.assertEqual(attachment.content, binary_file_content)
+            self.assertEqual(attachment.name, 'my_file.txt')
+
+        return
+        # TODO: We can't do this - we can create attachments on insert but only attach them using the webservice when
+        # the item has been created. Instead of requiring an account on Attachment creation, require a parent_item
+        # that will be updated with the returned root IDs
+
+        # Maybe:
+        #   New and existing items:
+        #   item.attach(FileAttachment(...))  # does a.attach(self)
+        #   Updated item should also run through attachments list and create ones with no AttachmentId
+        #   item.save()  # Does fo a in attachments: if not a.attachment_id: a.attach(self)
+        #   item.detach()  # does a.detach(self)
+
+        item.attachments.append(FileAttachment(account=self.account, name='my_data.dat',
+                                               content=io.BytesIO(binary_file_content).read()))
+        item.save()
+        fresh_item = self.account.fetch(ids=[item])[0]
+        self.assertEqual(len(fresh_item.attachments), 2)
+        for attachment in fresh_item.attachments:
+            self.assertEqual(attachment.content, binary_file_content)
+            self.assertIn(attachment.name, ('my_file.txt', 'my_data.dat'))
 
 
 class CalendarTest(BaseItemTest):

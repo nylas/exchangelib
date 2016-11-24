@@ -591,11 +591,11 @@ class UpdateItem(EWSPooledAccountService):
                     val = field_uri(val)
                 elif isinstance(val, EWSElement) and not isinstance(val, IndexedField) and val is not None:
                     val = val.__class__.set_field_xml(
-                        items=[val], field_name=item_model.uri_for_field(fieldname), version=self.account.version)
+                        field_elem=item_model.elem_for_field(fieldname), items=[val], version=self.account.version)
                 elif isinstance(val, (tuple, list)) and len(val) and isinstance(val[0], EWSElement) \
                         and not isinstance(val[0], IndexedField):
                     val = val[0].__class__.set_field_xml(
-                        items=val, field_name=item_model.uri_for_field(fieldname), version=self.account.version)
+                        field_elem=item_model.elem_for_field(fieldname), items=val, version=self.account.version)
                 if isinstance(field_uri, str):
                     fielduri = create_element('t:FieldURI', FieldURI=field_uri)
                 elif issubclass(field_uri, ExtendedProperty):
@@ -880,19 +880,20 @@ class GetAttachment(EWSAccountService):
     def call(self, **kwargs):
         if self.protocol.version.build < EXCHANGE_2010:
             raise NotImplementedError('%s is only supported for Exchange 2010 servers and later' % self.SERVICE_NAME)
-        elements = super().call(**kwargs)
-        assert False, xml_to_str(elements)
+        return super().call(**kwargs)
 
     def _get_payload(self, items):
         from .folders import AttachmentId
         payload = create_element('m:%s' % self.SERVICE_NAME)
-        # TODO: Also support AttachmentShape. See https://msdn.microsoft.com/en-us/library/office/aa563727(v=exchg.150).aspx
+        # TODO: Support additional properties of AttachmentShape. See
+        # https://msdn.microsoft.com/en-us/library/office/aa563727(v=exchg.150).aspx
         attachment_shape = create_element('m:AttachmentShape')
+        payload.append(attachment_shape)
         attachment_ids = create_element('m:AttachmentIds')
         n = 0
         for item in items:
             n += 1
-            attachment_id = AttachmentId(*(item if isinstance(item, tuple) else (item.item_id, item.changekey)))
+            attachment_id = item if isinstance(item, AttachmentId) else AttachmentId(id=item)
             set_xml_value(attachment_ids, attachment_id, self.account.version)
         if not n:
             raise AttributeError('"ids" must not be empty')
@@ -905,15 +906,19 @@ class CreateAttachment(EWSAccountService):
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa565877(v=exchg.150).aspx
     """
     SERVICE_NAME = 'CreateAttachment'
+    element_container_name = '{%s}Attachments' % MNS
 
     def call(self, **kwargs):
         if self.protocol.version.build < EXCHANGE_2010:
             raise NotImplementedError('%s is only supported for Exchange 2010 servers and later' % self.SERVICE_NAME)
-        elements = super().call(**kwargs)
-        assert False, xml_to_str(elements)
+        return super().call(**kwargs)
 
-    def _get_payload(self, attachments):
+    def _get_payload(self, parent_item, attachments):
+        from .folders import ParentItemId
         payload = create_element('m:%s' % self.SERVICE_NAME)
+        parent_id = ParentItemId(*(parent_item if isinstance(parent_item, tuple)
+                                   else (parent_item.item_id, parent_item.changekey)))
+        payload.append(parent_id.to_xml(version=self.account.version))
         attachments = create_element('m:Attachments')
         n = 0
         for attachment in attachments:
@@ -930,12 +935,12 @@ class DeleteAttachment(EWSAccountService):
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa580782(v=exchg.150).aspx
     """
     SERVICE_NAME = 'DeleteAttachment'
+    element_container_name = '{%s}AttachmentIds' % MNS
 
     def call(self, **kwargs):
         if self.protocol.version.build < EXCHANGE_2010:
             raise NotImplementedError('%s is only supported for Exchange 2010 servers and later' % self.SERVICE_NAME)
-        elements = super().call(**kwargs)
-        assert False, xml_to_str(elements)
+        return super().call(**kwargs)
 
     def _get_payload(self, items):
         from .folders import AttachmentId
@@ -944,7 +949,7 @@ class DeleteAttachment(EWSAccountService):
         n = 0
         for item in items:
             n += 1
-            attachment_id = AttachmentId(*(item if isinstance(item, tuple) else (item.item_id, item.changekey)))
+            attachment_id = item if isinstance(item, AttachmentId) else AttachmentId(id=item)
             set_xml_value(attachment_ids, attachment_id, self.account.version)
         if not n:
             raise AttributeError('"ids" must not be empty')
