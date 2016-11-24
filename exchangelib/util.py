@@ -95,7 +95,7 @@ def xml_text_to_value(value, field_type):
         # Return string types unprocessed
         return value
     return {
-        bool: lambda v: True if v == 'true' else False,
+        bool: lambda v: True if v == 'true' else False if v == 'false' else None,
         int: lambda v: int(v),
         Decimal: lambda v: Decimal(v),
         EWSDateTime: lambda v: EWSDateTime.from_string(v),
