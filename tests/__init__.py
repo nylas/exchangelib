@@ -20,8 +20,8 @@ from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalid
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, ExtendedProperty, Choice, Email, Contact, \
     Task, EmailAddress, PhysicalAddress, PhoneNumber, IndexedField, RoomList, Calendar, DeletedItems, Drafts, Inbox, \
-    Outbox, SentItems, JunkEmail, Messages, Tasks, Contacts, Root, AnyURI, Body, HTMLBody, FileAttachment, \
-    ItemAttachment, ALL_OCCURRENCIES
+    Outbox, SentItems, JunkEmail, Messages, Tasks, Contacts, Item, AnyURI, Body, HTMLBody, FileAttachment, \
+    ItemAttachment, Attachment, ALL_OCCURRENCIES
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.restriction import Restriction, Q
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms
@@ -326,6 +326,10 @@ class EWSTest(unittest.TestCase):
             return get_random_datetime()
         if field_type == Email:
             return get_random_email()
+        if field_type == Attachment:
+            return FileAttachment(name='my_file.txt', content=b'test_content')
+        if field_type == [Attachment]:
+            return [self.random_val(Attachment)]
         if field_type == Mailbox:
             # email_address must be a real account on the server(?)
             # TODO: Mailbox has multiple optional args, but they must match the server account, so we can't easily test.
@@ -555,9 +559,6 @@ class BaseItemTest(EWSTest):
         for f in self.ITEM_CLASS.fieldnames():
             if f in self.ITEM_CLASS.readonly_fields():
                 # These cannot be created
-                continue
-            if f == 'attachments':
-                # We'll test attachments separately
                 continue
             if f == 'resources':
                 # The test server doesn't have any resources
@@ -1330,7 +1331,7 @@ class BaseItemTest(EWSTest):
         # Test with generator as argument
         insert_ids = self.test_folder.bulk_create(items=(i for i in [item]))
         self.assertEqual(len(insert_ids), 1)
-        assert isinstance(insert_ids[0], tuple)
+        assert isinstance(insert_ids[0], Item)
         find_ids = self.test_folder.filter(categories__contains=item.categories).values_list('item_id', 'changekey')
         self.assertEqual(len(find_ids), 1)
         self.assertEqual(len(find_ids[0]), 2)
@@ -1361,8 +1362,8 @@ class BaseItemTest(EWSTest):
         update_ids = self.account.bulk_update(items=(i for i in [(item, update_fieldnames)]))
         self.assertEqual(len(update_ids), 1)
         self.assertEqual(len(update_ids[0]), 2, update_ids)
-        self.assertEqual(insert_ids[0][0], update_ids[0][0])  # ID should be the same
-        self.assertNotEqual(insert_ids[0][1], update_ids[0][1])  # Changekey should not be the same when item is updated
+        self.assertEqual(insert_ids[0].item_id, update_ids[0][0])  # ID should be the same
+        self.assertNotEqual(insert_ids[0].changekey, update_ids[0][1])  # Changekey should not be the same when item is updated
         item = self.account.fetch(update_ids)[0]
         for f in self.ITEM_CLASS.fieldnames():
             if f in self.ITEM_CLASS.readonly_fields():
@@ -1409,8 +1410,8 @@ class BaseItemTest(EWSTest):
         wipe_ids = self.account.bulk_update([(item, update_fieldnames), ])
         self.assertEqual(len(wipe_ids), 1)
         self.assertEqual(len(wipe_ids[0]), 2, wipe_ids)
-        self.assertEqual(insert_ids[0][0], wipe_ids[0][0])  # ID should be the same
-        self.assertNotEqual(insert_ids[0][1], wipe_ids[0][1])  # Changekey should not be the same when item is updated
+        self.assertEqual(insert_ids[0].item_id, wipe_ids[0][0])  # ID should be the same
+        self.assertNotEqual(insert_ids[0].changekey, wipe_ids[0][1])  # Changekey should not be the same when item is updated
         item = self.account.fetch(wipe_ids)[0]
         for f in self.ITEM_CLASS.fieldnames():
             if f in self.ITEM_CLASS.required_fields():
@@ -1431,8 +1432,8 @@ class BaseItemTest(EWSTest):
         wipe2_ids = self.account.bulk_update([(item, ['extern_id']), ])
         self.assertEqual(len(wipe2_ids), 1)
         self.assertEqual(len(wipe2_ids[0]), 2, wipe2_ids)
-        self.assertEqual(insert_ids[0][0], wipe2_ids[0][0])  # ID should be the same
-        self.assertNotEqual(insert_ids[0][1], wipe2_ids[0][1])  # Changekey should not be the same when item is updated
+        self.assertEqual(insert_ids[0].item_id, wipe2_ids[0][0])  # ID should be the same
+        self.assertNotEqual(insert_ids[0].changekey, wipe2_ids[0][1])  # Changekey should not be the same when item is updated
         item = self.account.fetch(wipe2_ids)[0]
         self.assertEqual(item.extern_id, extern_id)
 
@@ -1444,8 +1445,7 @@ class BaseItemTest(EWSTest):
         # 15 new items which we will attempt to export and re-upload
         items = [self.get_test_item(self.test_folder).save() for _ in range(15)]
         ids = [(i.item_id, i.changekey) for i in items]
-        # re-fetch items because there will be some extra fields added by the
-        #  server
+        # re-fetch items because there will be some extra fields added by the server
         items = self.test_folder.fetch(items)
 
         # Try exporting and making sure we get the right response
@@ -1465,25 +1465,25 @@ class BaseItemTest(EWSTest):
         # Check the items uploaded are the same as the original items
         def to_dict(item):
             dict_item = {}
-            # fieldnames is everything except the ID so we'll use it to
-            #  compare
+            # fieldnames is everything except the ID so we'll use it to compare
             for attribute in item.fieldnames():
-                # datetime_created and last_modified_time aren't copied, but
-                # instead are added to the new item after uploading
-                if attribute not in {'datetime_created', 'last_modified_time'}:
-                    dict_item[attribute] = getattr(item, attribute)
+                # datetime_created and last_modified_time aren't copied, but instead are added to the new item after
+                # uploading.
+                if attribute in {'datetime_created', 'last_modified_time'}:
+                    continue
+                dict_item[attribute] = getattr(item, attribute)
+                if attribute == 'attachments':
+                    # Attachments get new IDs on upload. Wipe them here so we can compare the other fields
+                    for a in dict_item[attribute]:
+                        a.attachment_id = None
             return dict_item
 
-        uploaded_items = self.test_folder.fetch(upload_results)
-        original_items = [to_dict(item) for item in items]
-        for item in uploaded_items:
-            dict_item = to_dict(item)
-            try:
-                original_items.remove(dict_item)
-            except ValueError:
-                raise AssertionError("Uploaded item: '%s' not equal to any of the items we originally inserted" % repr(item))
+        uploaded_items = sorted([to_dict(item) for item in self.test_folder.fetch(upload_results)],
+                                key=lambda i: i['subject'])
+        original_items = sorted([to_dict(item) for item in items], key=lambda i: i['subject'])
+        self.assertListEqual(original_items, uploaded_items)
 
-        # Clean up after yourself
+        # Clean up after ourselves
         self.account.bulk_delete(ids=upload_results, affected_task_occurrences=ALL_OCCURRENCIES)
         self.account.bulk_delete(ids=ids, affected_task_occurrences=ALL_OCCURRENCIES)
 
@@ -1558,38 +1558,44 @@ class BaseItemTest(EWSTest):
 
     def test_attachments(self):
         item = self.get_test_item(folder=self.test_folder)
+
+        # Test __init__(attachments=...) and attach() on new item
         binary_file_content = 'Hello from unicode æøå'.encode('utf-8')
-        with TemporaryFile() as f:
-            f.write(binary_file_content)
-            f.seek(0)
-            item.attachments.append(FileAttachment(account=self.account, name='my_file.txt', content=f.read()))
-        item.save()
-        fresh_item = self.account.fetch(ids=[item])[0]
-        self.assertEqual(len(fresh_item.attachments), 1)
-        for attachment in fresh_item.attachments:
-            self.assertEqual(attachment.content, binary_file_content)
-            self.assertEqual(attachment.name, 'my_file.txt')
-
-        return
-        # TODO: We can't do this - we can create attachments on insert but only attach them using the webservice when
-        # the item has been created. Instead of requiring an account on Attachment creation, require a parent_item
-        # that will be updated with the returned root IDs
-
-        # Maybe:
-        #   New and existing items:
-        #   item.attach(FileAttachment(...))  # does a.attach(self)
-        #   Updated item should also run through attachments list and create ones with no AttachmentId
-        #   item.save()  # Does fo a in attachments: if not a.attachment_id: a.attach(self)
-        #   item.detach()  # does a.detach(self)
-
-        item.attachments.append(FileAttachment(account=self.account, name='my_data.dat',
-                                               content=io.BytesIO(binary_file_content).read()))
+        att1 = FileAttachment(name='my_file_1.txt', content=binary_file_content)
+        self.assertEqual(len(item.attachments), 1)
+        item.attach(att1)
+        self.assertEqual(len(item.attachments), 2)
         item.save()
         fresh_item = self.account.fetch(ids=[item])[0]
         self.assertEqual(len(fresh_item.attachments), 2)
-        for attachment in fresh_item.attachments:
-            self.assertEqual(attachment.content, binary_file_content)
-            self.assertIn(attachment.name, ('my_file.txt', 'my_data.dat'))
+        fresh_attachments = sorted(fresh_item.attachments, key=lambda a: a.name)
+        self.assertEqual(fresh_attachments[0].name, 'my_file.txt')
+        self.assertEqual(fresh_attachments[0].content, b'test_content')
+        self.assertEqual(fresh_attachments[1].name, 'my_file_1.txt')
+        self.assertEqual(fresh_attachments[1].content, binary_file_content)
+
+        # Test attach on saved object
+        att2 = FileAttachment(name='my_file_2.txt', content=binary_file_content)
+        item.attach(att2)
+        fresh_item = self.account.fetch(ids=[item])[0]
+        self.assertEqual(len(fresh_item.attachments), 3)
+        fresh_attachments = sorted(fresh_item.attachments, key=lambda a: a.name)
+        self.assertEqual(fresh_attachments[0].name, 'my_file.txt')
+        self.assertEqual(fresh_attachments[0].content, b'test_content')
+        self.assertEqual(fresh_attachments[1].name, 'my_file_1.txt')
+        self.assertEqual(fresh_attachments[1].content, binary_file_content)
+        self.assertEqual(fresh_attachments[2].name, 'my_file_2.txt')
+        self.assertEqual(fresh_attachments[2].content, binary_file_content)
+
+        # Test detach
+        item.detach(att1)
+        fresh_item = self.account.fetch(ids=[item])[0]
+        self.assertEqual(len(fresh_item.attachments), 2)
+        fresh_attachments = sorted(fresh_item.attachments, key=lambda a: a.name)
+        self.assertEqual(fresh_attachments[0].name, 'my_file.txt')
+        self.assertEqual(fresh_attachments[0].content, b'test_content')
+        self.assertEqual(fresh_attachments[1].name, 'my_file_2.txt')
+        self.assertEqual(fresh_attachments[1].content, binary_file_content)
 
 
 class CalendarTest(BaseItemTest):

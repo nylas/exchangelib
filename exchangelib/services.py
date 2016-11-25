@@ -913,7 +913,7 @@ class CreateAttachment(EWSAccountService):
             raise NotImplementedError('%s is only supported for Exchange 2010 servers and later' % self.SERVICE_NAME)
         return super().call(**kwargs)
 
-    def _get_payload(self, parent_item, attachments):
+    def _get_payload(self, parent_item, items):
         from .folders import ParentItemId
         payload = create_element('m:%s' % self.SERVICE_NAME)
         parent_id = ParentItemId(*(parent_item if isinstance(parent_item, tuple)
@@ -921,9 +921,9 @@ class CreateAttachment(EWSAccountService):
         payload.append(parent_id.to_xml(version=self.account.version))
         attachments = create_element('m:Attachments')
         n = 0
-        for attachment in attachments:
+        for item in items:
             n += 1
-            set_xml_value(attachments, attachment, self.account.version)
+            set_xml_value(attachments, item, self.account.version)
         if not n:
             raise AttributeError('"attachments" must not be empty')
         payload.append(attachments)
@@ -935,7 +935,18 @@ class DeleteAttachment(EWSAccountService):
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa580782(v=exchg.150).aspx
     """
     SERVICE_NAME = 'DeleteAttachment'
-    element_container_name = '{%s}AttachmentIds' % MNS
+
+    def _get_element_container(self, message, name=None):
+        # DeleteAttachment returns RootItemIds directly beneath DeleteAttachmentResponseMessage. Collect the elements
+        # and make our own fake container.
+        res = super()._get_element_container(message=message, name=name)
+        if not res:
+            return res
+        from .folders import RootItemId
+        fake_elem = create_element('FakeContainer')
+        for elem in message.findall(RootItemId.response_tag()):
+            fake_elem.append(elem)
+        return fake_elem
 
     def call(self, **kwargs):
         if self.protocol.version.build < EXCHANGE_2010:

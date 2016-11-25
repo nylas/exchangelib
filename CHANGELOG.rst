@@ -2,10 +2,30 @@
 Change Log
 ==========
 
+HEAD
+----
+* Implement attachments support. It's now possible to create, delete and get attachments connected to any item type:
+
+  .. code-block::python
+
+        # Create a new item with an attachment
+        item = Message(...)
+        binary_file_content = 'Hello from unicode æøå'.encode('utf-8')  # Or read from file, BytesIO etc.
+        my_file = FileAttachment(name='my_file.txt', content=binary_file_content)
+        item.attach(my_file)
+        item.save()
+
+        # Add an attachment on an existing item
+        my_other_file = FileAttachment(name='my_other_file.txt', content=binary_file_content)
+        item.attach(my_other_file)
+
+        # Remove the attachment again
+        item.detach(my_file)
+
 
 1.7.2
 -----
-* Implement for ``Contact.physical_addresses`` attribute. This is a list of ``exchangelib.folders.PhysicalAddress``
+* Implement the ``Contact.physical_addresses`` attribute. This is a list of ``exchangelib.folders.PhysicalAddress``
   items.
 * Implement the ``CalendarItem.is_all_day`` boolean to create all-day appointments.
 * Implement ``my_folder.export()`` and ``my_folder.upload()``. Thanks to @SamCB!

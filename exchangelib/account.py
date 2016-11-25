@@ -208,7 +208,7 @@ class Account:
             # empty 'items' and return early.
             return []
         return list(map(
-            Item.id_from_xml,
+            lambda i: folder.item_model_from_tag(i.tag).from_xml(elem=i, account=self, folder=folder),
             CreateItem(account=self).call(
                 items=items,
                 folder=folder,
