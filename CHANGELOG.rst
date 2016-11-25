@@ -30,13 +30,13 @@ HEAD
 * Implement the ``CalendarItem.is_all_day`` boolean to create all-day appointments.
 * Implement ``my_folder.export()`` and ``my_folder.upload()``. Thanks to @SamCB!
 * Fixed ``Account.folders`` for non-distinguished folders
-* Added ``Folder.get_folder_by_name()`` to make it easier to get subfolders by name.
+* Added ``Folder.get_folder_by_name()`` to make it easier to get sub-folders by name.
 * Implement ``CalendarView`` searches as ``my_calendar.view(start=..., end=...)``. A view differs from a normal
-  ``filter()`` in that a view expands recurring items and returns recurring item occuccences that are valid in the time
+  ``filter()`` in that a view expands recurring items and returns recurring item occurrences that are valid in the time
   span of the view.
 * Persistent storage location for autodiscover cache is now platform independent
 * Implemented custom extended properties. To add support for your own custom property, subclass
-  ``exchangelibfolders.ExtendedProperty`` and call ``register()`` on the item class you want to use the extended
+  ``exchangelib.folders.ExtendedProperty`` and call ``register()`` on the item class you want to use the extended
   property with. When you have registered your extended property, you can use it exactly like you would use any other
   attribute on this item type. If you change your mind, you can remove the extended property again with ``deregister()``:
 
@@ -115,7 +115,7 @@ HEAD
 * Added convenience methods ``Item.save()``, ``Item.delete()``, ``Item.soft_delete()``, ``Item.move_to_trash()``, and
   methods ``Message.send()`` and ``Message.send_and_save()`` that are specific to ``Message`` objects. These methods
   make it easier to create, update and delete single items.
-* Removed ``fetch(.., with_extra=True)`` in favor of the more finegrained ``fetch(.., only_fields=[...])``
+* Removed ``fetch(.., with_extra=True)`` in favor of the more fine-grained ``fetch(.., only_fields=[...])``
 * Added a ``QuerySet`` class that supports QuerySet-returning methods ``filter()``, ``exclude()``, ``only()``,
   ``order_by()``, ``reverse()````values()`` and ``values_list()`` that all allow for chaining. ``QuerySet`` also has
   methods ``iterator()``, ``get()``, ``count()``, ``exists()`` and ``delete()``. All these methods behave like their
