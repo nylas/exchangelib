@@ -1556,7 +1556,7 @@ class BaseItemTest(EWSTest):
         with self.assertRaises(ValueError):
             self.ITEM_CLASS.type_for_field(attr_name)
 
-    def test_attachments(self):
+    def test_file_attachments(self):
         item = self.get_test_item(folder=self.test_folder)
 
         # Test __init__(attachments=...) and attach() on new item
@@ -1576,7 +1576,9 @@ class BaseItemTest(EWSTest):
 
         # Test attach on saved object
         att2 = FileAttachment(name='my_file_2.txt', content=binary_file_content)
+        self.assertEqual(len(item.attachments), 2)
         item.attach(att2)
+        self.assertEqual(len(item.attachments), 3)
         fresh_item = self.account.fetch(ids=[item])[0]
         self.assertEqual(len(fresh_item.attachments), 3)
         fresh_attachments = sorted(fresh_item.attachments, key=lambda a: a.name)
@@ -1596,6 +1598,121 @@ class BaseItemTest(EWSTest):
         self.assertEqual(fresh_attachments[0].content, b'test_content')
         self.assertEqual(fresh_attachments[1].name, 'my_file_2.txt')
         self.assertEqual(fresh_attachments[1].content, binary_file_content)
+
+    def test_item_attachments(self):
+        item = self.get_test_item(folder=self.test_folder)
+        item.attachments.clear()
+
+        attached_item1 = self.get_test_item(folder=self.test_folder)
+        attached_item1.attachments.clear()
+        if hasattr(attached_item1, 'is_all_day'):
+            attached_item1.is_all_day = False
+        attached_item1.save()
+        attachment1 = ItemAttachment(name='attachment1', item=attached_item1)
+        item.attach(attachment1)
+
+        self.assertEqual(len(item.attachments), 1)
+        item.save()
+        fresh_item = self.account.fetch(ids=[item])[0]
+        self.assertEqual(len(fresh_item.attachments), 1)
+        fresh_attachments = sorted(fresh_item.attachments, key=lambda a: a.name)
+        self.assertEqual(fresh_attachments[0].name, 'attachment1')
+
+        for f in self.ITEM_CLASS.fieldnames():
+            # Normalize some values we don't control
+            if f in self.ITEM_CLASS.readonly_fields():
+                continue
+            if f == 'extern_id':
+                # Attachments don't have this value. It may be possible to request it if we can find the FieldURI
+                continue
+            if f == 'is_read':
+                # This is always true for item attachments?
+                continue
+            old_val = getattr(attached_item1, f)
+            new_val = getattr(fresh_attachments[0].item, f)
+            if isinstance(old_val, (tuple, list)):
+                old_val, new_val = set(old_val), set(new_val)
+            self.assertEqual(old_val, new_val, (f, old_val, new_val))
+
+        # Test attach on saved object
+        attached_item2 = self.get_test_item(folder=self.test_folder)
+        attached_item2.attachments.clear()
+        if hasattr(attached_item2, 'is_all_day'):
+            attached_item2.is_all_day = False
+        attached_item2.save()
+        attachment2 = ItemAttachment(name='attachment2', item=attached_item2)
+        item.attach(attachment2)
+
+        self.assertEqual(len(item.attachments), 2)
+        fresh_item = self.account.fetch(ids=[item])[0]
+        self.assertEqual(len(fresh_item.attachments), 2)
+        fresh_attachments = sorted(fresh_item.attachments, key=lambda a: a.name)
+        self.assertEqual(fresh_attachments[0].name, 'attachment1')
+
+        for f in self.ITEM_CLASS.fieldnames():
+            # Normalize some values we don't control
+            if f in self.ITEM_CLASS.readonly_fields():
+                continue
+            if f == 'extern_id':
+                # Attachments don't have this value. It may be possible to request it if we can find the FieldURI
+                continue
+            if f == 'is_read':
+                # This is always true for item attachments?
+                continue
+            old_val = getattr(attached_item1, f)
+            new_val = getattr(fresh_attachments[0].item, f)
+            if isinstance(old_val, (tuple, list)):
+                old_val, new_val = set(old_val), set(new_val)
+            self.assertEqual(old_val, new_val, (f, old_val, new_val))
+
+        self.assertEqual(fresh_attachments[1].name, 'attachment2')
+
+        for f in self.ITEM_CLASS.fieldnames():
+            # Normalize some values we don't control
+            if f in self.ITEM_CLASS.readonly_fields():
+                continue
+            if f == 'extern_id':
+                # Attachments don't have this value. It may be possible to request it if we can find the FieldURI
+                continue
+            if f == 'is_read':
+                # This is always true for item attachments?
+                continue
+            old_val = getattr(attached_item2, f)
+            new_val = getattr(fresh_attachments[1].item, f)
+            if isinstance(old_val, (tuple, list)):
+                old_val, new_val = set(old_val), set(new_val)
+            self.assertEqual(old_val, new_val, (f, old_val, new_val))
+
+        # Test detach
+        item.detach(attachment2)
+        fresh_item = self.account.fetch(ids=[item])[0]
+        self.assertEqual(len(fresh_item.attachments), 1)
+        fresh_attachments = sorted(fresh_item.attachments, key=lambda a: a.name)
+
+        for f in self.ITEM_CLASS.fieldnames():
+            # Normalize some values we don't control
+            if f in self.ITEM_CLASS.readonly_fields():
+                continue
+            if f == 'extern_id':
+                # Attachments don't have this value. It may be possible to request it if we can find the FieldURI
+                continue
+            if f == 'is_read':
+                # This is always true for item attachments?
+                continue
+            old_val = getattr(attached_item1, f)
+            new_val = getattr(fresh_attachments[0].item, f)
+            if isinstance(old_val, (tuple, list)):
+                old_val, new_val = set(old_val), set(new_val)
+            self.assertEqual(old_val, new_val, (f, old_val, new_val))
+
+        # Test attach with non-saved item
+        attached_item3 = self.get_test_item(folder=self.test_folder)
+        attached_item3.attachments.clear()
+        if hasattr(attached_item3, 'is_all_day'):
+            attached_item3.is_all_day = False
+        attachment3 = ItemAttachment(name='attachment2', item=attached_item3)
+        item.attach(attachment3)
+        item.detach(attachment3)
 
 
 class CalendarTest(BaseItemTest):

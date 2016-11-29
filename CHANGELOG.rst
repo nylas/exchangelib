@@ -8,7 +8,7 @@ HEAD
 
   .. code-block:: python
 
-      from exchangelib.folders import FileAttachment
+      from exchangelib.folders import FileAttachment, ItemAttachment
 
       # Process attachments on existing items
       for item in my_folder.all():
@@ -23,6 +23,9 @@ HEAD
       binary_file_content = 'Hello from unicode æøå'.encode('utf-8')  # Or read from file, BytesIO etc.
       my_file = FileAttachment(name='my_file.txt', content=binary_file_content)
       item.attach(my_file)
+      my_calendar_item = CalendarItem(...)
+      my_appointment = ItemAttachment(name='my_appointment', item=my_calendar_item)
+      item.attach(my_appointment)
       item.save()
 
       # Add an attachment on an existing item
