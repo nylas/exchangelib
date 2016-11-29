@@ -8,6 +8,16 @@ HEAD
 
   .. code-block:: python
 
+      from exchangelib.folders import FileAttachment
+
+      # Process attachments on existing items
+      for item in my_folder.all():
+          for attachment in item.attachments:
+              local_path = os.path.join('/tmp', attachment.name)
+              with open(local_path, 'wb') as f:
+                  f.write(attachment.content)
+                  print('Saved attachment to', local_path)
+
       # Create a new item with an attachment
       item = Message(...)
       binary_file_content = 'Hello from unicode æøå'.encode('utf-8')  # Or read from file, BytesIO etc.
@@ -21,6 +31,9 @@ HEAD
 
       # Remove the attachment again
       item.detach(my_file)
+
+  Be aware that adding and deleting attachments from items that are already created in Exchange (items that have an
+  `item_id`) will update the `changekey` of the item.
 
 
 1.7.2
