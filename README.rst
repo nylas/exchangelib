@@ -22,12 +22,13 @@ and contact items.
 Usage
 ~~~~~
 
-Here is a simple example that inserts, retrieves and deletes calendar items in an Exchange calendar:
+Here are some examples of how `exchangelib` works:
 
 .. code-block:: python
 
     from exchangelib import DELEGATE, IMPERSONATION, Account, Credentials, \
-        EWSDateTime, EWSTimeZone, Configuration, NTLM, CalendarItem, Q
+        EWSDateTime, EWSTimeZone, Configuration, NTLM, CalendarItem, Message, \
+        Mailbox, Q
     from exchangelib.folders import Calendar
 
     year, month, day = 2016, 3, 20
@@ -108,6 +109,7 @@ Here is a simple example that inserts, retrieves and deletes calendar items in a
     # ids_as_list = my_folder.all().values_list('item_id', 'changekey')
     # all_subjects = my_folder.all().values_list('subject', flat=True)
     #
+    # If you want recurring calendar items to be expanded, use calendar.view(start=..., end=...) instead
     items = account.calendar.filter(
         start__lt=tz.localize(EWSDateTime(year, month, day + 1)),
         end__gt=tz.localize(EWSDateTime(year, month, day)),
@@ -126,3 +128,26 @@ Here is a simple example that inserts, retrieves and deletes calendar items in a
     item.subject = 'bar'
     item.save()
     item.delete()
+
+    # You can also send emails
+
+    # If you don't want a local copy
+    m = Message(
+        account=a,
+        subject='Daily motivation',
+        body='All bodies are beautiful',
+        to_recipients=[Mailbox(email_address='anne@example.com')]
+    )
+    m.send()
+
+    # Or, if you want a copy in the 'Sent' folder
+    m = Message(
+        account=a,
+        folder=a.sent,
+        subject='Daily motivation',
+        body='All bodies are beautiful',
+        to_recipients=[Mailbox(email_address='anne@example.com')]
+    )
+    m.send_and_save()
+
+    # There is also support for most item attributes, attachments, item export and upload, and extended properties
