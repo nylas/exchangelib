@@ -156,6 +156,10 @@ def discover(email, credentials, verify_ssl=True):
             assert primary_smtp_address
             assert isinstance(protocol, Protocol)
             return primary_smtp_address, protocol
+        except AutoDiscoverFailed:
+            # Autodiscover no longer works with this domain. Clear cache and try again
+            del _autodiscover_cache[autodiscover_key]
+            return discover(email=email, credentials=credentials, verify_ssl=verify_ssl)
         except AutoDiscoverRedirect as e:
             log.debug('%s redirects to %s', email, e.redirect_email)
             if email.lower() == e.redirect_email.lower():

@@ -5,15 +5,13 @@ import random
 import string
 from decimal import Decimal
 import time
-from tempfile import TemporaryFile
-import io
 
 import requests
 from yaml import load
 
 from exchangelib import close_connections
 from exchangelib.account import Account
-from exchangelib.autodiscover import discover
+from exchangelib.autodiscover import AutodiscoverProtocol, discover
 from exchangelib.configuration import Configuration
 from exchangelib.credentials import DELEGATE, Credentials
 from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalidOperation
@@ -22,8 +20,10 @@ from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, Extend
     Task, EmailAddress, PhysicalAddress, PhoneNumber, IndexedField, RoomList, Calendar, DeletedItems, Drafts, Inbox, \
     Outbox, SentItems, JunkEmail, Messages, Tasks, Contacts, Item, AnyURI, Body, HTMLBody, FileAttachment, \
     ItemAttachment, Attachment, ALL_OCCURRENCIES
+from exchangelib.protocol import Protocol
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.restriction import Restriction, Q
+from exchangelib.transport import NTLM
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms
 from exchangelib.util import xml_to_str, chunkify, peek, get_redirect_url
 from exchangelib.version import Build
@@ -387,7 +387,7 @@ class CommonTest(EWSTest):
     def test_get_timezones(self):
         ws = GetServerTimeZones(self.config.protocol)
         data = ws.call()
-        self.assertAlmostEqual(len(data), 100, delta=10, msg=data)
+        self.assertAlmostEqual(len(data), 130, delta=30, msg=data)
 
     def test_get_roomlists(self):
         # The test server is not guaranteed to have any room lists which makes this test less useful
@@ -460,6 +460,32 @@ class CommonTest(EWSTest):
         self.assertEqual(primary_smtp_address, self.account.primary_smtp_address)
         self.assertEqual(protocol.service_endpoint.lower(), self.config.protocol.service_endpoint.lower())
         self.assertEqual(protocol.version.build, self.config.protocol.version.build)
+
+    def test_autodiscover_cache(self):
+        from exchangelib.autodiscover import _autodiscover_cache
+        # Empty the cache
+        _autodiscover_cache.clear()
+        cache_key = (self.account.domain, self.config.credentials, self.config.protocol.verify_ssl)
+        # Not cached
+        self.assertNotIn(cache_key, _autodiscover_cache)
+        discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
+        # Now it's cached
+        self.assertIn(cache_key, _autodiscover_cache)
+        # Make sure the cache can be looked by value, not by id(). This is important for multi-threading/processing
+        self.assertIn((
+            self.account.primary_smtp_address.split('@')[1],
+            Credentials(self.config.credentials.username, self.config.credentials.password),
+            True
+        ), _autodiscover_cache)
+        # Poison the cache. discover() must survive and rebuild the cache
+        _autodiscover_cache[cache_key] = AutodiscoverProtocol(
+            service_endpoint='https://example.com/blackhole.asmx',
+            credentials=Credentials('leet_user', 'cannaguess', is_service_account=False),
+            auth_type=NTLM,
+            verify_ssl=True
+        )
+        discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
+        self.assertIn(cache_key, _autodiscover_cache)
 
     def test_autodiscover_from_account(self):
         from exchangelib.autodiscover import _autodiscover_cache
