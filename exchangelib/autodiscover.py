@@ -357,7 +357,10 @@ def _get_autodiscover_response(protocol, email, encoding='utf-8'):
         return r
     if r.status_code != 200:
         log.debug('%s returned HTTP %s', protocol.service_endpoint, r.status_code)
-        # raise an uncatched error for now, until we understand this failure case
+        if 401 <= r.status_code <= 410:
+            # A reasonable subset of status codes for which autodiscover will probably never succeed on this server
+            raise AutoDiscoverFailed('%s returned HTTP %s' % (protocol.service_endpoint, r.status_code))
+        # raise a more generic error for now, until we understand this failure case
         raise TransportError('%s returned HTTP %s' % (protocol.service_endpoint, r.status_code))
     if not is_xml(r.text):
         # This is normal - e.g. a greedy webserver serving custom HTTP 404's as 200 OK
