@@ -87,6 +87,14 @@ class HTMLBody(Body):
     body_type = 'HTML'
 
 
+class MimeContent(str):
+    # Helper to work with the base64 encoded MimeContent Message field
+    def b64encode(self):
+        return base64.b64encode(self).decode('ascii')
+
+    def b64decode(self):
+        return base64.b64decode(self)
+
 class EWSElement:
     ELEMENT_NAME = None
 
@@ -814,7 +822,7 @@ class Item(EWSElement):
     ITEM_FIELDS = {
         'item_id': ('ItemId', str),
         'changekey': ('ChangeKey', str),
-        # 'mime_content': ('MimeContent', str),
+        'mime_content': ('MimeContent', MimeContent),
         'sensitivity': ('Sensitivity', Choice),
         'importance': ('Importance', Choice),
         'is_draft': ('IsDraft', bool),
@@ -844,7 +852,7 @@ class Item(EWSElement):
     REQUIRED_FIELDS = {'sensitivity', 'importance', 'reminder_is_set'}
     # Fields that are read-only in Exchange. Put mime_content here until it's properly supported
     READONLY_FIELDS = {'is_draft', 'datetime_created', 'datetime_sent', 'datetime_received', 'last_modified_name',
-                       'last_modified_time'}
+                       'last_modified_time', 'mime_content'}
     # Fields that are readonly when an item is no longer a draft. Updating these would result in
     # ErrorInvalidPropertyUpdateSentMessage
     READONLY_AFTER_SEND_FIELDS = set()
@@ -878,7 +886,7 @@ class Item(EWSElement):
                 else:
                     if issubclass(field_type, ExtendedProperty):
                         valid_field_types = (field_type, field_type.python_type())
-                    elif field_type in (Body, HTMLBody, Choice):
+                    elif field_type in (Body, HTMLBody, Choice, MimeContent):
                         valid_field_types = (field_type, str)
                     else:
                         valid_field_types = (field_type,)
@@ -1165,7 +1173,7 @@ class Item(EWSElement):
         extended_properties = elem.findall(ExtendedProperty.response_tag())
         for fieldname in cls.fieldnames():
             field_type = cls.type_for_field(fieldname)
-            if field_type in (EWSDateTime, bool, int, Decimal, str, Choice, Email, AnyURI, Body, HTMLBody):
+            if field_type in (EWSDateTime, bool, int, Decimal, str, Choice, Email, AnyURI, Body, HTMLBody, MimeContent):
                 field_elem = elem.find(cls.response_xml_elem_for_field(fieldname))
                 val = None if field_elem is None else field_elem.text.strip() if field_elem.text else None
                 if val is not None:

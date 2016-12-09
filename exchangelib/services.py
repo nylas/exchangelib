@@ -285,8 +285,7 @@ class PagingEWSMixIn(EWSService):
                 break
             if next_offset != 1 + last_offset:
                 # Guard against endless loop
-                log.warning('Unexpected next offset: %s -> %s', last_offset, next_offset)
-                break
+                raise TransportError('Unexpected next offset: %s -> %s' % (item_count, next_offset))
 
     def _get_page(self, response):
         assert len(response) == 1
@@ -947,6 +946,7 @@ class DeleteAttachment(EWSAccountService):
         for elem in message.findall(RootItemId.response_tag()):
             fake_elem.append(elem)
         return fake_elem
+
 
     def call(self, **kwargs):
         if self.protocol.version.build < EXCHANGE_2010:
