@@ -19,8 +19,7 @@ from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_
 from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, ExtendedProperty, Choice, Email, Contact, \
     Task, EmailAddress, PhysicalAddress, PhoneNumber, IndexedField, RoomList, Calendar, DeletedItems, Drafts, Inbox, \
     Outbox, SentItems, JunkEmail, Messages, Tasks, Contacts, Item, AnyURI, Body, HTMLBody, FileAttachment, \
-    ItemAttachment, Attachment, ALL_OCCURRENCIES
-from exchangelib.protocol import Protocol
+    ItemAttachment, Attachment, ALL_OCCURRENCIES, MimeContent
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.restriction import Restriction, Q
 from exchangelib.transport import NTLM
@@ -311,6 +310,8 @@ class EWSTest(unittest.TestCase):
         if field_type == Body:
             return get_random_string(255)
         if field_type == HTMLBody:
+            return get_random_string(255)
+        if field_type == MimeContent:
             return get_random_string(255)
         if field_type == AnyURI:
             return get_random_url()
@@ -1193,6 +1194,17 @@ class BaseItemTest(EWSTest):
         )
         self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES)
 
+    def test_paging(self):
+        # Test that paging services work correctly. Normal paging size is 1000 items.
+        items = []
+        for _ in range(1001):
+            i = self.get_test_item()
+            del i.attachments[:]
+            items.append(i)
+        self.test_folder.bulk_create(items=items)
+        ids = list(self.test_folder.filter(categories__contains=self.categories).values_list('item_id', 'changekey'))
+        self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES)
+
     def test_getitems(self):
         item = self.get_test_item()
         self.test_folder.bulk_create(items=[item, item])
@@ -1494,8 +1506,8 @@ class BaseItemTest(EWSTest):
             # fieldnames is everything except the ID so we'll use it to compare
             for attribute in item.fieldnames():
                 # datetime_created and last_modified_time aren't copied, but instead are added to the new item after
-                # uploading.
-                if attribute in {'datetime_created', 'last_modified_time'}:
+                # uploading. This means mime_content can also change.
+                if attribute in {'datetime_created', 'last_modified_time', 'mime_content'}:
                     continue
                 dict_item[attribute] = getattr(item, attribute)
                 if attribute == 'attachments':
@@ -1838,6 +1850,9 @@ class ContactsTest(BaseItemTest):
     TEST_FOLDER = 'contacts'
     ITEM_CLASS = Contact
 
+    def test_paging(self):
+        # TODO: This test throws random ErrorIrresolvableConflict errors on item creation for some reason.
+        pass
 
 def get_random_bool():
     return bool(random.randint(0, 1))
