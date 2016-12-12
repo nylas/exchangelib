@@ -91,8 +91,9 @@ Here are some examples of how `exchangelib` works:
     # q = (Q(subject__iexact='foo') | Q(subject__contains='bar')) & ~Q(subject__startswith='baz')
     # items = my_folder.filter(q)
     #
-    # A large part of the Django QuerySet API is supported. The QuerySet doesn't fetch anything before the QuerySet is
-    # iterated. The QuerySet returns an iterator, and results are cached when the QuerySet is iterated the first time.
+    # A large part of the Django QuerySet API is supported. The QuerySet doesn't fetch anything before the 
+    # QuerySet is iterated. The QuerySet returns an iterator, and results are cached when the QuerySet is 
+    # iterated the first time.
     # Examples:
     #
     # all_items = my_folder.all()
