@@ -29,7 +29,8 @@ Here are some examples of how `exchangelib` works:
     from exchangelib import DELEGATE, IMPERSONATION, Account, Credentials, \
         EWSDateTime, EWSTimeZone, Configuration, NTLM, CalendarItem, Message, \
         Mailbox, Q
-    from exchangelib.folders import Calendar, ExtendedProperty
+    from exchangelib.folders import Calendar, ExtendedProperty, FileAttachment, ItemAttachment, \
+        HTMLBody
 
     year, month, day = 2016, 3, 20
     tz = EWSTimeZone.timezone('Europe/Copenhagen')
@@ -141,7 +142,7 @@ Here are some examples of how `exchangelib` works:
     )
     m.send()
 
-    # Or, if you want a copy in the 'Sent' folder
+    # Or, if you want a copy in e.g. the 'Sent' folder
     m = Message(
         account=a,
         folder=a.sent,
@@ -150,6 +151,10 @@ Here are some examples of how `exchangelib` works:
         to_recipients=[Mailbox(email_address='anne@example.com')]
     )
     m.send_and_save()
+    
+    # EWS distinquishes between plain text and HTML body contents. If you want to send HTML body content, use 
+    # the HTMLBody helper. Clients will see this as HTML and display the body correctly:
+    item.body = HTMLBody('<html><body>Hello happy <blink>OWA user!</blink></body></html>')
     
     # The most common folders are available as account.calendar, account.trash, account.drafts, account.inbox,
     # account.outbox, account.sent, account.junk, account.tasks, and account.contacts.
@@ -181,4 +186,33 @@ Here are some examples of how `exchangelib` works:
     # If you change your mind, jsut remove the property again
     CalendarItem.deregister('lunch_menu')
 
-    # 'exchangelib' also has support for most item attributes, attachments, and item export and upload.
+    # It's possible to create, delete and get attachments connected to any item type:
+    # Process attachments on existing items
+    for item in my_folder.all():
+        for attachment in item.attachments:
+            local_path = os.path.join('/tmp', attachment.name)
+            with open(local_path, 'wb') as f:
+                f.write(attachment.content)
+                print('Saved attachment to', local_path)
+
+    # Create a new item with an attachment
+    item = Message(...)
+    binary_file_content = 'Hello from unicode æøå'.encode('utf-8')  # Or read from file, BytesIO etc.
+    my_file = FileAttachment(name='my_file.txt', content=binary_file_content)
+    item.attach(my_file)
+    my_calendar_item = CalendarItem(...)
+    my_appointment = ItemAttachment(name='my_appointment', item=my_calendar_item)
+    item.attach(my_appointment)
+    item.save()
+
+    # Add an attachment on an existing item
+    my_other_file = FileAttachment(name='my_other_file.txt', content=binary_file_content)
+    item.attach(my_other_file)
+
+    # Remove the attachment again
+    item.detach(my_file)
+
+    Be aware that adding and deleting attachments from items that are already created in Exchange (items that have an item_id) will update the changekey of the item.
+
+    
+    # 'exchangelib' has support for most (but not all) item attributes, and also item export and upload.
