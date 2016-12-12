@@ -19,7 +19,7 @@ from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_
 from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, ExtendedProperty, Choice, Email, Contact, \
     Task, EmailAddress, PhysicalAddress, PhoneNumber, IndexedField, RoomList, Calendar, DeletedItems, Drafts, Inbox, \
     Outbox, SentItems, JunkEmail, Messages, Tasks, Contacts, Item, AnyURI, Body, HTMLBody, FileAttachment, \
-    ItemAttachment, Attachment, ALL_OCCURRENCIES, MimeContent
+    ItemAttachment, Attachment, ALL_OCCURRENCIES, MimeContent, MessageHeader
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.restriction import Restriction, Q
 from exchangelib.transport import NTLM
@@ -327,6 +327,10 @@ class EWSTest(unittest.TestCase):
             return get_random_datetime()
         if field_type == Email:
             return get_random_email()
+        if field_type == MessageHeader:
+            return MessageHeader(name=get_random_string(10), value=get_random_string(255))
+        if field_type == [MessageHeader]:
+            return [self.random_val(MessageHeader) for _ in range(random.randint(1, 4))]
         if field_type == Attachment:
             return FileAttachment(name='my_file.txt', content=b'test_content')
         if field_type == [Attachment]:
