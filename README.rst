@@ -149,5 +149,18 @@ Here are some examples of how `exchangelib` works:
         to_recipients=[Mailbox(email_address='anne@example.com')]
     )
     m.send_and_save()
+    
+    # The most common folders are available as account.calendar, account.trash, account.drafts, account.inbox,
+    # account.outbox, account.sent, account.junk, account.tasks, and account.contacts.
+    #
+    # If you want to access other folders, you can either traverse the account.folders dictionary, or find 
+    # the folder by name, starting at a direct or indirect parent of the folder you want to find. To search the 
+    # full folder hirarchy, start the search from account.root:
+    python_dev_mail_folder = account.root.get_folder_by_name('python-dev')
+    # If you have multiple folders with the same name in your folder hierarchy, start your search further down 
+    # the hierarchy:
+    foo1_folder = account.inbox.get_folder_by_name('foo')
+    foo2_folder = python_dev_mail_folder.get_folder_by_name('foo')
+    # For more advanced folder traversing, use some_folder.get_folders()
 
-    # There is also support for most item attributes, attachments, item export and upload, and extended properties
+    # 'exchangelib' also has support for most item attributes, attachments, item export and upload, and extended properties
