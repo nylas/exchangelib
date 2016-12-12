@@ -29,7 +29,7 @@ Here are some examples of how `exchangelib` works:
     from exchangelib import DELEGATE, IMPERSONATION, Account, Credentials, \
         EWSDateTime, EWSTimeZone, Configuration, NTLM, CalendarItem, Message, \
         Mailbox, Q
-    from exchangelib.folders import Calendar
+    from exchangelib.folders import Calendar, ExtendedProperty
 
     year, month, day = 2016, 3, 20
     tz = EWSTimeZone.timezone('Europe/Copenhagen')
@@ -154,8 +154,8 @@ Here are some examples of how `exchangelib` works:
     # account.outbox, account.sent, account.junk, account.tasks, and account.contacts.
     #
     # If you want to access other folders, you can either traverse the account.folders dictionary, or find 
-    # the folder by name, starting at a direct or indirect parent of the folder you want to find. To search the 
-    # full folder hirarchy, start the search from account.root:
+    # the folder by name, starting at a direct or indirect parent of the folder you want to find. To search 
+    # the full folder hirarchy, start the search from account.root:
     python_dev_mail_folder = account.root.get_folder_by_name('python-dev')
     # If you have multiple folders with the same name in your folder hierarchy, start your search further down 
     # the hierarchy:
@@ -163,4 +163,21 @@ Here are some examples of how `exchangelib` works:
     foo2_folder = python_dev_mail_folder.get_folder_by_name('foo')
     # For more advanced folder traversing, use some_folder.get_folders()
 
-    # 'exchangelib' also has support for most item attributes, attachments, item export and upload, and extended properties
+    # If folder items have extended properties, you need to register them before you can access them. Create
+    # a subclass of ExtendedProperty and set your custom property_id: 
+    class LunchMenu(ExtendedProperty):
+        property_id = '12345678-1234-1234-1234-123456781234'
+        property_name = 'Catering from the cafeteria'
+        property_type = 'String'
+
+    # Register the property on the item type of your choice
+    CalendarItem.register('lunch_menu', LunchMenu)
+    # Now your property is available as the attribute 'lunch_menu', just like any other attribute
+    item = CalendarItem(..., lunch_menu='Foie gras et consommé de légumes')
+    item.save()
+    for i in account.calendar.all():
+        print(i.lunch_menu)
+    # If you change your mind, jsut remove the property again
+    CalendarItem.deregister('lunch_menu')
+
+    # 'exchangelib' also has support for most item attributes, attachments, and item export and upload.
