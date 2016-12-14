@@ -305,7 +305,7 @@ class EWSTest(unittest.TestCase):
             print('Copy settings.yml.sample to settings.yml and enter values for your test server')
             raise unittest.SkipTest('Skipping %s - no settings.yml file found' % self.__class__.__name__)
         self.tz = EWSTimeZone.timezone('Europe/Copenhagen')
-        self.categories = ['Test']
+        self.categories = [get_random_string(length=6, spaces=False, special=False)]
         self.config = Configuration(server=settings['server'],
                                     credentials=Credentials(settings['username'], settings['password']),
                                     verify_ssl=settings['verify_ssl'])
@@ -800,9 +800,10 @@ class BaseItemTest(EWSTest):
             test_items.append(item)
         self.test_folder.bulk_create(items=test_items)
         qs = QuerySet(self.test_folder).filter(categories__contains=self.categories)
+        test_cat = self.categories[0]
         self.assertEqual(
             set((i.subject, i.categories[0]) for i in qs),
-            {('Item 0', 'Test'), ('Item 1', 'Test'), ('Item 2', 'Test'), ('Item 3', 'Test')}
+            {('Item 0', test_cat), ('Item 1', test_cat), ('Item 2', test_cat), ('Item 3', test_cat)}
         )
         self.assertEqual(
             [(i.subject, i.categories[0]) for i in qs.none()],
@@ -810,11 +811,11 @@ class BaseItemTest(EWSTest):
         )
         self.assertEqual(
             [(i.subject, i.categories[0]) for i in qs.filter(subject__startswith='Item 2')],
-            [('Item 2', 'Test')]
+            [('Item 2', test_cat)]
         )
         self.assertEqual(
             set((i.subject, i.categories[0]) for i in qs.exclude(subject__startswith='Item 2')),
-            {('Item 0', 'Test'), ('Item 1', 'Test'), ('Item 3', 'Test')}
+            {('Item 0', test_cat), ('Item 1', test_cat), ('Item 3', test_cat)}
         )
         self.assertEqual(
             set((i.subject, i.categories) for i in qs.only('subject')),
@@ -822,19 +823,19 @@ class BaseItemTest(EWSTest):
         )
         self.assertEqual(
             [(i.subject, i.categories[0]) for i in qs.order_by('subject')],
-            [('Item 0', 'Test'), ('Item 1', 'Test'), ('Item 2', 'Test'), ('Item 3', 'Test')]
+            [('Item 0', test_cat), ('Item 1', test_cat), ('Item 2', test_cat), ('Item 3', test_cat)]
         )
         self.assertEqual(  # Test '-some_field' syntax for reverse sorting
             [(i.subject, i.categories[0]) for i in qs.order_by('-subject')],
-            [('Item 3', 'Test'), ('Item 2', 'Test'), ('Item 1', 'Test'), ('Item 0', 'Test')]
+            [('Item 3', test_cat), ('Item 2', test_cat), ('Item 1', test_cat), ('Item 0', test_cat)]
         )
         self.assertEqual(  # Test ordering on a field that we don't need to fetch
             [(i.subject, i.categories[0]) for i in qs.order_by('-subject').only('categories')],
-            [(None, 'Test'), (None, 'Test'), (None, 'Test'), (None, 'Test')]
+            [(None, test_cat), (None, test_cat), (None, test_cat), (None, test_cat)]
         )
         self.assertEqual(
             [(i.subject, i.categories[0]) for i in qs.order_by('subject').reverse()],
-            [('Item 3', 'Test'), ('Item 2', 'Test'), ('Item 1', 'Test'), ('Item 0', 'Test')]
+            [('Item 3', test_cat), ('Item 2', test_cat), ('Item 1', test_cat), ('Item 0', test_cat)]
         )
         self.assertEqual(
             [i for i in qs.order_by('subject').values('subject')],
@@ -854,16 +855,16 @@ class BaseItemTest(EWSTest):
         )
         self.assertEqual(
             set((i.subject, i.categories[0]) for i in qs.exclude(subject__startswith='Item 2')),
-            {('Item 0', 'Test'), ('Item 1', 'Test'), ('Item 3', 'Test')}
+            {('Item 0', test_cat), ('Item 1', test_cat), ('Item 3', test_cat)}
         )
         # Test that we can sort on a field that we don't want
         self.assertEqual(
             [i.categories[0] for i in qs.only('categories').order_by('subject')],
-            ['Test', 'Test', 'Test', 'Test']
+            [test_cat, test_cat, test_cat, test_cat]
         )
         self.assertEqual(
             set((i.subject, i.categories[0]) for i in qs.iterator()),
-            {('Item 0', 'Test'), ('Item 1', 'Test'), ('Item 2', 'Test'), ('Item 3', 'Test')}
+            {('Item 0', test_cat), ('Item 1', test_cat), ('Item 2', test_cat), ('Item 3', test_cat)}
         )
         self.assertEqual(qs.get(subject='Item 3').subject, 'Item 3')
         with self.assertRaises(DoesNotExist):
