@@ -1900,7 +1900,7 @@ class Folder(EWSElement):
             assert self.folder_id
         if self.folder_id:
             assert self.changekey
-        log.debug('%s created for %s', self.__class__.__name__, account)
+        log.debug('%s created for %s', self, account)
 
     @property
     def is_distinguished(self):
