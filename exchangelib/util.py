@@ -91,9 +91,12 @@ def xml_text_to_value(value, field_type):
         return None
     from .ewsdatetime import EWSDateTime
     from .folders import Choice, Email, AnyURI, Body, HTMLBody, MimeContent
-    if field_type in (str, Choice, Email, AnyURI, Body, HTMLBody, MimeContent):
-        # Return string types unprocessed
+    if field_type == str:
+        # Return builtin str unprocessed
         return value
+    if field_type in (Choice, Email, AnyURI, Body, HTMLBody, MimeContent):
+        # Cast string-like values to their intended class
+        return field_type(value)
     return {
         bool: lambda v: True if v == 'true' else False if v == 'false' else None,
         int: lambda v: int(v),
