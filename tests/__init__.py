@@ -293,8 +293,10 @@ class UtilTest(unittest.TestCase):
 class EWSTest(unittest.TestCase):
     def setUp(self):
         # There's no official Exchange server we can test against, and we can't really provide credentials for our
-        # own test server to anyone on the Internet. You need to create your own settings.yml with credentials for
-        # your own test server. 'settings.yml.sample' is provided as a template.
+        # own test server to everyone on the Internet. Travis-CI uses the encrypted settings.yml.enc for testing.
+        #
+        # If you want to test against your own server and account, create your own settings.yml with credentials for
+        # that server. 'settings.yml.sample' is provided as a template.
         try:
             with open(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'settings.yml')) as f:
                 settings = load(f)
