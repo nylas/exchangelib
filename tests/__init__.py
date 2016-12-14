@@ -299,7 +299,7 @@ class EWSTest(unittest.TestCase):
         self.config = Configuration(server=settings['server'],
                                     credentials=Credentials(settings['username'], settings['password']),
                                     verify_ssl=settings['verify_ssl'])
-        self.account = Account(primary_smtp_address=settings['account'], access_type=DELEGATE, config=self.config)
+        self.account = Account(primary_smtp_address=settings['account'], access_type=DELEGATE, config=self.config, locale='da_DK')
         self.maxDiff = None
 
     def random_val(self, field_type):
@@ -496,7 +496,7 @@ class CommonTest(EWSTest):
         from exchangelib.autodiscover import _autodiscover_cache
         _autodiscover_cache.clear()
         account = Account(primary_smtp_address=self.account.primary_smtp_address, credentials=self.config.credentials,
-                          autodiscover=True)
+                          autodiscover=True, locale='da_DK')
         self.assertEqual(account.primary_smtp_address, self.account.primary_smtp_address)
         self.assertEqual(account.protocol.service_endpoint.lower(), self.config.protocol.service_endpoint.lower())
         self.assertEqual(account.protocol.version.build, self.config.protocol.version.build)
@@ -504,7 +504,7 @@ class CommonTest(EWSTest):
         self.assertTrue((account.domain, self.config.credentials, True) in _autodiscover_cache)
         # Test that autodiscover works with a full cache
         account = Account(primary_smtp_address=self.account.primary_smtp_address, credentials=self.config.credentials,
-                          autodiscover=True)
+                          autodiscover=True, locale='da_DK')
         self.assertEqual(account.primary_smtp_address, self.account.primary_smtp_address)
         # Test cache manipulation
         key = (account.domain, self.config.credentials, True)
