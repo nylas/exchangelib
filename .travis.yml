@@ -7,13 +7,13 @@ python:
 # command to install dependencies
 # PyYAML is a test dependency but Travis doesn't read tests_require from setup.py
 install:
-  - "python setup.py -q install"
+  - "python setup.py install"
   - "pip install PyYAML"
   - "pip install coverage"
   - "pip install coveralls"
 # command to run tests
 script:
-  - "nosetests tests"
+#  - "nosetests tests"
   - "coverage run --source=exchangelib setup.py test"
 after_success:
     coveralls
