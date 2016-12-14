@@ -159,12 +159,12 @@ def to_xml(text, encoding):
     try:
         return fromstring(processed)
     except ParseError:
-        from io import StringIO
+        from io import BytesIO
         from lxml.etree import XMLParser, parse, tostring
         # Exchange servers may spit out the weirdest XML. lxml is pretty good at recovering from errors
         log.warning('Fallback to lxml processing of faulty XML')
         magical_parser = XMLParser(encoding=encoding or 'utf-8', recover=True)
-        root = parse(StringIO(processed), magical_parser)
+        root = parse(BytesIO(processed), magical_parser)
         try:
             return fromstring(tostring(root))
         except ParseError as e:
@@ -175,6 +175,8 @@ def to_xml(text, encoding):
                 offending_line = ''
             offending_excerpt = offending_line[max(0, col_no - 20):col_no + 20].decode('ascii', 'ignore')
             raise ParseError('%s\nOffending text: [...]%s[...]' % (str(e), offending_excerpt)) from e
+        except  TypeError:
+            raise ParseError('This is not XML: %s' % text)
 
 
 def is_xml(text):

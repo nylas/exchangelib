@@ -8,6 +8,7 @@ import time
 
 import requests
 from yaml import load
+from xml.etree.ElementTree import ParseError
 
 from exchangelib import close_connections
 from exchangelib.account import Account
@@ -24,7 +25,7 @@ from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.restriction import Restriction, Q
 from exchangelib.transport import NTLM
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms
-from exchangelib.util import xml_to_str, chunkify, peek, get_redirect_url
+from exchangelib.util import xml_to_str, chunkify, peek, get_redirect_url, to_xml, BOM
 from exchangelib.version import Build
 
 
@@ -280,6 +281,13 @@ class UtilTest(unittest.TestCase):
 
     def test_close_connections(self):
         close_connections()
+
+    def test_to_xml(self):
+        to_xml('<?xml version="1.0" encoding="UTF-8"?><foo></foo>', encoding='ascii')
+        to_xml(BOM+'<?xml version="1.0" encoding="UTF-8"?><foo></foo>', encoding='ascii')
+        to_xml(BOM+'<?xml version="1.0" encoding="UTF-8"?><foo>&broken</foo>', encoding='ascii')
+        with self.assertRaises(ParseError):
+            to_xml('foo', encoding='ascii')
 
 
 class EWSTest(unittest.TestCase):
