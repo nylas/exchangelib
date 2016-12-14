@@ -1,19 +1,14 @@
 language: python
 python:
-  - "3.4"
-  - "3.5"
-  - "3.6-dev" # 3.6 development branch
-  - "nightly"
-# command to install dependencies
-# PyYAML is a test dependency but Travis doesn't read tests_require from setup.py
+- '3.4'
+- '3.5'
+- 3.6-dev
+- nightly
 install:
-  - "python setup.py install"
-  - "pip install PyYAML"
-  - "pip install coverage"
-  - "pip install coveralls"
-# command to run tests
+- python setup.py install
+- pip install PyYAML
+- pip install coverage
+- pip install coveralls
 script:
-#  - "nosetests tests"
-  - "coverage run --source=exchangelib setup.py test"
-after_success:
-    coveralls
+- coverage run --source=exchangelib setup.py test
+after_success: coveralls
