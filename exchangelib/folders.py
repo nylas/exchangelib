@@ -1457,7 +1457,7 @@ class CalendarItem(ItemMixIn):
                 else False if (k in self.required_fields() and field_type == bool) else None
             v = kwargs.pop(k, default)
             if k in ('start', 'end') and v and not getattr(v, 'tzinfo'):
-                raise ValueError("'%s' must be timezone aware")
+                raise ValueError("'%s' must be timezone aware" % k)
             if field_type == Choice:
                 assert v is None or v in self.choices_for_field(k), (v, self.choices_for_field(k))
             setattr(self, k, v)
@@ -2233,8 +2233,10 @@ class CalendarView(EWSElement):
             raise ValueError("'start' must be an EWSDateTime")
         if not isinstance(end, EWSDateTime):
             raise ValueError("'end' must be an EWSDateTime")
-        if not isinstance(end, EWSDateTime):
-            raise ValueError("'end' must be an EWSDateTime")
+        if not getattr(start, 'tzinfo'):
+            raise ValueError("'start' must be timezone aware")
+        if not getattr(end, 'tzinfo'):
+            raise ValueError("'end' must be timezone aware")
         if end < start:
             raise AttributeError("'start' must be before 'end'")
         if max_items is not None:

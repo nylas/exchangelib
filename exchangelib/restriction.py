@@ -99,6 +99,8 @@ class Q:
                 self.op = op
                 if isinstance(value, EWSDateTime):
                     # We want to convert all values to UTC
+                    if not getattr(value, 'tzinfo'):
+                        raise ValueError("'%s' must be timezone aware" % field)
                     self.value = value.astimezone(UTC)
                 else:
                     self.value = value
