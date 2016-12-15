@@ -21,12 +21,16 @@ from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, Extend
     Task, EmailAddress, PhysicalAddress, PhoneNumber, IndexedField, RoomList, Calendar, DeletedItems, Drafts, Inbox, \
     Outbox, SentItems, JunkEmail, Messages, Tasks, Contacts, Item, AnyURI, Body, HTMLBody, FileAttachment, \
     ItemAttachment, Attachment, ALL_OCCURRENCIES, MimeContent, MessageHeader
+from exchangelib.protocol import BaseProtocol
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.restriction import Restriction, Q
 from exchangelib.transport import NTLM
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms
 from exchangelib.util import xml_to_str, chunkify, peek, get_redirect_url, to_xml, BOM
 from exchangelib.version import Build
+
+# Travis runs tests in parallel. Limit the connection pool to not overload the test server
+BaseProtocol.SESSION_POOLSIZE = 2
 
 
 class BuildTest(unittest.TestCase):
@@ -311,6 +315,9 @@ class EWSTest(unittest.TestCase):
                                     verify_ssl=settings['verify_ssl'])
         self.account = Account(primary_smtp_address=settings['account'], access_type=DELEGATE, config=self.config, locale='da_DK')
         self.maxDiff = None
+
+    def test_poolsize(self):
+        self.assertEqual(self.config.protocol.SESSION_POOLSIZE, 2)
 
     def random_val(self, field_type):
         if not isinstance(field_type, list) and issubclass(field_type, ExtendedProperty):
