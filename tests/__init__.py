@@ -1804,25 +1804,28 @@ class CalendarTest(BaseItemTest):
         with self.assertRaises(ValueError):
             self.test_folder.view(start=item1.start, end=item1.end, max_items=0)
 
+        def match_cat(i):
+            return set(i.categories) == set(self.categories)
+
         # Test dates
-        self.assertEqual(len(self.test_folder.view(start=item1.start, end=item1.end)), 1)
-        self.assertEqual(len(self.test_folder.view(start=item1.start, end=item2.end)), 2)
+        self.assertEqual(len([i for i in self.test_folder.view(start=item1.start, end=item1.end) if match_cat(i)]), 1)
+        self.assertEqual(len([i for i in self.test_folder.view(start=item1.start, end=item2.end) if match_cat(i)]), 2)
         # Edge cases. Get view from end of item1 to start of item2. Should logically return 0 items, but Exchange wants
         # it differently and returns item1 even though there is no overlap.
-        self.assertEqual(len(self.test_folder.view(start=item1.end, end=item2.start)), 1)
-        self.assertEqual(len(self.test_folder.view(start=item1.start, end=item2.start)), 1)
+        self.assertEqual(len([i for i in self.test_folder.view(start=item1.end, end=item2.start) if match_cat(i)]), 1)
+        self.assertEqual(len([i for i in self.test_folder.view(start=item1.start, end=item2.start) if match_cat(i)]), 1)
 
         # Test max_items
-        self.assertEqual(len(self.test_folder.view(start=item1.start, end=item2.end, max_items=10)), 2)
+        self.assertEqual(len([i for i in self.test_folder.view(start=item1.start, end=item2.end, max_items=10) if match_cat(i)]), 2)
         self.assertEqual(len(self.test_folder.view(start=item1.start, end=item2.end, max_items=1)), 1)
 
         # Test chaining
         qs = self.test_folder.view(start=item1.start, end=item2.end)
-        self.assertEqual(qs.count(), 2)
+        self.assertTrue(qs.count() >= 2)
         with self.assertRaises(ErrorInvalidOperation):
             qs.filter(subject=item1.subject).count()  # EWS does not allow restrictions
         self.assertListEqual(
-            [i for i in qs.order_by('subject').values('subject')],
+            [i for i in qs.order_by('subject').values('subject') if i['subject'] in (item1.subject, item2.subject)],
             [{'subject': item1.subject}, {'subject': item2.subject}]
         )
 
