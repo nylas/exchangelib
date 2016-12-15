@@ -305,7 +305,7 @@ class EWSTest(unittest.TestCase):
             print('Copy settings.yml.sample to settings.yml and enter values for your test server')
             raise unittest.SkipTest('Skipping %s - no settings.yml file found' % self.__class__.__name__)
         self.tz = EWSTimeZone.timezone('Europe/Copenhagen')
-        self.categories = [get_random_string(length=6, spaces=False, special=False)]
+        self.categories = [get_random_string(length=10, spaces=False, special=False)]
         self.config = Configuration(server=settings['server'],
                                     credentials=Credentials(settings['username'], settings['password']),
                                     verify_ssl=settings['verify_ssl'])
@@ -1339,7 +1339,7 @@ class BaseItemTest(EWSTest):
 
     def test_move_to_trash(self):
         # First, empty trash bin
-        self.account.trash.all().delete()
+        self.account.trash.filter(categories__contains=self.categories).delete()
         item = self.get_test_item().save()
         item_id = (item.item_id, item.changekey)
         # Move to trash
@@ -1357,7 +1357,7 @@ class BaseItemTest(EWSTest):
 
     def test_move(self):
         # First, empty trash bin
-        self.account.trash.all().delete()
+        self.account.trash.filter(categories__contains=self.categories).delete()
         item = self.get_test_item().save()
         item_id = (item.item_id, item.changekey)
         # Move to trash. We use trash because it can contain all item types. This changes the ItemId

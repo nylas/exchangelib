@@ -14,6 +14,7 @@ from .folders import Root, Calendar, DeletedItems, Drafts, Inbox, Outbox, SentIt
     SEND_MEETING_INVITATIONS_CHOICES, SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES, \
     SEND_MEETING_CANCELLATIONS_CHOICES
 from .services import ExportItems, UploadItems
+from .queryset import QuerySet
 from .protocol import Protocol
 from .services import GetItem, CreateItem, UpdateItem, DeleteItem, MoveItem, SendItem
 from .util import get_domain, peek
@@ -278,6 +279,11 @@ class Account:
             send_meeting_cancellations,
             affected_task_occurrences,
         )
+        # 'ids' could be an unevaluated QuerySet, e.g. if we ended up here via `some_folder.filter(...).delete()`. In
+        # that case, we want to evaluate it now. Otherwise, peek() will start a count() which is wasteful because we
+        # need the item IDs immediately afterwards. iterator() will do the bare minimum.
+        if isinstance(ids, QuerySet):
+            ids = ids.iterator()
         is_empty, ids = peek(ids)
         if is_empty:
             # We accept generators, so it's not always convenient for caller to know up-front if 'items' is empty. Allow
