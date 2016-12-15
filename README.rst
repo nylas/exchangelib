@@ -102,7 +102,10 @@ Here are some examples of how `exchangelib` works:
     # filtered_items = my_folder.filter(subject__contains='foo').exclude(categories__contains='bar')
     # sparse_items = my_folder.all().only('subject', 'start')
     # status_report = my_folder.all().delete()
-    # items_for_2017 = my_calendar.filter(start__range=(EWSDateTime(2016, 1, 1), EWSDateTime(2017, 1, 1)))
+    # items_for_2017 = my_calendar.filter(start__range=(
+    #     tz.localize(EWSDateTime(2017, 1, 1)), 
+    #     tz.localize(EWSDateTime(2018, 1, 1))
+    # ))
     # item = my_folder.get(subject='unique_string')
     # ordered_items = my_folder.all().order_by('subject')
     # n = my_folder.all().count()
