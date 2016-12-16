@@ -1,3 +1,4 @@
+# coding=utf-8
 """
 Autodiscover is a Microsoft method for automatically getting the hostname of the Exchange server and the server
 version of the server holding the email address using only the email address and password of the user (and possibly
@@ -8,22 +9,25 @@ http://msdn.microsoft.com/en-us/library/office/dn467392(v=exchg.150).aspx. This 
 WARNING: We are taking many shortcuts here, like assuming SSL and following 302 Redirects automatically.
 If you have problems autodiscovering, start by doing an official test at https://testconnectivity.microsoft.com
 """
+from __future__ import unicode_literals
 
 import logging
-from threading import Lock
-import queue
-import shelve
 import os
+import shelve
 import tempfile
+from threading import Lock
 
 import dns.resolver
+import queue
 import requests.exceptions
+from future.utils import raise_from, PY2, python_2_unicode_compatible
+from six import text_type
 
+from . import transport
 from .credentials import Credentials
 from .errors import AutoDiscoverFailed, AutoDiscoverRedirect, AutoDiscoverCircularRedirect, TransportError, \
     RedirectError, ErrorNonExistentMailbox
 from .protocol import BaseProtocol, Protocol
-from . import transport
 from .util import create_element, get_xml_attr, add_xml_child, to_xml, is_xml, post_ratelimited, get_redirect_url, \
     xml_to_str, get_domain
 
@@ -36,11 +40,25 @@ RESPONSE_NS = 'http://schemas.microsoft.com/exchange/autodiscover/outlook/respon
 
 TIMEOUT = 10  # Seconds
 
-
 AUTODISCOVER_PERSISTENT_STORAGE = os.path.join(tempfile.gettempdir(), 'exchangelib.cache')
 
+if PY2:
+    from contextlib import contextmanager
 
-class AutodiscoverCache:
+
+    @contextmanager
+    def shelve_open(*args, **kwargs):
+        shelve_handle = shelve.open(*args, **kwargs)
+        try:
+            yield shelve_handle
+        finally:
+            shelve_handle.close()
+else:
+    shelve_open = shelve.open
+
+
+@python_2_unicode_compatible
+class AutodiscoverCache(object):
     # Stores the translation from (email domain, credentials) -> AutodiscoverProtocol object so we can re-use TCP
     # connections to an autodiscover server within the same process. Also persists the email domain -> (autodiscover
     # endpoint URL, auth_type) translation to the filesystem so the cache can be shared between multiple processes.
@@ -67,13 +85,13 @@ class AutodiscoverCache:
 
     def clear(self):
         # Wipe the entire cache
-        with shelve.open(self._storage_file) as db:
+        with shelve_open(self._storage_file) as db:
             db.clear()
         self._protocols.clear()
 
     def __contains__(self, key):
         domain, credentials, verify_ssl = key
-        with shelve.open(self._storage_file) as db:
+        with shelve_open(self._storage_file) as db:
             return domain in db
 
     def __getitem__(self, key):
@@ -81,7 +99,7 @@ class AutodiscoverCache:
         if protocol:
             return protocol
         domain, credentials, verify_ssl = key
-        with shelve.open(self._storage_file) as db:
+        with shelve_open(self._storage_file) as db:
             endpoint, auth_type = db[domain]  # It's OK to fail with KeyError here
         protocol = AutodiscoverProtocol(service_endpoint=endpoint, credentials=credentials, auth_type=auth_type,
                                         verify_ssl=verify_ssl)
@@ -91,7 +109,7 @@ class AutodiscoverCache:
     def __setitem__(self, key, protocol):
         # Populate both local and persistent cache
         domain, credentials, verify_ssl = key
-        with shelve.open(self._storage_file) as db:
+        with shelve_open(self._storage_file) as db:
             db[domain] = (protocol.service_endpoint, protocol.auth_type)
         self._protocols[key] = protocol
 
@@ -99,7 +117,7 @@ class AutodiscoverCache:
         # Empty both local and persistent cache. Don't fail on non-existing entries because we could end here
         # multiple times due to race conditions.
         domain, credentials, verify_ssl = key
-        with shelve.open(self._storage_file) as db:
+        with shelve_open(self._storage_file) as db:
             try:
                 del db[domain]
             except KeyError:
@@ -125,7 +143,7 @@ class AutodiscoverCache:
             pass
 
     def __str__(self):
-        return str(self._protocols)
+        return text_type(self._protocols)
 
 
 _autodiscover_cache = AutodiscoverCache()
@@ -168,7 +186,7 @@ def discover(email, credentials, verify_ssl=True):
         except AutoDiscoverRedirect as e:
             log.debug('%s redirects to %s', email, e.redirect_email)
             if email.lower() == e.redirect_email.lower():
-                raise AutoDiscoverCircularRedirect('Redirect to same email address: %s' % email) from e
+                raise_from(AutoDiscoverCircularRedirect('Redirect to same email address: %s' % email), e)
             # Start over with the new email address
             try:
                 return discover(email=e.redirect_email, credentials=credentials, verify_ssl=verify_ssl)
@@ -197,7 +215,7 @@ def discover(email, credentials, verify_ssl=True):
                 return primary_smtp_address, protocol
             except AutoDiscoverRedirect as e:
                 if email.lower() == e.redirect_email.lower():
-                    raise AutoDiscoverCircularRedirect('Redirect to same email address: %s' % email) from e
+                    raise_from(AutoDiscoverCircularRedirect('Redirect to same email address: %s' % email), e)
                 log.debug('%s redirects to %s', email, e.redirect_email)
                 email = e.redirect_email
             finally:
@@ -266,8 +284,8 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl, verify, auth_t
                 redirect_hostname = redirect_hostname[4:]
             if redirect_hostname == hostname:
                 log.debug('We were redirected to the same host')
-                raise AutoDiscoverFailed('We were redirected to the same host') from e
-            raise RedirectError(url='%s://%s' % ('https' if redirect_has_ssl else 'http', redirect_hostname)) from e
+                raise_from(AutoDiscoverFailed('We were redirected to the same host'), e)
+            raise_from(RedirectError(url='%s://%s' % ('https' if redirect_has_ssl else 'http', redirect_hostname)), e)
 
     autodiscover_protocol = AutodiscoverProtocol(service_endpoint=url, credentials=credentials, auth_type=auth_type,
                                                  verify_ssl=verify)
@@ -325,7 +343,7 @@ def _get_autodiscover_auth_type(url, email, verify, encoding='utf-8'):
         if isinstance(e, RedirectError):
             raise
         log.debug('Error guessing auth type: %s', e)
-        raise AutoDiscoverFailed('Error guessing auth type: %s' % e) from e
+        raise_from(AutoDiscoverFailed('Error guessing auth type: %s' % e), e)
 
 
 def _get_autodiscover_payload(email, encoding='utf-8'):
@@ -462,23 +480,24 @@ def _get_hostname_from_srv(hostname):
                 vals = rdata.to_text().strip().rstrip('.').split(' ')
                 priority, weight, port, svr = int(vals[0]), int(vals[1]), int(vals[2]), vals[3]
             except (ValueError, KeyError) as e:
-                raise AutoDiscoverFailed('Incompatible SRV record for %s (%s)' % (hostname, rdata.to_text())) from e
+                raise_from(AutoDiscoverFailed('Incompatible SRV record for %s (%s)' % (hostname, rdata.to_text())), e)
             else:
                 return svr
     except dns.resolver.NoNameservers as e:
-        raise AutoDiscoverFailed('No name servers for %s' % hostname) from e
+        raise_from(AutoDiscoverFailed('No name servers for %s' % hostname), e)
     except dns.resolver.NoAnswer as e:
-        raise AutoDiscoverFailed('No SRV record for %s' % hostname) from e
+        raise_from(AutoDiscoverFailed('No SRV record for %s' % hostname), e)
     except dns.resolver.NXDOMAIN as e:
-        raise AutoDiscoverFailed('Nonexistent domain %s' % hostname) from e
+        raise_from(AutoDiscoverFailed('Nonexistent domain %s' % hostname), e)
 
 
+@python_2_unicode_compatible
 class AutodiscoverProtocol(BaseProtocol):
     # Protocol which implements the bare essentials for autodiscover
     TIMEOUT = TIMEOUT
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super(AutodiscoverProtocol, self).__init__(*args, **kwargs)
         self._session_pool = queue.LifoQueue(maxsize=self.SESSION_POOLSIZE)
         for _ in range(self.SESSION_POOLSIZE):
             self._session_pool.put(self.create_session(), block=False)

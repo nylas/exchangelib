@@ -1,12 +1,14 @@
-import os
-import unittest
+# coding=utf-8
 import datetime
+import os
 import random
 import string
-from decimal import Decimal
 import time
+import unittest
+from decimal import Decimal
 
 import requests
+from six import PY2, string_types, text_type
 from yaml import load
 from xml.etree.ElementTree import ParseError
 
@@ -25,12 +27,15 @@ from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, Extend
 from exchangelib.protocol import BaseProtocol
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.restriction import Restriction, Q
-from exchangelib.transport import NTLM
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms
-from exchangelib.util import xml_to_str, chunkify, peek, get_redirect_url, to_xml, BOM
+from exchangelib.transport import NTLM
+from exchangelib.util import xml_to_str, chunkify, peek, get_redirect_url, isanysubclass, to_xml, BOM
 from exchangelib.version import Build
 
-# Travis runs tests in parallel. Limit the connection pool to not overload the test server
+if PY2:
+    FileNotFoundError = OSError
+
+    # Travis runs tests in parallel. Limit the connection pool to not overload the test server
 BaseProtocol.SESSION_POOLSIZE = 2
 
 
@@ -123,7 +128,8 @@ class RestrictionTest(unittest.TestCase):
         self.maxDiff = None
 
     def test_parse(self):
-        r = Restriction.from_source("start > '2016-01-15T13:45:56Z' and (not subject == 'EWS Test')", folder_class=Calendar)
+        r = Restriction.from_source("start > '2016-01-15T13:45:56Z' and (not subject == 'EWS Test')",
+                                    folder_class=Calendar)
         result = '''\
 <m:Restriction>
     <t:And>
@@ -318,9 +324,9 @@ class EWSTest(unittest.TestCase):
         self.assertEqual(self.config.protocol.SESSION_POOLSIZE, 2)
 
     def random_val(self, field_type):
-        if not isinstance(field_type, list) and issubclass(field_type, ExtendedProperty):
+        if not isinstance(field_type, list) and isanysubclass(field_type, ExtendedProperty):
             field_type = field_type.python_type()
-        if field_type == str:
+        if field_type == string_types[0]:
             return get_random_string(255)
         if field_type == Body:
             return get_random_string(255)
@@ -330,7 +336,7 @@ class EWSTest(unittest.TestCase):
             return get_random_string(255)
         if field_type == AnyURI:
             return get_random_url()
-        if field_type == [str]:
+        if field_type == [string_types[0]]:
             return [get_random_string(16) for _ in range(random.randint(1, 4))]
         if field_type == int:
             return get_random_int(0, 256)
@@ -434,7 +440,7 @@ class CommonTest(EWSTest):
             items.append(item)
         return_ids = self.account.calendar.bulk_create(items=items)
         self.assertEqual(len(return_ids), len(items))
-        ids = self.account.calendar.filter(start__lt=end, end__gt=start, categories__contains=self.categories)\
+        ids = self.account.calendar.filter(start__lt=end, end__gt=start, categories__contains=self.categories) \
             .values_list('item_id', 'changekey')
         self.assertEqual(len(ids), len(items))
         items = self.account.fetch(return_ids)
@@ -694,10 +700,10 @@ class BaseItemTest(EWSTest):
     def setUpClass(cls):
         if cls is BaseItemTest:
             raise unittest.SkipTest("Skip BaseItemTest, it's only for inheritance")
-        super().setUpClass()
+        super(BaseItemTest, cls).setUpClass()
 
     def setUp(self):
-        super().setUp()
+        super(BaseItemTest, self).setUp()
         self.test_folder = getattr(self.account, self.TEST_FOLDER)
         self.assertEqual(self.test_folder.DISTINGUISHED_FOLDER_ID, self.TEST_FOLDER)
         self.test_folder.filter(categories__contains=self.categories).delete()
@@ -733,7 +739,8 @@ class BaseItemTest(EWSTest):
                 # Start with an incomplete task
                 status = get_random_choice(Task.choices_for_field(f) - {Task.COMPLETED})
                 insert_kwargs[f] = status
-                insert_kwargs['percent_complete'] = Decimal(0) if status == Task.NOT_STARTED else get_random_decimal(0, 100)
+                insert_kwargs['percent_complete'] = Decimal(0) if status == Task.NOT_STARTED else get_random_decimal(0,
+                                                                                                                     100)
                 continue
             if f == 'percent_complete':
                 continue
@@ -790,7 +797,7 @@ class BaseItemTest(EWSTest):
                 continue
             field_type = self.ITEM_CLASS.type_for_field(f)
             if field_type == bool:
-                update_kwargs[f] = not(insert_kwargs[f])
+                update_kwargs[f] = not (insert_kwargs[f])
                 continue
             if field_type == Choice:
                 update_kwargs[f] = get_random_choice(self.ITEM_CLASS.choices_for_field(f))
@@ -1574,7 +1581,8 @@ class BaseItemTest(EWSTest):
         self.assertEqual(len(wipe_ids), 1)
         self.assertEqual(len(wipe_ids[0]), 2, wipe_ids)
         self.assertEqual(insert_ids[0].item_id, wipe_ids[0][0])  # ID should be the same
-        self.assertNotEqual(insert_ids[0].changekey, wipe_ids[0][1])  # Changekey should not be the same when item is updated
+        self.assertNotEqual(insert_ids[0].changekey,
+                            wipe_ids[0][1])  # Changekey should not be the same when item is updated
         item = self.account.fetch(wipe_ids)[0]
         for f in self.ITEM_CLASS.fieldnames():
             if f in self.ITEM_CLASS.required_fields():
@@ -1666,9 +1674,9 @@ class BaseItemTest(EWSTest):
                 # If it is the one returning the error
                 self.assertIsInstance(result, tuple)
                 self.assertEqual(result[0], False)
-                self.assertIsInstance(result[1], str)
+                self.assertIsInstance(result[1], text_type)
             else:
-                self.assertIsInstance(result, str)
+                self.assertIsInstance(result, text_type)
 
         # Clean up after yourself
         del ids[3]  # Sending the deleted one through will cause an error
@@ -1982,6 +1990,7 @@ class ContactsTest(BaseItemTest):
         # TODO: This test throws random ErrorIrresolvableConflict errors on item creation for some reason.
         pass
 
+
 def get_random_bool():
     return bool(random.randint(0, 1))
 
@@ -2043,19 +2052,20 @@ def get_random_datetime(start_date=datetime.date(1900, 1, 1), end_date=datetime.
     # Create a random datetime with minute precision
     random_date = get_random_date(start_date=start_date, end_date=end_date)
     random_datetime = datetime.datetime.combine(random_date, datetime.time.min) \
-                      + datetime.timedelta(minutes=random.randint(0, 60*24))
+                      + datetime.timedelta(minutes=random.randint(0, 60 * 24))
     return UTC.localize(EWSDateTime.from_datetime(random_datetime))
 
 
 def get_random_datetime_range():
     # Create two random datetimes. Calendar items raise ErrorCalendarDurationIsTooLong if duration is > 5 years.
     dt1 = get_random_datetime()
-    dt2 = dt1 + datetime.timedelta(minutes=random.randint(0, 60*24*365*5))
+    dt2 = dt1 + datetime.timedelta(minutes=random.randint(0, 60 * 24 * 365 * 5))
     return dt1, dt2
 
 
 if __name__ == '__main__':
     import logging
+
     loglevel = logging.DEBUG
     # loglevel = logging.WARNING
     logging.basicConfig(level=loglevel)

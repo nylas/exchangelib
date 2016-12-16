@@ -1,8 +1,13 @@
-from logging import getLogger
-from locale import getlocale
+# coding=utf-8
+from __future__ import unicode_literals
+
 from collections import defaultdict
+from locale import getlocale
+from logging import getLogger
 
 from cached_property import threaded_cached_property
+from future.utils import raise_from, python_2_unicode_compatible
+from six import text_type, string_types
 
 from .autodiscover import discover
 from .credentials import DELEGATE, IMPERSONATION
@@ -16,16 +21,19 @@ from .folders import Root, Calendar, DeletedItems, Drafts, Inbox, Outbox, SentIt
 from .services import ExportItems, UploadItems
 from .queryset import QuerySet
 from .protocol import Protocol
+from .services import ExportItems, UploadItems
 from .services import GetItem, CreateItem, UpdateItem, DeleteItem, MoveItem, SendItem
 from .util import get_domain, peek
 
 log = getLogger(__name__)
 
 
-class Account:
+@python_2_unicode_compatible
+class Account(object):
     """
     Models an Exchange server user account. The primary key for an account is its PrimarySMTPAddress
     """
+
     def __init__(self, primary_smtp_address, fullname=None, access_type=None, autodiscover=False, credentials=None,
                  config=None, verify_ssl=True, locale=None):
         if '@' not in primary_smtp_address:
@@ -33,7 +41,7 @@ class Account:
         self.primary_smtp_address = primary_smtp_address
         self.fullname = fullname
         self.locale = locale or getlocale()[0]
-        assert isinstance(self.locale, str)
+        assert isinstance(self.locale, string_types)
         # Assume delegate access if individual credentials are provided. Else, assume service user with impersonation
         self.access_type = access_type or (DELEGATE if credentials else IMPERSONATION)
         assert self.access_type in (DELEGATE, IMPERSONATION)
@@ -90,9 +98,9 @@ class Account:
             log.debug('Searching default %s folder in full folder list', fld_class.__name__)
             flds = self.folders[fld_class]
             if not flds:
-                raise ErrorFolderNotFound('No useable default %s folders' % fld_class.__name__) from e
+                raise_from(ErrorFolderNotFound('No useable default %s folders' % fld_class.__name__), e)
             assert len(flds) == 1, 'Multiple possible default %s folders: %s' % (
-                fld_class.__name__, [str(f) for f in flds])
+                fld_class.__name__, [text_type(f) for f in flds])
             return flds[0]
 
     @threaded_cached_property
