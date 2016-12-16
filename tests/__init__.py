@@ -1894,7 +1894,7 @@ class CalendarTest(BaseItemTest):
         item1 = self.ITEM_CLASS(
             account=self.account,
             folder=self.test_folder,
-            subject='TEST1',
+            subject=get_random_string(16),
             start=self.tz.localize(EWSDateTime(2016, 1, 1, 8)),
             end=self.tz.localize(EWSDateTime(2016, 1, 1, 10)),
             categories=self.categories,
@@ -1903,7 +1903,7 @@ class CalendarTest(BaseItemTest):
         item2 = self.ITEM_CLASS(
             account=self.account,
             folder=self.test_folder,
-            subject='TEST2',
+            subject=get_random_string(16),
             start=self.tz.localize(EWSDateTime(2016, 2, 1, 8)),
             end=self.tz.localize(EWSDateTime(2016, 2, 1, 10)),
             categories=self.categories,
@@ -1934,7 +1934,7 @@ class CalendarTest(BaseItemTest):
         self.assertEqual(len([i for i in self.test_folder.view(start=item1.start, end=item2.start) if match_cat(i)]), 1)
 
         # Test max_items
-        self.assertEqual(len([i for i in self.test_folder.view(start=item1.start, end=item2.end, max_items=10) if match_cat(i)]), 2)
+        self.assertEqual(len([i for i in self.test_folder.view(start=item1.start, end=item2.end, max_items=9999) if match_cat(i)]), 2)
         self.assertEqual(len(self.test_folder.view(start=item1.start, end=item2.end, max_items=1)), 1)
 
         # Test chaining
