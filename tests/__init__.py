@@ -1008,7 +1008,6 @@ class BaseItemTest(EWSTest):
 
         # Test argument types
         item = self.get_test_item()
-        item.subject = get_random_string(16)
         ids = self.test_folder.bulk_create(items=[item])
         # No arguments. There may be leftover items in the folder, so just make sure there's at least one.
         self.assertGreaterEqual(
@@ -1048,57 +1047,55 @@ class BaseItemTest(EWSTest):
         self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES)
 
         # Test categories which are handled specially - only '__contains' and '__in' lookups are supported
-        # First, delete any leftovers from last run. tearDown(doesn't do that since we're using non-devault categories)
-        ids = self.test_folder.filter(categories__contains=['TestA', 'TestB'])
-        self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES)
         item = self.get_test_item(categories=['TestA', 'TestB'])
         ids = self.test_folder.bulk_create(items=[item])
+        common_qs = self.test_folder.filter(subject=item.subject)  # Guard against other sumultaneous runs
         self.assertEqual(
-            len(self.test_folder.filter(categories__contains='ci6xahH1')),  # Plain string
+            len(common_qs.filter(categories__contains='ci6xahH1')),  # Plain string
             0
         )
         self.assertEqual(
-            len(self.test_folder.filter(categories__contains=['ci6xahH1'])),  # Same, but as list
+            len(common_qs.filter(categories__contains=['ci6xahH1'])),  # Same, but as list
             0
         )
         self.assertEqual(
-            len(self.test_folder.filter(categories__contains=['TestA', 'TestC'])),  # One wrong category
+            len(common_qs.filter(categories__contains=['TestA', 'TestC'])),  # One wrong category
             0
         )
         self.assertEqual(
-            len(self.test_folder.filter(categories__contains=['TESTA'])),  # Test case insensitivity
+            len(common_qs.filter(categories__contains=['TESTA'])),  # Test case insensitivity
             1
         )
         self.assertEqual(
-            len(self.test_folder.filter(categories__contains=['testa'])),  # Test case insensitivity
+            len(common_qs.filter(categories__contains=['testa'])),  # Test case insensitivity
             1
         )
         self.assertEqual(
-            len(self.test_folder.filter(categories__contains=['TestA'])),  # Partial
+            len(common_qs.filter(categories__contains=['TestA'])),  # Partial
             1
         )
         self.assertEqual(
-            len(self.test_folder.filter(categories__contains=item.categories)),  # Exact match
+            len(common_qs.filter(categories__contains=item.categories)),  # Exact match
             1
         )
         self.assertEqual(
-            len(self.test_folder.filter(categories__in='ci6xahH1')),  # Plain string
+            len(common_qs.filter(categories__in='ci6xahH1')),  # Plain string
             0
         )
         self.assertEqual(
-            len(self.test_folder.filter(categories__in=['ci6xahH1'])),  # Same, but as list
+            len(common_qs.filter(categories__in=['ci6xahH1'])),  # Same, but as list
             0
         )
         self.assertEqual(
-            len(self.test_folder.filter(categories__in=['TestA', 'TestC'])),  # One wrong category
+            len(common_qs.filter(categories__in=['TestA', 'TestC'])),  # One wrong category
             1
         )
         self.assertEqual(
-            len(self.test_folder.filter(categories__in=['TestA'])),  # Partial
+            len(common_qs.filter(categories__in=['TestA'])),  # Partial
             1
         )
         self.assertEqual(
-            len(self.test_folder.filter(categories__in=item.categories)),  # Exact match
+            len(common_qs.filter(categories__in=item.categories)),  # Exact match
             1
         )
         self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES)
@@ -1947,7 +1944,7 @@ class CalendarTest(BaseItemTest):
             qs.filter(subject=item1.subject).count()  # EWS does not allow restrictions
         self.assertListEqual(
             [i for i in qs.order_by('subject').values('subject') if i['subject'] in (item1.subject, item2.subject)],
-            [{'subject': item1.subject}, {'subject': item2.subject}]
+            [{'subject': s} for s in sorted([item1.subject, item2.subject])]
         )
 
 
