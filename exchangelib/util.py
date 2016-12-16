@@ -10,22 +10,20 @@ from decimal import Decimal
 from xml.etree.ElementTree import Element
 
 from future.moves.urllib.parse import urlparse
-from future.utils import PY3
+from future.utils import PY2
 from future.utils import raise_from
 from six import text_type, string_types
 
 from .errors import TransportError, RateLimitError, RedirectError, RelativeRedirect
 
-if PY3:
-    from threading import get_ident
-else:
+if PY2:
     from thread import get_ident
 
-try:
-    ConnectionResetError = ConnectionResetError
-except NameError:  # Python 2, so define backported exceptions
     class ConnectionResetError(OSError):
         pass
+else:
+    from threading import get_ident
+
 
 log = logging.getLogger(__name__)
 
