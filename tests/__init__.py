@@ -35,9 +35,6 @@ from exchangelib.version import Build
 if PY2:
     FileNotFoundError = OSError
 
-    # Travis runs tests in parallel. Limit the connection pool to not overload the test server
-BaseProtocol.SESSION_POOLSIZE = 2
-
 
 class BuildTest(unittest.TestCase):
     def test_magic(self):
@@ -321,7 +318,7 @@ class EWSTest(unittest.TestCase):
         self.maxDiff = None
 
     def test_poolsize(self):
-        self.assertEqual(self.config.protocol.SESSION_POOLSIZE, 2)
+        self.assertEqual(self.config.protocol.SESSION_POOLSIZE, 4)
 
     def random_val(self, field_type):
         if not isinstance(field_type, list) and isanysubclass(field_type, ExtendedProperty):
