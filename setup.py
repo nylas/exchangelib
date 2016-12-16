@@ -32,7 +32,7 @@ setup(
         'Development Status :: 5 - Production/Stable',
         'Topic :: Communications',
         'License :: OSI Approved :: BSD License',
-        'Programming Language :: Python :: 2'
+        'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 3',
     ],
 )
