@@ -1676,7 +1676,7 @@ class BaseItemTest(EWSTest):
                 self.assertEqual(result[0], False)
                 self.assertIsInstance(result[1], text_type)
             else:
-                self.assertIsInstance(result, text_type)
+                self.assertIsInstance(result, str)
 
         # Clean up after yourself
         del ids[3]  # Sending the deleted one through will cause an error
@@ -1731,7 +1731,7 @@ class BaseItemTest(EWSTest):
         item = self.get_test_item(folder=self.test_folder)
 
         # Test __init__(attachments=...) and attach() on new item
-        binary_file_content = 'Hello from unicode æøå'.encode('utf-8')
+        binary_file_content = u'Hello from unicode æøå'.encode('utf-8')
         att1 = FileAttachment(name='my_file_1.txt', content=binary_file_content)
         self.assertEqual(len(item.attachments), 1)
         item.attach(att1)
@@ -1772,10 +1772,10 @@ class BaseItemTest(EWSTest):
 
     def test_item_attachments(self):
         item = self.get_test_item(folder=self.test_folder)
-        item.attachments.clear()
+        item.attachments = []
 
         attached_item1 = self.get_test_item(folder=self.test_folder)
-        attached_item1.attachments.clear()
+        attached_item1.attachments = []
         if hasattr(attached_item1, 'is_all_day'):
             attached_item1.is_all_day = False
         attached_item1.save()
@@ -1807,7 +1807,7 @@ class BaseItemTest(EWSTest):
 
         # Test attach on saved object
         attached_item2 = self.get_test_item(folder=self.test_folder)
-        attached_item2.attachments.clear()
+        attached_item2.attachments = []
         if hasattr(attached_item2, 'is_all_day'):
             attached_item2.is_all_day = False
         attached_item2.save()
@@ -1878,7 +1878,7 @@ class BaseItemTest(EWSTest):
 
         # Test attach with non-saved item
         attached_item3 = self.get_test_item(folder=self.test_folder)
-        attached_item3.attachments.clear()
+        attached_item3.attachments = []
         if hasattr(attached_item3, 'is_all_day'):
             attached_item3.is_all_day = False
         attachment3 = ItemAttachment(name='attachment2', item=attached_item3)

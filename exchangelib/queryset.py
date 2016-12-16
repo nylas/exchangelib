@@ -283,7 +283,11 @@ class QuerySet(object):
         new_qs.return_format = self.VALUES
         return new_qs
 
-    def values_list(self, flat=False, *args):
+    def values_list(self, *args, **kwargs):
+        # Allow an arbitrary list of fields in *args, possibly ending with flat=True|False
+        flat = kwargs.pop('flat', False)
+        if kwargs:
+            raise AttributeError('Unknown kwargs: %s' % kwargs)
         try:
             self._check_fields(args)
         except ValueError as e:

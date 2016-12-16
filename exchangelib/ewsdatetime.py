@@ -100,7 +100,7 @@ class EWSTimeZone(object):
         try:
             self_cls.ms_name = cls.MS_TIMEZONE_DEFINITIONS[self_cls.ms_id]
         except KeyError as e:
-            raise ValueError('PYTZ_TO_MS_MAP value %s must be a key in MS_TIMEZONE_DEFINITIONS' % self_cls.ms_id) from e
+            raise_from(ValueError('PYTZ_TO_MS_MAP value %s must be a key in MS_TIMEZONE_DEFINITIONS' % self_cls.ms_id), e)
         self = self_cls()
         for k, v in tz.__dict__.items():
             setattr(self, k, v)

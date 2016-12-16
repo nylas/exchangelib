@@ -589,7 +589,7 @@ class UpdateItem(EWSPooledAccountService):
                     continue
                 val = getattr(item, fieldname)
                 field_uri = item_model.fielduri_for_field(fieldname)
-                if not isinstance(field_uri, str) and issubclass(field_uri, ExtendedProperty) and val is not None \
+                if not isinstance(field_uri, text_type) and issubclass(field_uri, ExtendedProperty) and val is not None \
                         and not isinstance(val, field_uri.__class__):
                     # For convenience, item attributes implemented as an extended property can be assigned their
                     # internal value instead of wrapping them in an ExtendedProperty class.
@@ -601,7 +601,7 @@ class UpdateItem(EWSPooledAccountService):
                         and not isinstance(val[0], IndexedField):
                     val = val[0].__class__.set_field_xml(
                         field_elem=item_model.elem_for_field(fieldname), items=val, version=self.account.version)
-                if isinstance(field_uri, str):
+                if isinstance(field_uri, text_type):
                     fielduri = create_element('t:FieldURI', FieldURI=field_uri)
                 elif issubclass(field_uri, ExtendedProperty):
                     fielduri = field_uri.field_uri_xml()

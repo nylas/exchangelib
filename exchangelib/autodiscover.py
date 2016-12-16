@@ -92,7 +92,7 @@ class AutodiscoverCache(object):
     def __contains__(self, key):
         domain, credentials, verify_ssl = key
         with shelve_open(self._storage_file) as db:
-            return domain in db
+            return str(domain) in db
 
     def __getitem__(self, key):
         protocol = self._protocols.get(key)
@@ -100,7 +100,7 @@ class AutodiscoverCache(object):
             return protocol
         domain, credentials, verify_ssl = key
         with shelve_open(self._storage_file) as db:
-            endpoint, auth_type = db[domain]  # It's OK to fail with KeyError here
+            endpoint, auth_type = db[str(domain)]  # It's OK to fail with KeyError here
         protocol = AutodiscoverProtocol(service_endpoint=endpoint, credentials=credentials, auth_type=auth_type,
                                         verify_ssl=verify_ssl)
         self._protocols[key] = protocol
@@ -110,7 +110,7 @@ class AutodiscoverCache(object):
         # Populate both local and persistent cache
         domain, credentials, verify_ssl = key
         with shelve_open(self._storage_file) as db:
-            db[domain] = (protocol.service_endpoint, protocol.auth_type)
+            db[str(domain)] = (protocol.service_endpoint, protocol.auth_type)
         self._protocols[key] = protocol
 
     def __delitem__(self, key):
@@ -119,7 +119,7 @@ class AutodiscoverCache(object):
         domain, credentials, verify_ssl = key
         with shelve_open(self._storage_file) as db:
             try:
-                del db[domain]
+                del db[str(domain)]
             except KeyError:
                 pass
         try:
