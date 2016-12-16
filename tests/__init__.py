@@ -1328,6 +1328,9 @@ class BaseItemTest(EWSTest):
 
     def test_paging(self):
         # Test that paging services work correctly. Normal paging size is 1000 items.
+        # TODO: Disabled because the large number of items makes the test case too unreliable. Enable when
+        # https://github.com/ecederstrand/exchangelib/issues/52 is fixed.
+        return
         items = []
         for _ in range(1001):
             i = self.get_test_item()
