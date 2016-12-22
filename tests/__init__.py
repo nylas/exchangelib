@@ -828,6 +828,12 @@ class BaseItemTest(EWSTest):
         self.assertEqual(self.account.bulk_update(items=[]), [])
         self.assertEqual(self.account.bulk_delete(ids=[]), [])
 
+    def test_no_kwargs(self):
+        self.assertEqual(self.test_folder.bulk_create([]), [])
+        self.assertEqual(self.account.fetch([]), [])
+        self.assertEqual(self.account.bulk_update([]), [])
+        self.assertEqual(self.account.bulk_delete([]), [])
+
     def test_error_policy(self):
         # Test the is_service_account flag. This is difficult to test thoroughly
         self.account.protocol.credentials.is_service_account = False

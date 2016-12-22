@@ -1822,10 +1822,10 @@ class FileAttachment(Attachment):
 
     __slots__ = ('parent_item',) + tuple(ORDERED_FIELDS[:-1]) + ('_content',)
 
-    def __init__(self, content=None, is_contact_photo=None, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
+        self._content = kwargs.pop('content', None)
+        self.is_contact_photo = kwargs.pop('is_contact_photo', None)
         super(FileAttachment, self).__init__(*args, **kwargs)
-        self._content = content
-        self.is_contact_photo = is_contact_photo
         for field_name, (_, field_type) in self.ATTACHMENT_FIELDS.items():
             if field_name == 'content':
                 field_name = '_content'
@@ -1872,9 +1872,9 @@ class ItemAttachment(Attachment):
 
     __slots__ = ('parent_item',) + tuple(ORDERED_FIELDS[:-1]) + ('_item',)
 
-    def __init__(self, item=None, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
+        self._item = kwargs.pop('item', None)
         super(ItemAttachment, self).__init__(*args, **kwargs)
-        self._item = item
         for field_name, (_, field_type) in self.ATTACHMENT_FIELDS.items():
             if field_name == 'item':
                 field_name = '_item'
@@ -2105,24 +2105,24 @@ class Folder(EWSElement):
         warnings.warn('add_items() is deprecated. Use bulk_create() instead', PendingDeprecationWarning)
         return self.bulk_create(*args, **kwargs)
 
-    def bulk_create(self, *args, **kwargs):
-        return self.account.bulk_create(folder=self, *args, **kwargs)
+    def bulk_create(self, items, *args, **kwargs):
+        return self.account.bulk_create(folder=self, items=items, *args, **kwargs)
 
-    def delete_items(self, *args, **kwargs):
+    def delete_items(self, ids, *args, **kwargs):
         warnings.warn('delete_items() is deprecated. Use bulk_delete() instead', PendingDeprecationWarning)
-        return self.bulk_delete(*args, **kwargs)
+        return self.bulk_delete(ids, *args, **kwargs)
 
-    def bulk_delete(self, *args, **kwargs):
+    def bulk_delete(self, ids, *args, **kwargs):
         warnings.warn('Folder.bulk_delete() is deprecated. Use Account.bulk_delete() instead', PendingDeprecationWarning)
-        return self.account.bulk_delete(*args, **kwargs)
+        return self.account.bulk_delete(ids, *args, **kwargs)
 
-    def update_items(self, *args, **kwargs):
+    def update_items(self, items, *args, **kwargs):
         warnings.warn('update_items() is deprecated. Use bulk_update() instead', PendingDeprecationWarning)
-        return self.bulk_update(*args, **kwargs)
+        return self.bulk_update(items, *args, **kwargs)
 
-    def bulk_update(self, *args, **kwargs):
+    def bulk_update(self, items, *args, **kwargs):
         warnings.warn('Folder.bulk_update() is deprecated. Use Account.bulk_update() instead', PendingDeprecationWarning)
-        return self.account.bulk_update(*args, **kwargs)
+        return self.account.bulk_update(items, *args, **kwargs)
 
     def get_items(self, *args, **kwargs):
         warnings.warn('get_items() is deprecated. Use fetch() instead', PendingDeprecationWarning)
