@@ -420,7 +420,7 @@ class Attachment(EWSElement):
 
     def __repr__(self):
         return self.__class__.__name__ + '(%s)' % ', '.join(
-            '%s=%s' % (k, repr(getattr(self, k))) for k in self.ORDERED_FIELDS
+            '%s=%s' % (k, repr(getattr(self, k))) for k in self.ORDERED_FIELDS if k not in ('item', 'content')
         )
 
 
@@ -2078,6 +2078,9 @@ class Folder(EWSElement):
         # Get the CalendarView, if any
         calendar_view = kwargs.pop('calendar_view', None)
 
+        # Get the requested number of items per page. Default to 100 and disallow None
+        page_size = kwargs.pop('page_size', None) or 100
+
         # Build up any restrictions
         q = Q.from_filter_args(self.__class__, *args, **kwargs)
         if q and not q.is_empty():
@@ -2099,6 +2102,7 @@ class Folder(EWSElement):
             shape=shape,
             depth=depth,
             calendar_view=calendar_view,
+            page_size=page_size,
         )
         if shape == IdOnly and additional_fields is None:
             return map(Item.id_from_xml, items)
@@ -2172,7 +2176,8 @@ class Folder(EWSElement):
         for elem in FindFolder(folder=self).call(
                 additional_fields=('folder:DisplayName', 'folder:FolderClass'),
                 shape=shape,
-                depth=depth
+                depth=depth,
+                page_size=100,
         ):
             # The "FolderClass" element value is the only indication we have in the FindFolder response of which
             # folder class we should create the folder with.

@@ -637,6 +637,7 @@ class AutodiscoverTest(EWSTest):
             _get_hostname_from_srv('example.com.')
         dns.resolver.Resolver = _orig
 
+
 class FolderTest(EWSTest):
     def test_folders(self):
         folders = self.account.folders
@@ -1327,12 +1328,9 @@ class BaseItemTest(EWSTest):
         self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES)
 
     def test_paging(self):
-        # Test that paging services work correctly. Normal paging size is 1000 items.
-        # TODO: Disabled because the large number of items makes the test case too unreliable. Enable when
-        # https://github.com/ecederstrand/exchangelib/issues/52 is fixed.
-        return
+        # Test that paging services work correctly. Default EWS paging size is 1000 items. Our default is 100 items.
         items = []
-        for _ in range(1001):
+        for _ in range(101):
             i = self.get_test_item()
             del i.attachments[:]
             items.append(i)

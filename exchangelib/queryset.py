@@ -44,6 +44,7 @@ class QuerySet(object):
         self.reversed = False
         self.return_format = self.NONE
         self.calendar_view = None
+        self.page_size = None
 
         self._cache = None
 
@@ -96,21 +97,25 @@ class QuerySet(object):
         if extra_order_fields:
             # Also fetch order_by fields that we only need for sorting
             additional_fields.update(extra_order_fields)
+        find_item_kwargs = dict(
+            additional_fields=None,
+            shape=IdOnly,
+            calendar_view=self.calendar_view,
+            page_size=self.page_size,
+        )
         if not additional_fields and not self.order_fields:
             # TODO: if self.order_fields only contain item_id or changekey, we can still take this shortcut
             # We requested no additional fields and we need to do no sorting, so we can take a shortcut by setting
             # additional_fields=None. This tells find_items() to do less work
             assert not complex_fields_requested
-            return self.folder.find_items(
-                self.q, additional_fields=None, shape=IdOnly, calendar_view=self.calendar_view)
+            return self.folder.find_items(self.q, **find_item_kwargs)
         if complex_fields_requested:
             # The FindItems service does not support complex field types. Fallback to getting ids and calling GetItems
-            ids = self.folder.find_items(
-                self.q, additional_fields=None, shape=IdOnly, calendar_view=self.calendar_view)
+            ids = self.folder.find_items(self.q, **find_item_kwargs)
             items = self.folder.fetch(ids=ids, only_fields=additional_fields)
         else:
-            items = self.folder.find_items(
-                self.q, additional_fields=additional_fields, shape=IdOnly, calendar_view=self.calendar_view)
+            find_item_kwargs['additional_fields'] = additional_fields
+            items = self.folder.find_items(self.q, find_item_kwargs)
         if self.order_fields:
             assert isinstance(self.order_fields, tuple)
             # Sorting in Python is stable, so when we search on multiple fields, we can do a sort on each of the

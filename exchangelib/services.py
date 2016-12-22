@@ -716,7 +716,7 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
     def call(self, **kwargs):
         return self._paged_call(**kwargs)
 
-    def _get_payload(self, additional_fields, restriction, shape, depth, calendar_view, offset=0):
+    def _get_payload(self, additional_fields, restriction, shape, depth, calendar_view, page_size, offset=0):
         finditem = create_element('m:%s' % self.SERVICE_NAME, Traversal=depth)
         itemshape = create_element('m:ItemShape')
         add_xml_child(itemshape, 't:BaseShape', shape)
@@ -725,7 +725,8 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
             add_xml_child(itemshape, 't:AdditionalProperties', additional_property_elems)
         finditem.append(itemshape)
         if calendar_view is None:
-            view_type = create_element('m:IndexedPageItemView', Offset=text_type(offset), BasePoint='Beginning')
+            view_type = create_element('m:IndexedPageItemView', MaxEntriesReturned=text_type(page_size),
+                                       Offset=text_type(offset), BasePoint='Beginning')
         else:
             view_type = calendar_view.to_xml(version=self.account.version)
         finditem.append(view_type)
@@ -749,7 +750,7 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
     def call(self, **kwargs):
         return self._paged_call(**kwargs)
 
-    def _get_payload(self, additional_fields, shape, depth, offset=0):
+    def _get_payload(self, additional_fields, shape, depth, page_size, offset=0):
         findfolder = create_element('m:%s' % self.SERVICE_NAME, Traversal=depth)
         foldershape = create_element('m:FolderShape')
         add_xml_child(foldershape, 't:BaseShape', shape)
@@ -760,8 +761,8 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
             foldershape.append(additionalproperties)
         findfolder.append(foldershape)
         if self.account.version.build >= EXCHANGE_2010:
-            indexedpageviewitem = create_element('m:IndexedPageFolderView', Offset=text_type(offset),
-                                                 BasePoint='Beginning')
+            indexedpageviewitem = create_element('m:IndexedPageFolderView', MaxEntriesReturned=text_type(page_size),
+                                                 Offset=text_type(offset), BasePoint='Beginning')
             findfolder.append(indexedpageviewitem)
         else:
             assert offset == 0, 'Offset is %s' % offset
