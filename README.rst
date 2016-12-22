@@ -28,7 +28,7 @@ Here are some examples of how `exchangelib` works:
 
     from exchangelib import DELEGATE, IMPERSONATION, Account, Credentials, \
         EWSDateTime, EWSTimeZone, Configuration, NTLM, CalendarItem, Message, \
-        Mailbox, Q
+        Mailbox, Attendee, Q
     from exchangelib.folders import Calendar, ExtendedProperty, FileAttachment, ItemAttachment, \
         HTMLBody
 
@@ -45,6 +45,10 @@ Here are some examples of how `exchangelib` works:
             body='Hello from Python',
             location='devnull',
             categories=['foo', 'bar'],
+            required_attendees = [Attendee(
+                mailbox=Mailbox(email_address='user1@example.com'),
+                response_type='Accept'
+            )]
         ))
 
     # Username in WINDOMAIN\username format. Office365 wants usernames in PrimarySMTPAddress
@@ -75,7 +79,7 @@ Here are some examples of how `exchangelib` works:
     # non-standard calendar, choose a different one from account.folders[Calendar]
     #
     # bulk_update() and bulk_delete() methods are also supported.
-    res = account.calendar.bulk_create(calendar_items)
+    res = account.calendar.bulk_create(items=calendar_items)
     print(res)
 
     # Get the calendar items we just created. We filter by categories so we only get the items created by
