@@ -410,12 +410,18 @@ class Attachment(EWSElement):
         assert root_item_id.id == self.parent_item.item_id
         assert root_item_id.changekey != self.parent_item.changekey
         self.parent_item.changekey = root_item_id.changekey
+        self.parent_item = None
         self.attachment_id = None
 
     def __hash__(self):
         if self.attachment_id is None:
             return hash(tuple(getattr(self, f) for f in self.__slots__[1:]))
         return hash(self.attachment_id)
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(%s)' % ', '.join(
+            '%s=%s' % (k, repr(getattr(self, k))) for k in self.ORDERED_FIELDS
+        )
 
 
 class IndexedField(EWSElement):

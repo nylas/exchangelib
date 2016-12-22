@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """
 To upload to PyPI:
    python setup.py sdist upload

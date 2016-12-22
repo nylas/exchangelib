@@ -1765,6 +1765,8 @@ class BaseItemTest(EWSTest):
 
         # Test detach
         item.detach(att1)
+        self.assertTrue(att1.attachment_id is None)
+        self.assertTrue(att1.parent_item is None)
         fresh_item = self.account.fetch(ids=[item])[0]
         self.assertEqual(len(fresh_item.attachments), 2)
         fresh_attachments = sorted(fresh_item.attachments, key=lambda a: a.name)
@@ -1859,6 +1861,8 @@ class BaseItemTest(EWSTest):
 
         # Test detach
         item.detach(attachment2)
+        self.assertTrue(attachment2.attachment_id is None)
+        self.assertTrue(attachment2.parent_item is None)
         fresh_item = self.account.fetch(ids=[item])[0]
         self.assertEqual(len(fresh_item.attachments), 1)
         fresh_attachments = sorted(fresh_item.attachments, key=lambda a: a.name)
