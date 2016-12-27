@@ -837,7 +837,6 @@ class BaseItemTest(EWSTest):
         # Test the is_service_account flag. This is difficult to test thoroughly
         self.account.protocol.credentials.is_service_account = False
         item = self.get_test_item()
-        item.subject = get_random_string(16)
         self.test_folder.all()
         self.account.protocol.credentials.is_service_account = True
 
@@ -1167,7 +1166,6 @@ class BaseItemTest(EWSTest):
 
         # Test '='
         item = self.get_test_item()
-        item.subject = get_random_string(16)
         ids = self.test_folder.bulk_create(items=[item])
         self.assertEqual(
             len(common_qs.filter(subject=item.subject + 'XXX')),
@@ -1181,7 +1179,6 @@ class BaseItemTest(EWSTest):
 
         # Test '!='
         item = self.get_test_item()
-        item.subject = get_random_string(16)
         ids = self.test_folder.bulk_create(items=[item])
         self.assertEqual(
             len(common_qs.filter(subject__not=item.subject)),
@@ -1195,7 +1192,7 @@ class BaseItemTest(EWSTest):
 
         # Test 'exact'
         item = self.get_test_item()
-        item.subject = get_random_string(16)
+        item.subject = 'aA' + item.subject
         ids = self.test_folder.bulk_create(items=[item])
         self.assertEqual(
             len(common_qs.filter(subject__iexact=item.subject + 'XXX')),
@@ -1217,7 +1214,7 @@ class BaseItemTest(EWSTest):
 
         # Test 'iexact'
         item = self.get_test_item()
-        item.subject = get_random_string(16)
+        item.subject = 'aA' + item.subject
         ids = self.test_folder.bulk_create(items=[item])
         self.assertEqual(
             len(common_qs.filter(subject__iexact=item.subject + 'XXX')),
@@ -1239,7 +1236,7 @@ class BaseItemTest(EWSTest):
 
         # Test 'contains'
         item = self.get_test_item()
-        item.subject = get_random_string(16)
+        item.subject = item.subject[:8] + 'aA' + item.subject[8:]
         ids = self.test_folder.bulk_create(items=[item])
         self.assertEqual(
             len(common_qs.filter(subject__contains=item.subject[2:14] + 'XXX')),
@@ -1261,7 +1258,7 @@ class BaseItemTest(EWSTest):
 
         # Test 'icontains'
         item = self.get_test_item()
-        item.subject = get_random_string(16)
+        item.subject = item.subject[:8] + 'aA' + item.subject[8:]
         ids = self.test_folder.bulk_create(items=[item])
         self.assertEqual(
             len(common_qs.filter(subject__icontains=item.subject[2:14] + 'XXX')),
@@ -1283,7 +1280,7 @@ class BaseItemTest(EWSTest):
 
         # Test 'startswith'
         item = self.get_test_item()
-        item.subject = get_random_string(16)
+        item.subject = 'aA' + item.subject
         ids = self.test_folder.bulk_create(items=[item])
         self.assertEqual(
             len(common_qs.filter(subject__startswith='XXX' + item.subject[:12])),
@@ -1305,7 +1302,7 @@ class BaseItemTest(EWSTest):
 
         # Test 'istartswith'
         item = self.get_test_item()
-        item.subject = get_random_string(16)
+        item.subject = 'aA' + item.subject
         ids = self.test_folder.bulk_create(items=[item])
         self.assertEqual(
             len(common_qs.filter(subject__istartswith='XXX' + item.subject[:12])),
