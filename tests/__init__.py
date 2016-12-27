@@ -338,7 +338,7 @@ class EWSTest(unittest.TestCase):
         if field_type == int:
             return get_random_int(0, 256)
         if field_type == Decimal:
-            return get_random_decimal(0, 100)
+            return get_random_decimal(1, 99)
         if field_type == bool:
             return get_random_bool()
         if field_type == EWSDateTime:
@@ -737,8 +737,7 @@ class BaseItemTest(EWSTest):
                 # Start with an incomplete task
                 status = get_random_choice(Task.choices_for_field(f) - {Task.COMPLETED})
                 insert_kwargs[f] = status
-                insert_kwargs['percent_complete'] = Decimal(0) if status == Task.NOT_STARTED else get_random_decimal(0,
-                                                                                                                     100)
+                insert_kwargs['percent_complete'] = Decimal(0) if status == Task.NOT_STARTED else get_random_decimal(1, 99)
                 continue
             if f == 'percent_complete':
                 continue
@@ -822,6 +821,13 @@ class BaseItemTest(EWSTest):
         self.assertIn('item_id', str(item))
         self.assertIn(item.__class__.__name__, repr(item))
 
+    def test_validation(self):
+        item = self.get_test_item()
+        item.clean()
+        with self.assertRaises(ValueError):
+            item.subject = 'a' * 256
+            item.clean()
+
     def test_empty_args(self):
         # We allow empty sequences for these methods
         self.assertEqual(self.test_folder.bulk_create(items=[]), [])
@@ -839,7 +845,6 @@ class BaseItemTest(EWSTest):
         # Test the is_service_account flag. This is difficult to test thoroughly
         self.account.protocol.credentials.is_service_account = False
         item = self.get_test_item()
-        item.subject = get_random_string(16)
         self.test_folder.all()
         self.account.protocol.credentials.is_service_account = True
 
@@ -1169,7 +1174,6 @@ class BaseItemTest(EWSTest):
 
         # Test '='
         item = self.get_test_item()
-        item.subject = get_random_string(16)
         ids = self.test_folder.bulk_create(items=[item])
         self.assertEqual(
             len(common_qs.filter(subject=item.subject + 'XXX')),
@@ -1183,7 +1187,6 @@ class BaseItemTest(EWSTest):
 
         # Test '!='
         item = self.get_test_item()
-        item.subject = get_random_string(16)
         ids = self.test_folder.bulk_create(items=[item])
         self.assertEqual(
             len(common_qs.filter(subject__not=item.subject)),
@@ -1197,10 +1200,10 @@ class BaseItemTest(EWSTest):
 
         # Test 'exact'
         item = self.get_test_item()
-        item.subject = get_random_string(16)
+        item.subject = 'aA' + item.subject[2:]
         ids = self.test_folder.bulk_create(items=[item])
         self.assertEqual(
-            len(common_qs.filter(subject__iexact=item.subject + 'XXX')),
+            len(common_qs.filter(subject__exact=item.subject + 'XXX')),
             0
         )
         self.assertEqual(
@@ -1219,7 +1222,7 @@ class BaseItemTest(EWSTest):
 
         # Test 'iexact'
         item = self.get_test_item()
-        item.subject = get_random_string(16)
+        item.subject = 'aA' + item.subject[2:]
         ids = self.test_folder.bulk_create(items=[item])
         self.assertEqual(
             len(common_qs.filter(subject__iexact=item.subject + 'XXX')),
@@ -1241,7 +1244,7 @@ class BaseItemTest(EWSTest):
 
         # Test 'contains'
         item = self.get_test_item()
-        item.subject = get_random_string(16)
+        item.subject = item.subject[2:8] + 'aA' + item.subject[8:]
         ids = self.test_folder.bulk_create(items=[item])
         self.assertEqual(
             len(common_qs.filter(subject__contains=item.subject[2:14] + 'XXX')),
@@ -1263,7 +1266,7 @@ class BaseItemTest(EWSTest):
 
         # Test 'icontains'
         item = self.get_test_item()
-        item.subject = get_random_string(16)
+        item.subject = item.subject[2:8] + 'aA' + item.subject[8:]
         ids = self.test_folder.bulk_create(items=[item])
         self.assertEqual(
             len(common_qs.filter(subject__icontains=item.subject[2:14] + 'XXX')),
@@ -1285,7 +1288,7 @@ class BaseItemTest(EWSTest):
 
         # Test 'startswith'
         item = self.get_test_item()
-        item.subject = get_random_string(16)
+        item.subject = 'aA' + item.subject[2:]
         ids = self.test_folder.bulk_create(items=[item])
         self.assertEqual(
             len(common_qs.filter(subject__startswith='XXX' + item.subject[:12])),
@@ -1307,7 +1310,7 @@ class BaseItemTest(EWSTest):
 
         # Test 'istartswith'
         item = self.get_test_item()
-        item.subject = get_random_string(16)
+        item.subject = 'aA' + item.subject[2:]
         ids = self.test_folder.bulk_create(items=[item])
         self.assertEqual(
             len(common_qs.filter(subject__istartswith='XXX' + item.subject[:12])),
@@ -2005,10 +2008,9 @@ def get_random_int(min=0, max=2147483647):
 
 
 def get_random_decimal(min=0, max=100):
-    # Return a random decimal with 6-digit precision
-    major = get_random_int(min, max)
-    minor = 0 if major == max else get_random_int(0, 999999)
-    return Decimal('%s.%s' % (major, minor))
+    precision = 2
+    val = get_random_int(min, max * 10**precision) / 10.0**precision
+    return Decimal('{:.2f}'.format(val))
 
 
 def get_random_choice(choices):
