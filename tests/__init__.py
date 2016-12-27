@@ -2002,10 +2002,9 @@ def get_random_int(min=0, max=2147483647):
 
 
 def get_random_decimal(min=0, max=100):
-    # Return a random decimal with 6-digit precision
-    major = get_random_int(min, max)
-    minor = 0 if major == max else get_random_int(0, 999999)
-    return Decimal('%s.%s' % (major, minor))
+    precision = 2
+    val = get_random_int(min, max * 10**precision) / 10.0**precision
+    return Decimal('{:.2f}'.format(val))
 
 
 def get_random_choice(choices):
