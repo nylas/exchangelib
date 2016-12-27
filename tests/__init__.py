@@ -338,7 +338,7 @@ class EWSTest(unittest.TestCase):
         if field_type == int:
             return get_random_int(0, 256)
         if field_type == Decimal:
-            return get_random_decimal(0, 100)
+            return get_random_decimal(1, 99)
         if field_type == bool:
             return get_random_bool()
         if field_type == EWSDateTime:
@@ -736,8 +736,7 @@ class BaseItemTest(EWSTest):
                 # Start with an incomplete task
                 status = get_random_choice(Task.choices_for_field(f) - {Task.COMPLETED})
                 insert_kwargs[f] = status
-                insert_kwargs['percent_complete'] = Decimal(0) if status == Task.NOT_STARTED else get_random_decimal(0,
-                                                                                                                     100)
+                insert_kwargs['percent_complete'] = Decimal(0) if status == Task.NOT_STARTED else get_random_decimal(1, 99)
                 continue
             if f == 'percent_complete':
                 continue
