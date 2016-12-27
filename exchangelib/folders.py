@@ -1787,7 +1787,7 @@ class MeetingRequest(ItemMixIn):
 class MeetingResponse(ItemMixIn):
     # Supported attrs: https://msdn.microsoft.com/en-us/library/office/aa564337(v=exchg.150).aspx
     # TODO: Untested and unfinished. Only the bare minimum supported to allow reading a folder that contains meeting
-    # requests.
+    # responses.
     ELEMENT_NAME = 'MeetingResponse'
     FIELDURI_PREFIX = 'meetingRequest'
     ITEM_FIELDS = {
@@ -1874,12 +1874,18 @@ class FileAttachment(Attachment):
         # We have an ID to the data but still haven't called GetAttachment to get the actual data. Do that now.
         if not self.parent_item.account:
             raise ValueError('%s must have an account' % self.__class__.__name__)
-        items = list(
-            self.__class__.from_xml(elem=i)
-            for i in GetAttachment(account=self.parent_item.account).call(items=[self.attachment_id])
-        )
-        assert len(items) == 1
-        self._content = items[0]._content
+        elems = list(GetAttachment(account=self.parent_item.account).call(
+            items=[self.attachment_id], include_mime_content=False))
+        assert len(elems) == 1
+        elem = elems[0]
+        assert not isinstance(elem, tuple), elem
+        response_tag = '{%s}%s' % (TNS, self.ATTACHMENT_FIELDS['content'][0])
+        val = get_xml_attr(elem, response_tag)
+        if val is None:
+            self._content = None
+        else:
+            self._content = base64.b64decode(val)
+            elem.clear()
         return self._content
 
     @content.setter
@@ -1925,7 +1931,8 @@ class ItemAttachment(Attachment):
             raise ValueError('%s must have an account' % self.__class__.__name__)
         items = list(
             self.__class__.from_xml(elem=i)
-            for i in GetAttachment(account=self.parent_item.account).call(items=[self.attachment_id])
+            for i in GetAttachment(account=self.parent_item.account).call(
+                items=[self.attachment_id], include_mime_content=True)
         )
         assert len(items) == 1
         self._item = items[0]._item

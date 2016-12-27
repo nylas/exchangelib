@@ -892,12 +892,14 @@ class GetAttachment(EWSAccountService):
             raise NotImplementedError('%s is only supported for Exchange 2010 servers and later' % self.SERVICE_NAME)
         return super(GetAttachment, self).call(**kwargs)
 
-    def _get_payload(self, items):
+    def _get_payload(self, items, include_mime_content):
         from .folders import AttachmentId
         payload = create_element('m:%s' % self.SERVICE_NAME)
         # TODO: Support additional properties of AttachmentShape. See
         # https://msdn.microsoft.com/en-us/library/office/aa563727(v=exchg.150).aspx
-        attachment_shape = create_element('m:AttachmentShape')
+        attachment_shape = create_element(
+            'm:AttachmentShape',
+            IncludeMimeContent='true' if include_mime_content else 'false')
         payload.append(attachment_shape)
         attachment_ids = create_element('m:AttachmentIds')
         n = 0
