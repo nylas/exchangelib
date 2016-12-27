@@ -572,6 +572,7 @@ class UpdateItem(EWSPooledAccountService):
 
         n = 0
         for item, fieldnames in items:
+            item.clean()
             n += 1
             if not fieldnames:
                 raise AttributeError('"fieldnames" must not be empty')

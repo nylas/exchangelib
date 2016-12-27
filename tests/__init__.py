@@ -820,6 +820,13 @@ class BaseItemTest(EWSTest):
         self.assertIn('item_id', str(item))
         self.assertIn(item.__class__.__name__, repr(item))
 
+    def test_validation(self):
+        item = self.get_test_item()
+        item.clean()
+        with self.assertRaises(ValueError):
+            item.subject = 'a' * 256
+            item.clean()
+
     def test_empty_args(self):
         # We allow empty sequences for these methods
         self.assertEqual(self.test_folder.bulk_create(items=[]), [])
@@ -1192,10 +1199,10 @@ class BaseItemTest(EWSTest):
 
         # Test 'exact'
         item = self.get_test_item()
-        item.subject = 'aA' + item.subject
+        item.subject = 'aA' + item.subject[2:]
         ids = self.test_folder.bulk_create(items=[item])
         self.assertEqual(
-            len(common_qs.filter(subject__iexact=item.subject + 'XXX')),
+            len(common_qs.filter(subject__exact=item.subject + 'XXX')),
             0
         )
         self.assertEqual(
@@ -1214,7 +1221,7 @@ class BaseItemTest(EWSTest):
 
         # Test 'iexact'
         item = self.get_test_item()
-        item.subject = 'aA' + item.subject
+        item.subject = 'aA' + item.subject[2:]
         ids = self.test_folder.bulk_create(items=[item])
         self.assertEqual(
             len(common_qs.filter(subject__iexact=item.subject + 'XXX')),
@@ -1236,7 +1243,7 @@ class BaseItemTest(EWSTest):
 
         # Test 'contains'
         item = self.get_test_item()
-        item.subject = item.subject[:8] + 'aA' + item.subject[8:]
+        item.subject = item.subject[2:8] + 'aA' + item.subject[8:]
         ids = self.test_folder.bulk_create(items=[item])
         self.assertEqual(
             len(common_qs.filter(subject__contains=item.subject[2:14] + 'XXX')),
@@ -1258,7 +1265,7 @@ class BaseItemTest(EWSTest):
 
         # Test 'icontains'
         item = self.get_test_item()
-        item.subject = item.subject[:8] + 'aA' + item.subject[8:]
+        item.subject = item.subject[2:8] + 'aA' + item.subject[8:]
         ids = self.test_folder.bulk_create(items=[item])
         self.assertEqual(
             len(common_qs.filter(subject__icontains=item.subject[2:14] + 'XXX')),
@@ -1280,7 +1287,7 @@ class BaseItemTest(EWSTest):
 
         # Test 'startswith'
         item = self.get_test_item()
-        item.subject = 'aA' + item.subject
+        item.subject = 'aA' + item.subject[2:]
         ids = self.test_folder.bulk_create(items=[item])
         self.assertEqual(
             len(common_qs.filter(subject__startswith='XXX' + item.subject[:12])),
@@ -1302,7 +1309,7 @@ class BaseItemTest(EWSTest):
 
         # Test 'istartswith'
         item = self.get_test_item()
-        item.subject = 'aA' + item.subject
+        item.subject = 'aA' + item.subject[2:]
         ids = self.test_folder.bulk_create(items=[item])
         self.assertEqual(
             len(common_qs.filter(subject__istartswith='XXX' + item.subject[:12])),
