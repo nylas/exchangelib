@@ -4,7 +4,6 @@ from __future__ import unicode_literals
 import logging
 from xml.etree.ElementTree import ParseError
 
-import requests.adapters
 import requests.sessions
 from future.utils import raise_from, python_2_unicode_compatible
 from six import text_type

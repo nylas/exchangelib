@@ -15,7 +15,8 @@ from threading import Lock
 
 import queue
 from future.utils import with_metaclass, python_2_unicode_compatible, raise_from
-from requests import adapters, Session
+import requests.adapters
+import requests.sessions
 from six import text_type
 
 from .credentials import Credentials
@@ -119,7 +120,7 @@ class BaseProtocol(object):
         session.headers.update(headers)
         scheme = 'https' if self.has_ssl else 'http'
         # We want just one connection per session. No retries, since we wrap all requests in our own retry handler
-        session.mount('%s://' % scheme, adapters.HTTPAdapter(
+        session.mount('%s://' % scheme, requests.adapters.HTTPAdapter(
             pool_block=True,
             pool_connections=self.CONNECTIONS_PER_SESSION,
             pool_maxsize=self.CONNECTIONS_PER_SESSION,
@@ -217,7 +218,7 @@ XSD auth: %s''' % (
         )
 
 
-class EWSSession(Session):
+class EWSSession(requests.sessions.Session):
     # A requests Session object that closes the underlying socket when we need it
     def __init__(self, protocol):
         self.session_id = random.randint(1, 32767)  # Used for debugging messages in services

@@ -4,11 +4,11 @@ from __future__ import unicode_literals
 import logging
 from xml.etree.ElementTree import tostring
 
-import requests.sessions
 from future.utils import raise_from
-from requests.auth import HTTPBasicAuth, HTTPDigestAuth
-from requests_ntlm import HttpNtlmAuth
 from six import text_type
+import requests.sessions
+import requests.auth
+import requests_ntlm
 
 from .credentials import IMPERSONATION
 from .errors import UnauthorizedError, TransportError, RedirectError, RelativeRedirect
@@ -30,9 +30,9 @@ DIGEST = 'digest'
 UNKNOWN = 'unknown'
 
 AUTH_TYPE_MAP = {
-    NTLM: HttpNtlmAuth,
-    BASIC: HTTPBasicAuth,
-    DIGEST: HTTPDigestAuth,
+    NTLM: requests_ntlm.HttpNtlmAuth,
+    BASIC: requests.auth.HTTPBasicAuth,
+    DIGEST: requests.auth.HTTPDigestAuth,
     NOAUTH: None,
 }
 
