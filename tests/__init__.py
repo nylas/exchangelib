@@ -440,8 +440,7 @@ class CommonTest(EWSTest):
         ids = self.account.calendar.filter(start__lt=end, end__gt=start, categories__contains=self.categories) \
             .values_list('item_id', 'changekey')
         self.assertEqual(len(ids), len(items))
-        items = self.account.fetch(return_ids)
-        for i, item in enumerate(items):
+        for i, item in enumerate(self.account.fetch(return_ids)):
             subject = 'Test Subject %s' % i
             self.assertEqual(item.start, start)
             self.assertEqual(item.end, end)
@@ -831,13 +830,13 @@ class BaseItemTest(EWSTest):
     def test_empty_args(self):
         # We allow empty sequences for these methods
         self.assertEqual(self.test_folder.bulk_create(items=[]), [])
-        self.assertEqual(self.account.fetch(ids=[]), [])
+        self.assertEqual(list(self.account.fetch(ids=[])), [])
         self.assertEqual(self.account.bulk_update(items=[]), [])
         self.assertEqual(self.account.bulk_delete(ids=[]), [])
 
     def test_no_kwargs(self):
         self.assertEqual(self.test_folder.bulk_create([]), [])
-        self.assertEqual(self.account.fetch([]), [])
+        self.assertEqual(list(self.account.fetch([])), [])
         self.assertEqual(self.account.bulk_update([]), [])
         self.assertEqual(self.account.bulk_delete([]), [])
 
@@ -1338,14 +1337,14 @@ class BaseItemTest(EWSTest):
             del i.attachments[:]
             items.append(i)
         self.test_folder.bulk_create(items=items)
-        ids = list(self.test_folder.filter(categories__contains=self.categories).values_list('item_id', 'changekey'))
+        ids = self.test_folder.filter(categories__contains=self.categories).values_list('item_id', 'changekey')
         self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES)
 
     def test_getitems(self):
         item = self.get_test_item()
         self.test_folder.bulk_create(items=[item, item])
         ids = self.test_folder.filter(categories__contains=item.categories)
-        items = self.account.fetch(ids=ids)
+        items = list(self.account.fetch(ids=ids))
         for item in items:
             assert isinstance(item, self.ITEM_CLASS)
         self.assertEqual(len(items), 2)
@@ -1400,7 +1399,7 @@ class BaseItemTest(EWSTest):
         for k, v in insert_kwargs.items():
             self.assertEqual(getattr(item, k), v, (k, getattr(item, k), v))
         # Test that whatever we have locally also matches whatever is in the DB
-        fresh_item = self.account.fetch(ids=[item])[0]
+        fresh_item = list(self.account.fetch(ids=[item]))[0]
         for f in item.fieldnames():
             old, new = getattr(item, f), getattr(fresh_item, f)
             if f in self.ITEM_CLASS.readonly_fields() and old is None:
@@ -1418,7 +1417,7 @@ class BaseItemTest(EWSTest):
         for k, v in update_kwargs.items():
             self.assertEqual(getattr(item, k), v, (k, getattr(item, k), v))
         # Test that whatever we have locally also matches whatever is in the DB
-        fresh_item = self.account.fetch(ids=[item])[0]
+        fresh_item = list(self.account.fetch(ids=[item]))[0]
         for f in item.fieldnames():
             old, new = getattr(item, f), getattr(fresh_item, f)
             if f in self.ITEM_CLASS.readonly_fields() and old is None:
@@ -1433,7 +1432,7 @@ class BaseItemTest(EWSTest):
         item.delete(affected_task_occurrences=ALL_OCCURRENCIES)
         with self.assertRaises(ErrorItemNotFound):
             # It's gone from the account
-            self.account.fetch(ids=[item_id])
+            list(self.account.fetch(ids=[item_id]))
             # Really gone, not just changed ItemId
             items = self.test_folder.filter(categories__contains=item.categories)
             self.assertEqual(len(items), 0)
@@ -1448,10 +1447,10 @@ class BaseItemTest(EWSTest):
         item.soft_delete(affected_task_occurrences=ALL_OCCURRENCIES)
         with self.assertRaises(ErrorItemNotFound):
             # It's gone from the test folder
-            self.account.fetch(ids=[item_id])
+            list(self.account.fetch(ids=[item_id]))
         with self.assertRaises(ErrorItemNotFound):
             # It's gone from the trash folder
-            self.account.fetch(ids=[item_id])
+            list(self.account.fetch(ids=[item_id]))
         # Really gone, not just changed ItemId
         self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 0)
         self.assertEqual(len(self.account.trash.filter(categories__contains=item.categories)), 0)
@@ -1467,12 +1466,12 @@ class BaseItemTest(EWSTest):
         item.move_to_trash(affected_task_occurrences=ALL_OCCURRENCIES)
         with self.assertRaises(ErrorItemNotFound):
             # Not in the test folder anymore
-            self.account.fetch(ids=[item_id])
+            list(self.account.fetch(ids=[item_id]))
         # Really gone, not just changed ItemId
         self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 0)
         # Test that the item moved to trash
         item = self.account.trash.get(categories__contains=item.categories)
-        moved_item = self.account.fetch(ids=[item])[0]
+        moved_item = list(self.account.fetch(ids=[item]))[0]
         # The item was copied, so the ItemId has changed. Let's compare the subject instead
         self.assertEqual(item.subject, moved_item.subject)
 
@@ -1485,14 +1484,14 @@ class BaseItemTest(EWSTest):
         item.move(to_folder=self.account.trash)
         with self.assertRaises(ErrorItemNotFound):
             # original item ID no longer exists
-            self.account.fetch(ids=[item_id])
+            list(self.account.fetch(ids=[item_id]))
         # Test that the item moved to trash
         self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 0)
         moved_item = self.account.trash.get(categories__contains=item.categories)
         self.assertEqual(item.item_id, moved_item.item_id)
         self.assertEqual(item.changekey, moved_item.changekey)
         # Test that the original item self.updated its ItemId
-        moved_item = self.account.fetch(ids=[item])[0]
+        moved_item = list(self.account.fetch(ids=[item]))[0]
 
     def test_item(self):
         # Test insert
@@ -1511,7 +1510,7 @@ class BaseItemTest(EWSTest):
         self.assertEqual(len(find_ids[0]), 2)
         self.assertEqual(insert_ids, list(find_ids))
         # Test with generator as argument
-        item = self.account.fetch(ids=(i for i in find_ids))[0]
+        item = list(self.account.fetch(ids=(i for i in find_ids)))[0]
         for f in self.ITEM_CLASS.fieldnames():
             if f in self.ITEM_CLASS.readonly_fields():
                 continue
@@ -1538,7 +1537,7 @@ class BaseItemTest(EWSTest):
         self.assertEqual(len(update_ids[0]), 2, update_ids)
         self.assertEqual(insert_ids[0].item_id, update_ids[0][0])  # ID should be the same
         self.assertNotEqual(insert_ids[0].changekey, update_ids[0][1])  # Changekey should not be the same when item is updated
-        item = self.account.fetch(update_ids)[0]
+        item = list(self.account.fetch(update_ids))[0]
         for f in self.ITEM_CLASS.fieldnames():
             if f in self.ITEM_CLASS.readonly_fields():
                 continue
@@ -1587,7 +1586,7 @@ class BaseItemTest(EWSTest):
         self.assertEqual(insert_ids[0].item_id, wipe_ids[0][0])  # ID should be the same
         self.assertNotEqual(insert_ids[0].changekey,
                             wipe_ids[0][1])  # Changekey should not be the same when item is updated
-        item = self.account.fetch(wipe_ids)[0]
+        item = list(self.account.fetch(wipe_ids))[0]
         for f in self.ITEM_CLASS.fieldnames():
             if f in self.ITEM_CLASS.required_fields():
                 continue
@@ -1609,7 +1608,7 @@ class BaseItemTest(EWSTest):
         self.assertEqual(len(wipe2_ids[0]), 2, wipe2_ids)
         self.assertEqual(insert_ids[0].item_id, wipe2_ids[0][0])  # ID should be the same
         self.assertNotEqual(insert_ids[0].changekey, wipe2_ids[0][1])  # Changekey should not be the same when item is updated
-        item = self.account.fetch(wipe2_ids)[0]
+        item = list(self.account.fetch(wipe2_ids))[0]
         self.assertEqual(item.extern_id, extern_id)
 
         # Remove test item. Test with generator as argument
@@ -1621,7 +1620,7 @@ class BaseItemTest(EWSTest):
         items = [self.get_test_item(self.test_folder).save() for _ in range(15)]
         ids = [(i.item_id, i.changekey) for i in items]
         # re-fetch items because there will be some extra fields added by the server
-        items = self.test_folder.fetch(items)
+        items = list(self.test_folder.fetch(items))
 
         # Try exporting and making sure we get the right response
         export_results = self.account.export(items)
@@ -1715,12 +1714,12 @@ class BaseItemTest(EWSTest):
         prop_val = item.dead_beef
         self.assertTrue(isinstance(prop_val, int))
         item.save()
-        item = self.account.fetch(ids=[(item.item_id, item.changekey)])[0]
+        item = list(self.account.fetch(ids=[(item.item_id, item.changekey)]))[0]
         self.assertEqual(prop_val, item.dead_beef)
         new_prop_val = get_random_int()
         item.dead_beef = new_prop_val
         item.save()
-        item = self.account.fetch(ids=[(item.item_id, item.changekey)])[0]
+        item = list(self.account.fetch(ids=[(item.item_id, item.changekey)]))[0]
         self.assertEqual(new_prop_val, item.dead_beef)
 
         # Test deregister
@@ -1741,7 +1740,7 @@ class BaseItemTest(EWSTest):
         item.attach(att1)
         self.assertEqual(len(item.attachments), 2)
         item.save()
-        fresh_item = self.account.fetch(ids=[item])[0]
+        fresh_item = list(self.account.fetch(ids=[item]))[0]
         self.assertEqual(len(fresh_item.attachments), 2)
         fresh_attachments = sorted(fresh_item.attachments, key=lambda a: a.name)
         self.assertEqual(fresh_attachments[0].name, 'my_file.txt')
@@ -1754,7 +1753,7 @@ class BaseItemTest(EWSTest):
         self.assertEqual(len(item.attachments), 2)
         item.attach(att2)
         self.assertEqual(len(item.attachments), 3)
-        fresh_item = self.account.fetch(ids=[item])[0]
+        fresh_item = list(self.account.fetch(ids=[item]))[0]
         self.assertEqual(len(fresh_item.attachments), 3)
         fresh_attachments = sorted(fresh_item.attachments, key=lambda a: a.name)
         self.assertEqual(fresh_attachments[0].name, 'my_file.txt')
@@ -1768,7 +1767,7 @@ class BaseItemTest(EWSTest):
         item.detach(att1)
         self.assertTrue(att1.attachment_id is None)
         self.assertTrue(att1.parent_item is None)
-        fresh_item = self.account.fetch(ids=[item])[0]
+        fresh_item = list(self.account.fetch(ids=[item]))[0]
         self.assertEqual(len(fresh_item.attachments), 2)
         fresh_attachments = sorted(fresh_item.attachments, key=lambda a: a.name)
         self.assertEqual(fresh_attachments[0].name, 'my_file.txt')
@@ -1790,7 +1789,7 @@ class BaseItemTest(EWSTest):
 
         self.assertEqual(len(item.attachments), 1)
         item.save()
-        fresh_item = self.account.fetch(ids=[item])[0]
+        fresh_item = list(self.account.fetch(ids=[item]))[0]
         self.assertEqual(len(fresh_item.attachments), 1)
         fresh_attachments = sorted(fresh_item.attachments, key=lambda a: a.name)
         self.assertEqual(fresh_attachments[0].name, 'attachment1')
@@ -1821,7 +1820,7 @@ class BaseItemTest(EWSTest):
         item.attach(attachment2)
 
         self.assertEqual(len(item.attachments), 2)
-        fresh_item = self.account.fetch(ids=[item])[0]
+        fresh_item = list(self.account.fetch(ids=[item]))[0]
         self.assertEqual(len(fresh_item.attachments), 2)
         fresh_attachments = sorted(fresh_item.attachments, key=lambda a: a.name)
         self.assertEqual(fresh_attachments[0].name, 'attachment1')
@@ -1864,7 +1863,7 @@ class BaseItemTest(EWSTest):
         item.detach(attachment2)
         self.assertTrue(attachment2.attachment_id is None)
         self.assertTrue(attachment2.parent_item is None)
-        fresh_item = self.account.fetch(ids=[item])[0]
+        fresh_item = list(self.account.fetch(ids=[item]))[0]
         self.assertEqual(len(fresh_item.attachments), 1)
         fresh_attachments = sorted(fresh_item.attachments, key=lambda a: a.name)
 

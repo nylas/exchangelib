@@ -314,6 +314,7 @@ class ExpectResponseErrorsMixin(EWSService):
     """Don't raise errors in the response, just return them as if they're warnings"""
     ERRORS_TO_CATCH_IN_RESPONSE = EWSError
 
+
 class GetServerTimeZones(EWSService):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/dd899371(v=exchg.150).aspx
@@ -389,6 +390,7 @@ class EWSPooledMixIn(EWSService):
         log.debug('Processing items in chunks of %s', self.CHUNKSIZE)
         # Chop items list into suitable pieces and let worker threads chew on the work. The order of the output result
         # list must be the same as the input id list, so the caller knows which status message belongs to which ID.
+        # TODO: Rewrite this to return preliminary results as soon as they are available
         return itertools.chain(*self.protocol.thread_pool.map(
             lambda chunk: self._get_elements(payload=payload_func(chunk, **kwargs)),
             chunkify(items, self.CHUNKSIZE)

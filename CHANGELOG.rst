@@ -2,6 +2,10 @@
 Change Log
 ==========
 
+HEAD
+----
+* `Account.fetch()` and `Folder.fetch()` are now generators
+
 1.7.4
 -----
 * Add Python2 support

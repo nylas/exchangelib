@@ -390,10 +390,10 @@ class Attachment(EWSElement):
             raise ValueError('This attachment has already been created')
         if not self.parent_item.account:
             raise ValueError('Parent item %s must have an account' % self.parent_item)
-        items = list(map(
-            lambda i: self.from_xml(elem=i),
-            CreateAttachment(account=self.parent_item.account).call(parent_item=self.parent_item, items=[self])
-        ))
+        items = list(
+            self.from_xml(elem=i)
+            for i in CreateAttachment(account=self.parent_item.account).call(parent_item=self.parent_item, items=[self])
+        )
         assert len(items) == 1
         attachment_id = items[0].attachment_id
         assert attachment_id.root_id == self.parent_item.item_id
@@ -410,10 +410,10 @@ class Attachment(EWSElement):
             raise ValueError('This attachment has not been created')
         if not self.parent_item:
             raise ValueError('This attachment is not attached to an item')
-        items = list(map(
-            lambda i: RootItemId.from_xml(elem=i),
-            DeleteAttachment(account=self.parent_item.account).call(items=[self.attachment_id])
-        ))
+        items = list(
+            RootItemId.from_xml(elem=i)
+            for i in DeleteAttachment(account=self.parent_item.account).call(items=[self.attachment_id])
+        )
         assert len(items) == 1
         root_item_id = items[0]
         assert root_item_id.id == self.parent_item.item_id
@@ -1044,7 +1044,7 @@ class Item(EWSElement):
         # Updates the item based on fresh data from EWS
         if not self.account:
             raise ValueError('Item must have an account')
-        res = self.account.fetch(ids=[self])
+        res = list(self.account.fetch(ids=[self]))
         if not res:
             raise ValueError('Item disappeared')
         assert len(res) == 1, res
@@ -1874,10 +1874,10 @@ class FileAttachment(Attachment):
         # We have an ID to the data but still haven't called GetAttachment to get the actual data. Do that now.
         if not self.parent_item.account:
             raise ValueError('%s must have an account' % self.__class__.__name__)
-        items = list(map(
-            lambda i: self.__class__.from_xml(elem=i),
-            GetAttachment(account=self.parent_item.account).call(items=[self.attachment_id])
-        ))
+        items = list(
+            self.__class__.from_xml(elem=i)
+            for i in GetAttachment(account=self.parent_item.account).call(items=[self.attachment_id])
+        )
         assert len(items) == 1
         self._content = items[0]._content
         return self._content
@@ -1923,10 +1923,10 @@ class ItemAttachment(Attachment):
         # We have an ID to the data but still haven't called GetAttachment to get the actual data. Do that now.
         if not self.parent_item.account:
             raise ValueError('%s must have an account' % self.__class__.__name__)
-        items = list(map(
-            lambda i: self.__class__.from_xml(elem=i),
-            GetAttachment(account=self.parent_item.account).call(items=[self.attachment_id])
-        ))
+        items = list(
+            self.__class__.from_xml(elem=i)
+            for i in GetAttachment(account=self.parent_item.account).call(items=[self.attachment_id])
+        )
         assert len(items) == 1
         self._item = items[0]._item
         return self._item
@@ -2131,11 +2131,11 @@ class Folder(EWSElement):
             page_size=page_size,
         )
         if shape == IdOnly and additional_fields is None:
-            return map(Item.id_from_xml, items)
-        return map(
-            lambda i: self.item_model_from_tag(i.tag).from_xml(elem=i, account=self.account, folder=self),
-            items
-        )
+            for i in items:
+                yield Item.id_from_xml(i)
+        else:
+            for i in items:
+                yield self.item_model_from_tag(i.tag).from_xml(elem=i, account=self.account, folder=self)
 
     def add_items(self, *args, **kwargs):
         warnings.warn('add_items() is deprecated. Use bulk_create() instead', PendingDeprecationWarning)
