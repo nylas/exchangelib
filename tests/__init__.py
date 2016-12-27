@@ -1332,13 +1332,13 @@ class BaseItemTest(EWSTest):
     def test_paging(self):
         # Test that paging services work correctly. Default EWS paging size is 1000 items. Our default is 100 items.
         items = []
-        for _ in range(101):
+        for _ in range(11):
             i = self.get_test_item()
             del i.attachments[:]
             items.append(i)
         self.test_folder.bulk_create(items=items)
         ids = self.test_folder.filter(categories__contains=self.categories).values_list('item_id', 'changekey')
-        self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES)
+        self.account.bulk_delete(ids.iterator(page_size=10), affected_task_occurrences=ALL_OCCURRENCIES)
 
     def test_getitems(self):
         item = self.get_test_item()

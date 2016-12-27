@@ -333,11 +333,13 @@ class QuerySet(object):
     # Methods that end chaining
     #
     ###########################
-    def iterator(self):
-        """ Return the query result as an iterator, without caching the result """
+    def iterator(self, page_size=None):
+        """ Return the query result as an iterator, without caching the result. 'page_size' is the number of items to
+        fetch from the server per request. """
         if self._cache is not None:
             return self._cache
         # Return an iterator that doesn't bother with caching
+        self.page_size = page_size
         return self._query()
 
     def get(self, *args, **kwargs):
