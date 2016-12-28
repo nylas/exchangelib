@@ -190,7 +190,7 @@ class Account(object):
         """
         is_empty, upload_data = peek(upload_data)
         if is_empty:
-            # We accept generators, so it's not always convenient for caller to know up-front if 'upload_dats' is empty.
+            # We accept generators, so it's not always convenient for caller to know up-front if 'upload_data' is empty.
             # Allow empty 'upload_data' and return early.
             return []
         return list(UploadItems(self).call(upload_data))
@@ -310,8 +310,8 @@ class Account(object):
             ids = ids.iterator()
         is_empty, ids = peek(ids)
         if is_empty:
-            # We accept generators, so it's not always convenient for caller to know up-front if 'items' is empty. Allow
-            # empty 'items' and return early.
+            # We accept generators, so it's not always convenient for caller to know up-front if 'ids' is empty. Allow
+            # empty 'ids' and return early.
             return []
         return list(DeleteItem(account=self).call(
             items=ids,
