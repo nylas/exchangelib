@@ -13,17 +13,21 @@ import socket
 from multiprocessing.pool import ThreadPool
 from threading import Lock
 
-import queue
 from future.utils import with_metaclass, python_2_unicode_compatible, raise_from
 import requests.adapters
 import requests.sessions
-from six import text_type
+from six import text_type, PY2
 
 from .credentials import Credentials
 from .errors import TransportError
 from .transport import get_auth_instance, get_service_authtype, get_docs_authtype, test_credentials, AUTH_TYPE_MAP
 from .util import split_url
 from .version import Version, API_VERSIONS
+
+if PY2:
+    import Queue as queue
+else:
+    import queue
 
 log = logging.getLogger(__name__)
 

@@ -18,7 +18,6 @@ import tempfile
 from threading import Lock
 
 import dns.resolver
-import queue
 import requests.exceptions
 from future.utils import raise_from, PY2, python_2_unicode_compatible
 from six import text_type
@@ -30,6 +29,11 @@ from .errors import AutoDiscoverFailed, AutoDiscoverRedirect, AutoDiscoverCircul
 from .protocol import BaseProtocol, Protocol
 from .util import create_element, get_xml_attr, add_xml_child, to_xml, is_xml, post_ratelimited, get_redirect_url, \
     xml_to_str, get_domain
+
+if PY2:
+    import Queue as queue
+else:
+    import queue
 
 log = logging.getLogger(__name__)
 
