@@ -80,13 +80,13 @@ def xml_to_str(tree, encoding='utf-8'):
 
 def get_xml_attr(tree, name):
     elem = tree.find(name)
-    if elem is not None and elem.text:  # Must compare with None, see XML docs
-        return elem.text.strip() or None
-    return None
+    if elem is None:  # Must compare with None, see XML docs
+        return None
+    return  elem.text or None
 
 
 def get_xml_attrs(tree, name):
-    return [elem.text.strip() for elem in tree.findall(name) if elem.text is not None]
+    return [elem.text for elem in tree.findall(name) if elem.text is not None]
 
 
 def value_to_xml_text(value):
@@ -215,7 +215,7 @@ class DummyResponse(object):
 
 def get_domain(email):
     try:
-        return email.split('@')[1].lower().strip()
+        return email.split('@')[1].lower()
     except (IndexError, AttributeError) as e:
         raise_from(ValueError("'%s' is not a valid email" % email), e)
 

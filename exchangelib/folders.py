@@ -1253,7 +1253,7 @@ class Item(EWSElement):
             field_type = cls.type_for_field(fieldname)
             if field_type in (EWSDateTime, bool, int, Decimal, string_type, Choice, Email, AnyURI, Body, HTMLBody, MimeContent):
                 field_elem = elem.find(cls.response_xml_elem_for_field(fieldname))
-                val = None if field_elem is None else field_elem.text.strip() if field_elem.text else None
+                val = None if field_elem is None else field_elem.text or None
                 if val is not None:
                     try:
                         val = xml_text_to_value(value=val, field_type=field_type)
@@ -1879,12 +1879,12 @@ class FileAttachment(Attachment):
         assert len(elems) == 1
         elem = elems[0]
         assert not isinstance(elem, tuple), elem
-        response_tag = '{%s}%s' % (TNS, self.ATTACHMENT_FIELDS['content'][0])
-        val = get_xml_attr(elem, response_tag)
+        # Don't use get_xml_attr() here because we want to handle empty file content as '', not None
+        val = elem.find('{%s}%s' % (TNS, self.ATTACHMENT_FIELDS['content'][0]))
         if val is None:
             self._content = None
         else:
-            self._content = base64.b64decode(val)
+            self._content = base64.b64decode(val.text)
             elem.clear()
         return self._content
 
