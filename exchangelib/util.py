@@ -40,12 +40,13 @@ def chunkify(iterable, chunksize):
     """
     Splits an iterable into chunks of size ``chunksize``. The last chunk may be smaller than ``chunksize``.
     """
-    if hasattr(iterable, '__getitem__'):
-        # list, tuple
+    from .queryset import QuerySet
+    if hasattr(iterable, '__getitem__') and not isinstance(iterable, QuerySet):
+        # list, tuple. QuerySet has __getitem__ but that evaluates the entire query greedily. We don't want that here.
         for i in range(0, len(iterable), chunksize):
             yield iterable[i:i + chunksize]
     else:
-        # generator, set, map
+        # generator, set, map, QuerySet
         chunk = []
         for i in iterable:
             chunk.append(i)
@@ -58,15 +59,22 @@ def chunkify(iterable, chunksize):
 
 def peek(iterable):
     """
-    Checks if an iterable or iterator is empty and returns status and the rewinded iterable or iterator
+    Checks if an iterable is empty and returns status and the rewinded iterable
     """
+    from .queryset import QuerySet
+    assert not isinstance(iterable, QuerySet)
+    # QuerySet has __len__ but that evaluates the entire query greedily. We don't want that here. Instead, peek() should
+    # be called on QuerySet.iterator()
     if hasattr(iterable, '__len__'):
+        # list, tuple, set
         return len(iterable) == 0, iterable
     else:
+        # generator
         try:
             first = next(iterable)
         except StopIteration:
             return True, iterable
+        # We can't rewind a generator. Instead, chain the first element and the rest of the generator
         return False, itertools.chain([first], iterable)
 
 
