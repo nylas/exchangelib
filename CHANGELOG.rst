@@ -4,9 +4,10 @@ Change Log
 
 HEAD
 ----
-* `Account.fetch()` and `Folder.fetch()` are now generators
+* `Account.fetch()` and `Folder.fetch()` are now generators. They will do nothing before being evaluated.
 * Added optional `page_size` attribute to `QuerySet.iterator()` to specify the number of items to return per HTTP
   request for large query results. Default `page_size` is 100.
+* Many minor changes to make queries less greedy and return earlier
 
 1.7.4
 -----

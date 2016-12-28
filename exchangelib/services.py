@@ -13,7 +13,6 @@ Exchange EWS references:
 
 from __future__ import unicode_literals
 
-import itertools
 import logging
 import traceback
 from xml.parsers.expat import ExpatError
@@ -390,11 +389,37 @@ class EWSPooledMixIn(EWSService):
         log.debug('Processing items in chunks of %s', self.CHUNKSIZE)
         # Chop items list into suitable pieces and let worker threads chew on the work. The order of the output result
         # list must be the same as the input id list, so the caller knows which status message belongs to which ID.
-        # TODO: Rewrite this to return preliminary results as soon as they are available. Maybe as asyncio?
-        return itertools.chain(*self.protocol.thread_pool.map(
-            lambda chunk: self._get_elements(payload=payload_func(chunk, **kwargs)),
-            chunkify(items, self.CHUNKSIZE)
-        ))
+        # Yield results as they become available.
+        results = []
+        n = 1
+        for chunk in chunkify(items, self.CHUNKSIZE):
+            log.debug('Starting %s._get_elements worker %s for %s items', self.__class__.__name__, n, len(chunk))
+            n += 1
+            results.append(self.protocol.thread_pool.apply_async(
+                lambda c: self._get_elements(payload=payload_func(c, **kwargs)),
+                (chunk,)
+            ))
+            # Results will be available before iteration has finished if 'items' is a slow generator. Return early
+            for i, r in enumerate(results, 1):
+                if r is None:
+                    continue
+                if not r.ready():
+                    # First non-yielded result isn't ready yet. Yielding other ready results would mess up ordering
+                    break
+                log.debug('%s._get_elements result %s is ready early', self.__class__.__name__, i)
+                for elem in r.get():
+                    yield elem
+                results[i-1] = None
+        # Yield remaining results in order, as they become available
+        for i, r in enumerate(results, 1):
+            if r is None:
+                log.debug('%s._get_elements result %s of %s already sent', self.__class__.__name__, i, len(results))
+                continue
+            log.debug('Waiting for %s._get_elements result %s of %s', self.__class__.__name__, i, len(results))
+            elems = r.get()
+            log.debug('%s._get_elements result %s of %s is ready', self.__class__.__name__, i, len(results))
+            for elem in elems:
+                yield elem
 
 
 class EWSPooledAccountService(EWSAccountService, EWSPooledMixIn):

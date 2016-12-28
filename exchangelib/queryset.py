@@ -111,7 +111,6 @@ class QuerySet(object):
             return self.folder.find_items(self.q, **find_item_kwargs)
         if complex_fields_requested:
             # The FindItems service does not support complex field types. Fallback to getting ids and calling GetItems
-            # TODO: This is greedy because thread_pool.map() is greedy
             items = self.folder.fetch(
                 ids=self.folder.find_items(self.q, **find_item_kwargs),
                 only_fields=additional_fields
