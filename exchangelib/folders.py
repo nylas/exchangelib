@@ -982,7 +982,7 @@ class Item(EWSElement):
 
     def save(self, conflict_resolution=AUTO_RESOLVE, send_meeting_invitations=SEND_TO_NONE):
         item = self._save(message_disposition=SAVE_ONLY, conflict_resolution=conflict_resolution,
-                                        send_meeting_invitations=send_meeting_invitations)
+                          send_meeting_invitations=send_meeting_invitations)
         if self.item_id:
             # _save() returns tuple()
             item_id, changekey = item
@@ -1017,6 +1017,7 @@ class Item(EWSElement):
                 if f in self.required_fields() and getattr(self, f) is None:
                     continue
                 update_fields.append(f)
+            # bulk_update() returns a tuple
             res = self.account.bulk_update(
                 items=[(self, update_fields)], message_disposition=message_disposition,
                 conflict_resolution=conflict_resolution,
@@ -1030,6 +1031,7 @@ class Item(EWSElement):
                 assert len(res) == 1, res
                 return res[0]
         else:
+            # bulk_create() returns an Item because we want to return item_id on both main item *and* attachments
             res = self.account.bulk_create(
                 items=[self], folder=self.folder, message_disposition=message_disposition,
                 send_meeting_invitations=send_meeting_invitations)

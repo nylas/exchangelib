@@ -24,7 +24,6 @@ from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, Extend
     Task, EmailAddress, PhysicalAddress, PhoneNumber, IndexedField, RoomList, Calendar, DeletedItems, Drafts, Inbox, \
     Outbox, SentItems, JunkEmail, Messages, Tasks, Contacts, Item, AnyURI, Body, HTMLBody, FileAttachment, \
     ItemAttachment, Attachment, ALL_OCCURRENCIES, MimeContent, MessageHeader
-from exchangelib.protocol import BaseProtocol
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.restriction import Restriction, Q
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms

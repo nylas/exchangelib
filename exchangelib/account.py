@@ -18,11 +18,9 @@ from .folders import Root, Calendar, DeletedItems, Drafts, Inbox, Outbox, SentIt
     DELETE_TYPE_CHOICES, MESSAGE_DISPOSITION_CHOICES, CONFLICT_RESOLUTION_CHOICES, AFFECTED_TASK_OCCURRENCES_CHOICES, \
     SEND_MEETING_INVITATIONS_CHOICES, SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES, \
     SEND_MEETING_CANCELLATIONS_CHOICES
-from .services import ExportItems, UploadItems
-from .queryset import QuerySet
 from .protocol import Protocol
-from .services import ExportItems, UploadItems
-from .services import GetItem, CreateItem, UpdateItem, DeleteItem, MoveItem, SendItem
+from .queryset import QuerySet
+from .services import ExportItems, UploadItems, GetItem, CreateItem, UpdateItem, DeleteItem, MoveItem, SendItem
 from .util import get_domain, peek
 
 log = getLogger(__name__)
@@ -197,8 +195,9 @@ class Account(object):
 
     def bulk_create(self, folder, items, message_disposition=SAVE_ONLY, send_meeting_invitations=SEND_TO_NONE):
         """
-        Creates new items in the folder. 'items' is an iterable of Item objects. Returns a list of (id, changekey)
-        tuples in the same order as the input.
+        Creates new items in 'folder'. 'items' is an iterable of Item objects. Returns a list of Item objects
+        in the same order as the input. The returned Item objects only contain item_id and changekey of the created
+        item, and item_id on any attachments that were also created.
         'message_disposition' is only applicable to Message items.
         'send_meeting_invitations' is only applicable to CalendarItem items.
         """
