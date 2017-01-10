@@ -26,7 +26,7 @@ from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, Extend
     ItemAttachment, Attachment, ALL_OCCURRENCIES, MimeContent, MessageHeader
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.restriction import Restriction, Q
-from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms
+from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, GetAttachment, TNS
 from exchangelib.transport import NTLM
 from exchangelib.util import xml_to_str, chunkify, peek, get_redirect_url, isanysubclass, to_xml, BOM
 from exchangelib.version import Build
@@ -1746,6 +1746,14 @@ class BaseItemTest(EWSTest):
         self.assertEqual(fresh_attachments[0].content, b'test_content')
         self.assertEqual(fresh_attachments[1].name, 'my_file_1.txt')
         self.assertEqual(fresh_attachments[1].content, binary_file_content)
+
+        # Test raw call to service
+        self.assertEqual(
+            list(GetAttachment(account=item.account).call(
+                items=[att1.attachment_id],
+                include_mime_content=False)
+            )[0].find('{%s}%s' % (TNS, FileAttachment.ATTACHMENT_FIELDS['content'][0])).text,
+            'SGVsbG8gZnJvbSB1bmljb2RlIMOmw7jDpQ==')
 
         # Test attach on saved object
         att2 = FileAttachment(name='my_file_2.txt', content=binary_file_content)
