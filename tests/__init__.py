@@ -91,7 +91,7 @@ class EWSDateTest(unittest.TestCase):
         tz = EWSTimeZone.timezone('Europe/Copenhagen')
         self.assertIsInstance(tz, EWSTimeZone)
         self.assertEqual(tz.ms_id, 'Romance Standard Time')
-        self.assertEqual(tz.ms_name, '(UTC+01:00) Brussels, Copenhagen, Madrid, Paris')
+        # self.assertEqual(tz.ms_name, '')  # EWS works fine without the ms_name
 
         dt = tz.localize(EWSDateTime(2000, 1, 2, 3, 4, 5))
         self.assertIsInstance(dt, EWSDateTime)
