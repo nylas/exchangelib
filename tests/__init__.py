@@ -479,10 +479,10 @@ class CommonTest(EWSTest):
             Configuration(credentials=Credentials(username='foo', password='bar'),
                           service_endpoint='http://example.com/svc',
                           auth_type='XXX')
-	with self.assertRaises(DeprecationWarning):
+        with self.assertRaises(DeprecationWarning):
             Configuration(credentials=Credentials(username='foo', password='bar'), 
-			  username='foo', 
-			  password='bar')
+                          username='foo',
+                          password='bar')
 
 
 class AccountTest(EWSTest):
