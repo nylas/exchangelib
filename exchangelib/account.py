@@ -38,8 +38,9 @@ class Account(object):
             raise ValueError("primary_smtp_address '%s' is not an email address" % primary_smtp_address)
         self.primary_smtp_address = primary_smtp_address
         self.fullname = fullname
-        self.locale = locale or getlocale()[0]
-        assert isinstance(self.locale, string_types)
+        self.locale = locale or getlocale()[0] or None  # get_locale() might not be able to determine the locale
+        if self.locale is not None:
+            assert isinstance(self.locale, string_types)
         # Assume delegate access if individual credentials are provided. Else, assume service user with impersonation
         self.access_type = access_type or (DELEGATE if credentials else IMPERSONATION)
         assert self.access_type in (DELEGATE, IMPERSONATION)
