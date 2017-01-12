@@ -28,7 +28,7 @@ from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.restriction import Restriction, Q
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, GetAttachment, TNS
 from exchangelib.transport import NTLM
-from exchangelib.util import xml_to_str, chunkify, peek, get_redirect_url, isanysubclass, to_xml, BOM
+from exchangelib.util import xml_to_str, chunkify, peek, get_redirect_url, isanysubclass, to_xml, BOM, get_domain
 from exchangelib.version import Build
 
 if PY2:
@@ -293,6 +293,11 @@ class UtilTest(unittest.TestCase):
         with self.assertRaises(ParseError):
             to_xml('foo', encoding='ascii')
 
+    def test_get_domain(self):
+        self.assertEqual(get_domain('foo@example.com'), 'example.com')
+        with self.assertRaises(ValueError):
+            get_domain('blah')
+
 
 class EWSTest(unittest.TestCase):
     def setUp(self):
@@ -474,6 +479,28 @@ class CommonTest(EWSTest):
             Configuration(credentials=Credentials(username='foo', password='bar'),
                           service_endpoint='http://example.com/svc',
                           auth_type='XXX')
+	with self.assertRaises(DeprecationWarning):
+            Configuration(credentials=Credentials(username='foo', password='bar'), 
+			  username='foo', 
+			  password='bar')
+
+
+class AccountTest(EWSTest):
+    def test_magic(self):
+        self.account.fullname = 'John Doe'
+        self.assertIn(self.account.primary_smtp_address, str(self.account))
+        self.assertIn(self.account.fullname, str(self.account))
+    
+    def test_validation(self):
+        with self.assertRaises(ValueError):
+            # Must have valid email address
+            Account(primary_smtp_address='blah')
+        with self.assertRaises(AttributeError):
+            # Autodiscover requires credentials
+            Account(primary_smtp_address=self.account.primary_smtp_address, autodiscover=True)
+        with self.assertRaises(AttributeError):
+            # Non-autodiscover requires a config
+            Account(primary_smtp_address=self.account.primary_smtp_address, autodiscover=False)
 
 
 class AutodiscoverTest(EWSTest):
