@@ -12,6 +12,7 @@ import pytz
 import requests
 from future.utils import raise_from, PY2
 
+from .errors import UnknownTimeZone
 
 if PY2:
     from contextlib import contextmanager
@@ -110,12 +111,7 @@ CLDR_WINZONE_URL = 'http://unicode.org/repos/cldr/trunk/common/supplemental/wind
 PYTZ_TO_MS_MAP_PERSISTENT_STORAGE = os.path.join(tempfile.gettempdir(), 'exchangelib.winzone.cache')
 
 
-class EWSTimeZone(object):
-    """
-    Represents a timezone as expected by the EWS TimezoneContext / TimezoneDefinition XML element, and returned by
-    services.GetServerTimeZones.
-    """
-
+def _get_pytz_to_ms_map():
     # Translation map between pytz location / timezone name and Windows timezone ID. This is contained in the CLDR
     # database and exposed by the 'babel' package, but we can't use it until this issue is fixed:
     #    https://github.com/python-babel/babel/issues/464
@@ -134,7 +130,20 @@ class EWSTimeZone(object):
             db['GMT'] = str('GMT Standard Time')
         else:
             log.debug('Loading cached tz map from shelve: %s.db', PYTZ_TO_MS_MAP_PERSISTENT_STORAGE)
-        PYTZ_TO_MS_MAP = dict(db)
+        return dict(db)
+
+
+class EWSTimeZone(object):
+    """
+    Represents a timezone as expected by the EWS TimezoneContext / TimezoneDefinition XML element, and returned by
+    services.GetServerTimeZones.
+    """
+    PYTZ_TO_MS_MAP = _get_pytz_to_ms_map()
+
+    @classmethod
+    def reset_cache(cls):
+        os.remove(PYTZ_TO_MS_MAP_PERSISTENT_STORAGE + '.db')
+        cls.PYTZ_TO_MS_MAP = _get_pytz_to_ms_map()
 
     @classmethod
     def from_pytz(cls, tz):
@@ -159,7 +168,10 @@ class EWSTimeZone(object):
     @classmethod
     def timezone(cls, location):
         # Like pytz.timezone() but returning EWSTimeZone instances
-        tz = pytz.timezone(location)
+        try:
+            tz = pytz.timezone(location)
+        except pytz.exceptions.UnknownTimeZoneError:
+            raise UnknownTimeZone("Timezone '%s' is unknown by pytz" % location)
         return cls.from_pytz(tz)
 
     def normalize(self, dt):

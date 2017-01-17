@@ -18,7 +18,7 @@ from exchangelib.autodiscover import AutodiscoverProtocol, discover
 from exchangelib.configuration import Configuration
 from exchangelib.credentials import DELEGATE, Credentials
 from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalidOperation, AutoDiscoverRedirect, \
-    AutoDiscoverCircularRedirect, AutoDiscoverFailed, ErrorNonExistentMailbox
+    AutoDiscoverCircularRedirect, AutoDiscoverFailed, ErrorNonExistentMailbox, UnknownTimeZone
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, ExtendedProperty, Choice, Email, Contact, \
     Task, EmailAddress, PhysicalAddress, PhoneNumber, IndexedField, RoomList, Calendar, DeletedItems, Drafts, Inbox, \
@@ -110,6 +110,17 @@ class EWSDateTimeTest(unittest.TestCase):
         for k, v in EWSTimeZone.PYTZ_TO_MS_MAP.items():
             self.assertIsInstance(k, str)
             self.assertIsInstance(v, str)
+
+        # Test unknown timezone
+        with self.assertRaises(UnknownTimeZone):
+            EWSTimeZone.timezone('UNKNOWN')
+
+        # Test resetting cache
+        EWSTimeZone.PYTZ_TO_MS_MAP = {}
+        with self.assertRaises(ValueError):
+            EWSTimeZone.timezone('UTC')
+        EWSTimeZone.reset_cache()
+        EWSTimeZone.timezone('UTC')
 
     def test_ewsdatetime(self):
         tz = EWSTimeZone.timezone('Europe/Copenhagen')
