@@ -85,6 +85,10 @@ class AutoDiscoverRedirect(AutoDiscoverError):
         return 'AutoDiscover redirects to %s' % self.redirect_email
 
 
+class UnknownTimeZone(EWSError):
+    pass
+
+
 class ResponseMessageError(TransportError):
     pass
 
