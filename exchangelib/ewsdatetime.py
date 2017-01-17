@@ -2,6 +2,7 @@
 from __future__ import unicode_literals
 
 import datetime
+import logging
 import os
 import shelve
 import tempfile
@@ -25,6 +26,8 @@ if PY2:
             shelve_handle.close()
 else:
     shelve_open = shelve.open
+
+log = logging.getLogger(__name__)
 
 
 class EWSDate(datetime.date):
@@ -121,13 +124,16 @@ class EWSTimeZone(object):
     # and caches the map on-disk instead of downloading the database every time.
     with shelve_open(PYTZ_TO_MS_MAP_PERSISTENT_STORAGE) as db:
         if not len(db):
+            log.debug('Building cached tz map from URL: %s', CLDR_WINZONE_URL)
             r = requests.get(CLDR_WINZONE_URL)
             assert r.status_code == 200
             for e in fromstring(r.content).find('windowsZones').find('mapTimezones').findall('mapZone'):
                 db[e.get('type')] = e.get('other')
             # Add some missing but helpful translations
-            db['UTC'] = 'UTC'
-            db['GMT'] = 'GMT Standard Time'
+            db['UTC'] = str('UTC')
+            db['GMT'] = str('GMT Standard Time')
+        else:
+            log.debug('Loading cached tz map from shelve: %s.db', PYTZ_TO_MS_MAP_PERSISTENT_STORAGE)
         PYTZ_TO_MS_MAP = dict(db)
 
     @classmethod
