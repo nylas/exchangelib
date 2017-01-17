@@ -2327,7 +2327,14 @@ class Calendar(Folder):
     supported_item_models = (CalendarItem,)
 
     LOCALIZED_NAMES = {
-        'da_DK': ('Kalender',)
+        'da_DK': ('Kalender',),
+        'de_DE': ('Kalender',),
+        'en_US': ('Calendar',),
+        'es_ES': ('Calendario',),
+        'fr_CA': ('Calendrier',),
+        'nl_NL': ('Agenda',),
+        'ru_RU': ('Календарь',),
+        'sv_SE': ('Kalender',),
     }
 
     def view(self, start, end, max_items=None, *args, **kwargs):
@@ -2355,6 +2362,13 @@ class DeletedItems(Folder):
 
     LOCALIZED_NAMES = {
         'da_DK': ('Slettet post',),
+        'de_DE': ('Gelöschte Elemente',),
+        'en_US': ('Deleted Items',),
+        'es_ES': ('Elementos eliminados',),
+        'fr_CA': ('Éléments supprimés',),
+        'nl_NL': ('Verwijderde items',),
+        'ru_RU': ('Удаленные',),
+        'sv_SE': ('Borttaget',),
     }
 
 
@@ -2367,7 +2381,14 @@ class Drafts(Messages):
     DISTINGUISHED_FOLDER_ID = 'drafts'
 
     LOCALIZED_NAMES = {
-        'da_DK': ('Kladder',)
+        'da_DK': ('Kladder',),
+        'de_DE': ('Entwürfe',),
+        'en_US': ('Drafts',),
+        'es_ES': ('Borradores',),
+        'fr_CA': ('Brouillons',),
+        'nl_NL': ('Concepten',),
+        'ru_RU': ('Черновики',),
+        'sv_SE': ('Utkast',),
     }
 
 
@@ -2375,7 +2396,14 @@ class Inbox(Messages):
     DISTINGUISHED_FOLDER_ID = 'inbox'
 
     LOCALIZED_NAMES = {
-        'da_DK': ('Indbakke',)
+        'da_DK': ('Indbakke',),
+        'de_DE': ('Posteingang',),
+        'en_US': ('Inbox',),
+        'es_ES': ('Bandeja de entrada',),
+        'fr_CA': ('Boîte de réception',),
+        'nl_NL': ('Postvak IN',),
+        'ru_RU': ('Входящие',),
+        'sv_SE': ('Inkorgen',),
     }
 
 
@@ -2384,6 +2412,13 @@ class Outbox(Messages):
 
     LOCALIZED_NAMES = {
         'da_DK': ('Udbakke',),
+        'de_DE': ('Kalender',),
+        'en_US': ('Outbox',),
+        'es_ES': ('Bandeja de salida',),
+        'fr_CA': ("Boîte d'envoi",),
+        'nl_NL': ('Postvak UIT',),
+        'ru_RU': ('Исходящие',),
+        'sv_SE': ('Utkorgen',),
     }
 
 
@@ -2391,7 +2426,14 @@ class SentItems(Messages):
     DISTINGUISHED_FOLDER_ID = 'sentitems'
 
     LOCALIZED_NAMES = {
-        'da_DK': ('Sendt post',)
+        'da_DK': ('Sendt post',),
+        'de_DE': ('Gesendete Elemente',),
+        'en_US': ('Sent Items',),
+        'es_ES': ('Elementos enviados',),
+        'fr_CA': ('Éléments envoyés',),
+        'nl_NL': ('Verzonden items',),
+        'ru_RU': ('Отправленные',),
+        'sv_SE': ('Skickat',),
     }
 
 
@@ -2400,6 +2442,13 @@ class JunkEmail(Messages):
 
     LOCALIZED_NAMES = {
         'da_DK': ('Uønsket e-mail',),
+        'de_DE': ('Junk-E-Mail',),
+        'en_US': ('Junk E-mail',),
+        'es_ES': ('Correo no deseado',),
+        'fr_CA': ('Courrier indésirables',),
+        'nl_NL': ('Ongewenste e-mail',),
+        'ru_RU': ('Нежелательная почта',),
+        'sv_SE': ('Skräppost',),
     }
 
 
@@ -2425,7 +2474,14 @@ class Tasks(Folder):
     supported_item_models = (Task,)
 
     LOCALIZED_NAMES = {
-        'da_DK': ('Opgaver',)
+        'da_DK': ('Opgaver',),
+        'de_DE': ('Aufgaben',),
+        'en_US': ('Tasks',),
+        'es_ES': ('Tareas',),
+        'fr_CA': ('Tâches',),
+        'nl_NL': ('Taken',),
+        'ru_RU': ('Задачи',),
+        'sv_SE': ('Uppgifter',),
     }
 
 
@@ -2435,7 +2491,14 @@ class Contacts(Folder):
     supported_item_models = (Contact,)
 
     LOCALIZED_NAMES = {
-        'da_DK': ('Kontaktpersoner',)
+        'da_DK': ('Kontaktpersoner',),
+        'de_DE': ('Kontakte',),
+        'en_US': ('Contacts',),
+        'es_ES': ('Contactos',),
+        'fr_CA': ('Contacts',),
+        'nl_NL': ('Contactpersonen',),
+        'ru_RU': ('Контакты',),
+        'sv_SE': ('Kontakter',),
     }
 
 
