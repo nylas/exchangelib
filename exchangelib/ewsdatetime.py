@@ -142,7 +142,10 @@ class EWSTimeZone(object):
 
     @classmethod
     def reset_cache(cls):
-        os.remove(PYTZ_TO_MS_MAP_PERSISTENT_STORAGE + '.db')
+        try:
+            os.remove(PYTZ_TO_MS_MAP_PERSISTENT_STORAGE + '.db')
+        except OSError:
+            pass  # The file was never created
         cls.PYTZ_TO_MS_MAP = _get_pytz_to_ms_map()
 
     @classmethod
