@@ -18,7 +18,7 @@ import traceback
 from xml.parsers.expat import ExpatError
 
 from future.utils import raise_from
-from six import text_type
+from six import text_type, string_types
 
 from . import errors
 from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, ErrorBatchProcessingStopped, \
@@ -579,7 +579,7 @@ class UpdateItem(EWSPooledAccountService):
         # Takes a list of (Item, fieldnames) tuples where 'Item' is a instance of a subclass of Item and 'fieldnames'
         # are the attribute names that were updated. Returns the XML for an UpdateItem call.
         # an UpdateItem request.
-        from .folders import ItemId, IndexedField, ExtendedProperty, EWSElement
+        from .folders import ItemId, IndexedField, ExtendedProperty, EWSElement, Attendee, Mailbox
         if self.account.version.build >= EXCHANGE_2013:
             updateitem = create_element(
                 'm:%s' % self.SERVICE_NAME,
@@ -616,6 +616,19 @@ class UpdateItem(EWSPooledAccountService):
                     log.warning('%s is a read-only field. Skipping', fieldname)
                     continue
                 val = getattr(item, fieldname)
+
+                # Allow setting attendee and mailbox types as plain strings
+                field_type = item_model.type_for_field(fieldname)
+                if field_type == Mailbox and isinstance(val, string_types):
+                    val = Mailbox(email_address=val)
+                elif field_type == [Mailbox] and val is not None:
+                    val = [Mailbox(email_address=s) if isinstance(s, string_types) else s for s in val]
+                elif field_type == Attendee and isinstance(val, string_types):
+                    val = Attendee(mailbox=Mailbox(email_address=val), response_type='Accept')
+                elif field_type == [Attendee] and val is not None:
+                    val = [Attendee(mailbox=Mailbox(email_address=s), response_type='Accept')
+                           if isinstance(s, string_types) else s for s in val]
+
                 field_uri = item_model.fielduri_for_field(fieldname)
                 if not isinstance(field_uri, text_type) and issubclass(field_uri, ExtendedProperty) and val is not None \
                         and not isinstance(val, field_uri.__class__):

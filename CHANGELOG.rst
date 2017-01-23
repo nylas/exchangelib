@@ -2,6 +2,18 @@
 Change Log
 ==========
 
+HEAD
+----
+* Allow setting `Mailbox` and `Attendee`-type attributes as plain strings, e.g.:
+
+```python
+calendar_item.organizer =  'anne@example.com'
+calendar_item.required_attendees =  ['john@example.com', 'bill@example.com']
+
+message.to_recipients =  ['john@example.com', 'anne@example.com']
+
+```
+
 1.7.6
 -----
 * Bugfix release

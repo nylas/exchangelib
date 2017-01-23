@@ -833,6 +833,8 @@ class Attendee(EWSElement):
     __slots__ = ('mailbox', 'response_type', 'last_response_time')
 
     def __init__(self, mailbox, response_type, last_response_time=None):
+        if isinstance(mailbox, string_types):
+            mailbox = Mailbox(email_address=mailbox)
         assert isinstance(mailbox, Mailbox)
         assert response_type in self.RESPONSE_TYPES
         if last_response_time is not None:
@@ -1348,6 +1350,19 @@ class ItemMixIn(Item):
                 continue
             if isinstance(v, (tuple, list)) and not v:
                 continue
+
+            # Allow setting attendee and mailbox types as plain strings
+            field_type = self.type_for_field(f)
+            if field_type == Mailbox and isinstance(v, string_types):
+                v = Mailbox(email_address=v)
+            elif field_type == [Mailbox] and v is not None:
+                v = [Mailbox(email_address=s) if isinstance(s, string_types) else s for s in v]
+            elif field_type == Attendee and isinstance(v, string_types):
+                v = Attendee(mailbox=Mailbox(email_address=v), response_type='Accept')
+            elif field_type == [Attendee] and v is not None:
+                v = [Attendee(mailbox=Mailbox(email_address=s), response_type='Accept')
+                     if isinstance(s, string_types) else s for s in v]
+
             if isinstance(field_uri, string_types):
                 field_elem = self.elem_for_field(f)
                 if f == 'body':

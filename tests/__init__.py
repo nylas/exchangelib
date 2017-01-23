@@ -391,7 +391,10 @@ class EWSTest(unittest.TestCase):
         if field_type == Mailbox:
             # email_address must be a real account on the server(?)
             # TODO: Mailbox has multiple optional args, but they must match the server account, so we can't easily test.
-            return Mailbox(email_address=self.account.primary_smtp_address)
+            if get_random_bool():
+                return Mailbox(email_address=self.account.primary_smtp_address)
+            else:
+                return self.account.primary_smtp_address
         if field_type == [Mailbox]:
             # Mailbox must be a real mailbox on the server(?). We're only sure to have one
             return [self.random_val(Mailbox)]
@@ -401,7 +404,10 @@ class EWSTest(unittest.TestCase):
                 return Attendee(mailbox=self.random_val(Mailbox), response_type='Accept',
                                 last_response_time=self.random_val(EWSDateTime))
             else:
-                return Attendee(mailbox=self.random_val(Mailbox), response_type='Accept')
+                if get_random_bool():
+                    return Attendee(mailbox=self.random_val(Mailbox), response_type='Accept')
+                else:
+                    return self.account.primary_smtp_address
         if field_type == [Attendee]:
             # Attendee must refer to a real mailbox on the server(?). We're only sure to have one
             return [self.random_val(Attendee)]
