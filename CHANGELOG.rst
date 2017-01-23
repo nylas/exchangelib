@@ -2,6 +2,10 @@
 Change Log
 ==========
 
+1.7.6
+-----
+* Bugfix release
+
 1.7.5
 -----
 * `Account.fetch()` and `Folder.fetch()` are now generators. They will do nothing before being evaluated.

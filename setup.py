@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
 To upload to PyPI:
-   python setup.py sdist upload
+   python setup.py sdist bdist_wheel upload
 """
 import os
 
@@ -14,7 +14,7 @@ def read(fname):
 
 setup(
     name='exchangelib',
-    version='1.7.5',
+    version='1.7.6',
     author='Erik Cederstrand',
     author_email='erik@cederstrand.dk',
     description='Client for Microsoft Exchange Web Services (EWS)',
