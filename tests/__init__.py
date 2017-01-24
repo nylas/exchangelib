@@ -452,12 +452,16 @@ class CommonTest(EWSTest):
         ws = GetServerTimeZones(self.config.protocol)
         data = ws.call()
         self.assertAlmostEqual(len(data), 130, delta=30, msg=data)
+        # Test shortcut
+        self.assertAlmostEqual(len(self.config.protocol.get_timezones()), 130, delta=30, msg=data)
 
     def test_get_roomlists(self):
         # The test server is not guaranteed to have any room lists which makes this test less useful
         ws = GetRoomLists(self.config.protocol)
         roomlists = ws.call()
         self.assertEqual(roomlists, [])
+        # Test shortcut
+        self.assertEqual(self.config.protocol.get_roomlists(), [])
 
     def test_get_rooms(self):
         # The test server is not guaranteed to have any rooms or room lists which makes this test less useful
@@ -465,6 +469,8 @@ class CommonTest(EWSTest):
         ws = GetRooms(self.config.protocol)
         roomlists = ws.call(roomlist=roomlist)
         self.assertEqual(roomlists, [])
+        # Test shortcut
+        self.assertEqual(self.config.protocol.get_rooms('my.roomlist@example.com'), [])
 
     def test_sessionpool(self):
         # First, empty the calendar

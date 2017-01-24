@@ -20,6 +20,7 @@ from six import text_type, PY2
 
 from .credentials import Credentials
 from .errors import TransportError
+from .services import GetServerTimeZones, GetRoomLists, GetRooms, ResolveNames
 from .transport import get_auth_instance, get_service_authtype, get_docs_authtype, test_credentials, AUTH_TYPE_MAP
 from .util import split_url
 from .version import Version, API_VERSIONS
@@ -204,6 +205,16 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
 
         # Needs auth objects and a working session pool
         self.version = Version.guess(self)
+
+    def get_timezones(self):
+        return GetServerTimeZones(protocol=self).call()
+
+    def get_roomlists(self):
+        return GetRoomLists(protocol=self).call()
+
+    def get_rooms(self, roomlist):
+        from .folders import RoomList
+        return GetRooms(protocol=self).call(roomlist=RoomList(email_address=roomlist))
 
     def __str__(self):
         return '''\
