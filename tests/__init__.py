@@ -18,12 +18,13 @@ from exchangelib.autodiscover import AutodiscoverProtocol, discover
 from exchangelib.configuration import Configuration
 from exchangelib.credentials import DELEGATE, Credentials
 from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalidOperation, AutoDiscoverRedirect, \
-    AutoDiscoverCircularRedirect, AutoDiscoverFailed, ErrorNonExistentMailbox, UnknownTimeZone
+    AutoDiscoverCircularRedirect, AutoDiscoverFailed, ErrorNonExistentMailbox, UnknownTimeZone, \
+    ErrorNameResolutionNoResults
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, ExtendedProperty, Choice, Email, Contact, \
     Task, EmailAddress, PhysicalAddress, PhoneNumber, IndexedField, RoomList, Calendar, DeletedItems, Drafts, Inbox, \
     Outbox, SentItems, JunkEmail, Messages, Tasks, Contacts, Item, AnyURI, Body, HTMLBody, FileAttachment, \
-    ItemAttachment, Attachment, ALL_OCCURRENCIES, MimeContent, MessageHeader
+    ItemAttachment, Attachment, ALL_OCCURRENCIES, MimeContent, MessageHeader, Room
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.restriction import Restriction, Q
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, GetAttachment, TNS
@@ -463,14 +464,105 @@ class CommonTest(EWSTest):
         # Test shortcut
         self.assertEqual(self.config.protocol.get_roomlists(), [])
 
+    def test_get_roomlists_parsing(self):
+        # Test static XML since server has no roomlists
+        ws = GetRoomLists(self.config.protocol)
+        xml = '''\
+<?xml version="1.0" ?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+    <s:Header>
+        <h:ServerVersionInfo
+            MajorBuildNumber="845" MajorVersion="15" MinorBuildNumber="22" MinorVersion="1" Version="V2016_10_10"
+            xmlns:h="http://schemas.microsoft.com/exchange/services/2006/types"
+            xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"/>
+    </s:Header>
+    <s:Body>
+        <m:GetRoomListsResponse ResponseClass="Success"
+                xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"
+                xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types"
+                xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+            <m:ResponseCode>NoError</m:ResponseCode>
+            <m:RoomLists>
+                <t:Address>
+                    <t:Name>Roomlist</t:Name>
+                    <t:EmailAddress>roomlist1@example.com</t:EmailAddress>
+                    <t:RoutingType>SMTP</t:RoutingType>
+                    <t:MailboxType>PublicDL</t:MailboxType>
+                </t:Address>
+                <t:Address>
+                    <t:Name>Roomlist</t:Name>
+                    <t:EmailAddress>roomlist2@example.com</t:EmailAddress>
+                    <t:RoutingType>SMTP</t:RoutingType>
+                    <t:MailboxType>PublicDL</t:MailboxType>
+                </t:Address>
+            </m:RoomLists>
+        </m:GetRoomListsResponse>
+    </s:Body>
+</s:Envelope>'''
+        res = ws._get_elements_in_response(response=ws._get_soap_payload(soap_response=to_xml(xml, 'utf-8')))
+        self.assertSetEqual(
+            {RoomList.from_xml(elem).email_address for elem in res},
+            {'roomlist1@example.com', 'roomlist2@example.com'}
+        )
+
     def test_get_rooms(self):
         # The test server is not guaranteed to have any rooms or room lists which makes this test less useful
         roomlist = RoomList(email_address='my.roomlist@example.com')
         ws = GetRooms(self.config.protocol)
-        roomlists = ws.call(roomlist=roomlist)
-        self.assertEqual(roomlists, [])
+        with self.assertRaises(ErrorNameResolutionNoResults):
+            ws.call(roomlist=roomlist)
         # Test shortcut
-        self.assertEqual(self.config.protocol.get_rooms('my.roomlist@example.com'), [])
+        with self.assertRaises(ErrorNameResolutionNoResults):
+            self.config.protocol.get_rooms('my.roomlist@example.com')
+
+    def test_get_rooms_parsing(self):
+        # Test static XML since server has no rooms
+        ws = GetRooms(self.config.protocol)
+        xml = '''\
+<?xml version="1.0" ?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+    <s:Header>
+        <h:ServerVersionInfo
+            MajorBuildNumber="845" MajorVersion="15" MinorBuildNumber="22" MinorVersion="1" Version="V2016_10_10"
+            xmlns:h="http://schemas.microsoft.com/exchange/services/2006/types"
+            xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"/>
+    </s:Header>
+    <s:Body>
+        <m:GetRoomsResponse ResponseClass="Success"
+                xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"
+                xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types"
+                xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+            <m:ResponseCode>NoError</m:ResponseCode>
+            <m:Rooms>
+                <t:Room>
+                    <t:Id>
+                        <t:Name>room1</t:Name>
+                        <t:EmailAddress>room1@example.com</t:EmailAddress>
+                        <t:RoutingType>SMTP</t:RoutingType>
+                        <t:MailboxType>Mailbox</t:MailboxType>
+                    </t:Id>
+                </t:Room>
+                <t:Room>
+                    <t:Id>
+                        <t:Name>room2</t:Name>
+                        <t:EmailAddress>room2@example.com</t:EmailAddress>
+                        <t:RoutingType>SMTP</t:RoutingType>
+                        <t:MailboxType>Mailbox</t:MailboxType>
+                    </t:Id>
+                </t:Room>
+            </m:Rooms>
+        </m:GetRoomsResponse>
+    </s:Body>
+</s:Envelope>'''
+        res = ws._get_elements_in_response(response=ws._get_soap_payload(soap_response=to_xml(xml, 'utf-8')))
+        self.assertSetEqual(
+            {Room.from_xml(elem).email_address for elem in res},
+            {'room1@example.com', 'room2@example.com'}
+        )
 
     def test_sessionpool(self):
         # First, empty the calendar
@@ -611,7 +703,7 @@ class AutodiscoverTest(EWSTest):
         _autodiscover_cache._protocols.clear()
         discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
         exchangelib.autodiscover._try_autodiscover = _orig
-	# Make sure we can delete cache entries even though we don't have it in our in-memory cache
+    # Make sure we can delete cache entries even though we don't have it in our in-memory cache
         _autodiscover_cache._protocols.clear()
         del _autodiscover_cache[cache_key]
         # This should also work if the cache does not contain the entry anymore

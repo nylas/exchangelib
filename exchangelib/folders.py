@@ -651,7 +651,11 @@ class Mailbox(EWSElement):
 
 
 class RoomList(Mailbox):
+    # MSDN: https://msdn.microsoft.com/en-us/library/office/dd899514(v=exchg.150).aspx
     ELEMENT_NAME = 'RoomList'
+    # In a GetRoomLists response, room lists are delivered as Address elements
+    # MSDN: https://msdn.microsoft.com/en-us/library/office/dd899404(v=exchg.150).aspx
+    RESPONSE_ELEMENT_NAME = 'Address'
 
     @classmethod
     def request_tag(cls):
@@ -659,10 +663,11 @@ class RoomList(Mailbox):
 
     @classmethod
     def response_tag(cls):
-        return '{%s}%s' % (MNS, cls.ELEMENT_NAME)
+        return '{%s}%s' % (TNS, cls.RESPONSE_ELEMENT_NAME)
 
 
 class Room(Mailbox):
+    # MSDN: https://msdn.microsoft.com/en-us/library/office/dd899479(v=exchg.150).aspx
     ELEMENT_NAME = 'Room'
 
     @classmethod
