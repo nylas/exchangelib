@@ -156,7 +156,9 @@ class EWSService(object):
             self._raise_soap_errors(fault=fault)  # Will throw SOAPError
         response_messages = response.find('{%s}ResponseMessages' % MNS)
         if response_messages is None:
-            return response.findall('{%s}%sResponse' % (MNS, self.SERVICE_NAME))
+            # Result isn't delivered in a list of FooResponseMessages, but directly in the FooResponse. Consumers expect
+            # a list, so return a list
+            return [response]
         return response_messages.findall('{%s}%sResponseMessage' % (MNS, self.SERVICE_NAME))
 
     def _raise_soap_errors(self, fault):
