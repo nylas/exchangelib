@@ -1490,6 +1490,33 @@ class BaseItemTest(EWSTest):
         )
         self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES)
 
+    def test_filter_on_fields(self):
+        # Test that we can filter on all field names that we support filtering on
+        item = self.get_test_item()
+        if hasattr(item, 'is_all_day'):
+            item.is_all_day = False  # Make sure start- and end dates don't change
+        ids = self.test_folder.bulk_create(items=[item])
+        common_qs = self.test_folder.filter(categories__contains=self.categories)
+        for f in self.test_folder.allowed_field_names():
+            print('FILTER ON %s=%s' % (f, getattr(item, f)))
+            val = getattr(item, f)
+            if f == 'categories':
+                filter_kwargs = {'%s__contains' % f: val}
+            else:
+                filter_kwargs = {f: val}
+            if val is None:
+                # We cannot filter on None values
+                with self.assertRaises(ValueError):
+                    len(common_qs.filter(**filter_kwargs))
+                continue
+            if f in self.test_folder.complex_field_names():
+                # We cannot filter on complex fields
+                with self.assertRaises(ValueError):
+                    len(common_qs.filter(**filter_kwargs))
+                continue
+            self.assertEqual(len(common_qs.filter(**filter_kwargs)), 1)
+        self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES)
+
     def test_paging(self):
         # Test that paging services work correctly. Default EWS paging size is 1000 items. Our default is 100 items.
         items = []

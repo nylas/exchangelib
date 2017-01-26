@@ -80,6 +80,8 @@ class Q(object):
                 self.children.append(q)
 
         for key, value in kwargs.items():
+            if value is None:
+                raise ValueError('Value for Q kwarg "%s" cannot be None' % key)
             if '__' in key:
                 field, lookup = key.rsplit('__')
                 if lookup == self.LOOKUP_RANGE:
@@ -99,6 +101,7 @@ class Q(object):
                     op = self._lookup_to_op(lookup)
             else:
                 field, op = key, self.EQ
+
             assert op in self.OP_TYPES
             if len(args) == 0 and len(kwargs) == 1:
                 self.field = field
@@ -132,10 +135,13 @@ class Q(object):
         if kwargs:
             kwargs_q = q or Q()
             for key, value in kwargs.items():
+                if value is None:
+                    raise ValueError('Value for filter kwarg "%s" cannot be None' % key)
                 if '__' in key:
                     field, lookup = key.rsplit('__')
                 else:
                     field, lookup = key, None
+                cls._validate_field(field, folder_class)
                 # Filtering by category is a bit quirky. The only lookup type I have found to work is:
                 #
                 #     item:Categories == 'foo' AND item:Categories == 'bar' AND ...
@@ -288,13 +294,19 @@ class Q(object):
         if self.translated:
             return self
         if self.field is not None:
-            if self.field in folder_class.complex_field_names():
-                raise ValueError("Complex field '%s' does not support filtering" % self.field)
+            self._validate_field(self.field, folder_class)
             self.field = folder_class.fielduri_for_field(self.field)
         for c in self.children:
             c.translate_fields(folder_class=folder_class)
         self.translated = True
         return self
+
+    @staticmethod
+    def _validate_field(field, folder_class):
+        if field not in folder_class.allowed_field_names():
+            raise ValueError("'%s' is not a valid field when filtering on %s" % (field, folder_class.__name__))
+        if field in folder_class.complex_field_names():
+            raise ValueError("Complex field '%s' does not support filtering" % field)
 
     def to_xml(self, folder_class):
         # Translate this Q object to a valid Restriction XML tree
