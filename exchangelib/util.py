@@ -99,6 +99,7 @@ def get_xml_attrs(tree, name):
 
 def value_to_xml_text(value):
     from .ewsdatetime import EWSDateTime
+    from .folders import Attendee, Mailbox, EmailAddress, PhoneNumber
     if isinstance(value, string_types):
         return safe_xml_value(value)
     if isinstance(value, bool):
@@ -107,6 +108,14 @@ def value_to_xml_text(value):
         return text_type(value)
     if isinstance(value, EWSDateTime):
         return value.ewsformat()
+    if isinstance(value, PhoneNumber):
+        return value.phone_number
+    if isinstance(value, EmailAddress):
+        return value.email
+    if isinstance(value, Mailbox):
+        return value.email_address
+    if isinstance(value, Attendee):
+        return value.mailbox.email_address
     raise ValueError('Unsupported type: %s (%s)' % (type(value), value))
 
 

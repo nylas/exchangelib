@@ -1490,7 +1490,7 @@ class BaseItemTest(EWSTest):
         )
         self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES)
 
-    def test_filter_on_fields(self):
+    def test_filter_on_all_fields(self):
         # Test that we can filter on all field names that we support filtering on
         item = self.get_test_item()
         if hasattr(item, 'is_all_day'):
@@ -1498,23 +1498,32 @@ class BaseItemTest(EWSTest):
         ids = self.test_folder.bulk_create(items=[item])
         common_qs = self.test_folder.filter(categories__contains=self.categories)
         for f in self.test_folder.allowed_field_names():
-            print('FILTER ON %s=%s' % (f, getattr(item, f)))
+            if f in ('status', 'companies'):
+                # For some reason, EWS disallows searching on these, instead throwing ErrorInvalidValueForProperty
+                continue
+            if f in ('percent_complete',):
+                # This simply doesn't match anything. Error in EWS?
+                continue
+            field_type = self.ITEM_CLASS.type_for_field(f)
+            if field_type in ([Attachment], [Mailbox], [Attendee], [PhysicalAddress]):
+                # These are not searchable, either. Maybe EWS just doesn't support it
+                continue
             val = getattr(item, f)
-            if f == 'categories':
-                filter_kwargs = {'%s__contains' % f: val}
-            else:
-                filter_kwargs = {f: val}
             if val is None:
                 # We cannot filter on None values
-                with self.assertRaises(ValueError):
-                    len(common_qs.filter(**filter_kwargs))
                 continue
-            if f in self.test_folder.complex_field_names():
-                # We cannot filter on complex fields
-                with self.assertRaises(ValueError):
-                    len(common_qs.filter(**filter_kwargs))
-                continue
-            self.assertEqual(len(common_qs.filter(**filter_kwargs)), 1)
+            if isinstance(field_type, list):
+                # Filter multi-value fields with __in and __contains
+                filter_kwargs = [{'%s__in' % f: val}, {'%s__contains' % f: val}]
+            else:
+                # Filter all others with =, __in and __contains. We could have more filters here, but these should
+                # always match.
+                filter_kwargs = [{f: val}, {'%s__in' % f: [val]}]
+                if field_type in string_types and f not in ('display_name',):
+                    # For some reason, 'display_name__contains' does not match. Error in EWS?
+                    filter_kwargs.append({'%s__contains' % f: val})
+            for kw in filter_kwargs:
+                self.assertEqual(len(common_qs.filter(**kw)), 1)
         self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES)
 
     def test_paging(self):
@@ -2171,7 +2180,7 @@ class MessagesTest(BaseItemTest):
         item.send_and_save()
         self.assertIsNone(item.item_id)
         self.assertIsNone(item.changekey)
-        time.sleep(1)  # Requests are supposed to be transactional, but apparently not...
+        time.sleep(5)  # Requests are supposed to be transactional, but apparently not...
         ids = self.test_folder.filter(categories__contains=item.categories).values_list('item_id', 'changekey')
         self.assertEqual(len(ids), 1)
         item.item_id, item.changekey = ids[0]

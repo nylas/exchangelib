@@ -1218,14 +1218,14 @@ class Item(EWSElement):
 
     @classmethod
     def complex_fields(cls):
-        # Return fields that are not complex EWS types. Quoting the EWS FindItem docs:
+        # Return fields that are complex EWS types. Quoting the EWS FindItem docs:
         #
         #   The FindItem operation returns only the first 512 bytes of any streamable property. For Unicode, it returns
         #   the first 255 characters by using a null-terminated Unicode string. It does not return any of the message
         #   body formats or the recipient lists.
         #
-        simple_types = (bool, int, string_type, [string_type], AnyURI, Choice, EWSDateTime)
-        return tuple(f for f in cls.fieldnames() if cls.type_for_field(f) not in simple_types) + ('item_id', 'changekey')
+        complex_types = (Body, HTMLBody, Attachment, [Attachment])
+        return tuple(f for f in cls.fieldnames() if cls.type_for_field(f) in complex_types)
 
     @classmethod
     def type_for_field(cls, fieldname):
@@ -2070,6 +2070,15 @@ class Folder(EWSElement):
         for item_model in cls.supported_item_models:
             try:
                 return item_model.fielduri_for_field(fieldname=fieldname)
+            except ValueError:
+                pass
+        raise ValueError("No fielduri defined for fieldname '%s'" % fieldname)
+
+    @classmethod
+    def field_type_for_field(cls, fieldname):
+        for item_model in cls.supported_item_models:
+            try:
+                return item_model.type_for_field(fieldname=fieldname)
             except ValueError:
                 pass
         raise ValueError("No fielduri defined for fieldname '%s'" % fieldname)
