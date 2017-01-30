@@ -17,7 +17,6 @@ from .errors import UnknownTimeZone
 if PY2:
     from contextlib import contextmanager
 
-
     @contextmanager
     def shelve_open(*args, **kwargs):
         shelve_handle = shelve.open(*args, **kwargs)
@@ -133,19 +132,28 @@ def _get_pytz_to_ms_map():
         return dict(db)
 
 
+def _reset_pytz_to_ms_map():
+    try:
+        os.remove(PYTZ_TO_MS_MAP_PERSISTENT_STORAGE + '.db')
+    except OSError:
+        pass  # The file was never created
+
+
 class EWSTimeZone(object):
     """
     Represents a timezone as expected by the EWS TimezoneContext / TimezoneDefinition XML element, and returned by
     services.GetServerTimeZones.
     """
-    PYTZ_TO_MS_MAP = _get_pytz_to_ms_map()
+    try:
+        PYTZ_TO_MS_MAP = _get_pytz_to_ms_map()
+    except Exception as e:
+        log.warning('Failed to load cached tz map from shelve. Resetting (%r)' % e)
+        _reset_pytz_to_ms_map()
+        PYTZ_TO_MS_MAP = _get_pytz_to_ms_map()
 
     @classmethod
     def reset_cache(cls):
-        try:
-            os.remove(PYTZ_TO_MS_MAP_PERSISTENT_STORAGE + '.db')
-        except OSError:
-            pass  # The file was never created
+        _reset_pytz_to_ms_map()
         cls.PYTZ_TO_MS_MAP = _get_pytz_to_ms_map()
 
     @classmethod
