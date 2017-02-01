@@ -116,13 +116,6 @@ class EWSDateTimeTest(unittest.TestCase):
         with self.assertRaises(UnknownTimeZone):
             EWSTimeZone.timezone('UNKNOWN')
 
-        # Test resetting cache
-        EWSTimeZone.PYTZ_TO_MS_MAP = {}
-        with self.assertRaises(ValueError):
-            EWSTimeZone.timezone('UTC')
-        EWSTimeZone.reset_cache()
-        EWSTimeZone.timezone('UTC')
-
     def test_ewsdatetime(self):
         tz = EWSTimeZone.timezone('Europe/Copenhagen')
         dt = tz.localize(EWSDateTime(2000, 1, 2, 3, 4, 5))
