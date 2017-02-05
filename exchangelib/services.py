@@ -646,8 +646,6 @@ class UpdateItem(EWSPooledAccountService):
                         field_elem=item_model.elem_for_field(fieldname), items=val, version=self.account.version)
                 if isinstance(field_uri, text_type):
                     fielduri = create_element('t:FieldURI', FieldURI=field_uri)
-                elif issubclass(field_uri, ExtendedProperty):
-                    fielduri = field_uri.field_uri_xml()
                 elif issubclass(field_uri, IndexedField):
                     # TODO: Maybe the set/delete logic should extend into each attribute of a complex type like e.g.
                     # PhysicalAddress and not just the whole item.
@@ -684,7 +682,8 @@ class UpdateItem(EWSPooledAccountService):
                                     value=wrapped_v, meeting_timezone_added=meeting_timezone_added)
                     continue
                 else:
-                    assert False, 'Unknown field_uri type: %s' % field_uri
+                    assert issubclass(field_uri, ExtendedProperty)
+                    fielduri = field_uri.field_uri_xml()
                 if val is None or isinstance(val, (tuple, list)) and not len(val):
                     # A value of None or [] means we want to remove this field from the item
                     self._add_delete_item_elem(

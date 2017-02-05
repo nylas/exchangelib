@@ -1247,10 +1247,9 @@ class Item(EWSElement):
                     elems.extend(field_uri_xml)
                 else:
                     elems.append(field_uri_xml)
-        elif issubclass(field_uri, ExtendedProperty):
-            elems.append(field_uri.field_uri_xml())
         else:
-            assert False, 'Unknown field_uri type: %s' % field_uri
+            assert issubclass(field_uri, ExtendedProperty)
+            elems.append(field_uri.field_uri_xml())
         return elems
 
     @classmethod
