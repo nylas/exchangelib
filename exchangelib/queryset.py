@@ -254,7 +254,7 @@ class QuerySet(object):
                     return self._cache[idx_or_slice]
                 return self.reverse()[-(idx_or_slice+1)]
             else:
-                if self._cache is not None and idx_or_slice < FindItem.CHUNKSIZE:
+                if self._cache is None and idx_or_slice < FindItem.CHUNKSIZE:
                     self.page_size = idx_or_slice + 1
                 # Support non-negative indexes by consuming the iterator up to the index
                 for i, val in enumerate(self.__iter__()):
@@ -267,8 +267,8 @@ class QuerySet(object):
             # query result, and then slice on the cache.
             list(self.__iter__())
             return self._cache[idx_or_slice]
-        if self._cache is not None and idx_or_slice.stop is not None and idx_or_slice.stop < FindItem.CHUNKSIZE:
-            self.page_size = idx_or_slice.stop + 1
+        if self._cache is None and idx_or_slice.stop is not None and idx_or_slice.stop < FindItem.CHUNKSIZE:
+            self.page_size = idx_or_slice.stop
         return islice(self.__iter__(), idx_or_slice.start, idx_or_slice.stop, idx_or_slice.step)
 
     def as_values(self, iterable):
