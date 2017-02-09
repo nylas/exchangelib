@@ -194,13 +194,19 @@ Here are some examples of how `exchangelib` works:
     CalendarItem.deregister('lunch_menu')
 
     # It's possible to create, delete and get attachments connected to any item type:
-    # Process attachments on existing items
+    # Process attachments on existing items. FileAttachments have a 'content' attribute 
+    # containing the binary content of the file, and ItemAttachments have an 'item' attribute
+    # containing the item. The item can be a Message, CalendarItem, Task etc.
     for item in my_folder.all():
         for attachment in item.attachments:
-            local_path = os.path.join('/tmp', attachment.name)
-            with open(local_path, 'wb') as f:
-                f.write(attachment.content)
+            if isinstance(attachment, FileAttachment):
+                local_path = os.path.join('/tmp', attachment.name)
+                with open(local_path, 'wb') as f:
+                    f.write(attachment.content)
                 print('Saved attachment to', local_path)
+            elif isinstance(attachment, ItemAttachment):
+                if isinstance(attachment.item, Message):
+                    print(attachment.item.subject, attachment.item.body)
 
     # Create a new item with an attachment
     item = Message(...)
