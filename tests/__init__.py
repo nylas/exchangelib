@@ -1006,7 +1006,6 @@ class BaseItemTest(EWSTest):
         qs.q = Q()
         qs.only_fields = ('a', 'b')
         qs.order_fields = ('c', 'd')
-        qs.reversed = True
         qs.return_format = QuerySet.NONE
 
         # Initially, immutable items have the same id()
@@ -1021,8 +1020,6 @@ class BaseItemTest(EWSTest):
         self.assertEqual(qs.only_fields, new_qs.only_fields)
         self.assertEqual(id(qs.order_fields), id(new_qs.order_fields))
         self.assertEqual(qs.order_fields, new_qs.order_fields)
-        self.assertEqual(id(qs.reversed), id(new_qs.reversed))
-        self.assertEqual(qs.reversed, new_qs.reversed)
         self.assertEqual(id(qs.return_format), id(new_qs.return_format))
         self.assertEqual(qs.return_format, new_qs.return_format)
 
@@ -1030,7 +1027,6 @@ class BaseItemTest(EWSTest):
         new_qs.q = Q()
         new_qs.only_fields = ('a', 'b')
         new_qs.order_fields = ('c', 'd')
-        new_qs.reversed = True
         new_qs.return_format = QuerySet.NONE
 
         self.assertNotEqual(id(qs), id(new_qs))
@@ -1043,8 +1039,6 @@ class BaseItemTest(EWSTest):
         self.assertEqual(qs.only_fields, new_qs.only_fields)
         self.assertNotEqual(id(qs.order_fields), id(new_qs.order_fields))
         self.assertEqual(qs.order_fields, new_qs.order_fields)
-        self.assertEqual(id(qs.reversed), id(new_qs.reversed))  # True and False are singletons in Python
-        self.assertEqual(qs.reversed, new_qs.reversed)
         self.assertEqual(id(qs.return_format), id(new_qs.return_format))  # String literals are also singletons
         self.assertEqual(qs.return_format, new_qs.return_format)
 
@@ -1052,7 +1046,6 @@ class BaseItemTest(EWSTest):
         new_qs.q = Q(foo=5)
         new_qs.only_fields = ('c', 'd')
         new_qs.order_fields = ('e', 'f')
-        new_qs.reversed = False
         new_qs.return_format = QuerySet.VALUES
 
         self.assertNotEqual(id(qs), id(new_qs))
@@ -1065,13 +1058,10 @@ class BaseItemTest(EWSTest):
         self.assertNotEqual(qs.only_fields, new_qs.only_fields)
         self.assertNotEqual(id(qs.order_fields), id(new_qs.order_fields))
         self.assertNotEqual(qs.order_fields, new_qs.order_fields)
-        self.assertNotEqual(id(qs.reversed), id(new_qs.reversed))
-        self.assertNotEqual(qs.reversed, new_qs.reversed)
         self.assertNotEqual(id(qs.return_format), id(new_qs.return_format))
         self.assertNotEqual(qs.return_format, new_qs.return_format)
 
     def test_querysets(self):
-        self.test_folder.filter(categories__contains=self.categories).delete()
         test_items = []
         for i in range(4):
             item = self.get_test_item()
@@ -1164,6 +1154,121 @@ class BaseItemTest(EWSTest):
             qs.filter(subject__startswith='Item').delete(),
             [(True, None), (True, None), (True, None), (True, None)]
         )
+
+    def test_order_by(self):
+        # Test order_by() on normal field
+        test_items = []
+        for i in range(4):
+            item = self.get_test_item()
+            item.subject = 'Subj %s' % i
+            test_items.append(item)
+        self.test_folder.bulk_create(items=test_items)
+        qs = QuerySet(self.test_folder).filter(categories__contains=self.categories)
+        self.assertEqual(
+            [i for i in qs.order_by('subject').values_list('subject', flat=True)],
+            ['Subj 0', 'Subj 1', 'Subj 2', 'Subj 3']
+        )
+        self.assertEqual(
+            [i for i in qs.order_by('-subject').values_list('subject', flat=True)],
+            ['Subj 3', 'Subj 2', 'Subj 1', 'Subj 0']
+        )
+        self.test_folder.filter(categories__contains=self.categories).delete()
+
+        # Test order_by() on ExtendedProperty
+        test_items = []
+        for i in range(4):
+            item = self.get_test_item()
+            item.extern_id = 'ID %s' % i
+            test_items.append(item)
+        self.test_folder.bulk_create(items=test_items)
+        qs = QuerySet(self.test_folder).filter(categories__contains=self.categories)
+        self.assertEqual(
+            [i for i in qs.order_by('extern_id').values_list('extern_id', flat=True)],
+            ['ID 0', 'ID 1', 'ID 2', 'ID 3']
+        )
+        self.assertEqual(
+            [i for i in qs.order_by('-extern_id').values_list('extern_id', flat=True)],
+            ['ID 3', 'ID 2', 'ID 1', 'ID 0']
+        )
+        self.test_folder.filter(categories__contains=self.categories).delete()
+
+        # Test order_by() on IndexedField (simple and multi-subfield). Only Contact items have these
+        if self.ITEM_CLASS == Contact:
+            test_items = []
+            label = random.choice(list(EmailAddress.LABELS))
+            for i in range(4):
+                item = self.get_test_item()
+                item.email_addresses = [EmailAddress(email='%s@foo.com' % i, label=label)]
+                test_items.append(item)
+            self.test_folder.bulk_create(items=test_items)
+            qs = QuerySet(self.test_folder).filter(categories__contains=self.categories)
+            self.assertEqual(
+                [i[0].email for i in qs.order_by('email_addresses__%s' % label).values_list('email_addresses', flat=True)],
+                ['0@foo.com', '1@foo.com', '2@foo.com', '3@foo.com']
+            )
+            self.assertEqual(
+                [i[0].email for i in qs.order_by('-email_addresses__%s' % label).values_list('email_addresses', flat=True)],
+                ['3@foo.com', '2@foo.com', '1@foo.com', '0@foo.com']
+            )
+            self.test_folder.filter(categories__contains=self.categories).delete()
+
+            test_items = []
+            label = random.choice(list(PhysicalAddress.LABELS))
+            for i in range(4):
+                item = self.get_test_item()
+                item.physical_addresses = [PhysicalAddress(street='Elm St %s' % i, label=label)]
+                test_items.append(item)
+            self.test_folder.bulk_create(items=test_items)
+            qs = QuerySet(self.test_folder).filter(categories__contains=self.categories)
+            self.assertEqual(
+                [i[0].street for i in qs.order_by('physical_addresses__%s__street' % label).values_list('physical_addresses', flat=True)],
+                ['Elm St 0', 'Elm St 1', 'Elm St 2', 'Elm St 3']
+            )
+            self.assertEqual(
+                [i[0].street for i in qs.order_by('-physical_addresses__%s__street' % label).values_list('physical_addresses', flat=True)],
+                ['Elm St 3', 'Elm St 2', 'Elm St 1', 'Elm St 0']
+            )
+            self.test_folder.filter(categories__contains=self.categories).delete()
+
+        # Test sorting on multiple fields
+        test_items = []
+        for i in range(2):
+            for j in range(2):
+                item = self.get_test_item()
+                item.subject = 'Subj %s' % i
+                item.extern_id = 'ID %s' % j
+                test_items.append(item)
+        self.test_folder.bulk_create(items=test_items)
+        qs = QuerySet(self.test_folder).filter(categories__contains=self.categories)
+        self.assertEqual(
+            [i for i in qs.order_by('subject', 'extern_id').values('subject', 'extern_id')],
+            [{'subject': 'Subj 0', 'extern_id': 'ID 0'},
+             {'subject': 'Subj 0', 'extern_id': 'ID 1'},
+             {'subject': 'Subj 1', 'extern_id': 'ID 0'},
+             {'subject': 'Subj 1', 'extern_id': 'ID 1'}]
+        )
+        self.assertEqual(
+            [i for i in qs.order_by('-subject', 'extern_id').values('subject', 'extern_id')],
+            [{'subject': 'Subj 1', 'extern_id': 'ID 0'},
+             {'subject': 'Subj 1', 'extern_id': 'ID 1'},
+             {'subject': 'Subj 0', 'extern_id': 'ID 0'},
+             {'subject': 'Subj 0', 'extern_id': 'ID 1'}]
+        )
+        self.assertEqual(
+            [i for i in qs.order_by('subject', '-extern_id').values('subject', 'extern_id')],
+            [{'subject': 'Subj 0', 'extern_id': 'ID 1'},
+             {'subject': 'Subj 0', 'extern_id': 'ID 0'},
+             {'subject': 'Subj 1', 'extern_id': 'ID 1'},
+             {'subject': 'Subj 1', 'extern_id': 'ID 0'}]
+        )
+        self.assertEqual(
+            [i for i in qs.order_by('-subject', '-extern_id').values('subject', 'extern_id')],
+            [{'subject': 'Subj 1', 'extern_id': 'ID 1'},
+             {'subject': 'Subj 1', 'extern_id': 'ID 0'},
+             {'subject': 'Subj 0', 'extern_id': 'ID 1'},
+             {'subject': 'Subj 0', 'extern_id': 'ID 0'}]
+        )
+        self.test_folder.filter(categories__contains=self.categories).delete()
 
     def test_finditems(self):
         now = UTC_NOW()

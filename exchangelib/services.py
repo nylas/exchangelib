@@ -758,7 +758,7 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
     def call(self, **kwargs):
         return self._paged_call(**kwargs)
 
-    def _get_payload(self, additional_fields, restriction, shape, depth, calendar_view, page_size, offset=0):
+    def _get_payload(self, additional_fields, restriction, order, shape, depth, calendar_view, page_size, offset=0):
         finditem = create_element('m:%s' % self.SERVICE_NAME, Traversal=depth)
         itemshape = create_element('m:ItemShape')
         add_xml_child(itemshape, 't:BaseShape', shape)
@@ -774,6 +774,20 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
         finditem.append(view_type)
         if restriction:
             finditem.append(restriction.xml)
+        if order:
+            from .queryset import OrderField
+            assert isinstance(order, OrderField)
+            from .folders import IndexedField, ExtendedProperty
+            field_order = create_element('t:FieldOrder', Order='Descending' if order.reverse else 'Ascending')
+            field_uri = self.folder.fielduri_for_field(order.field)
+            if isinstance(field_uri, string_types):
+                field_order.append(create_element('t:FieldURI', FieldURI=field_uri))
+            elif issubclass(field_uri, IndexedField):
+                field_order.append(field_uri.field_uri_xml(label=order.label, subfield=order.subfield))
+            else:
+                assert issubclass(field_uri, ExtendedProperty)
+                field_order.append(field_uri.field_uri_xml())
+            add_xml_child(finditem, 'm:SortOrder', field_order)
         parentfolderids = create_element('m:ParentFolderIds')
         parentfolderids.append(self.folder.to_xml(version=self.account.version))
         finditem.append(parentfolderids)

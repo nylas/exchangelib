@@ -446,8 +446,14 @@ class IndexedField(EWSElement):
     SUB_FIELD_ELEMENT_NAMES = {}
 
     @classmethod
-    def field_uri_xml(cls, label):
+    def field_uri_xml(cls, label, subfield=None):
         if cls.SUB_FIELD_ELEMENT_NAMES:
+            if subfield:
+                return create_element(
+                    't:IndexedFieldURI',
+                    FieldURI='%s:%s' % (cls.FIELD_URI, cls.SUB_FIELD_ELEMENT_NAMES[subfield]),
+                    FieldIndex=label,
+                )
             return [create_element(
                 't:IndexedFieldURI',
                 FieldURI='%s:%s' % (cls.FIELD_URI, field),
@@ -2146,6 +2152,9 @@ class Folder(EWSElement):
                 if f in complex_field_names:
                     raise ValueError("find_items() does not support field '%s'. Use fetch() instead" % f)
 
+        # Get the SortOrder field, if any
+        order = kwargs.pop('order', None)
+
         # Get the CalendarView, if any
         calendar_view = kwargs.pop('calendar_view', None)
 
@@ -2170,6 +2179,7 @@ class Folder(EWSElement):
         items = FindItem(folder=self).call(
             additional_fields=additional_fields,
             restriction=restriction,
+            order=order,
             shape=shape,
             depth=depth,
             calendar_view=calendar_view,
