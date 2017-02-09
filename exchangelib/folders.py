@@ -1574,12 +1574,12 @@ class Message(ItemMixIn):
         EXTENDED_PROPERTIES,
         'to_recipients', 'cc_recipients', 'bcc_recipients',
         'is_read_receipt_requested', 'is_delivery_receipt_requested',
-        'from', 'is_read', 'is_response_requested', 'reply_to',
+        'author', 'is_read', 'is_response_requested', 'reply_to',
     )
     REQUIRED_FIELDS = {'subject', 'is_read', 'is_delivery_receipt_requested', 'is_read_receipt_requested',
                        'is_response_requested'}
     READONLY_FIELDS = {'sender', 'message_id'}
-    READONLY_AFTER_SEND_FIELDS = {'is_read_receipt_requested', 'is_delivery_receipt_requested', 'from', 'sender',
+    READONLY_AFTER_SEND_FIELDS = {'is_read_receipt_requested', 'is_delivery_receipt_requested', 'author', 'sender',
                                   'reply_to', 'to_recipients', 'cc_recipients', 'bcc_recipients', 'message_id'}
 
     __slots__ = tuple(ITEM_FIELDS) + tuple(Item.ITEM_FIELDS)
@@ -1803,10 +1803,10 @@ class MeetingRequest(ItemMixIn):
     }
     EXTENDED_PROPERTIES = []
     ORDERED_FIELDS = (
-        'subject', EXTENDED_PROPERTIES, 'from', 'is_read', 'start', 'end'
+        'subject', EXTENDED_PROPERTIES, 'author', 'is_read', 'start', 'end'
     )
     REQUIRED_FIELDS = {'subject'}
-    READONLY_FIELDS = {'from'}
+    READONLY_FIELDS = {'author'}
 
     __slots__ = tuple(ITEM_FIELDS) + tuple(Item.ITEM_FIELDS)
 
@@ -1829,10 +1829,10 @@ class MeetingResponse(ItemMixIn):
     }
     EXTENDED_PROPERTIES = []
     ORDERED_FIELDS = (
-        'subject', EXTENDED_PROPERTIES, 'from', 'is_read', 'start', 'end'
+        'subject', EXTENDED_PROPERTIES, 'author', 'is_read', 'start', 'end'
     )
     REQUIRED_FIELDS = {'subject'}
-    READONLY_FIELDS = {'from'}
+    READONLY_FIELDS = {'author'}
 
     __slots__ = tuple(ITEM_FIELDS) + tuple(Item.ITEM_FIELDS)
 
@@ -1855,10 +1855,10 @@ class MeetingCancellation(ItemMixIn):
     }
     EXTENDED_PROPERTIES = []
     ORDERED_FIELDS = (
-        'subject', EXTENDED_PROPERTIES, 'from', 'is_read', 'start', 'end'
+        'subject', EXTENDED_PROPERTIES, 'author', 'is_read', 'start', 'end'
     )
     REQUIRED_FIELDS = {'subject'}
-    READONLY_FIELDS = {'from'}
+    READONLY_FIELDS = {'author'}
 
     __slots__ = tuple(ITEM_FIELDS) + tuple(Item.ITEM_FIELDS)
 
