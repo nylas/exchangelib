@@ -1151,7 +1151,7 @@ class BaseItemTest(EWSTest):
         self.assertEqual(qs.count(), 4)
         # Indexing and slicing
         self.assertTrue(isinstance(qs[0], self.ITEM_CLASS))
-        self.assertEqual(len(qs[1:3]), 2)
+        self.assertEqual(len(list(qs[1:3])), 2)
         self.assertEqual(len(qs), 4)
         # Exists
         self.assertEqual(qs.exists(), True)
@@ -1640,6 +1640,84 @@ class BaseItemTest(EWSTest):
         self.test_folder.bulk_create(items=items)
         ids = self.test_folder.filter(categories__contains=self.categories).values_list('item_id', 'changekey')
         self.account.bulk_delete(ids.iterator(page_size=10), affected_task_occurrences=ALL_OCCURRENCIES)
+
+    def test_slicing(self):
+        # Test that slicing works correctly
+        items = []
+        for i in range(4):
+            item = self.get_test_item()
+            item.subject = 'Subj %s' % i
+            del item.attachments[:]
+            items.append(item)
+        ids = self.test_folder.bulk_create(items=items)
+        qs = self.test_folder.filter(categories__contains=self.categories).only('subject').order_by('subject')
+
+        # Test positive index
+        self.assertEqual(
+            qs.copy()[0].subject,
+            'Subj 0'
+        )
+        # Test positive index
+        self.assertEqual(
+            qs.copy()[3].subject,
+            'Subj 3'
+        )
+        # Test negative index
+        self.assertEqual(
+            qs.copy()[-2].subject,
+            'Subj 2'
+        )
+        # Test positive slice
+        self.assertEqual(
+            [i.subject for i in qs.copy()[0:2]],
+            ['Subj 0', 'Subj 1']
+        )
+        # Test positive slice
+        self.assertEqual(
+            [i.subject for i in qs.copy()[2:4]],
+            ['Subj 2', 'Subj 3']
+        )
+        # Test positive open slice
+        self.assertEqual(
+            [i.subject for i in qs.copy()[:2]],
+            ['Subj 0', 'Subj 1']
+        )
+        # Test positive open slice
+        self.assertEqual(
+            [i.subject for i in qs.copy()[2:]],
+            ['Subj 2', 'Subj 3']
+        )
+        # Test negative slice
+        self.assertEqual(
+            [i.subject for i in qs.copy()[-3:-1]],
+            ['Subj 1', 'Subj 2']
+        )
+        # Test negative slice
+        self.assertEqual(
+            [i.subject for i in qs.copy()[1:-1]],
+            ['Subj 1', 'Subj 2']
+        )
+        # Test negative open slice
+        self.assertEqual(
+            [i.subject for i in qs.copy()[:-2]],
+            ['Subj 0', 'Subj 1']
+        )
+        # Test negative open slice
+        self.assertEqual(
+            [i.subject for i in qs.copy()[-2:]],
+            ['Subj 2', 'Subj 3']
+        )
+        # Test positive slice with step
+        self.assertEqual(
+            [i.subject for i in qs.copy()[0:4:2]],
+            ['Subj 0', 'Subj 2']
+        )
+        # Test negative slice with step
+        self.assertEqual(
+            [i.subject for i in qs.copy()[4:0:-2]],
+            ['Subj 3', 'Subj 1']
+        )
+        self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES)
 
     def test_getitems(self):
         item = self.get_test_item()

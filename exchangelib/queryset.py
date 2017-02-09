@@ -1,8 +1,9 @@
 # coding=utf-8
 from __future__ import unicode_literals
 
-import logging
 from copy import deepcopy
+from itertools import islice
+import logging
 from operator import attrgetter
 
 from future.utils import python_2_unicode_compatible
@@ -46,6 +47,7 @@ class OrderField(object):
             subfield = search_parts[2]
         except IndexError:
             subfield = None
+        reverse = s.startswith('-')
         field_uri = folder.fielduri_for_field(field)
         if not isinstance(field_uri, string_types) and issubclass(field_uri, IndexedField):
             if not label:
@@ -57,7 +59,10 @@ class OrderField(object):
             if not field_uri.SUB_FIELD_ELEMENT_NAMES and subfield:
                 raise ValueError("IndexedField order_by() value '%s' must not specify subfield, e.g. just "
                                  "'email_addresses__EmailAddress1'" % s)
-        return cls(field=field, label=label, subfield=subfield, reverse=s.startswith('-'))
+        return cls(field=field, label=label, subfield=subfield, reverse=reverse)
+
+    def __repr__(self):
+        return self.__class__.__name__ + repr((self.field, self.label, self.subfield, self.reverse))
 
 
 @python_2_unicode_compatible
@@ -103,7 +108,7 @@ class QuerySet(object):
         new_qs = self.__class__(self.folder)
         new_qs.q = None if self.q is None else deepcopy(self.q)
         new_qs.only_fields = self.only_fields
-        new_qs.order_fields = self.order_fields
+        new_qs.order_fields = None if self.order_fields is None else deepcopy(self.order_fields)
         new_qs.return_format = self.return_format
         new_qs.calendar_view = self.calendar_view
         return new_qs
@@ -235,10 +240,36 @@ class QuerySet(object):
         # This queryset has no cache yet. Call the optimized counting implementation
         return self.count()
 
-    def __getitem__(self, key):
-        # Support indexing and slicing
-        list(self.__iter__())  # Make sure cache is full by iterating the full query result
-        return self._cache[key]
+    def __getitem__(self, idx_or_slice):
+        # Support indexing and slicing. This is non-greedy when possible (slicing start, stop and step are not negative,
+        # and we're ordering on at most one field), and will only fill the cache if the entire query is iterated.
+        #
+        # If this queryset isn't cached, we can optimize a bit by setting self.page_size to only get as many items as
+        # strictly needed.
+        from .services import FindItem
+        if isinstance(idx_or_slice, int):
+            if idx_or_slice < 0:
+                # Support negative indexes by reversing the queryset and negating the index value
+                if self._cache is not None:
+                    return self._cache[idx_or_slice]
+                return self.reverse()[-(idx_or_slice+1)]
+            else:
+                if self._cache is not None and idx_or_slice < FindItem.CHUNKSIZE:
+                    self.page_size = idx_or_slice + 1
+                # Support non-negative indexes by consuming the iterator up to the index
+                for i, val in enumerate(self.__iter__()):
+                    if i == idx_or_slice:
+                        return val
+                raise IndexError()
+        assert isinstance(idx_or_slice, slice)
+        if ((idx_or_slice.start or 0) < 0) or ((idx_or_slice.stop or 0) < 0) or ((idx_or_slice.step or 0) < 0):
+            # islice() does not support negative start, stop and step. Make sure cache is full by iterating the full
+            # query result, and then slice on the cache.
+            list(self.__iter__())
+            return self._cache[idx_or_slice]
+        if self._cache is not None and idx_or_slice.stop is not None and idx_or_slice.stop < FindItem.CHUNKSIZE:
+            self.page_size = idx_or_slice.stop + 1
+        return islice(self.__iter__(), idx_or_slice.start, idx_or_slice.stop, idx_or_slice.step)
 
     def as_values(self, iterable):
         if len(self.only_fields) == 0:
@@ -362,7 +393,7 @@ class QuerySet(object):
         if not self.order_fields:
             raise ValueError('Reversing only makes sense if there are order_by fields')
         new_qs = self.copy()
-        for f in self.order_fields:
+        for f in new_qs.order_fields:
             f.reverse = not f.reverse
         return new_qs
 
