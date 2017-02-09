@@ -14,7 +14,7 @@ def read(fname):
 
 setup(
     name='exchangelib',
-    version='1.8.0',
+    version='1.8.1',
     author='Erik Cederstrand',
     author_email='erik@cederstrand.dk',
     description='Client for Microsoft Exchange Web Services (EWS)',
