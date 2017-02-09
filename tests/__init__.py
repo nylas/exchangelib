@@ -1,11 +1,12 @@
 # coding=utf-8
 import datetime
+from decimal import Decimal
+from keyword import kwlist
 import os
 import random
 import string
 import time
 import unittest
-from decimal import Decimal
 
 import requests
 from six import PY2, string_types, text_type
@@ -963,6 +964,11 @@ class BaseItemTest(EWSTest):
             update_kwargs['start'] = update_kwargs['start'].replace(hour=0, minute=0, second=0, microsecond=0)
             update_kwargs['end'] = update_kwargs['end'].replace(hour=0, minute=0, second=0, microsecond=0)
         return update_kwargs
+
+    def test_field_names(self):
+        # Test that fieldnames don't clash with Python keywords
+        for f in self.ITEM_CLASS.fieldnames():
+            self.assertNotIn(f, kwlist)
 
     def get_test_item(self, folder=None, categories=None):
         item_kwargs = self.get_random_insert_kwargs()

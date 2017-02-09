@@ -1560,27 +1560,27 @@ class Message(ItemMixIn):
         'is_delivery_receipt_requested': ('IsDeliveryReceiptRequested', bool),
         'is_read_receipt_requested': ('IsReadReceiptRequested', bool),
         'is_response_requested': ('IsResponseRequested', bool),
-        'from': ('From', Mailbox),
+        'author': ('From', Mailbox),  # We can't use fieldname 'from' since it's a Python keyword
         'sender': ('Sender', Mailbox),
         'reply_to': ('ReplyTo', [Mailbox]),
         'to_recipients': ('ToRecipients', [Mailbox]),
         'cc_recipients': ('CcRecipients', [Mailbox]),
         'bcc_recipients': ('BccRecipients', [Mailbox]),
+        'message_id': ('InternetMessageId', string_type),
     }
     EXTENDED_PROPERTIES = ['extern_id']
     ORDERED_FIELDS = (
         'subject', 'sensitivity', 'body', 'attachments', 'categories', 'importance', 'reminder_is_set',
         EXTENDED_PROPERTIES,
-        # 'sender',
         'to_recipients', 'cc_recipients', 'bcc_recipients',
         'is_read_receipt_requested', 'is_delivery_receipt_requested',
         'from', 'is_read', 'is_response_requested', 'reply_to',
     )
     REQUIRED_FIELDS = {'subject', 'is_read', 'is_delivery_receipt_requested', 'is_read_receipt_requested',
                        'is_response_requested'}
-    READONLY_FIELDS = {'sender'}
+    READONLY_FIELDS = {'sender', 'message_id'}
     READONLY_AFTER_SEND_FIELDS = {'is_read_receipt_requested', 'is_delivery_receipt_requested', 'from', 'sender',
-                                  'reply_to', 'to_recipients', 'cc_recipients', 'bcc_recipients'}
+                                  'reply_to', 'to_recipients', 'cc_recipients', 'bcc_recipients', 'message_id'}
 
     __slots__ = tuple(ITEM_FIELDS) + tuple(Item.ITEM_FIELDS)
 
