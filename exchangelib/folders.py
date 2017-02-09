@@ -2158,8 +2158,8 @@ class Folder(EWSElement):
         # Get the CalendarView, if any
         calendar_view = kwargs.pop('calendar_view', None)
 
-        # Get the requested number of items per page. Default to 100 and disallow None
-        page_size = kwargs.pop('page_size', None) or 100
+        # Get the requested number of items per page. Set a sane default and disallow None
+        page_size = kwargs.pop('page_size', None) or FindItem.CHUNKSIZE
 
         # Build up any restrictions
         q = Q.from_filter_args(self.__class__, *args, **kwargs)

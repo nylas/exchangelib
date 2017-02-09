@@ -754,6 +754,7 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
     """
     SERVICE_NAME = 'FindItem'
     element_container_name = '{%s}Items' % TNS
+    CHUNKSIZE = 100
 
     def call(self, **kwargs):
         return self._paged_call(**kwargs)
@@ -767,8 +768,10 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
             add_xml_child(itemshape, 't:AdditionalProperties', additional_property_elems)
         finditem.append(itemshape)
         if calendar_view is None:
-            view_type = create_element('m:IndexedPageItemView', MaxEntriesReturned=text_type(page_size),
-                                       Offset=text_type(offset), BasePoint='Beginning')
+            view_type = create_element('m:IndexedPageItemView',
+                                       MaxEntriesReturned=text_type(page_size),
+                                       Offset=text_type(offset),
+                                       BasePoint='Beginning')
         else:
             view_type = calendar_view.to_xml(version=self.account.version)
         finditem.append(view_type)
