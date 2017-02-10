@@ -744,7 +744,7 @@ class ExtendedProperty(EWSElement):
     property_set_id = None
     property_tag = None  # hex integer (e.g. 0x8000) or string ('0x8000')
     property_name = None
-    property_id = None
+    property_id = None  # integer as hex-formatted int (e.g. 0x8000) or normal int (32768)
     property_type = None
 
     __slots__ = ('value',)
@@ -806,7 +806,7 @@ class ExtendedProperty(EWSElement):
         if cls.property_id:
             assert not any([cls.property_name, cls.property_tag])
             assert any([cls.distinguished_property_set_id, cls.property_set_id])
-            elem.set('PropertyId', cls.property_id)
+            elem.set('PropertyId', value_to_xml_text(cls.property_id))
         assert cls.property_type in cls.PROPERTY_TYPES
         elem.set('PropertyType', cls.property_type)
         return elem
@@ -836,9 +836,9 @@ class ExtendedProperty(EWSElement):
             for k, v in (
                     ('DistinguishedPropertySetId', cls.distinguished_property_set_id),
                     ('PropertySetId', cls.property_set_id),
-                    ('PropertyTag', cls.property_tag),
+                    ('PropertyTag', hex(cls.property_tag) if isinstance(cls.property_tag, int) else cls.property_tag),
                     ('PropertyName', cls.property_name),
-                    ('PropertyId', cls.property_id),
+                    ('PropertyId', value_to_xml_text(cls.property_id) if cls.property_id else None),
                     ('PropertyType', cls.property_type),
             ):
                 if extended_field_uri.get(k) != v:
