@@ -127,6 +127,10 @@ def xml_text_to_value(value, field_type):
     if field_type == string_type:
         # Return builtin str unprocessed
         return value
+    if field_type == bytes:
+        # Return builtin bytes unprocessed. The XML returns binary data as plain strings, so we'll leave it to the
+        # caller to decide how to decode.
+        return value
     if field_type in (Choice, Email, AnyURI, Body, HTMLBody, MimeContent):
         # Cast string-like values to their intended class
         return field_type(value)

@@ -2,6 +2,11 @@
 Change Log
 ==========
 
+HEAD
+----
+* Expanded support for `ExtendedPropery` to include all possible attributes. This required renaming the `property_id`
+* attribute to `property_set_id`.
+
 1.8.1
 -----
 * Fix completely botched `Message.from` field renaming in 1.8.0

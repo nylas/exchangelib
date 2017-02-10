@@ -2067,7 +2067,7 @@ class BaseItemTest(EWSTest):
     def test_register(self):
         # Tests that we can register and de-register custom extended properties
         class TestProp(ExtendedProperty):
-            property_id = 'deadbeaf-cafe-cafe-cafe-deadbeefcafe'
+            property_set_id = 'deadbeaf-cafe-cafe-cafe-deadbeefcafe'
             property_name = 'Test Property'
             property_type = 'Integer'
 

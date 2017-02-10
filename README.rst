@@ -96,8 +96,8 @@ Here are some examples of how `exchangelib` works:
     # q = (Q(subject__iexact='foo') | Q(subject__contains='bar')) & ~Q(subject__startswith='baz')
     # items = my_folder.filter(q)
     #
-    # A large part of the Django QuerySet API is supported. The QuerySet doesn't fetch anything before the 
-    # QuerySet is iterated. The QuerySet returns an iterator, and results are cached when the QuerySet is 
+    # A large part of the Django QuerySet API is supported. The QuerySet doesn't fetch anything before the
+    # QuerySet is iterated. The QuerySet returns an iterator, and results are cached when the QuerySet is
     # iterated the first time.
     # Examples:
     #
@@ -107,7 +107,7 @@ Here are some examples of how `exchangelib` works:
     # sparse_items = my_folder.all().only('subject', 'start')
     # status_report = my_folder.all().delete()
     # items_for_2017 = my_calendar.filter(start__range=(
-    #     tz.localize(EWSDateTime(2017, 1, 1)), 
+    #     tz.localize(EWSDateTime(2017, 1, 1)),
     #     tz.localize(EWSDateTime(2018, 1, 1))
     # ))
     # item = my_folder.get(subject='unique_string')
@@ -158,28 +158,28 @@ Here are some examples of how `exchangelib` works:
         to_recipients=[Mailbox(email_address='anne@example.com')]
     )
     m.send_and_save()
-    
-    # EWS distinquishes between plain text and HTML body contents. If you want to send HTML body content, use 
+
+    # EWS distinquishes between plain text and HTML body contents. If you want to send HTML body content, use
     # the HTMLBody helper. Clients will see this as HTML and display the body correctly:
     item.body = HTMLBody('<html><body>Hello happy <blink>OWA user!</blink></body></html>')
-    
+
     # The most common folders are available as account.calendar, account.trash, account.drafts, account.inbox,
     # account.outbox, account.sent, account.junk, account.tasks, and account.contacts.
     #
-    # If you want to access other folders, you can either traverse the account.folders dictionary, or find 
-    # the folder by name, starting at a direct or indirect parent of the folder you want to find. To search 
+    # If you want to access other folders, you can either traverse the account.folders dictionary, or find
+    # the folder by name, starting at a direct or indirect parent of the folder you want to find. To search
     # the full folder hirarchy, start the search from account.root:
     python_dev_mail_folder = account.root.get_folder_by_name('python-dev')
-    # If you have multiple folders with the same name in your folder hierarchy, start your search further down 
+    # If you have multiple folders with the same name in your folder hierarchy, start your search further down
     # the hierarchy:
     foo1_folder = account.inbox.get_folder_by_name('foo')
     foo2_folder = python_dev_mail_folder.get_folder_by_name('foo')
     # For more advanced folder traversing, use some_folder.get_folders()
 
     # If folder items have extended properties, you need to register them before you can access them. Create
-    # a subclass of ExtendedProperty and set your custom property_id: 
+    # a subclass of ExtendedProperty and set your custom property_id:
     class LunchMenu(ExtendedProperty):
-        property_id = '12345678-1234-1234-1234-123456781234'
+        property_set_id = '12345678-1234-1234-1234-123456781234'
         property_name = 'Catering from the cafeteria'
         property_type = 'String'
 
@@ -194,7 +194,7 @@ Here are some examples of how `exchangelib` works:
     CalendarItem.deregister('lunch_menu')
 
     # It's possible to create, delete and get attachments connected to any item type:
-    # Process attachments on existing items. FileAttachments have a 'content' attribute 
+    # Process attachments on existing items. FileAttachments have a 'content' attribute
     # containing the binary content of the file, and ItemAttachments have an 'item' attribute
     # containing the item. The item can be a Message, CalendarItem, Task etc.
     for item in my_folder.all():
@@ -225,8 +225,8 @@ Here are some examples of how `exchangelib` works:
     # Remove the attachment again
     item.detach(my_file)
 
-    # Be aware that adding and deleting attachments from items that are already created in Exchange 
+    # Be aware that adding and deleting attachments from items that are already created in Exchange
     # (items that have an item_id) will update the changekey of the item.
 
-    
+
     # 'exchangelib' has support for most (but not all) item attributes, and also item export and upload.

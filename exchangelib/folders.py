@@ -740,8 +740,11 @@ class ExtendedProperty(EWSElement):
         'StringArray',
     }  # The commented-out types cannot be used for setting or getting (see docs) and are thus not very useful here
 
-    property_id = None
+    distinguished_property_set_id = None
+    property_set_id = None
+    property_tag = None  # hex integer (e.g. 0x8000) or string ('0x8000')
     property_name = None
+    property_id = None
     property_type = None
 
     __slots__ = ('value',)
@@ -780,13 +783,33 @@ class ExtendedProperty(EWSElement):
 
     @classmethod
     def field_uri_xml(cls):
+        elem = create_element('t:ExtendedFieldURI')
+        if cls.distinguished_property_set_id:
+            assert not any([cls.property_set_id, cls.property_tag])
+            assert any([cls.property_id, cls.property_name])
+            assert cls.distinguished_property_set_id in cls.DISTINGUISHED_SETS
+            elem.set('DistinguishedPropertySetId', cls.distinguished_property_set_id)
+        if cls.property_set_id:
+            assert not any([cls.distinguished_property_set_id, cls.property_tag])
+            assert any([cls.property_id, cls.property_name])
+            elem.set('PropertySetId', cls.property_set_id)
+        if cls.property_tag:
+            assert not any([cls.distinguished_property_set_id, cls.property_set_id, cls.property_name, cls.property_id])
+            hex_val = int(cls.property_tag, base=16) if isinstance(cls.property_tag, string_types) else cls.property_tag
+            if 0x8000 <= hex_val <= 0xFFFE:
+                raise ValueError("'property_tag' value '%s' is reserved for custom properties" % hex(hex_val))
+            elem.set('PropertyTag', hex(hex_val))
+        if cls.property_name:
+            assert not any([cls.property_id, cls.property_tag])
+            assert any([cls.distinguished_property_set_id, cls.property_set_id])
+            elem.set('PropertyName', cls.property_name)
+        if cls.property_id:
+            assert not any([cls.property_name, cls.property_tag])
+            assert any([cls.distinguished_property_set_id, cls.property_set_id])
+            elem.set('PropertyId', cls.property_id)
         assert cls.property_type in cls.PROPERTY_TYPES
-        return create_element(
-            't:ExtendedFieldURI',
-            PropertySetId=cls.property_id,
-            PropertyName=cls.property_name,
-            PropertyType=cls.property_type
-        )
+        elem.set('PropertyType', cls.property_type)
+        return elem
 
     def to_xml(self, version):
         self.clean()
@@ -811,8 +834,11 @@ class ExtendedProperty(EWSElement):
             match = True
 
             for k, v in (
-                    ('PropertySetId', cls.property_id),
+                    ('DistinguishedPropertySetId', cls.distinguished_property_set_id),
+                    ('PropertySetId', cls.property_set_id),
+                    ('PropertyTag', cls.property_tag),
                     ('PropertyName', cls.property_name),
+                    ('PropertyId', cls.property_id),
                     ('PropertyType', cls.property_type),
             ):
                 if extended_field_uri.get(k) != v:
@@ -837,7 +863,12 @@ class ExtendedProperty(EWSElement):
 
 
 class ExternId(ExtendedProperty):
-    property_id = 'c11ff724-aa03-4555-9952-8fa248a11c3e'  # This is arbirtary. We just want a unique UUID.
+    # This is a custom extended property defined by us. It's useful for synchronization purposes, to attach a unique ID
+    # from an external system. Strictly, this is an field that should probably not be registered by default since it's
+    # not part of EWS, but it's been around since the beginning of this library and would be a pain for consumers to
+    # register manually.
+
+    property_set_id = 'c11ff724-aa03-4555-9952-8fa248a11c3e'  # This is arbitrary. We just want a unique UUID.
     property_name = 'External ID'
     property_type = 'String'
 
