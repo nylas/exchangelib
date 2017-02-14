@@ -232,7 +232,7 @@ class Version(object):
     @classmethod
     def _get_version_from_service(cls, protocol, api_version):
         assert api_version
-        xml = dummy_xml(version=api_version)
+        xml = dummy_xml(version=api_version, name=protocol.credentials.username)
         # Create a minimal, valid EWS request to force Exchange into accepting the request and returning EWS xml
         # containing server version info. Some servers will only reply with their version if a valid POST is sent.
         session = protocol.get_session()

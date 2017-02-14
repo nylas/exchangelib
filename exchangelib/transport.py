@@ -58,7 +58,7 @@ def _test_service_credentials(protocol):
     # Retrieve the result. We allow 401 errors to happen since the authentication type may be wrong, giving a 401
     # response.
     headers = {'Content-Type': 'text/xml; charset=utf-8'}
-    data = dummy_xml(version=protocol.version.api_version)
+    data = dummy_xml(version=protocol.version.api_version, name=protocol.credentials.username)
     auth = get_auth_instance(credentials=protocol.credentials, auth_type=protocol.auth_type)
     with requests.sessions.Session() as s:
         r = s.post(url=protocol.service_endpoint, headers=headers, data=data, auth=auth, allow_redirects=False,
@@ -180,7 +180,7 @@ def get_docs_authtype(docs_url, verify):
     return _get_auth_method_from_response(response=r)
 
 
-def get_service_authtype(service_endpoint, versions, verify):
+def get_service_authtype(service_endpoint, versions, verify, name):
     # Get auth type by tasting headers from the server. Only do post requests. HEAD is too error prone, and some servers
     # are set up to redirect to OWA on all requests except POST to /EWS/Exchange.asmx
     log.debug('Getting service auth type for %s', service_endpoint)
@@ -189,7 +189,7 @@ def get_service_authtype(service_endpoint, versions, verify):
     # respond when given a valid request. Try all known versions. Gross.
     with requests.sessions.Session() as s:
         for version in versions:
-            data = dummy_xml(version=version)
+            data = dummy_xml(version=version, name=name)
             log.debug('Requesting %s from %s', data, service_endpoint)
             r = s.post(url=service_endpoint, headers=headers, data=data, allow_redirects=True, verify=verify)
             auth_method = _get_auth_method_from_response(response=r)
@@ -261,8 +261,8 @@ def _tokenize(val):
     return tokens
 
 
-def dummy_xml(version):
+def dummy_xml(version, name):
     # Used as a minimal, valid EWS request to force Exchange into accepting the request and returning EWS XML
     # containing server version info.
     from .services import ResolveNames  # Avoid circular import
-    return ResolveNames(protocol=None).payload(version=version, account=None, unresolved_entries=['DUMMY'])
+    return ResolveNames(protocol=None).payload(version=version, account=None, unresolved_entries=[name])

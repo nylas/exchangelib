@@ -193,7 +193,7 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
         # Autodetect authentication type if necessary
         if self.auth_type is None:
             self.auth_type = get_service_authtype(service_endpoint=self.service_endpoint, versions=API_VERSIONS,
-                                                  verify=self.verify_ssl)
+                                                  verify=self.verify_ssl, name=self.credentials.username)
         self.docs_auth_type = get_docs_authtype(verify=self.verify_ssl, docs_url=self.types_url)
 
         # Try to behave nicely with the Exchange server. We want to keep the connection open between requests.
