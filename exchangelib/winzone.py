@@ -1,13 +1,14 @@
 """ A dict to translate from pytz location name to Windows timezone name. Translations taken from
 http://unicode.org/repos/cldr/trunk/common/supplemental/windowsZones.xml """
 
+CLDR_WINZONE_URL = 'http://unicode.org/repos/cldr/trunk/common/supplemental/windowsZones.xml'
+
 
 def generate_map():
     """ Helper method to update the map if the CLDR database is updated """
     import requests
     from xml.etree.ElementTree import fromstring
 
-    CLDR_WINZONE_URL = 'http://unicode.org/repos/cldr/trunk/common/supplemental/windowsZones.xml'
     r = requests.get(CLDR_WINZONE_URL)
     assert r.status_code == 200
     tz_map = {}

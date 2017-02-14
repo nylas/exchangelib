@@ -77,7 +77,7 @@ def _test_response(auth, response):
     elif _is_unauthorized(resp):
         # Exchange brilliantly sends an unauth message as a non-401 page. Clever.
         raise UnauthorizedError('Unauthorized (non-401)')
-    elif isinstance(auth, HttpNtlmAuth) and not resp:
+    elif isinstance(auth, requests_ntlm.HttpNtlmAuth) and not resp:
         # It seems the NTLM handler doesn't throw 401 errors. If the request is invalid, it doesn't bother
         # responding with anything. Even more clever.
         raise UnauthorizedError('Unauthorized (NTLM, empty response)')

@@ -253,7 +253,7 @@ class Version(object):
         if r.status_code == 400:
             raise EWSWarning('Bad request')
         if r.status_code == 500 and ('The specified server version is invalid' in r.text or
-                                             'ErrorInvalidSchemaVersionForMailboxVersion' in r.text):
+                                     'ErrorInvalidSchemaVersionForMailboxVersion' in r.text):
             raise EWSWarning('Invalid server version')
         if r.status_code != 200:
             if 'The referenced account is currently locked out' in r.text:

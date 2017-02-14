@@ -280,7 +280,6 @@ class Q(object):
         return self.is_leaf() and self.field is None
 
     def expr(self):
-        from .folders import EWSElement
         if self.is_empty():
             return None
         if self.is_leaf():
@@ -295,7 +294,9 @@ class Q(object):
                 (c.expr() if c.is_leaf() or c.conn_type == self.NOT else '(%s)' % c.expr())
                 for c in sorted(
                     self.children,
-                    key=lambda i: i.field if isinstance(i.field, string_types) else '' if i.field is None else i.field.ELEMENT_NAME
+                    key=lambda i: i.field if isinstance(i.field, string_types)
+                    else '' if i.field is None
+                    else i.field.ELEMENT_NAME
                 )
             )
         if not expr:
@@ -350,7 +351,7 @@ class Q(object):
         # Return an XML tree structure of this Q object. First, remove any empty children. If conn_type is AND or OR and
         # there is exactly one child, ignore the AND/OR and treat this node as a leaf. If this is an empty leaf
         # (equivalent of Q()), return None.
-        from .folders import IndexedField, ExtendedProperty, EWSElement
+        from .folders import IndexedField, ExtendedProperty
         if self.is_empty():
             return None
         if self.is_leaf():
@@ -382,8 +383,10 @@ class Q(object):
             # Sort children by field name so we get stable output (for easier testing). Children should never be empty
             for c in sorted(
                     self.children,
-                    key=lambda i: i.field if isinstance(i.field, string_types) else '' if i.field is None else i.field.ELEMENT_NAME
-                ):
+                    key=lambda i: i.field if isinstance(i.field, string_types)
+                    else '' if i.field is None
+                    else i.field.ELEMENT_NAME
+                    ):
                 elem.append(c.xml_elem())
         if elem is None:
             return None  # Should not be necessary, but play safe

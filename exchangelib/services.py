@@ -521,7 +521,8 @@ class UpdateItem(EWSPooledAccountService):
     SERVICE_NAME = 'UpdateItem'
     element_container_name = '{%s}Items' % MNS
 
-    def _add_delete_item_elem(self, item_model, parent_elem, fieldname, fielduri):
+    @staticmethod
+    def _add_delete_item_elem(item_model, parent_elem, fieldname, fielduri):
         if fieldname in item_model.required_fields():
             log.warning('%s is a required field and may not be deleted. Skipping', fieldname)
             return
@@ -632,8 +633,8 @@ class UpdateItem(EWSPooledAccountService):
                            if isinstance(s, string_types) else s for s in val]
 
                 field_uri = item_model.fielduri_for_field(fieldname)
-                if not isinstance(field_uri, text_type) and issubclass(field_uri, ExtendedProperty) and val is not None \
-                        and not isinstance(val, field_uri.__class__):
+                if not isinstance(field_uri, text_type) and issubclass(field_uri, ExtendedProperty) \
+                        and val is not None and not isinstance(val, field_uri.__class__):
                     # For convenience, item attributes implemented as an extended property can be assigned their
                     # internal value instead of wrapping them in an ExtendedProperty class.
                     val = field_uri(val)

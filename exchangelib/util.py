@@ -90,7 +90,7 @@ def get_xml_attr(tree, name):
     elem = tree.find(name)
     if elem is None:  # Must compare with None, see XML docs
         return None
-    return  elem.text or None
+    return elem.text or None
 
 
 def get_xml_attrs(tree, name):
@@ -212,7 +212,7 @@ def to_xml(text, encoding):
                 offending_line = ''
             offending_excerpt = offending_line[max(0, col_no - 20):col_no + 20].decode('ascii', 'ignore')
             raise_from(ParseError('%s\nOffending text: [...]%s[...]' % (text_type(e), offending_excerpt)), e)
-        except  TypeError:
+        except TypeError:
             raise ParseError('This is not XML: %s' % text)
 
 

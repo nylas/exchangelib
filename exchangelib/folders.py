@@ -1304,7 +1304,8 @@ class Item(EWSElement):
         extended_properties = elem.findall(ExtendedProperty.response_tag())
         for fieldname in cls.fieldnames():
             field_type = cls.type_for_field(fieldname)
-            if field_type in (EWSDateTime, bool, int, Decimal, string_type, Choice, Email, AnyURI, Body, HTMLBody, MimeContent):
+            if field_type in \
+                    (EWSDateTime, bool, int, Decimal, string_type, Choice, Email, AnyURI, Body, HTMLBody, MimeContent):
                 field_elem = elem.find(cls.response_xml_elem_for_field(fieldname))
                 val = None if field_elem is None else field_elem.text or None
                 if val is not None:
@@ -2262,7 +2263,7 @@ class Folder(EWSElement):
         Does a simple FindItem to test (read) access to the folder. Maybe the account doesn't exist, maybe the
         service user doesn't have access to the calendar. This will throw the most common errors.
         """
-        list(self.filter(subject='DUMMY'))
+        list(self.filter(subject='DUMMY').values_list('subject'))
         return True
 
     @classmethod
@@ -2381,6 +2382,7 @@ class CalendarView(EWSElement):
         self.end = end
         self.max_items = max_items
 
+    @classmethod
     def request_tag(cls):
         return 'm:%s' % cls.ELEMENT_NAME
 
