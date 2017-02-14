@@ -14,7 +14,7 @@ from future.utils import PY2
 from future.utils import raise_from
 from six import text_type, string_types
 
-from .errors import TransportError, RateLimitError, RedirectError, RelativeRedirect
+from .errors import TransportError, RateLimitError, RedirectError, RelativeRedirect, CASError
 
 if PY2:
     from thread import get_ident
@@ -414,6 +414,9 @@ Response headers: %(response_headers)s'''
         protocol.retire_session(session)
         raise
     if r.status_code != 200:
+        cas_error = r.headers.get('X-CasErrorCode')
+        if cas_error:
+            raise CASError(cas_error=cas_error, response=r)
         if r.text and is_xml(r.text):
             # Some genius at Microsoft thinks it's OK to send 500 error messages with valid SOAP response
             log.debug('Got status code %s but trying to parse content anyway', r.status_code)

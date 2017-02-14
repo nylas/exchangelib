@@ -93,6 +93,18 @@ class ResponseMessageError(TransportError):
     pass
 
 
+class CASError(EWSError):
+    # EWS will sometimes return an error message in an 'X-CasErrorCode' custom HTTP header in an HTTP 500 error code.
+    # This exception is for those cases. The caller may want to do something with the original response, so store that.
+    def __init__(self, cas_error, response):
+        self.cas_error = cas_error
+        self.response = response
+        super(CASError, self).__init__(text_type(self))
+
+    def __str__(self):
+        return 'CAS error: %s' % self.cas_error
+
+
 # Somewhat-authoritative list of possible response message error types from EWS. See full list at
 # https://msdn.microsoft.com/en-us/library/office/aa580757(v=exchg.150).aspx
 #
