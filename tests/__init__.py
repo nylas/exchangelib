@@ -39,8 +39,7 @@ from exchangelib.winzone import generate_map, PYTZ_TO_MS_TIMEZONE_MAP
 if PY2:
     FileNotFoundError = OSError
 
-    class ConnectionResetError(OSError):
-        pass
+    from exchangelib.util import ConnectionResetError
 
 
 class BuildTest(unittest.TestCase):
