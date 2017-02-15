@@ -118,9 +118,17 @@ class EWSDateTimeTest(unittest.TestCase):
             self.assertIsInstance(k, str)
             self.assertIsInstance(v, str)
 
-        # Test unknown timezone
+        # Test timezone unknown by pytz
         with self.assertRaises(UnknownTimeZone):
             EWSTimeZone.timezone('UNKNOWN')
+
+        # Test timezone known by pytz but with no Winzone mapping
+        import pytz
+        tz = pytz.timezone('Africa/Tripoli')
+        # This hack smashes the pytz timezone cache. Don't reuse the original timezone name for other tests
+        tz.zone = 'UNKNOWN'
+        with self.assertRaises(ValueError):
+            EWSTimeZone.from_pytz(tz)
 
     def test_ewsdatetime(self):
         tz = EWSTimeZone.timezone('Europe/Copenhagen')
@@ -148,9 +156,14 @@ class EWSDateTimeTest(unittest.TestCase):
         # Test error when tzinfo is set directly
         with self.assertRaises(ValueError):
             EWSDateTime(2000, 1, 1, tzinfo=tz)
+        # Test normalize, for completeness
+        self.assertEqual(tz.normalize(tz.localize(EWSDateTime(2000, 1, 1))).ewsformat(), '2000-01-01T00:00:00')
 
     def test_generate(self):
         self.assertDictEqual(generate_map(), PYTZ_TO_MS_TIMEZONE_MAP)
+
+    def test_ewsdate(self):
+        self.assertEqual(EWSDate(2000, 1, 1).ewsformat(), '2000-01-01')
 
 
 class RestrictionTest(unittest.TestCase):
