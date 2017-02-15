@@ -21,7 +21,7 @@ from exchangelib.configuration import Configuration
 from exchangelib.credentials import DELEGATE, Credentials
 from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalidOperation, AutoDiscoverRedirect, \
     AutoDiscoverCircularRedirect, AutoDiscoverFailed, ErrorNonExistentMailbox, UnknownTimeZone, \
-    ErrorNameResolutionNoResults, TransportError, RedirectError, CASError
+    ErrorNameResolutionNoResults, TransportError, RedirectError, CASError, RateLimitError
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, ExtendedProperty, Choice, Email, Contact, \
     Task, EmailAddress, PhysicalAddress, PhoneNumber, IndexedField, RoomList, Calendar, DeletedItems, Drafts, Inbox, \
@@ -699,6 +699,13 @@ class CommonTest(EWSTest):
         session.post = mock_session_post(302, {'location': 'https://contoso.com'}, '')
         with self.assertRaises(TransportError):
             r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
+        # Redirect header to other location and allow_redirects=True
+        import exchangelib.util
+        exchangelib.util.MAX_REDIRECTS = 0
+        session.post = mock_session_post(302, {'location': 'https://contoso.com'}, '')
+        with self.assertRaises(TransportError):
+            r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='',
+                                          allow_redirects=True)
 
         # CAS error
         session.post = mock_session_post(999, {'X-CasErrorCode': 'AAARGH!'}, '')
@@ -714,6 +721,19 @@ class CommonTest(EWSTest):
         session.post = mock_session_post(999, {}, '')
         with self.assertRaises(TransportError):
             r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
+
+        # Rate limit exceeded. Only raised when is_service_account=True
+        exchangelib.util.MAX_WAIT = 1
+        protocol.credentials.is_service_account = True
+        session.post = mock_session_post(503, {'connection': 'close'}, '')
+        protocol.renew_session = lambda s: s  # Return the same session so it's still mocked
+        with self.assertRaises(RateLimitError):
+            r, session = post_ratelimited(protocol=protocol, session=session, url='', headers=None, data='')
+        # Test something larger than the default wait, so we retry at least once
+        exchangelib.util.MAX_WAIT = 15
+        session.post = mock_session_post(503, {'connection': 'close'}, '')
+        with self.assertRaises(RateLimitError):
+            r, session = post_ratelimited(protocol=protocol, session=session, url='', headers=None, data='')
 
         protocol.release_session(session)
         protocol.credentials.is_service_account = is_service_account

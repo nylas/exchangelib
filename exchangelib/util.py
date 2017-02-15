@@ -278,6 +278,10 @@ def get_redirect_url(response, allow_relative=True, require_relative=False):
     return redirect_url, redirect_server, redirect_has_ssl
 
 
+MAX_WAIT = 3600  # seconds
+MAX_REDIRECTS = 5  # Define a max redirection count. We don't want to be sent into an endless redirect loop
+
+
 def post_ratelimited(protocol, session, url, headers, data, timeout=None, verify=True, allow_redirects=False):
     """
     There are two error-handling policies implemented here: a fail-fast policy intended for stnad-alone scripts which
@@ -304,9 +308,7 @@ def post_ratelimited(protocol, session, url, headers, data, timeout=None, verify
     # intend to raise an exception. We give up on max_wait timeout, not number of retries
     r = None
     wait = 10  # seconds
-    max_wait = 3600  # seconds
     redirects = 0
-    max_redirects = 5  # We don't want to be sent into an endless redirect loop
     log_msg = '''\
 Retry: %(i)s
 Waited: %(wait)s
@@ -364,8 +366,8 @@ Response headers: %(response_headers)s'''
                 if not protocol.credentials.is_service_account:
                     break
                 log_vals['i'] += 1
-                log_vals['wait'] = wait  # We set it to 0 initially
-                if wait > max_wait:
+                log_vals['wait'] = wait
+                if wait > MAX_WAIT:
                     # We lost patience. Session is cleaned up in outer loop
                     raise RateLimitError(
                         'Session %(session_id)s URL %(url)s: Max timeout reached' % log_vals)
@@ -390,7 +392,7 @@ Response headers: %(response_headers)s'''
                 log_vals['url'] = url
                 log.debug('302 Redirected to %s', url)
                 redirects += 1
-                if redirects > max_redirects:
+                if redirects > MAX_REDIRECTS:
                     raise TransportError('Max redirect count exceeded')
                 continue
             break
