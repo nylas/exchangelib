@@ -353,7 +353,7 @@ Response headers: %(response_headers)s'''
             # f*ckups on the Exchange server.
             if (r.status_code == 401) \
                     or (r.headers.get('connection') == 'close') \
-                    or (r.status_code == 302 and r.headers.get('location').lower() ==
+                    or (r.status_code == 302 and r.headers.get('location', '').lower() ==
                         '/ews/genericerrorpage.htm?aspxerrorpath=/ews/exchange.asmx') \
                     or (r.status_code == 503):
                 # Maybe stale session. Get brand new one. But wait a bit, since the server may be rate-limiting us.
