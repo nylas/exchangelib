@@ -32,6 +32,7 @@ from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, Get
 from exchangelib.transport import NTLM
 from exchangelib.util import xml_to_str, chunkify, peek, get_redirect_url, isanysubclass, to_xml, BOM, get_domain
 from exchangelib.version import Build
+from exchangelib.winzone import generate_map, PYTZ_TO_MS_TIMEZONE_MAP
 
 if PY2:
     FileNotFoundError = OSError
@@ -143,6 +144,9 @@ class EWSDateTimeTest(unittest.TestCase):
         # Test error when tzinfo is set directly
         with self.assertRaises(ValueError):
             EWSDateTime(2000, 1, 1, tzinfo=tz)
+
+    def test_generate(self):
+        self.assertDictEqual(generate_map(), PYTZ_TO_MS_TIMEZONE_MAP)
 
 
 class RestrictionTest(unittest.TestCase):
