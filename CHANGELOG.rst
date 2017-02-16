@@ -16,21 +16,20 @@ HEAD
 
 1.8.0
 -----
-* Allow setting `Mailbox` and `Attendee`-type attributes as plain strings, e.g.:
 * Renamed `Message.from` field to `Message.author`. `from` is a Python keyword so `from` could only be accessed as
   `Getattr(my_essage, 'from')` which is just stupid.
 * Make `EWSTimeZone` Windows timezone name translation more robust
 * Add read-only `Message.message_id` which holds the Internet Message Id
 * Memory and speed improvements when sorting querysets using `order_by()` on a single field.
+* Allow setting `Mailbox` and `Attendee`-type attributes as plain strings, e.g.:
 
+  .. code-block:: python
 
-```python
-calendar_item.organizer =  'anne@example.com'
-calendar_item.required_attendees =  ['john@example.com', 'bill@example.com']
+      calendar_item.organizer =  'anne@example.com'
+      calendar_item.required_attendees =  ['john@example.com', 'bill@example.com']
 
-message.to_recipients =  ['john@example.com', 'anne@example.com']
+      message.to_recipients =  ['john@example.com', 'anne@example.com']
 
-```
 
 1.7.6
 -----

@@ -21,7 +21,7 @@ from exchangelib.configuration import Configuration
 from exchangelib.credentials import DELEGATE, Credentials
 from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalidOperation, AutoDiscoverRedirect, \
     AutoDiscoverCircularRedirect, AutoDiscoverFailed, ErrorNonExistentMailbox, UnknownTimeZone, \
-    ErrorNameResolutionNoResults, TransportError, RedirectError, CASError, RateLimitError
+    ErrorNameResolutionNoResults, TransportError, RedirectError, CASError, RateLimitError, UnauthorizedError
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, ExtendedProperty, Choice, Email, Contact, \
     Task, EmailAddress, PhysicalAddress, PhoneNumber, IndexedField, RoomList, Calendar, DeletedItems, Drafts, Inbox, \
@@ -634,6 +634,20 @@ class CommonTest(EWSTest):
                           username='foo',
                           password='bar')
 
+    def test_failed_login(self):
+        with self.assertRaises(UnauthorizedError):
+            Configuration(
+                service_endpoint=self.config.protocol.service_endpoint,
+                credentials=Credentials(self.config.protocol.credentials.username, 'WRONG_PASSWORD', is_service_account=False),
+                verify_ssl=self.config.protocol.verify_ssl)
+        with self.assertRaises(AutoDiscoverFailed):
+            Account(
+                primary_smtp_address=self.account.primary_smtp_address,
+                access_type=DELEGATE,
+                credentials=Credentials(self.config.protocol.credentials.username, 'WRONG_PASSWORD', is_service_account=False),
+                autodiscover=True,
+                locale='da_DK')
+
     def test_post_ratelimited(self):
         url = 'https://example.com'
 
@@ -666,12 +680,12 @@ class CommonTest(EWSTest):
         for exc_cls in (requests.exceptions.ChunkedEncodingError, requests.exceptions.ConnectionError,
                         ConnectionResetError, requests.exceptions.Timeout, SocketTimeout):
             session.post = mock_session_exception(exc_cls)
-            with self.assertRaises(TransportError):
+            with self.assertRaises(exc_cls):
                 r, session = post_ratelimited(protocol=protocol, session=session, url='', headers=None, data='')
 
         # Test bad exit codes and headers
         session.post = mock_session_post(401, {}, '')
-        with self.assertRaises(TransportError):
+        with self.assertRaises(UnauthorizedError):
             r, session = post_ratelimited(protocol=protocol, session=session, url='', headers=None, data='')
         session.post = mock_session_post(999, {'connection': 'close'}, '')
         with self.assertRaises(TransportError):
@@ -785,6 +799,12 @@ class AutodiscoverTest(EWSTest):
         discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
         del _autodiscover_cache
 
+    def test_autodiscover_direct_gc(self):
+        from exchangelib.autodiscover import _autodiscover_cache
+        # This is what Python garbage collection does
+        discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
+        _autodiscover_cache.__del__()
+
     def test_autodiscover_cache(self):
         from exchangelib.autodiscover import _autodiscover_cache
         # Empty the cache
@@ -822,7 +842,7 @@ class AutodiscoverTest(EWSTest):
         _autodiscover_cache._protocols.clear()
         discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
         exchangelib.autodiscover._try_autodiscover = _orig
-    # Make sure we can delete cache entries even though we don't have it in our in-memory cache
+        # Make sure we can delete cache entries even though we don't have it in our in-memory cache
         _autodiscover_cache._protocols.clear()
         del _autodiscover_cache[cache_key]
         # This should also work if the cache does not contain the entry anymore

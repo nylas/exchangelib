@@ -8,7 +8,7 @@ import requests.sessions
 from future.utils import raise_from, python_2_unicode_compatible
 from six import text_type
 
-from .errors import UnauthorizedError, TransportError, EWSWarning
+from .errors import UnauthorizedError, TransportError, EWSWarning, ErrorInvalidSchemaVersionForMailboxVersion
 from .transport import TNS, SOAPNS, dummy_xml, get_auth_instance
 from .util import is_xml, to_xml, post_ratelimited
 
@@ -225,53 +225,22 @@ class Version(object):
         for api_version in api_versions:
             try:
                 return cls._get_version_from_service(protocol=protocol, api_version=api_version)
-            except EWSWarning:
+            except ErrorInvalidSchemaVersionForMailboxVersion:
                 continue
         raise TransportError('Unable to guess version')
 
     @classmethod
     def _get_version_from_service(cls, protocol, api_version):
-        assert api_version
-        xml = dummy_xml(version=api_version, name=protocol.credentials.username)
         # Create a minimal, valid EWS request to force Exchange into accepting the request and returning EWS xml
         # containing server version info. Some servers will only reply with their version if a valid POST is sent.
+        assert api_version
+        log.debug('Test if service API version is %s', api_version)
+        xml = dummy_xml(version=api_version, name=protocol.credentials.username)
         session = protocol.get_session()
-        log.debug('Test if service API version is %s using auth %s', api_version, session.auth.__class__.__name__)
         r, session = post_ratelimited(protocol=protocol, session=session, url=protocol.service_endpoint, headers=None,
                                       data=xml, timeout=protocol.TIMEOUT, verify=protocol.verify_ssl,
                                       allow_redirects=False)
         protocol.release_session(session)
-
-        if r.status_code == 401:
-            raise UnauthorizedError('Wrong username or password for %s' % protocol.service_endpoint)
-        elif r.status_code == 302:
-            log.debug('We were redirected. Unable to get version info from service')
-            return None
-        elif r.status_code == 503:
-            log.debug('Service is unavailable. Unable to get version info from service')
-            return None
-        if r.status_code == 400:
-            raise EWSWarning('Bad request')
-        if r.status_code == 500 and ('The specified server version is invalid' in r.text or
-                                     'ErrorInvalidSchemaVersionForMailboxVersion' in r.text):
-            raise EWSWarning('Invalid server version')
-        if r.status_code != 200:
-            if 'The referenced account is currently locked out' in r.text:
-                raise TransportError('The service account is currently locked out')
-            raise TransportError('Unexpected HTTP status %s when getting %s (%s)' % (
-                r.status_code, protocol.service_endpoint, r.text))
-        log.debug('Response data: %s', r.text)
-        try:
-            header = to_xml(r.text, encoding=r.encoding).find('{%s}Header' % SOAPNS)
-            if header is None:
-                raise ParseError()
-        except ParseError as e:
-            raise_from(EWSWarning('Unknown XML response from %s (response: %s)' % (protocol.service_endpoint,
-                                                                                   r.text)), e)
-        info = header.find('{%s}ServerVersionInfo' % TNS)
-        if info is None:
-            raise TransportError('No ServerVersionInfo in response: %s' % r.text)
-
         version = cls.from_response(requested_api_version=api_version, response=r)
         log.debug('Service version is: %s', version)
         return version
@@ -284,10 +253,10 @@ class Version(object):
                 raise ParseError()
         except ParseError as e:
             raise_from(EWSWarning('Unknown XML response from %s (response: %s)' % (response, response.text)), e)
+
         info = header.find('{%s}ServerVersionInfo' % TNS)
         if info is None:
             raise TransportError('No ServerVersionInfo in response: %s' % response.text)
-
         try:
             build = Build.from_xml(info)
         except ValueError:

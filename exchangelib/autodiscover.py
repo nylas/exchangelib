@@ -26,7 +26,7 @@ from six import text_type
 from . import transport
 from .credentials import Credentials
 from .errors import AutoDiscoverFailed, AutoDiscoverRedirect, AutoDiscoverCircularRedirect, TransportError, \
-    RedirectError, ErrorNonExistentMailbox
+    RedirectError, ErrorNonExistentMailbox, UnauthorizedError
 from .protocol import BaseProtocol, Protocol
 from .util import create_element, get_xml_attr, add_xml_child, to_xml, is_xml, post_ratelimited, get_redirect_url, \
     xml_to_str, get_domain
@@ -264,9 +264,11 @@ def _try_autodiscover(hostname, credentials, email, verify):
                 except AutoDiscoverFailed:
                     hostname_from_dns = _get_hostname_from_srv(hostname='_autodiscover._tcp.%s' % hostname)
                     # Start over with new hostname
-                    return _try_autodiscover(hostname=hostname_from_dns, credentials=credentials, email=email,
-                                             verify=verify)
-
+                    try:
+                        return _try_autodiscover(hostname=hostname_from_dns, credentials=credentials, email=email,
+                                                 verify=verify)
+                    except AutoDiscoverFailed:
+                        raise AutoDiscoverFailed('All steps in the autodiscover protocol failed')
 
 def _autodiscover_hostname(hostname, credentials, email, has_ssl, verify, auth_type=None):
     # Tries to get autodiscover data on a specific host. If we are HTTP redirected, we restart the autodiscover dance on
@@ -298,12 +300,6 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl, verify, auth_t
     autodiscover_protocol = AutodiscoverProtocol(service_endpoint=url, credentials=credentials, auth_type=auth_type,
                                                  verify_ssl=verify)
     r = _get_autodiscover_response(protocol=autodiscover_protocol, email=email)
-    if r.status_code == 302:
-        redirect_url, redirect_hostname, redirect_has_ssl = get_redirect_url(r)
-        log.debug('We were redirected to %s', redirect_url)
-        # Don't raise RedirectError here because we need to pass the ssl and auth_type data
-        return _autodiscover_hostname(redirect_hostname, credentials, email, has_ssl=redirect_has_ssl, verify=verify,
-                                      auth_type=None)
     domain = get_domain(email)
     try:
         server, has_ssl, ews_url, ews_auth_type, primary_smtp_address = _parse_response(r.text)
@@ -378,25 +374,11 @@ def _get_autodiscover_response(protocol, email, encoding='utf-8'):
                                       allow_redirects=True)
         protocol.release_session(session)
         log.debug('Response headers: %s', r.headers)
-    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
-        log.debug('Connection error on %s: %s', protocol.service_endpoint, e)
-        # Don't raise AutoDiscoverFailed here. Connection errors could just as well be a valid but misbehaving server.
-        raise
     except RedirectError:
         raise
-    except TransportError:
+    except (TransportError, UnauthorizedError):
         log.debug('No access to %s using %s', protocol.service_endpoint, protocol.auth_type)
         raise AutoDiscoverFailed('No access to %s using %s' % (protocol.service_endpoint, protocol.auth_type))
-    if r.status_code == 302:
-        # Give caller a chance to re-do the request
-        return r
-    if r.status_code != 200:
-        log.debug('%s returned HTTP %s', protocol.service_endpoint, r.status_code)
-        if 401 <= r.status_code <= 410:
-            # A reasonable subset of status codes for which autodiscover will probably never succeed on this server
-            raise AutoDiscoverFailed('%s returned HTTP %s' % (protocol.service_endpoint, r.status_code))
-        # raise a more generic error for now, until we understand this failure case
-        raise TransportError('%s returned HTTP %s' % (protocol.service_endpoint, r.status_code))
     if not is_xml(r.text):
         # This is normal - e.g. a greedy webserver serving custom HTTP 404's as 200 OK
         log.debug('URL %s: This is not XML: %s', protocol.service_endpoint, r.text[:1000])
@@ -406,7 +388,6 @@ def _get_autodiscover_response(protocol, email, encoding='utf-8'):
 
 def _parse_response(response, encoding='utf-8'):
     # We could return lots more interesting things here
-    # log.debug('Autodiscover response: %s', response)
     autodiscover = to_xml(response, encoding=encoding)
     resp = autodiscover.find('{%s}Response' % RESPONSE_NS)
     if resp is None:

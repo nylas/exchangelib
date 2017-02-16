@@ -14,7 +14,8 @@ from future.utils import PY2
 from future.utils import raise_from
 from six import text_type, string_types
 
-from .errors import TransportError, RateLimitError, RedirectError, RelativeRedirect, CASError
+from .errors import TransportError, RateLimitError, RedirectError, RelativeRedirect, CASError, UnauthorizedError, \
+    ErrorInvalidSchemaVersionForMailboxVersion
 
 if PY2:
     from thread import get_ident
@@ -228,7 +229,7 @@ class DummyRequest(object):
 
 
 class DummyResponse(object):
-    status_code = 401
+    status_code = 503
     headers = {}
     text = ''
     request = DummyRequest()
@@ -335,13 +336,13 @@ Response headers: %(response_headers)s'''
                 r = session.post(url=url, headers=headers, data=data, allow_redirects=False, timeout=timeout,
                                  verify=verify)
             except (requests.exceptions.ChunkedEncodingError, requests.exceptions.ConnectionError, ConnectionResetError,
-                    requests.exceptions.Timeout, SocketTimeout):
+                    requests.exceptions.Timeout, SocketTimeout) as e:
                 log.debug(
                     'Session %(session_id)s thread %(thread_id)s: timeout or connection error POST\'ing to %(url)s',
                     log_vals)
                 r = DummyResponse()
                 r.request.headers = headers
-                r.headers = {'DummyResponseHeader': None}
+                r.headers = {'TimeoutException': e}
             d2 = datetime.now()
             log_vals['response_time'] = text_type(d2 - d1)
             log_vals['status_code'] = r.status_code
@@ -415,24 +416,33 @@ Response headers: %(response_headers)s'''
         log.error(log_msg, log_vals)
         protocol.retire_session(session)
         raise
-    if r.status_code != 200:
+    if r.status_code == 500 and r.text and is_xml(r.text):
+        # Some genius at Microsoft thinks it's OK to send a valid SOAP response as an HTTP 500
+        log.debug('Got status code %s but trying to parse content anyway', r.status_code)
+    elif r.status_code != 200:
+        protocol.retire_session(session)
         cas_error = r.headers.get('X-CasErrorCode')
         if cas_error:
             raise CASError(cas_error=cas_error, response=r)
-        if r.text and is_xml(r.text):
-            # Some genius at Microsoft thinks it's OK to send 500 error messages with valid SOAP response
-            log.debug('Got status code %s but trying to parse content anyway', r.status_code)
-        else:
-            # This could be anything. Let higher layers handle this
-            protocol.retire_session(session)
-            log_msg += '\nRequest data: %(data)s'
-            log_vals['data'] = data
-            try:
-                log_msg += '\nResponse data: %(text)s'
-                log_vals['text'] = r.text
-            except (NameError, AttributeError):
-                pass
-            raise TransportError('Unknown failure\n' + log_msg % log_vals)
+        if r.status_code == 500 and ('The specified server version is invalid' in r.text or
+                                     'ErrorInvalidSchemaVersionForMailboxVersion' in r.text):
+            raise ErrorInvalidSchemaVersionForMailboxVersion('Invalid server version')
+        if 'The referenced account is currently locked out' in r.text:
+            raise TransportError('The service account is currently locked out')
+        if r.status_code == 401 and not protocol.credentials.is_service_account:
+            # This is a login failure
+            raise UnauthorizedError('Wrong username or password for %s' % url)
+        # This could be anything. Let higher layers handle this
+        log_msg += '\nRequest data: %(data)s'
+        log_vals['data'] = data
+        try:
+            log_msg += '\nResponse data: %(text)s'
+            log_vals['text'] = r.text
+        except (NameError, AttributeError):
+            pass
+        if 'TimeoutException' in r.headers:
+            raise r.headers['TimeoutException']
+        raise TransportError('Unknown failure\n' + log_msg % log_vals)
     log.debug('Session %(session_id)s thread %(thread_id)s: Useful response from %(url)s', log_vals)
     return r, session
 
