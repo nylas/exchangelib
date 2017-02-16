@@ -382,9 +382,6 @@ class EWSTest(unittest.TestCase):
         self.account = Account(primary_smtp_address=settings['account'], access_type=DELEGATE, config=self.config, locale='da_DK')
         self.maxDiff = None
 
-    def test_poolsize(self):
-        self.assertEqual(self.config.protocol.SESSION_POOLSIZE, 4)
-
     def random_val(self, field_type):
         if not isinstance(field_type, list) and isanysubclass(field_type, ExtendedProperty):
             field_type = field_type.python_type()
@@ -474,6 +471,9 @@ class EWSTest(unittest.TestCase):
 
 
 class CommonTest(EWSTest):
+    def test_poolsize(self):
+        self.assertEqual(self.config.protocol.SESSION_POOLSIZE, 4)
+
     def test_credentials(self):
         self.assertEqual(self.account.access_type, DELEGATE)
         self.assertTrue(self.config.protocol.test())
