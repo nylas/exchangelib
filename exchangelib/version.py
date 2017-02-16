@@ -174,12 +174,12 @@ class Version(object):
         """
         log.debug('Asking server for version info')
         # We can't use a session object from the protocol pool for docs because sessions are created with service auth.
+        auth = get_auth_instance(credentials=protocol.credentials, auth_type=protocol.docs_auth_type)
         try:
-            auth = get_auth_instance(credentials=protocol.credentials, auth_type=protocol.docs_auth_type)
             shortname = cls._get_shortname_from_docs(auth=auth, types_url=protocol.types_url,
                                                      verify_ssl=protocol.verify_ssl)
             log.debug('Shortname according to %s: %s', protocol.types_url, shortname)
-        except (TransportError, UnauthorizedError) as e:
+        except (TransportError, ParseError) as e:
             log.info(text_type(e))
             shortname = None
         api_version = VERSIONS[shortname][0] if shortname else None
@@ -196,17 +196,7 @@ class Version(object):
         log.debug('Request headers: %s', r.request.headers)
         log.debug('Response code: %s', r.status_code)
         log.debug('Response headers: %s', r.headers)
-        if r.status_code == 401:
-            raise UnauthorizedError('Wrong username or password for %s' % types_url)
-        if r.status_code == 302:
-            log.debug('We were redirected. Unable to get version info from docs')
-            return None
-        if r.status_code == 503:
-            log.debug('Service is unavailable. Unable to get version info from docs')
-            return None
         if r.status_code != 200:
-            if 'The referenced account is currently locked out' in r.text:
-                raise TransportError('The service account is currently locked out')
             raise TransportError('Unexpected HTTP status %s when getting %s (%s)' % (r.status_code, types_url, r.text))
         if not is_xml(r.text):
             raise TransportError('Unexpected result when getting %s. Maybe this is not an EWS server?%s' % (
