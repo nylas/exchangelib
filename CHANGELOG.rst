@@ -4,8 +4,12 @@ Change Log
 
 HEAD
 ----
-* Expanded support for `ExtendedPropery` to include all possible attributes. This required renaming the `property_id`
-* attribute to `property_set_id`.
+* Expand support for `ExtendedPropery` to include all possible attributes. This required renaming the `property_id`
+  attribute to `property_set_id`.
+* When `Credentials` is created with `is_service_account=False`, `UnauthorizedError` is now raised if the credentials
+  are wrong.
+* Add a new `version` attribute to `Configuration`, to force the server version if version guessing does not work.
+  Accepts a `exchangelib.version.Version` object.
 
 1.8.1
 -----
