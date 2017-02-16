@@ -1086,6 +1086,8 @@ class Item(EWSElement):
                 if not res:
                     raise ValueError('Item disappeared')
                 assert len(res) == 1, res
+                if isinstance(res[0], Exception):
+                    raise res[0]
                 return res[0]
         else:
             # bulk_create() returns an Item because we want to return item_id on both main item *and* attachments
@@ -1097,6 +1099,8 @@ class Item(EWSElement):
                 return None
             else:
                 assert len(res) == 1, res
+                if isinstance(res[0], Exception):
+                    raise res[0]
                 return res[0]
 
     def refresh(self):
@@ -1107,6 +1111,8 @@ class Item(EWSElement):
         if not res:
             raise ValueError('Item disappeared')
         assert len(res) == 1, res
+        if isinstance(res[0], Exception):
+            raise res[0]
         fresh_item = res[0]
         for k in self.__slots__:
             setattr(self, k, getattr(fresh_item, k))
@@ -1118,6 +1124,8 @@ class Item(EWSElement):
         if not res:
             raise ValueError('Item disappeared')
         assert len(res) == 1, res
+        if isinstance(res[0], Exception):
+            raise res[0]
         self.item_id, self.changekey = res[0]
         self.folder = to_folder
 
