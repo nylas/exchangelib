@@ -10,7 +10,7 @@ import time
 import unittest
 
 import requests
-from six import PY2, string_types, text_type
+from six import PY2, string_types
 from yaml import load
 from xml.etree.ElementTree import ParseError
 
@@ -21,7 +21,8 @@ from exchangelib.configuration import Configuration
 from exchangelib.credentials import DELEGATE, Credentials
 from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalidOperation, AutoDiscoverRedirect, \
     AutoDiscoverCircularRedirect, AutoDiscoverFailed, ErrorNonExistentMailbox, UnknownTimeZone, \
-    ErrorNameResolutionNoResults, TransportError, RedirectError, CASError, RateLimitError, UnauthorizedError
+    ErrorNameResolutionNoResults, TransportError, RedirectError, CASError, RateLimitError, UnauthorizedError, \
+    ErrorInvalidChangeKey, ErrorInvalidIdMalformed
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, ExtendedProperty, Choice, Email, Contact, \
     Task, EmailAddress, PhysicalAddress, PhoneNumber, IndexedField, RoomList, Calendar, DeletedItems, Drafts, Inbox, \
@@ -382,6 +383,12 @@ class EWSTest(unittest.TestCase):
         self.account = Account(primary_smtp_address=settings['account'], access_type=DELEGATE, config=self.config, locale='da_DK')
         self.maxDiff = None
 
+    def bulk_delete(self, ids):
+        # Clean up items and check return values
+        for res in self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES):
+            self.assertEqual(res, True)
+
+
     def random_val(self, field_type):
         if not isinstance(field_type, list) and isanysubclass(field_type, ExtendedProperty):
             field_type = field_type.python_type()
@@ -614,8 +621,7 @@ class CommonTest(EWSTest):
             self.assertEqual(item.end, end)
             self.assertEqual(item.subject, subject)
             self.assertEqual(item.categories, self.categories)
-        status = self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES)
-        self.assertEqual(set(status), {(True, None)})
+        self.bulk_delete(ids)
 
     def test_magic(self):
         self.assertIn(self.config.protocol.version.api_version, str(self.config.protocol))
@@ -1318,7 +1324,7 @@ class BaseItemTest(EWSTest):
         self.assertEqual(qs.filter(subject='Test XXX').exists(), False)
         self.assertEqual(
             qs.filter(subject__startswith='Item').delete(),
-            [(True, None), (True, None), (True, None), (True, None)]
+            [True, True, True, True]
         )
 
     def test_order_by(self):
@@ -1477,7 +1483,7 @@ class BaseItemTest(EWSTest):
             len(self.test_folder.filter(Q(subject=item.subject), categories__contains=item.categories)),
             1
         )
-        self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES)
+        self.bulk_delete(ids)
 
         # Test categories which are handled specially - only '__contains' and '__in' lookups are supported
         item = self.get_test_item(categories=['TestA', 'TestB'])
@@ -1531,7 +1537,7 @@ class BaseItemTest(EWSTest):
             len(common_qs.filter(categories__in=item.categories)),  # Exact match
             1
         )
-        self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES)
+        self.bulk_delete(ids)
 
         common_qs = self.test_folder.filter(categories__contains=self.categories)
         one_hour = datetime.timedelta(hours=1)
@@ -1546,7 +1552,7 @@ class BaseItemTest(EWSTest):
             len(common_qs.filter(datetime_created__range=(now - one_hour, now + one_hour))),
             1
         )
-        self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES)
+        self.bulk_delete(ids)
 
         # Test '>'
         ids = self.test_folder.bulk_create(items=[self.get_test_item()])
@@ -1558,7 +1564,7 @@ class BaseItemTest(EWSTest):
             len(common_qs.filter(datetime_created__gt=now - one_hour)),
             1
         )
-        self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES)
+        self.bulk_delete(ids)
 
         # Test '>='
         ids = self.test_folder.bulk_create(items=[self.get_test_item()])
@@ -1570,7 +1576,7 @@ class BaseItemTest(EWSTest):
             len(common_qs.filter(datetime_created__gte=now - one_hour)),
             1
         )
-        self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES)
+        self.bulk_delete(ids)
 
         # Test '<'
         ids = self.test_folder.bulk_create(items=[self.get_test_item()])
@@ -1582,7 +1588,7 @@ class BaseItemTest(EWSTest):
             len(common_qs.filter(datetime_created__lt=now + one_hour)),
             1
         )
-        self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES)
+        self.bulk_delete(ids)
 
         # Test '<='
         ids = self.test_folder.bulk_create(items=[self.get_test_item()])
@@ -1594,7 +1600,7 @@ class BaseItemTest(EWSTest):
             len(common_qs.filter(datetime_created__lte=now + one_hour)),
             1
         )
-        self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES)
+        self.bulk_delete(ids)
 
         # Test '='
         item = self.get_test_item()
@@ -1607,7 +1613,7 @@ class BaseItemTest(EWSTest):
             len(common_qs.filter(subject=item.subject)),
             1
         )
-        self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES)
+        self.bulk_delete(ids)
 
         # Test '!='
         item = self.get_test_item()
@@ -1620,7 +1626,7 @@ class BaseItemTest(EWSTest):
             len(common_qs.filter(subject__not=item.subject + 'XXX')),
             1
         )
-        self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES)
+        self.bulk_delete(ids)
 
         # Test 'exact'
         item = self.get_test_item()
@@ -1642,7 +1648,7 @@ class BaseItemTest(EWSTest):
             len(common_qs.filter(subject__exact=item.subject)),
             1
         )
-        self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES)
+        self.bulk_delete(ids)
 
         # Test 'iexact'
         item = self.get_test_item()
@@ -1664,7 +1670,7 @@ class BaseItemTest(EWSTest):
             len(common_qs.filter(subject__iexact=item.subject)),
             1
         )
-        self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES)
+        self.bulk_delete(ids)
 
         # Test 'contains'
         item = self.get_test_item()
@@ -1686,7 +1692,7 @@ class BaseItemTest(EWSTest):
             len(common_qs.filter(subject__contains=item.subject[2:14])),
             1
         )
-        self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES)
+        self.bulk_delete(ids)
 
         # Test 'icontains'
         item = self.get_test_item()
@@ -1708,7 +1714,7 @@ class BaseItemTest(EWSTest):
             len(common_qs.filter(subject__icontains=item.subject[2:14])),
             1
         )
-        self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES)
+        self.bulk_delete(ids)
 
         # Test 'startswith'
         item = self.get_test_item()
@@ -1730,7 +1736,7 @@ class BaseItemTest(EWSTest):
             len(common_qs.filter(subject__startswith=item.subject[:12])),
             1
         )
-        self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES)
+        self.bulk_delete(ids)
 
         # Test 'istartswith'
         item = self.get_test_item()
@@ -1752,7 +1758,7 @@ class BaseItemTest(EWSTest):
             len(common_qs.filter(subject__istartswith=item.subject[:12])),
             1
         )
-        self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES)
+        self.bulk_delete(ids)
 
     def test_filter_on_all_fields(self):
         # Test that we can filter on all field names that we support filtering on
@@ -1788,7 +1794,7 @@ class BaseItemTest(EWSTest):
                     filter_kwargs.append({'%s__contains' % f: val})
             for kw in filter_kwargs:
                 self.assertEqual(len(common_qs.filter(**kw)), 1)
-        self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES)
+        self.bulk_delete(ids)
 
     def test_paging(self):
         # Test that paging services work correctly. Default EWS paging size is 1000 items. Our default is 100 items.
@@ -1799,7 +1805,7 @@ class BaseItemTest(EWSTest):
             items.append(i)
         self.test_folder.bulk_create(items=items)
         ids = self.test_folder.filter(categories__contains=self.categories).values_list('item_id', 'changekey')
-        self.account.bulk_delete(ids.iterator(page_size=10), affected_task_occurrences=ALL_OCCURRENCIES)
+        self.bulk_delete(ids.iterator(page_size=10))
 
     def test_slicing(self):
         # Test that slicing works correctly
@@ -1877,7 +1883,7 @@ class BaseItemTest(EWSTest):
             [i.subject for i in qs.copy()[4:0:-2]],
             ['Subj 3', 'Subj 1']
         )
-        self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES)
+        self.bulk_delete(ids)
 
     def test_getitems(self):
         item = self.get_test_item()
@@ -1887,7 +1893,7 @@ class BaseItemTest(EWSTest):
         for item in items:
             assert isinstance(item, self.ITEM_CLASS)
         self.assertEqual(len(items), 2)
-        self.account.bulk_delete(items, affected_task_occurrences=ALL_OCCURRENCIES)
+        self.bulk_delete(ids)
 
     def test_only_fields(self):
         item = self.get_test_item()
@@ -1918,7 +1924,7 @@ class BaseItemTest(EWSTest):
                     else:
                         self.assertIsNone(v, (f, v))
         self.assertEqual(len(items), 2)
-        self.account.bulk_delete(items, affected_task_occurrences=ALL_OCCURRENCIES)
+        self.bulk_delete(items)
 
     def test_save_and_delete(self):
         # Test that we can create, update and delete single items using methods directly on the item.
@@ -1969,12 +1975,12 @@ class BaseItemTest(EWSTest):
         # Hard delete
         item_id = (item.item_id, item.changekey)
         item.delete(affected_task_occurrences=ALL_OCCURRENCIES)
-        with self.assertRaises(ErrorItemNotFound):
+        for e in self.account.fetch(ids=[item_id]):
             # It's gone from the account
-            list(self.account.fetch(ids=[item_id]))
-            # Really gone, not just changed ItemId
-            items = self.test_folder.filter(categories__contains=item.categories)
-            self.assertEqual(len(items), 0)
+            self.assertIsInstance(e, ErrorItemNotFound)
+        # Really gone, not just changed ItemId
+        items = self.test_folder.filter(categories__contains=item.categories)
+        self.assertEqual(len(items), 0)
 
     def test_soft_delete(self):
         # First, empty trash bin
@@ -1984,12 +1990,9 @@ class BaseItemTest(EWSTest):
         item_id = (item.item_id, item.changekey)
         # Soft delete
         item.soft_delete(affected_task_occurrences=ALL_OCCURRENCIES)
-        with self.assertRaises(ErrorItemNotFound):
+        for e in self.account.fetch(ids=[item_id]):
             # It's gone from the test folder
-            list(self.account.fetch(ids=[item_id]))
-        with self.assertRaises(ErrorItemNotFound):
-            # It's gone from the trash folder
-            list(self.account.fetch(ids=[item_id]))
+            self.assertIsInstance(e, ErrorItemNotFound)
         # Really gone, not just changed ItemId
         self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 0)
         self.assertEqual(len(self.account.trash.filter(categories__contains=item.categories)), 0)
@@ -2003,9 +2006,9 @@ class BaseItemTest(EWSTest):
         item_id = (item.item_id, item.changekey)
         # Move to trash
         item.move_to_trash(affected_task_occurrences=ALL_OCCURRENCIES)
-        with self.assertRaises(ErrorItemNotFound):
+        for e in self.account.fetch(ids=[item_id]):
             # Not in the test folder anymore
-            list(self.account.fetch(ids=[item_id]))
+            self.assertIsInstance(e, ErrorItemNotFound)
         # Really gone, not just changed ItemId
         self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 0)
         # Test that the item moved to trash
@@ -2021,9 +2024,9 @@ class BaseItemTest(EWSTest):
         item_id = (item.item_id, item.changekey)
         # Move to trash. We use trash because it can contain all item types. This changes the ItemId
         item.move(to_folder=self.account.trash)
-        with self.assertRaises(ErrorItemNotFound):
+        for e in self.account.fetch(ids=[item_id]):
             # original item ID no longer exists
-            list(self.account.fetch(ids=[item_id]))
+            self.assertIsInstance(e, ErrorItemNotFound)
         # Test that the item moved to trash
         self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 0)
         moved_item = self.account.trash.get(categories__contains=item.categories)
@@ -2151,12 +2154,11 @@ class BaseItemTest(EWSTest):
         self.assertEqual(item.extern_id, extern_id)
 
         # Remove test item. Test with generator as argument
-        status = self.account.bulk_delete(ids=(i for i in wipe2_ids), affected_task_occurrences=ALL_OCCURRENCIES)
-        self.assertEqual(status, [(True, None)])
+        self.bulk_delete(ids=(i for i in wipe2_ids))
 
     def test_export_and_upload(self):
         # 15 new items which we will attempt to export and re-upload
-        items = [self.get_test_item(self.test_folder).save() for _ in range(15)]
+        items = [self.get_test_item().save() for _ in range(15)]
         ids = [(i.item_id, i.changekey) for i in items]
         # re-fetch items because there will be some extra fields added by the server
         items = list(self.test_folder.fetch(items))
@@ -2197,12 +2199,12 @@ class BaseItemTest(EWSTest):
         self.assertListEqual(original_items, uploaded_items)
 
         # Clean up after ourselves
-        self.account.bulk_delete(ids=upload_results, affected_task_occurrences=ALL_OCCURRENCIES)
-        self.account.bulk_delete(ids=ids, affected_task_occurrences=ALL_OCCURRENCIES)
+        self.bulk_delete(ids=upload_results)
+        self.bulk_delete(ids=ids)
 
     def test_export_with_error(self):
         # 15 new items which we will attempt to export and re-upload
-        items = [self.get_test_item(self.test_folder).save() for _ in range(15)]
+        items = [self.get_test_item().save() for _ in range(15)]
         # Use id tuples for export here because deleting an item clears it's
         #  id.
         ids = [(item.item_id, item.changekey) for item in items]
@@ -2214,15 +2216,13 @@ class BaseItemTest(EWSTest):
         for idx, result in enumerate(export_results):
             if idx == 3:
                 # If it is the one returning the error
-                self.assertIsInstance(result, tuple)
-                self.assertEqual(result[0], False)
-                self.assertIsInstance(result[1], text_type)
+                self.assertIsInstance(result, ErrorItemNotFound)
             else:
                 self.assertIsInstance(result, str)
 
         # Clean up after yourself
         del ids[3]  # Sending the deleted one through will cause an error
-        self.account.bulk_delete(ids=ids, affected_task_occurrences=ALL_OCCURRENCIES)
+        self.bulk_delete(ids)
 
     def test_register(self):
         # Tests that we can register and de-register custom extended properties
@@ -2439,6 +2439,30 @@ class BaseItemTest(EWSTest):
         item.attach(attachment3)
         item.detach(attachment3)
 
+    def test_bulk_failure(self):
+        # Test that bulk_* can handle EWS errors and return the errors in order without losing non-failure results
+        items1 = [self.get_test_item().save() for _ in range(3)]
+        items1[1].changekey = 'XXX'
+        for i, res in enumerate(self.account.bulk_delete(items1, affected_task_occurrences=ALL_OCCURRENCIES)):
+            if i == 1:
+                self.assertIsInstance(res, ErrorInvalidChangeKey)
+            else:
+                self.assertEqual(res, True)
+        items2 = [self.get_test_item().save() for _ in range(3)]
+        items2[1].item_id = 'AAAA=='
+        for i, res in enumerate(self.account.bulk_delete(items2, affected_task_occurrences=ALL_OCCURRENCIES)):
+            if i == 1:
+                self.assertIsInstance(res, ErrorInvalidIdMalformed)
+            else:
+                self.assertEqual(res, True)
+        items3 = [self.get_test_item().save() for _ in range(3)]
+        items3[1].item_id = items1[0].item_id
+        for i, res in enumerate(self.account.fetch(items3)):
+            if i == 1:
+                self.assertIsInstance(res, ErrorItemNotFound)
+            else:
+                self.assertIsInstance(res, Item)
+
 
 class CalendarTest(BaseItemTest):
     TEST_FOLDER = 'calendar'
@@ -2526,9 +2550,19 @@ class MessagesTest(BaseItemTest):
         ids = self.test_folder.filter(categories__contains=item.categories).values_list('item_id', 'changekey')
         self.assertEqual(len(ids), 1)
         item.item_id, item.changekey = ids[0]
-        item.delete()
 
-    # TODO: test if we can update existing, non-draft items in the test folder
+    def test_bulk_send(self):
+        item = self.get_test_item()
+        item.save()
+        for res in self.account.bulk_send(ids=[item]):
+            self.assertEqual(res, True)
+        time.sleep(5)  # Requests are supposed to be transactional, but apparently not...
+        # By default, sent items are placed in the sent folder
+        ids = self.account.sent.filter(categories__contains=item.categories).values_list('item_id', 'changekey')
+        self.assertEqual(len(ids), 1)
+        self.bulk_delete(ids)
+
+    # TODO: test if we can update existing, non-draft messages in the test folder
 
 
 class TasksTest(BaseItemTest):

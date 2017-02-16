@@ -396,11 +396,14 @@ class Attachment(EWSElement):
         if not self.parent_item.account:
             raise ValueError('Parent item %s must have an account' % self.parent_item)
         items = list(
-            self.from_xml(elem=i)
+            i if isinstance(i, Exception) else self.from_xml(elem=i)
             for i in CreateAttachment(account=self.parent_item.account).call(parent_item=self.parent_item, items=[self])
         )
         assert len(items) == 1
-        attachment_id = items[0].attachment_id
+        root_item_id = items[0]
+        if isinstance(root_item_id, Exception):
+            raise root_item_id
+        attachment_id = root_item_id.attachment_id
         assert attachment_id.root_id == self.parent_item.item_id
         assert attachment_id.root_changekey != self.parent_item.changekey
         self.parent_item.changekey = attachment_id.root_changekey
@@ -416,11 +419,13 @@ class Attachment(EWSElement):
         if not self.parent_item:
             raise ValueError('This attachment is not attached to an item')
         items = list(
-            RootItemId.from_xml(elem=i)
+            i if isinstance(i, Exception) else RootItemId.from_xml(elem=i)
             for i in DeleteAttachment(account=self.parent_item.account).call(items=[self.attachment_id])
         )
         assert len(items) == 1
         root_item_id = items[0]
+        if isinstance(root_item_id, Exception):
+            raise root_item_id
         assert root_item_id.id == self.parent_item.item_id
         assert root_item_id.changekey != self.parent_item.changekey
         self.parent_item.changekey = root_item_id.changekey
@@ -1148,8 +1153,8 @@ class Item(EWSElement):
         if not res:
             raise ValueError('Item disappeared')
         assert len(res) == 1, res
-        if not res[0][0]:
-            raise ValueError('Error deleting message: %s', res[0][1])
+        if isinstance(res[0], Exception):
+            raise res[0]
 
     def attach(self, attachments):
         """Add an attachment, or a list of attachments, to this item. If the item has already been saved, the
@@ -1637,8 +1642,8 @@ class Message(ItemMixIn):
             if not res:
                 raise ValueError('Item disappeared')
             assert len(res) == 1, res
-            if not res[0][0]:
-                raise ValueError('Error sending message: %s', res[0][1])
+            if isinstance(res[0], Exception):
+                raise res[0]
             # The item will be deleted from the original folder
             self.item_id, self.changekey = None, None
             self.folder = copy_to_folder
@@ -1945,6 +1950,8 @@ class FileAttachment(Attachment):
             items=[self.attachment_id], include_mime_content=False))
         assert len(elems) == 1
         elem = elems[0]
+        if isinstance(elem, Exception):
+            raise elem
         assert not isinstance(elem, tuple), elem
         # Don't use get_xml_attr() here because we want to handle empty file content as '', not None
         val = elem.find('{%s}%s' % (TNS, self.ATTACHMENT_FIELDS['content'][0]))
@@ -1997,12 +2004,15 @@ class ItemAttachment(Attachment):
         if not self.parent_item.account:
             raise ValueError('%s must have an account' % self.__class__.__name__)
         items = list(
-            self.__class__.from_xml(elem=i)
+            i if isinstance(i, Exception) else self.__class__.from_xml(elem=i)
             for i in GetAttachment(account=self.parent_item.account).call(
                 items=[self.attachment_id], include_mime_content=True)
         )
         assert len(items) == 1
-        self._item = items[0]._item
+        _attachment = items[0]
+        if isinstance(_attachment, Exception):
+            raise _attachment
+        self._item = _attachment._item
         return self._item
 
     @item.setter
@@ -2219,10 +2229,13 @@ class Folder(EWSElement):
         )
         if shape == IdOnly and additional_fields is None:
             for i in items:
-                yield Item.id_from_xml(i)
+                yield i if isinstance(i, Exception) else Item.id_from_xml(i)
         else:
             for i in items:
-                yield self.item_model_from_tag(i.tag).from_xml(elem=i, account=self.account, folder=self)
+                if isinstance(i, Exception):
+                    yield i
+                else:
+                    yield self.item_model_from_tag(i.tag).from_xml(elem=i, account=self.account, folder=self)
 
     def add_items(self, *args, **kwargs):
         warnings.warn('add_items() is deprecated. Use bulk_create() instead', PendingDeprecationWarning)
@@ -2304,6 +2317,9 @@ class Folder(EWSElement):
             # folder class by the "FolderClass" value.
             #
             # TODO: fld_class.LOCALIZED_NAMES is most definitely neither complete nor authoritative
+            if isinstance(elem, Exception):
+                folders.append(elem)
+                continue
             dummy_fld = Folder.from_xml(elem=elem, account=self.account)  # We use from_xml() only to parse elem
             try:
                 folder_cls = self.folder_cls_from_folder_name(folder_name=dummy_fld.name, locale=self.account.locale)
@@ -2338,6 +2354,9 @@ class Folder(EWSElement):
                 additional_fields=('folder:DisplayName', 'folder:FolderClass'),
                 shape=shape
         ):
+            if isinstance(elem, Exception):
+                folders.append(elem)
+                continue
             folders.append(cls.from_xml(elem=elem, account=account))
         assert len(folders) == 1
         return folders[0]

@@ -10,6 +10,11 @@ HEAD
   are wrong.
 * Add a new `version` attribute to `Configuration`, to force the server version if version guessing does not work.
   Accepts a `exchangelib.version.Version` object.
+* Rework bulk operations (`Account.buk_*()` and `Account.fetch()`) to return some exceptions unraised, if it is deemed
+  the exception does not apply to all items. This means that e.g. `fetch()` can return a mix of `Item` and
+  `ErrorItemNotFound` instances, if only some of the requested `ItemId`s were valid. Other exceptions will be raised
+  immediately, e.g. `ErrorNonExistentMailbox` because the exception applies to all items. It is the responsibility of
+  the caller to check the type of the returned values.
 
 1.8.1
 -----

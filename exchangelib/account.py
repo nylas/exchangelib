@@ -161,7 +161,7 @@ class Account(object):
         'items' is an iterable containing the Items we want to export
 
         Returns:
-        A list strings, the exported representation of the object
+        A list of strings, the exported representation of the object
         """
         is_empty, items = peek(items)
         if is_empty:
@@ -229,7 +229,7 @@ class Account(object):
             # empty 'items' and return early.
             return []
         return list(
-            folder.item_model_from_tag(i.tag).from_xml(elem=i, account=self, folder=folder)
+            i if isinstance(i, Exception) else folder.item_model_from_tag(i.tag).from_xml(elem=i, account=self, folder=folder)
             for i in CreateItem(account=self).call(
                 items=items,
                 folder=folder,
@@ -273,7 +273,7 @@ class Account(object):
             # empty 'items' and return early.
             return []
         return list(
-            Item.id_from_xml(i)
+            i if isinstance(i, Exception) else Item.id_from_xml(i)
             for i in UpdateItem(account=self).call(
                 items=items,
                 conflict_resolution=conflict_resolution,
@@ -354,7 +354,7 @@ class Account(object):
             # empty 'ids' and return early.
             return []
         return list(
-            Item.id_from_xml(i)
+            i if isinstance(i, Exception) else Item.id_from_xml(i)
             for i in MoveItem(account=self).call(items=ids, to_folder=to_folder)
         )
 
@@ -379,7 +379,10 @@ class Account(object):
         else:
             only_fields = validation_folder.allowed_field_names()
         for i in GetItem(account=self).call(items=ids, folder=validation_folder, additional_fields=only_fields):
-            yield validation_folder.item_model_from_tag(i.tag).from_xml(elem=i, account=self, folder=folder)
+            if isinstance(i, Exception):
+                yield i
+            else:
+                yield validation_folder.item_model_from_tag(i.tag).from_xml(elem=i, account=self, folder=folder)
 
     def __str__(self):
         txt = '%s' % self.primary_smtp_address

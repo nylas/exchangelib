@@ -27,7 +27,8 @@ from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, 
     ErrorInternalServerTransientError, ErrorNoRespondingCASInDestinationSite, ErrorImpersonationFailed, \
     ErrorMailboxMoveInProgress, ErrorAccessDenied, ErrorConnectionFailed, RateLimitError, ErrorServerBusy, \
     ErrorTooManyObjectsOpened, ErrorInvalidLicense, ErrorInvalidSchemaVersionForMailboxVersion, \
-    ErrorInvalidServerVersion, ErrorItemNotFound, ErrorADUnavailable, EWSError
+    ErrorInvalidServerVersion, ErrorItemNotFound, ErrorADUnavailable, ResponseMessageError, ErrorInvalidChangeKey, \
+    ErrorItemSave, ErrorInvalidIdMalformed
 from .ewsdatetime import EWSDateTime
 from .transport import wrap, SOAPNS, TNS, MNS, ENS
 from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, ElementType, \
@@ -55,7 +56,11 @@ FOLDER_TRAVERSAL_CHOICES = (SHALLOW, DEEP, SOFT_DELETED)
 class EWSService(object):
     SERVICE_NAME = None  # The name of the SOAP service
     element_container_name = None  # The name of the XML element wrapping the collection of returned items
-    ERRORS_TO_CATCH_IN_RESPONSE = EWSWarning  # Treat the following errors as warnings when contained in an element
+    # Return exception instance instead of raising exceptions for the following errors when contained in an element
+    ERRORS_TO_CATCH_IN_RESPONSE = (EWSWarning, ErrorCannotDeleteObject, ErrorInvalidChangeKey, ErrorItemNotFound,
+                                   ErrorItemSave, ErrorInvalidIdMalformed)
+    # Similarly, define the erors we want to return unraised
+    WARNINGS_TO_CATCH_IN_RESPONSE = ErrorBatchProcessingStopped
 
     def __init__(self, protocol):
         self.protocol = protocol
@@ -74,12 +79,31 @@ class EWSService(object):
         try:
             response = self._get_response_xml(payload=payload)
             return self._get_elements_in_response(response=response)
-        except (ErrorQuotaExceeded, ErrorCannotDeleteObject, ErrorCreateItemAccessDenied, ErrorTimeoutExpired,
-                ErrorFolderNotFound, ErrorNonExistentMailbox, ErrorMailboxStoreUnavailable, ErrorImpersonateUserDenied,
-                ErrorInternalServerError, ErrorInternalServerTransientError, ErrorNoRespondingCASInDestinationSite,
-                ErrorImpersonationFailed, ErrorMailboxMoveInProgress, ErrorAccessDenied, ErrorConnectionFailed,
-                RateLimitError, ErrorServerBusy, ErrorTooManyObjectsOpened, ErrorInvalidLicense, ErrorItemNotFound,
-                ErrorADUnavailable):
+        except (
+                ErrorAccessDenied,
+                ErrorADUnavailable,
+                ErrorBatchProcessingStopped,
+                ErrorCannotDeleteObject,
+                ErrorConnectionFailed,
+                ErrorCreateItemAccessDenied,
+                ErrorFolderNotFound,
+                ErrorImpersonateUserDenied,
+                ErrorImpersonationFailed,
+                ErrorInternalServerError,
+                ErrorInternalServerTransientError,
+                ErrorInvalidChangeKey,
+                ErrorInvalidLicense,
+                ErrorItemNotFound,
+                ErrorMailboxMoveInProgress,
+                ErrorMailboxStoreUnavailable,
+                ErrorNonExistentMailbox,
+                ErrorNoRespondingCASInDestinationSite,
+                ErrorQuotaExceeded,
+                ErrorServerBusy,
+                ErrorTimeoutExpired,
+                ErrorTooManyObjectsOpened,
+                RateLimitError,
+        ):
             # These are known and understood, and don't require a backtrace
             # TODO: ErrorTooManyObjectsOpened means there are too many connections to the database. We should be able to
             # act on this by lowering the self.protocol connection pool size.
@@ -201,19 +225,20 @@ class EWSService(object):
             if container is None:
                 raise TransportError('No %s elements in ResponseMessage (%s)' % (name, xml_to_str(message)))
             return container
+        # Raise any non-acceptable errors in the container, or return the container or the acceptable exception instance
         if response_class == 'Warning':
-            return self._raise_warnings(code=response_code, text=msg_text, xml=msg_xml)
+            try:
+                return self._raise_errors(code=response_code, text=msg_text, xml=msg_xml)
+            except self.WARNINGS_TO_CATCH_IN_RESPONSE as e:
+                return e
         # rspclass == 'Error', or 'Success' and not 'NoError'
-        return self._raise_errors(code=response_code, text=msg_text, xml=msg_xml)
-
-    def _raise_warnings(self, code, text, xml):
         try:
-            return self._raise_errors(code=code, text=text, xml=xml)
-        except ErrorBatchProcessingStopped as e:
-            raise_from(EWSWarning(e.value), e)
+            return self._raise_errors(code=response_code, text=msg_text, xml=msg_xml)
+        except self.ERRORS_TO_CATCH_IN_RESPONSE as e:
+            return e
 
-    @staticmethod
-    def _raise_errors(code, text, xml):
+    @classmethod
+    def _raise_errors(cls, code, text, xml):
         if code == 'NoError':
             return True
         if not code:
@@ -232,17 +257,12 @@ class EWSService(object):
         assert isinstance(response, list)
         for msg in response:
             assert isinstance(msg, ElementType)
-            try:
-                container = self._get_element_container(message=msg, name=self.element_container_name)
-                if isinstance(container, ElementType):
-                    for c in self._get_elements_in_container(container=container):
-                        yield c
-                else:
-                    yield (container, None)
-            except (ErrorTimeoutExpired, ErrorBatchProcessingStopped):
-                raise
-            except self.ERRORS_TO_CATCH_IN_RESPONSE as e:
-                yield (False, '%s' % e.value)
+            container_or_exc = self._get_element_container(message=msg, name=self.element_container_name)
+            if isinstance(container_or_exc, ElementType):
+                for c in self._get_elements_in_container(container=container_or_exc):
+                    yield c
+            else:
+                yield container_or_exc
 
     def _get_elements_in_container(self, container):
         return [elem for elem in container]
@@ -313,7 +333,7 @@ class PagingEWSMixIn(EWSService):
 
 class ExpectResponseErrorsMixin(EWSService):
     """Don't raise errors in the response, just return them as if they're warnings"""
-    ERRORS_TO_CATCH_IN_RESPONSE = EWSError
+    ERRORS_TO_CATCH_IN_RESPONSE = ResponseMessageError
 
 
 class GetServerTimeZones(EWSService):
