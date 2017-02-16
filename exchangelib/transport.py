@@ -182,10 +182,7 @@ def get_service_authtype(service_endpoint, versions, verify, name):
             data = dummy_xml(version=version, name=name)
             log.debug('Requesting %s from %s', data, service_endpoint)
             r = s.post(url=service_endpoint, headers=headers, data=data, allow_redirects=True, verify=verify)
-            auth_method = _get_auth_method_from_response(response=r)
-            if auth_method != UNKNOWN:
-                return auth_method
-            raise ValueError("Authentication type '%s' not supported" % auth_method)
+            return _get_auth_method_from_response(response=r)
 
 
 def _get_auth_method_from_response(response):
