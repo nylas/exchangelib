@@ -18,7 +18,7 @@ from exchangelib import close_connections
 from exchangelib.account import Account
 from exchangelib.autodiscover import AutodiscoverProtocol, discover
 from exchangelib.configuration import Configuration
-from exchangelib.credentials import DELEGATE, Credentials
+from exchangelib.credentials import DELEGATE, IMPERSONATION, Credentials
 from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalidOperation, AutoDiscoverRedirect, \
     AutoDiscoverCircularRedirect, AutoDiscoverFailed, ErrorNonExistentMailbox, UnknownTimeZone, \
     ErrorNameResolutionNoResults, TransportError, RedirectError, CASError, RateLimitError, UnauthorizedError, \
@@ -31,9 +31,9 @@ from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, Extend
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.restriction import Restriction, Q
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, GetAttachment, TNS
-from exchangelib.transport import NTLM
+from exchangelib.transport import NTLM, wrap
 from exchangelib.util import xml_to_str, chunkify, peek, get_redirect_url, isanysubclass, to_xml, BOM, get_domain, \
-    post_ratelimited
+    post_ratelimited, create_element
 from exchangelib.version import Build, Version
 from exchangelib.winzone import generate_map, PYTZ_TO_MS_TIMEZONE_MAP
 
@@ -478,6 +478,70 @@ class EWSTest(unittest.TestCase):
 
 
 class CommonTest(EWSTest):
+    def test_wrap(self):
+        # Test payload wrapper with both delegation, impersonation and timezones
+        MockAccount = namedtuple('Account', ['access_type', 'primary_smtp_address'])
+        MockTZ = namedtuple('EWSTimeZone', ['ms_id'])
+        content = create_element('AAA')
+        version = 'BBB'
+        account = MockAccount(DELEGATE, 'foo@example.com')
+        tz = MockTZ('XXX')
+        wrapped = wrap(content=content, version=version, account=account)
+        self.assertEqual(
+            wrapped,
+            b''.join(l.strip() for l in b'''\
+<?xml version="1.0" encoding="utf-8"?>
+<s:Envelope xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages" xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
+    <s:Header>
+        <t:RequestServerVersion Version="BBB" />
+    </s:Header>
+    <s:Body>
+        <AAA />
+    </s:Body>
+</s:Envelope>'''.split(b'\n')))
+
+        account = MockAccount(IMPERSONATION, 'foo@example.com')
+        wrapped = wrap(content=content, version=version, account=account, encoding='utf-8')
+        self.assertEqual(
+            wrapped,
+            b''.join(l.strip() for l in b'''\
+<?xml version="1.0" encoding="utf-8"?>
+<s:Envelope xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages" xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
+    <s:Header>
+        <t:RequestServerVersion Version="BBB" />
+        <t:ExchangeImpersonation>
+            <t:ConnectingSID>
+                <t:PrimarySmtpAddress>foo@example.com</t:PrimarySmtpAddress>
+            </t:ConnectingSID>
+        </t:ExchangeImpersonation>
+    </s:Header>
+    <s:Body>
+        <AAA />
+    </s:Body>
+</s:Envelope>'''.split(b'\n')))
+
+        wrapped = wrap(content=content, version=version, account=account, ewstimezone=tz, encoding='latin1')
+        self.assertEqual(
+            wrapped,
+            b''.join(l.strip() for l in b'''\
+<?xml version="1.0" encoding="latin1"?>
+<s:Envelope xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages" xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
+    <s:Header>
+        <t:RequestServerVersion Version="BBB" />
+        <t:ExchangeImpersonation>
+            <t:ConnectingSID>
+                <t:PrimarySmtpAddress>foo@example.com</t:PrimarySmtpAddress>
+            </t:ConnectingSID>
+        </t:ExchangeImpersonation>
+        <t:TimeZoneContext>
+            <t:TimeZoneDefinition Id="XXX" />
+        </t:TimeZoneContext>
+    </s:Header>
+    <s:Body>
+        <AAA />
+    </s:Body>
+</s:Envelope>'''.split(b'\n')))
+
     def test_poolsize(self):
         self.assertEqual(self.config.protocol.SESSION_POOLSIZE, 4)
 

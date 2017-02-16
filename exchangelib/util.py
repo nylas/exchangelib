@@ -1,5 +1,6 @@
 from __future__ import unicode_literals
 
+import io
 import itertools
 import logging
 import re
@@ -79,12 +80,19 @@ def peek(iterable):
         return False, itertools.chain([first], iterable)
 
 
-def xml_to_str(tree, encoding='utf-8'):
-    from xml.etree.ElementTree import tostring
-    # tostring returns bytecode unless encoding is 'unicode'. We ALWAYS want bytecode so we can convert to unicode
-    if encoding == 'unicode':
-        encoding = 'utf-8'
-    return tostring(tree, encoding=encoding).decode(encoding)
+def xml_to_str(tree, encoding=None, xml_declaration=False):
+    from xml.etree.ElementTree import ElementTree, tostring
+    # tostring() returns bytecode unless encoding is 'unicode', and does not reliably produce an XML declaration. We
+    # ALWAYS want bytecode so we can convert to unicode explicitly.
+    if encoding is None:
+        assert not xml_declaration
+        encoding = 'unicode'
+        stream = io.StringIO()
+    else:
+        stream = io.BytesIO()
+        stream.write(('<?xml version="1.0" encoding="%s"?>' % encoding).encode(encoding))
+    ElementTree(tree).write(stream, encoding, method='xml', short_empty_elements=True, xml_declaration=False)
+    return stream.getvalue()
 
 
 def get_xml_attr(tree, name):

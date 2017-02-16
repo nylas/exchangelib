@@ -357,8 +357,7 @@ def _get_autodiscover_payload(email, encoding='utf-8'):
     add_xml_child(request, 'EMailAddress', email)
     add_xml_child(request, 'AcceptableResponseSchema', RESPONSE_NS)
     payload.append(request)
-    xml_str = '<?xml version="1.0" encoding="%s"?>%s' % (encoding, xml_to_str(payload, encoding=encoding))
-    return xml_str.encode(encoding)
+    return xml_to_str(payload, encoding=encoding, xml_declaration=True)
 
 
 def _get_autodiscover_response(protocol, email, encoding='utf-8'):

@@ -2,7 +2,6 @@
 from __future__ import unicode_literals
 
 import logging
-from xml.etree.ElementTree import tostring
 
 from future.utils import raise_from
 from six import text_type
@@ -12,7 +11,7 @@ import requests_ntlm
 
 from .credentials import IMPERSONATION
 from .errors import UnauthorizedError, TransportError, RedirectError, RelativeRedirect
-from .util import create_element, add_xml_child, is_xml, get_redirect_url
+from .util import create_element, add_xml_child, is_xml, get_redirect_url, xml_to_str
 
 log = logging.getLogger(__name__)
 
@@ -35,8 +34,6 @@ AUTH_TYPE_MAP = {
     DIGEST: requests.auth.HTTPDigestAuth,
     NOAUTH: None,
 }
-
-AUTH_CLASS_MAP = dict((v, k) for k, v in AUTH_TYPE_MAP.items())
 
 
 def test_credentials(protocol):
@@ -122,7 +119,7 @@ def wrap(content, version, account, ewstimezone=None, encoding='utf-8'):
     body = create_element('s:Body')
     body.append(content)
     envelope.append(body)
-    return ('<?xml version="1.0" encoding="%s"?>' % encoding).encode(encoding) + tostring(envelope, encoding=encoding)
+    return xml_to_str(envelope, encoding=encoding, xml_declaration=True)
 
 
 def get_auth_instance(credentials, auth_type):
@@ -140,13 +137,6 @@ def get_auth_instance(credentials, auth_type):
         if auth_type == NTLM and credentials.type == credentials.EMAIL:
             username = '\\' + username
         return model(username=username, password=credentials.password)
-
-
-def get_auth_type(auth):
-    try:
-        return AUTH_CLASS_MAP[auth.__class__]
-    except KeyError as e:
-        raise_from(ValueError("Authentication model '%s' not supported" % auth.__class__), e)
 
 
 def get_autodiscover_authtype(service_endpoint, data, timeout, verify):
