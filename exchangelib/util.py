@@ -86,8 +86,11 @@ def xml_to_str(tree, encoding=None, xml_declaration=False):
     # ALWAYS want bytecode so we can convert to unicode explicitly.
     if encoding is None:
         assert not xml_declaration
-        encoding = 'unicode'
-        stream = io.StringIO()
+        if PY2:
+            stream = io.BytesIO()
+        else:
+            stream = io.StringIO()
+            encoding = 'unicode'
     else:
         stream = io.BytesIO()
         stream.write(('<?xml version="1.0" encoding="%s"?>' % encoding).encode(encoding))
