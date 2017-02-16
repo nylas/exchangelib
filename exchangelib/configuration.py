@@ -33,7 +33,7 @@ class Configuration(object):
     """
 
     def __init__(self, credentials, server=None, has_ssl=True, service_endpoint=None, auth_type=None,
-                 verify_ssl=True, **kwargs):
+                 verify_ssl=True, version=None, **kwargs):
         if kwargs:
             username = kwargs.pop('username')
             password = kwargs.pop('password')
@@ -52,6 +52,7 @@ class Configuration(object):
             auth_type=auth_type,
             credentials=credentials,
             verify_ssl=verify_ssl,
+            version=version
         )
 
     @property

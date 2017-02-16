@@ -19,9 +19,10 @@ import requests.sessions
 from six import text_type, PY2
 
 from .credentials import Credentials
-from .errors import TransportError
+from .errors import CASError, TransportError
 from .services import GetServerTimeZones, GetRoomLists, GetRooms
-from .transport import get_auth_instance, get_service_authtype, get_docs_authtype, test_credentials, AUTH_TYPE_MAP
+from .transport import get_auth_instance, get_service_authtype, get_docs_authtype, test_credentials, AUTH_TYPE_MAP, \
+    UNKNOWN
 from .util import split_url
 from .version import Version, API_VERSIONS
 
@@ -183,6 +184,7 @@ class CachingProtocol(type):
 @python_2_unicode_compatible
 class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
     def __init__(self, *args, **kwargs):
+        version = kwargs.pop('version', None)
         super(Protocol, self).__init__(*args, **kwargs)
 
         scheme = 'https' if self.has_ssl else 'https'
@@ -194,7 +196,10 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
         if self.auth_type is None:
             self.auth_type = get_service_authtype(service_endpoint=self.service_endpoint, versions=API_VERSIONS,
                                                   verify=self.verify_ssl, name=self.credentials.username)
-        self.docs_auth_type = get_docs_authtype(verify=self.verify_ssl, docs_url=self.types_url)
+        try:
+            self.docs_auth_type = get_docs_authtype(verify=self.verify_ssl, docs_url=self.types_url)
+        except TransportError:
+            self.docs_auth_type = UNKNOWN
 
         # Try to behave nicely with the Exchange server. We want to keep the connection open between requests.
         # We also want to re-use sessions, to avoid the NTLM auth handshake on every request.
@@ -207,8 +212,12 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
         thread_poolsize = 4 * self.SESSION_POOLSIZE
         self.thread_pool = ThreadPool(processes=thread_poolsize)
 
-        # Needs auth objects and a working session pool
-        self.version = Version.guess(self)
+        if version:
+            isinstance(version, Version)
+            self.version = version
+        else:
+            # Version.guess() needs auth objects and a working session pool
+            self.version = Version.guess(self)
 
     def get_timezones(self):
         return GetServerTimeZones(protocol=self).call()

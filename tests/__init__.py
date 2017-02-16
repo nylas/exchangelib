@@ -33,7 +33,7 @@ from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, Get
 from exchangelib.transport import NTLM
 from exchangelib.util import xml_to_str, chunkify, peek, get_redirect_url, isanysubclass, to_xml, BOM, get_domain, \
     post_ratelimited
-from exchangelib.version import Build
+from exchangelib.version import Build, Version
 from exchangelib.winzone import generate_map, PYTZ_TO_MS_TIMEZONE_MAP
 
 if PY2:
@@ -73,6 +73,20 @@ class BuildTest(unittest.TestCase):
             Build(16, 0).api_version()
         with self.assertRaises(KeyError):
             Build(15, 4).api_version()
+
+
+class ConfigurationTest(unittest.TestCase):
+    def test_hardcode_all(self):
+        # Test that we can hardcode everything without having a working server. This is useful if neither tasting or
+        # guessing missing values works.
+        Configuration(
+            server='example.com',
+            has_ssl=True,
+            credentials=Credentials('foo', 'bar', is_service_account=False),
+            auth_type=NTLM,
+            verify_ssl=True,
+            version=Version(build=Build(15, 1, 2, 3), api_version='foo'),
+        )
 
 
 class CredentialsTest(unittest.TestCase):
