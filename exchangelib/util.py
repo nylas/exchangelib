@@ -91,7 +91,7 @@ def xml_to_str(tree, encoding=None, xml_declaration=False):
     else:
         stream = io.BytesIO()
         stream.write(('<?xml version="1.0" encoding="%s"?>' % encoding).encode(encoding))
-    ElementTree(tree).write(stream, encoding, method='xml', short_empty_elements=True, xml_declaration=False)
+    ElementTree(tree).write(stream, encoding=encoding, xml_declaration=False, method='xml')
     return stream.getvalue()
 
 
