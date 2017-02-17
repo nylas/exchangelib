@@ -17,7 +17,6 @@ import logging
 import traceback
 from xml.parsers.expat import ExpatError
 
-from future.utils import raise_from
 from six import text_type, string_types
 
 from . import errors
@@ -147,7 +146,7 @@ class EWSService(object):
             try:
                 soap_response_payload = to_xml(r.text, encoding=r.encoding or 'utf-8')
             except ExpatError as e:
-                raise_from(SOAPError('SOAP response is not XML: %s' % e), e)
+                raise SOAPError('SOAP response is not XML: %s' % e)
             try:
                 res = self._get_soap_payload(soap_response=soap_response_payload)
             except (ErrorInvalidSchemaVersionForMailboxVersion, ErrorInvalidServerVersion):
@@ -249,9 +248,8 @@ class EWSService(object):
             raise vars(errors)[code](text)
         except KeyError as e:
             # Should not happen
-            raise_from(
-                TransportError('Unknown ResponseCode in ResponseMessage: %s (MessageText: %s, MessageXml: %s)' % (
-                    code, text, xml)), e)
+            raise TransportError('Unknown ResponseCode in ResponseMessage: %s (MessageText: %s, MessageXml: %s)' % (
+                    code, text, xml))
 
     def _get_elements_in_response(self, response):
         assert isinstance(response, list)

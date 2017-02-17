@@ -6,7 +6,7 @@ import logging
 import shelve
 
 import pytz
-from future.utils import raise_from, PY2
+from future.utils import PY2
 
 from .errors import UnknownTimeZone
 from .winzone import PYTZ_TO_MS_TIMEZONE_MAP
@@ -117,8 +117,8 @@ class EWSTimeZone(object):
         self_cls = type(cls.__name__, (cls, tz.__class__), dict(tz.__class__.__dict__))
         try:
             self_cls.ms_id = cls.PYTZ_TO_MS_MAP[tz.zone]
-        except KeyError as e:
-            raise_from(ValueError('No Windows timezone name found for timezone "%s"' % tz.zone), e)
+        except KeyError:
+            raise ValueError('No Windows timezone name found for timezone "%s"' % tz.zone)
 
         # We don't need the Windows long-format timezone name in long format. It's used in timezone XML elements, but
         # EWS happily accepts empty strings. For a full list of timezones supported by the target server, including

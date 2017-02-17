@@ -3,7 +3,6 @@ from __future__ import unicode_literals
 
 import logging
 
-from future.utils import raise_from
 from six import text_type
 import requests.sessions
 import requests.auth
@@ -128,8 +127,8 @@ def get_auth_instance(credentials, auth_type):
     """
     try:
         model = AUTH_TYPE_MAP[auth_type]
-    except KeyError as e:
-        raise_from(ValueError("Authentication type '%s' not supported" % auth_type), e)
+    except KeyError:
+        raise ValueError("Authentication type '%s' not supported" % auth_type)
     else:
         if model is None:
             return None

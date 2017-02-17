@@ -6,7 +6,7 @@ from locale import getlocale
 from logging import getLogger
 
 from cached_property import threaded_cached_property
-from future.utils import raise_from, python_2_unicode_compatible
+from future.utils import python_2_unicode_compatible
 from six import text_type, string_types
 
 from .autodiscover import discover
@@ -83,23 +83,23 @@ class Account(object):
     def _get_default_folder(self, fld_class):
         try:
             # Get the default folder
-            log.debug('Testing default %s folder with GetFolder', fld_class.__name__)
+            log.debug('Testing default %s folder with GetFolder', fld_class)
             return fld_class.get_distinguished(account=self)
         except ErrorAccessDenied:
             # Maybe we just don't have GetFolder access? Try FindItems instead
-            log.debug('Testing default %s folder with FindItem', fld_class.__name__)
+            log.debug('Testing default %s folder with FindItem', fld_class)
             fld = fld_class(account=self)  # Creates a folder instance with default distinguished folder name
             fld.test_access()
             return fld
-        except ErrorFolderNotFound as e:
+        except ErrorFolderNotFound:
             # There's no folder named fld_class.DISTINGUISHED_FOLDER_ID. Try to guess which folder is the default.
             # Exchange makes this unnecessarily difficult.
-            log.debug('Searching default %s folder in full folder list', fld_class.__name__)
+            log.debug('Searching default %s folder in full folder list', fld_class)
             flds = self.folders[fld_class]
             if not flds:
-                raise_from(ErrorFolderNotFound('No useable default %s folders' % fld_class.__name__), e)
+                raise ErrorFolderNotFound('No useable default %s folders' % fld_class)
             assert len(flds) == 1, 'Multiple possible default %s folders: %s' % (
-                fld_class.__name__, [text_type(f) for f in flds])
+                fld_class, [text_type(f) for f in flds])
             return flds[0]
 
     @threaded_cached_property
@@ -229,7 +229,8 @@ class Account(object):
             # empty 'items' and return early.
             return []
         return list(
-            i if isinstance(i, Exception) else folder.item_model_from_tag(i.tag).from_xml(elem=i, account=self, folder=folder)
+            i if isinstance(i, Exception)
+            else folder.item_model_from_tag(i.tag).from_xml(elem=i, account=self, folder=folder)
             for i in CreateItem(account=self).call(
                 items=items,
                 folder=folder,

@@ -33,14 +33,12 @@ from exchangelib.restriction import Restriction, Q
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, GetAttachment, TNS
 from exchangelib.transport import NTLM, wrap
 from exchangelib.util import xml_to_str, chunkify, peek, get_redirect_url, isanysubclass, to_xml, BOM, get_domain, \
-    post_ratelimited, create_element
+    post_ratelimited, create_element, CONNECTION_ERRORS
 from exchangelib.version import Build, Version
 from exchangelib.winzone import generate_map, PYTZ_TO_MS_TIMEZONE_MAP
 
 if PY2:
     FileNotFoundError = OSError
-
-    from exchangelib.util import ConnectionResetError
 
 
 class BuildTest(unittest.TestCase):
@@ -760,9 +758,7 @@ class CommonTest(EWSTest):
 
         # Test exceptions raises by the POST request
         import requests.exceptions
-        from socket import timeout as SocketTimeout
-        for exc_cls in (requests.exceptions.ChunkedEncodingError, requests.exceptions.ConnectionError,
-                        ConnectionResetError, requests.exceptions.Timeout, SocketTimeout):
+        for exc_cls in CONNECTION_ERRORS:
             session.post = mock_session_exception(exc_cls)
             with self.assertRaises(exc_cls):
                 r, session = post_ratelimited(protocol=protocol, session=session, url='', headers=None, data='')

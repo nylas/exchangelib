@@ -4,6 +4,7 @@ import io
 import itertools
 import logging
 import re
+import socket
 import time
 from copy import deepcopy
 from datetime import datetime
@@ -12,8 +13,8 @@ from xml.etree.ElementTree import Element
 
 from future.moves.urllib.parse import urlparse
 from future.utils import PY2
-from future.utils import raise_from
 from six import text_type, string_types
+import requests.exceptions
 
 from .errors import TransportError, RateLimitError, RedirectError, RelativeRedirect, CASError, UnauthorizedError, \
     ErrorInvalidSchemaVersionForMailboxVersion
@@ -21,8 +22,6 @@ from .errors import TransportError, RateLimitError, RedirectError, RelativeRedir
 if PY2:
     from thread import get_ident
 
-    class ConnectionResetError(OSError):
-        pass
 else:
     from threading import get_ident
 
@@ -81,7 +80,7 @@ def peek(iterable):
 
 
 def xml_to_str(tree, encoding=None, xml_declaration=False):
-    from xml.etree.ElementTree import ElementTree, tostring
+    from xml.etree.ElementTree import ElementTree
     # tostring() returns bytecode unless encoding is 'unicode', and does not reliably produce an XML declaration. We
     # ALWAYS want bytecode so we can convert to unicode explicitly.
     if encoding is None:
@@ -223,7 +222,7 @@ def to_xml(text, encoding):
             except IndexError:
                 offending_line = ''
             offending_excerpt = offending_line[max(0, col_no - 20):col_no + 20].decode('ascii', 'ignore')
-            raise_from(ParseError('%s\nOffending text: [...]%s[...]' % (text_type(e), offending_excerpt)), e)
+            raise ParseError('%s\nOffending text: [...]%s[...]' % (text_type(e), offending_excerpt))
         except TypeError:
             raise ParseError('This is not XML: %s' % text)
 
@@ -249,8 +248,8 @@ class DummyResponse(object):
 def get_domain(email):
     try:
         return email.split('@')[1].lower()
-    except (IndexError, AttributeError) as e:
-        raise_from(ValueError("'%s' is not a valid email" % email), e)
+    except (IndexError, AttributeError):
+        raise ValueError("'%s' is not a valid email" % email)
 
 
 def split_url(url):
@@ -293,6 +292,13 @@ def get_redirect_url(response, allow_relative=True, require_relative=False):
 MAX_WAIT = 3600  # seconds
 MAX_REDIRECTS = 5  # Define a max redirection count. We don't want to be sent into an endless redirect loop
 
+# A collection of error classes we want to handle as general connection errors
+CONNECTION_ERRORS = (requests.exceptions.ChunkedEncodingError, requests.exceptions.ConnectionError,
+                     requests.exceptions.Timeout, socket.timeout)
+if not PY2:
+    # Python2 does not have ConnectionResetError
+    CONNECTION_ERRORS += (ConnectionResetError,)
+
 
 def post_ratelimited(protocol, session, url, headers, data, timeout=None, verify=True, allow_redirects=False):
     """
@@ -313,11 +319,10 @@ def post_ratelimited(protocol, session, url, headers, data, timeout=None, verify
     If the connecting user has hit a throttling policy, then the server will start to malfunction in many interesting
     ways, but never actually tell the user what is happening. There is no way to distinguish this situation from other
     malfunctions. The only cure is to stop making requests.
+
+    The contract on sessions here is to return the session that ends up being used, or retiring the session if we
+    intend to raise an exception. We give up on max_wait timeout, not number of retries
     """
-    from socket import timeout as SocketTimeout
-    import requests.exceptions
-    # The contract on sessions here is to return the session that ends up being used, or retiring the session if we
-    # intend to raise an exception. We give up on max_wait timeout, not number of retries
     r = None
     wait = 10  # seconds
     redirects = 0
@@ -346,8 +351,7 @@ Response headers: %(response_headers)s'''
             try:
                 r = session.post(url=url, headers=headers, data=data, allow_redirects=False, timeout=timeout,
                                  verify=verify)
-            except (requests.exceptions.ChunkedEncodingError, requests.exceptions.ConnectionError, ConnectionResetError,
-                    requests.exceptions.Timeout, SocketTimeout) as e:
+            except CONNECTION_ERRORS as e:
                 log.debug(
                     'Session %(session_id)s thread %(thread_id)s: timeout or connection error POST\'ing to %(url)s',
                     log_vals)

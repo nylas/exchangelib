@@ -243,33 +243,41 @@ class QuerySet(object):
     def __getitem__(self, idx_or_slice):
         # Support indexing and slicing. This is non-greedy when possible (slicing start, stop and step are not negative,
         # and we're ordering on at most one field), and will only fill the cache if the entire query is iterated.
-        #
-        # If this queryset isn't cached, we can optimize a bit by setting self.page_size to only get as many items as
-        # strictly needed.
-        from .services import FindItem
         if isinstance(idx_or_slice, int):
-            if idx_or_slice < 0:
-                # Support negative indexes by reversing the queryset and negating the index value
-                if self._cache is not None:
-                    return self._cache[idx_or_slice]
-                return self.reverse()[-(idx_or_slice+1)]
-            else:
-                if self._cache is None and idx_or_slice < FindItem.CHUNKSIZE:
-                    self.page_size = idx_or_slice + 1
-                # Support non-negative indexes by consuming the iterator up to the index
-                for i, val in enumerate(self.__iter__()):
-                    if i == idx_or_slice:
-                        return val
-                raise IndexError()
-        assert isinstance(idx_or_slice, slice)
-        if ((idx_or_slice.start or 0) < 0) or ((idx_or_slice.stop or 0) < 0) or ((idx_or_slice.step or 0) < 0):
+            return self._getitem_idx(idx_or_slice)
+        return self._getitem_slice(idx_or_slice)
+
+    def _getitem_idx(self, idx):
+        from .services import FindItem
+        assert isinstance(idx, int)
+        if idx < 0:
+            # Support negative indexes by reversing the queryset and negating the index value
+            if self._cache is not None:
+                return self._cache[idx]
+            reverse_idx = -(idx+1)
+            return self.reverse()[reverse_idx]
+        else:
+            if self._cache is None and idx < FindItem.CHUNKSIZE:
+                # Optimize a bit by setting self.page_size to only get as many items as strictly needed
+                self.page_size = idx + 1
+            # Support non-negative indexes by consuming the iterator up to the index
+            for i, val in enumerate(self.__iter__()):
+                if i == idx:
+                    return val
+            raise IndexError()
+
+    def _getitem_slice(self, s):
+        from .services import FindItem
+        assert isinstance(s, slice)
+        if ((s.start or 0) < 0) or ((s.stop or 0) < 0) or ((s.step or 0) < 0):
             # islice() does not support negative start, stop and step. Make sure cache is full by iterating the full
             # query result, and then slice on the cache.
             list(self.__iter__())
-            return self._cache[idx_or_slice]
-        if self._cache is None and idx_or_slice.stop is not None and idx_or_slice.stop < FindItem.CHUNKSIZE:
-            self.page_size = idx_or_slice.stop
-        return islice(self.__iter__(), idx_or_slice.start, idx_or_slice.stop, idx_or_slice.step)
+            return self._cache[s]
+        if self._cache is None and s.stop is not None and s.stop < FindItem.CHUNKSIZE:
+            # Optimize a bit by setting self.page_size to only get as many items as strictly needed
+            self.page_size = s.stop
+        return islice(self.__iter__(), s.start, s.stop, s.step)
 
     def as_values(self, iterable):
         if len(self.only_fields) == 0:

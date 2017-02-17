@@ -14,7 +14,6 @@ from __future__ import unicode_literals
 import logging
 import os
 import shelve
-from socket import timeout as SocketTimeout
 import tempfile
 from threading import Lock
 
@@ -28,14 +27,11 @@ from .credentials import Credentials
 from .errors import AutoDiscoverFailed, AutoDiscoverRedirect, AutoDiscoverCircularRedirect, TransportError, \
     RedirectError, ErrorNonExistentMailbox, UnauthorizedError
 from .protocol import BaseProtocol, Protocol
-from .util import create_element, get_xml_attr, add_xml_child, to_xml, is_xml, post_ratelimited, get_redirect_url, \
-    xml_to_str, get_domain
+from .util import create_element, get_xml_attr, add_xml_child, to_xml, is_xml, post_ratelimited, xml_to_str, \
+    get_domain, CONNECTION_ERRORS
 
 if PY2:
     import Queue as queue
-
-    class ConnectionResetError(OSError):
-        pass
 else:
     import queue
 
@@ -270,6 +266,7 @@ def _try_autodiscover(hostname, credentials, email, verify):
                     except AutoDiscoverFailed:
                         raise AutoDiscoverFailed('All steps in the autodiscover protocol failed')
 
+
 def _autodiscover_hostname(hostname, credentials, email, has_ssl, verify, auth_type=None):
     # Tries to get autodiscover data on a specific host. If we are HTTP redirected, we restart the autodiscover dance on
     # the new host.
@@ -342,11 +339,13 @@ def _get_autodiscover_auth_type(url, email, verify, encoding='utf-8'):
         data = _get_autodiscover_payload(email=email, encoding=encoding)
         return transport.get_autodiscover_authtype(service_endpoint=url, data=data, timeout=TIMEOUT,
                                                    verify=verify)
-    except (TransportError, requests.exceptions.ChunkedEncodingError, requests.exceptions.ConnectionError,
-            ConnectionResetError, requests.exceptions.Timeout, SocketTimeout, requests.exceptions.SSLError) as e:
+    except TransportError as e:
         if isinstance(e, RedirectError):
             raise
-        log.debug('Error guessing auth type: %s', e)
+        raise_from(AutoDiscoverFailed('Error guessing auth type: %s' % e), e)
+    except requests.exceptions.SSLError as e:
+        raise_from(AutoDiscoverFailed('Error guessing auth type: %s' % e), e)
+    except CONNECTION_ERRORS as e:
         raise_from(AutoDiscoverFailed('Error guessing auth type: %s' % e), e)
 
 

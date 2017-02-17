@@ -13,13 +13,13 @@ import socket
 from multiprocessing.pool import ThreadPool
 from threading import Lock
 
-from future.utils import with_metaclass, python_2_unicode_compatible, raise_from
+from future.utils import with_metaclass, python_2_unicode_compatible
 import requests.adapters
 import requests.sessions
 from six import text_type, PY2
 
 from .credentials import Credentials
-from .errors import CASError, TransportError
+from .errors import TransportError
 from .services import GetServerTimeZones, GetRoomLists, GetRooms
 from .transport import get_auth_instance, get_service_authtype, get_docs_authtype, test_credentials, AUTH_TYPE_MAP, \
     UNKNOWN
@@ -134,8 +134,8 @@ class BaseProtocol(object):
         # We need the version for this
         try:
             socket.gethostbyname_ex(self.server)[2][0]
-        except socket.gaierror as e:
-            raise_from(TransportError("Server '%s' does not exist" % self.server), e)
+        except socket.gaierror:
+            raise TransportError("Server '%s' does not exist" % self.server)
         return test_credentials(protocol=self)
 
     def __repr__(self):

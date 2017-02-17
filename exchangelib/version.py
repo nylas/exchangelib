@@ -5,10 +5,10 @@ import logging
 from xml.etree.ElementTree import ParseError
 
 import requests.sessions
-from future.utils import raise_from, python_2_unicode_compatible
+from future.utils import python_2_unicode_compatible
 from six import text_type
 
-from .errors import UnauthorizedError, TransportError, EWSWarning, ErrorInvalidSchemaVersionForMailboxVersion
+from .errors import TransportError, EWSWarning, ErrorInvalidSchemaVersionForMailboxVersion
 from .transport import TNS, SOAPNS, dummy_xml, get_auth_instance
 from .util import is_xml, to_xml, post_ratelimited
 
@@ -241,8 +241,8 @@ class Version(object):
             header = to_xml(response.text, encoding=response.encoding).find('{%s}Header' % SOAPNS)
             if header is None:
                 raise ParseError()
-        except ParseError as e:
-            raise_from(EWSWarning('Unknown XML response from %s (response: %s)' % (response, response.text)), e)
+        except ParseError:
+            raise EWSWarning('Unknown XML response from %s (response: %s)' % (response, response.text))
 
         info = header.find('{%s}ServerVersionInfo' % TNS)
         if info is None:
