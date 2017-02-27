@@ -20,9 +20,12 @@ and contact items.
 
 
 Usage
-~~~~~
-
+-----
 Here are some examples of how `exchangelib` works:
+
+
+Setup and connecting
+^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: python
 
@@ -31,25 +34,6 @@ Here are some examples of how `exchangelib` works:
         Mailbox, Attendee, Q
     from exchangelib.folders import Calendar, ExtendedProperty, FileAttachment, ItemAttachment, \
         HTMLBody
-
-    year, month, day = 2016, 3, 20
-    tz = EWSTimeZone.timezone('Europe/Copenhagen')
-
-    # Build a list of calendar items
-    calendar_items = []
-    for hour in range(7, 17):
-        calendar_items.append(CalendarItem(
-            start=tz.localize(EWSDateTime(year, month, day, hour, 30)),
-            end=tz.localize(EWSDateTime(year, month, day, hour + 1, 15)),
-            subject='Test item',
-            body='Hello from Python',
-            location='devnull',
-            categories=['foo', 'bar'],
-            required_attendees = [Attendee(
-                mailbox=Mailbox(email_address='user1@example.com'),
-                response_type='Accept'
-            )]
-        ))
 
     # Username in WINDOMAIN\username format. Office365 wants usernames in PrimarySMTPAddress
     # ('myusername@example.com') format. UPN format is also supported.
@@ -63,7 +47,6 @@ Here are some examples of how `exchangelib` works:
     # access_type=IMPERSONATION
     account = Account(primary_smtp_address='john@example.com', credentials=credentials,
                       autodiscover=True, access_type=DELEGATE)
-
     # If the server doesn't support autodiscover, use a Configuration object to set the
     # server location:
     # config = Configuration(
@@ -75,70 +58,41 @@ Here are some examples of how `exchangelib` works:
     #                   access_type=DELEGATE)
 
 
+Folders
+^^^^^^^
+
+.. code-block:: python
+
+    # The most common folders are available as account.calendar, account.trash, account.drafts, account.inbox,
+    # account.outbox, account.sent, account.junk, account.tasks, and account.contacts.
+    #
+    # If you want to access other folders, you can either traverse the account.folders dictionary, or find
+    # the folder by name, starting at a direct or indirect parent of the folder you want to find. To search
+    # the full folder hirarchy, start the search from account.root:
+    python_dev_mail_folder = account.root.get_folder_by_name('python-dev')
+    # If you have multiple folders with the same name in your folder hierarchy, start your search further down
+    # the hierarchy:
+    foo1_folder = account.inbox.get_folder_by_name('foo')
+    foo2_folder = python_dev_mail_folder.get_folder_by_name('foo')
+    # For more advanced folder traversing, use some_folder.get_folders()
+
+
+Creating and sending
+^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
     # Create the calendar items in the user's standard calendar.  If you want to access a
     # non-standard calendar, choose a different one from account.folders[Calendar]
     #
-    # bulk_update() and bulk_delete() methods are also supported.
-    res = account.calendar.bulk_create(items=calendar_items)
-    print(res)
-
-    # Get the calendar items we just created. We filter by categories so we only get the items created by
-    # us. The syntax for filter() is modeled after Django QuerySet filters.
-    #
-    # If you need more complex filtering, filter() also accepts a Python-like search expression:
-    #
-    # items = my_folder.filter(
-    #       "start < '2016-01-02T03:04:05T' and end > '2016-01-01T03:04:05T' and categories in ('foo', 'bar')"
-    # )
-    #
-    # filter() also support Q objects that are modeled after Django Q objects.
-    #
-    # q = (Q(subject__iexact='foo') | Q(subject__contains='bar')) & ~Q(subject__startswith='baz')
-    # items = my_folder.filter(q)
-    #
-    # A large part of the Django QuerySet API is supported. The QuerySet doesn't fetch anything before the
-    # QuerySet is iterated. The QuerySet returns an iterator, and results are cached when the QuerySet is
-    # iterated the first time.
-    # Examples:
-    #
-    # all_items = my_folder.all()
-    # all_items_without_caching = my_folder.all().iterator()
-    # filtered_items = my_folder.filter(subject__contains='foo').exclude(categories__contains='bar')
-    # sparse_items = my_folder.all().only('subject', 'start')
-    # status_report = my_folder.all().delete()
-    # items_for_2017 = my_calendar.filter(start__range=(
-    #     tz.localize(EWSDateTime(2017, 1, 1)),
-    #     tz.localize(EWSDateTime(2018, 1, 1))
-    # ))
-    # item = my_folder.get(subject='unique_string')
-    # ordered_items = my_folder.all().order_by('subject')
-    # n = my_folder.all().count()
-    # folder_is_empty = not my_folder.all().exists()
-    # ids_as_dict = my_folder.all().values('item_id', 'changekey')
-    # ids_as_list = my_folder.all().values_list('item_id', 'changekey')
-    # all_subjects = my_folder.all().values_list('subject', flat=True)
-    #
-    # If you want recurring calendar items to be expanded, use calendar.view(start=..., end=...) instead
-    items = account.calendar.filter(
-        start__lt=tz.localize(EWSDateTime(year, month, day + 1)),
-        end__gt=tz.localize(EWSDateTime(year, month, day)),
-        categories__contains=['foo', 'bar'],
-    )
-    for item in items:
-        print(item.start, item.end, item.subject, item.body, item.location)
-
-    # Delete the calendar items we found
-    res = items.delete()
-    print(res)
-
-    # You can also create, update and delete single items
+    # You can create, update and delete single items
     item = CalendarItem(folder=account.calendar, subject='foo')
     item.save()
     item.subject = 'bar'
     item.save()
     item.delete()
 
-    # You can also send emails
+    # You can also send emails:
 
     # If you don't want a local copy
     m = Message(
@@ -162,19 +116,131 @@ Here are some examples of how `exchangelib` works:
     # EWS distinquishes between plain text and HTML body contents. If you want to send HTML body content, use
     # the HTMLBody helper. Clients will see this as HTML and display the body correctly:
     item.body = HTMLBody('<html><body>Hello happy <blink>OWA user!</blink></body></html>')
+    year, month, day = 2016, 3, 20
+    tz = EWSTimeZone.timezone('Europe/Copenhagen')
 
-    # The most common folders are available as account.calendar, account.trash, account.drafts, account.inbox,
-    # account.outbox, account.sent, account.junk, account.tasks, and account.contacts.
+
+Bulk operations
+^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
+    # Build a list of calendar items
+    calendar_items = []
+    for hour in range(7, 17):
+        calendar_items.append(CalendarItem(
+            start=tz.localize(EWSDateTime(year, month, day, hour, 30)),
+            end=tz.localize(EWSDateTime(year, month, day, hour + 1, 15)),
+            subject='Test item',
+            body='Hello from Python',
+            location='devnull',
+            categories=['foo', 'bar'],
+            required_attendees = [Attendee(
+                mailbox=Mailbox(email_address='user1@example.com'),
+                response_type='Accept'
+            )]
+        ))
+
+    # bulk_update() and bulk_delete() methods are also supported.
+    res = account.calendar.bulk_create(items=calendar_items)
+    print(res)
+
+
+Searching
+^^^^^^^^^
+
+.. code-block:: python
+
+    # Let's get the calendar items we just created. Searching is modeled after the Django QuerySet 
+    # API, and a large part of the API is supported. Like in Django, the QuerySet is lazy and doesn't 
+    # fetch anything before the QuerySet is iterated. QuerySets support chaining, so you can build
+    # the final query in multiple steps, and you can re-use a base QuerySet for multiple sub-searches.
+    # The QuerySet returns an iterator, and results are cached when the QuerySet is fully iterated 
+    # the first time.
     #
-    # If you want to access other folders, you can either traverse the account.folders dictionary, or find
-    # the folder by name, starting at a direct or indirect parent of the folder you want to find. To search
-    # the full folder hirarchy, start the search from account.root:
-    python_dev_mail_folder = account.root.get_folder_by_name('python-dev')
-    # If you have multiple folders with the same name in your folder hierarchy, start your search further down
-    # the hierarchy:
-    foo1_folder = account.inbox.get_folder_by_name('foo')
-    foo2_folder = python_dev_mail_folder.get_folder_by_name('foo')
-    # For more advanced folder traversing, use some_folder.get_folders()
+    # Here are some examples of using the API:
+    #
+    # all_items = my_folder.all()  # Get everything
+    # all_items_without_caching = my_folder.all().iterator()  # Get everything, but don't cache
+    # filtered_items = my_folder.filter(subject__contains='foo').exclude(categories__icontains='bar')  # Chaining
+    # sparse_items = my_folder.all().only('subject', 'start')  # Only return some attributes
+    # status_report = my_folder.all().delete()  # Delete the items returned by the QuerySet
+    # items_for_2017 = my_calendar.filter(start__range=(
+    #     tz.localize(EWSDateTime(2017, 1, 1)),
+    #     tz.localize(EWSDateTime(2018, 1, 1))
+    # ))  # Filter by a date range
+    # Same as filter() but throws an error if exactly one item isn't returned
+    # item = my_folder.get(subject='unique_string')
+    # ordered_items = my_folder.all().order_by('subject')  # Sorting, by one or multiple fields
+    # n = my_folder.all().count()  # Efficient counting
+    # folder_is_empty = not my_folder.all().exists()  # Efficient tasting
+    # ids_as_dict = my_folder.all().values('item_id', 'changekey')  # Return values as dicts, not objects
+    # ids_as_list = my_folder.all().values_list('item_id', 'changekey')  # Return values as nested lists
+    # all_subjects = my_folder.all().values_list('subject', flat=True)  # Return values as a flat list
+    #
+    # The syntax for filter() is modeled after Django QuerySet filters. The following filter lookups are 
+    # supported:
+    #
+    # filter(subject='foo')  # Returns items where subject is exactly 'foo'. Case-sensitive
+    # filter(start__range=(from, to))  # Returns items starting within this range. Only for date and numerical types
+    # filter(subject__in=('foo', 'bar'))  # Return items where subject is either 'foo' or 'bar'
+    # filter(subject__not='foo')  # Returns items where subject is not 'foo'
+    # filter(start__gt=dt)  # Returns items starting after 'dt'.  Only for date and numerical types
+    # filter(start__gte=dt)  # Returns items starting on or after 'dt'.  Only for date and numerical types
+    # filter(start__lt=dt)  # Returns items starting before 'dt'.  Only for date and numerical types
+    # filter(start__lte=dt)  # Returns items starting on or before 'dt'.  Only for date and numerical types
+    # filter(subject__exact='foo')  #  Returns items where subject is 'foo'. Same as filter(subject='foo')
+    # filter(subject__iexact='foo')  #  Returns items where subject is 'foo', 'FOO' or 'Foo'
+    # filter(subject__contains='foo')  #  Returns items where subject contains 'foo'
+    # filter(subject__icontains='foo')  # Returns items where subject contains 'foo', 'FOO' or 'Foo'
+    # filter(subject__startswith='foo')  # Returns items where subject starts with 'foo'
+    # filter(subject__istartswith='foo')  # Returns items where subject starts with 'foo', 'FOO' or 'Foo'
+    # 
+    # filter() also supports Q objects that are modeled after Django Q objects, for building complex
+    # boolean logic search expressions.
+    #
+    # q = (Q(subject__iexact='foo') | Q(subject__contains='bar')) & ~Q(subject__startswith='baz')
+    # items = my_folder.filter(q)
+    #
+    # filter() even accepts a Python-like search expression as a string:
+    #
+    # items = my_folder.filter(
+    #       "start < '2016-01-02T03:04:05T' and end > '2016-01-01T03:04:05T' and categories in ('foo', 'bar')"
+    # )
+    #
+    # In this example, we filter by categories so we only get the items created by us.
+    items = account.calendar.filter(
+        start__lt=tz.localize(EWSDateTime(year, month, day + 1)),
+        end__gt=tz.localize(EWSDateTime(year, month, day)),
+        categories__contains=['foo', 'bar'],
+    )
+    for item in items:
+        print(item.start, item.end, item.subject, item.body, item.location)
+
+    # By default, EWS returns only the master recurring item. If you want recurring calendar 
+    # items to be expanded, use calendar.view(start=..., end=...) instead.
+    items = account.calendar.view(
+        start=tz.localize(EWSDateTime(year, month, day + 1)),
+        end=tz.localize(EWSDateTime(year, month, day)),
+    )
+    for item in items:
+        print(item.start, item.end, item.subject, item.body, item.location)
+
+
+Deleting
+^^^^^^^^
+
+.. code-block:: python
+
+    # Delete the calendar items we found, when 'items' is a queryset
+    res = items.delete()
+    print(res)
+
+
+Extended properties
+^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
 
     # If folder items have extended properties, you need to register them before you can access them. Create
     # a subclass of ExtendedProperty and set your custom property_id:
@@ -192,6 +258,12 @@ Here are some examples of how `exchangelib` works:
         print(i.lunch_menu)
     # If you change your mind, jsut remove the property again
     CalendarItem.deregister('lunch_menu')
+
+
+Attachments
+^^^^^^^^^^^
+
+.. code-block:: python
 
     # It's possible to create, delete and get attachments connected to any item type:
     # Process attachments on existing items. FileAttachments have a 'content' attribute
@@ -229,4 +301,10 @@ Here are some examples of how `exchangelib` works:
     # (items that have an item_id) will update the changekey of the item.
 
 
-    # 'exchangelib' has support for most (but not all) item attributes, and also item export and upload.
+Notes
+^^^^^
+
+Most, but not all, item attributes are supported. Addeing more attributes is usually uncomplicated. Feel 
+free to open a PR or an issue.
+
+Item export and upload is supported, for efficient backup, restore and migration.
