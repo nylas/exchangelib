@@ -37,25 +37,51 @@ Setup and connecting
 
     # Username in WINDOMAIN\username format. Office365 wants usernames in PrimarySMTPAddress
     # ('myusername@example.com') format. UPN format is also supported.
-    #
-    # By default, fault-tolerant error handling is used. This means that calls may block for a long time
-    # if the server is unavailable. If you need immediate failures, add 'is_service_account=False' to
-    # Credentials.
     credentials = Credentials(username='MYWINDOMAIN\\myusername', password='topsecret')
 
-    # If your credentials have been given impersonation access to the target account, use
-    # access_type=IMPERSONATION
+    # By default, fault-tolerant error handling is enabled. This means that requests to the server
+    # do an exponential backoff and sleep up to one hour before giving up, if the server is 
+    # unavailable or responding with error messages. This prevents automated scripts from overwhelming
+    # a failing or overloaded server, and hides intermittent service outages that often happen in
+    # large Exchange installations.
+    
+    # If you want to disable the fault tolerance, unset the 'is_service_account' flag:
+    credentials = Credentials(username='FOO\\bar', password='topsecret', is_service_account=False)
+
+    # Set up a target account and do an autodiscover lookup to find the target EWS endpoint:
     account = Account(primary_smtp_address='john@example.com', credentials=credentials,
                       autodiscover=True, access_type=DELEGATE)
-    # If the server doesn't support autodiscover, use a Configuration object to set the
-    # server location:
-    # config = Configuration(
-    #     server='mail.example.com',
-    #     credentials=Credentials(username='MYWINDOMAIN\\myusername', password='topsecret'),
-    #     auth_type=NTLM
-    # )
-    # account = Account(primary_smtp_address='john@example.com', config=config,
-    #                   access_type=DELEGATE)
+
+    # If your credentials have been given impersonation access to the target account, set a 
+    # different 'access_type':
+    account = Account(primary_smtp_address='john@example.com', credentials=credentials,
+                      autodiscover=True, access_type=IMPERSONATION)
+
+
+    # If the server doesn't support autodiscover, use a Configuration object to set the server 
+    # location:
+    config = Configuration(server='mail.example.com', credentials=credentials)
+    account = Account(primary_smtp_address='john@example.com', config=config,
+                      autodiscover=False, access_type=DELEGATE)
+                      
+    # 'exchangelib' will attempt to guess the server version and authentication method. If you 
+    # have a really bizarre or locked-down installation and the guessing fails, you can set the 
+    # auth method and version explicitly:
+    from exchangelib.version import Build, Version
+    version = Version(build=Build(15, 0, 12, 34), api_version='Exchange2013')
+    config = Configuration(server='example.com', credentials=credentials, version=version, auth_type=NTLM)
+
+    # If you're connecting to the same account very often, you can cache the autodiscover result for 
+    # later so you can skip the autodiscover lookup:
+    ews_url = account.protocol.service_endpoint
+    ews_auth_type = account.protocol.auth_type
+    primary_smtp_address = account.primary_smtp_address
+
+    # 5 minutes later, fetch the cached values and create the account without autodiscovering:
+    config = Configuration(service_endpoint=ews_url, credentials=credentials, auth_type=ews_auth_type)
+    account = Account(
+        primary_smtp_address=primary_smtp_address, config=config, autodiscover=False, access_type=DELEGATE
+    )
 
 
 Folders
@@ -149,65 +175,64 @@ Bulk operations
 Searching
 ^^^^^^^^^
 
+Searching is modeled after the Django QuerySet API, and a large part of the API is supported. Like 
+in Django, the QuerySet is lazy and doesn't fetch anything before the QuerySet is iterated. QuerySets 
+support chaining, so you can build the final query in multiple steps, and you can re-use a base 
+QuerySet for multiple sub-searches. The QuerySet returns an iterator, and results are cached when the 
+QuerySet is fully iterated the first time.
+
+Here are some examples of using the API:
+
 .. code-block:: python
 
-    # Let's get the calendar items we just created. Searching is modeled after the Django QuerySet 
-    # API, and a large part of the API is supported. Like in Django, the QuerySet is lazy and doesn't 
-    # fetch anything before the QuerySet is iterated. QuerySets support chaining, so you can build
-    # the final query in multiple steps, and you can re-use a base QuerySet for multiple sub-searches.
-    # The QuerySet returns an iterator, and results are cached when the QuerySet is fully iterated 
-    # the first time.
-    #
-    # Here are some examples of using the API:
-    #
-    # all_items = my_folder.all()  # Get everything
-    # all_items_without_caching = my_folder.all().iterator()  # Get everything, but don't cache
-    # filtered_items = my_folder.filter(subject__contains='foo').exclude(categories__icontains='bar')  # Chaining
-    # sparse_items = my_folder.all().only('subject', 'start')  # Only return some attributes
-    # status_report = my_folder.all().delete()  # Delete the items returned by the QuerySet
-    # items_for_2017 = my_calendar.filter(start__range=(
-    #     tz.localize(EWSDateTime(2017, 1, 1)),
-    #     tz.localize(EWSDateTime(2018, 1, 1))
-    # ))  # Filter by a date range
+    # Let's get the calendar items we just created. 
+    all_items = my_folder.all()  # Get everything
+    all_items_without_caching = my_folder.all().iterator()  # Get everything, but don't cache
+    filtered_items = my_folder.filter(subject__contains='foo').exclude(categories__icontains='bar')  # Chaining
+    sparse_items = my_folder.all().only('subject', 'start')  # Only return some attributes
+    status_report = my_folder.all().delete()  # Delete the items returned by the QuerySet
+    items_for_2017 = my_calendar.filter(start__range=(
+        tz.localize(EWSDateTime(2017, 1, 1)),
+        tz.localize(EWSDateTime(2018, 1, 1))
+    ))  # Filter by a date range
     # Same as filter() but throws an error if exactly one item isn't returned
-    # item = my_folder.get(subject='unique_string')
-    # ordered_items = my_folder.all().order_by('subject')  # Sorting, by one or multiple fields
-    # n = my_folder.all().count()  # Efficient counting
-    # folder_is_empty = not my_folder.all().exists()  # Efficient tasting
-    # ids_as_dict = my_folder.all().values('item_id', 'changekey')  # Return values as dicts, not objects
-    # ids_as_list = my_folder.all().values_list('item_id', 'changekey')  # Return values as nested lists
-    # all_subjects = my_folder.all().values_list('subject', flat=True)  # Return values as a flat list
-    #
-    # The syntax for filter() is modeled after Django QuerySet filters. The following filter lookups are 
-    # supported:
-    #
-    # filter(subject='foo')  # Returns items where subject is exactly 'foo'. Case-sensitive
-    # filter(start__range=(from, to))  # Returns items starting within this range. Only for date and numerical types
-    # filter(subject__in=('foo', 'bar'))  # Return items where subject is either 'foo' or 'bar'
-    # filter(subject__not='foo')  # Returns items where subject is not 'foo'
-    # filter(start__gt=dt)  # Returns items starting after 'dt'.  Only for date and numerical types
-    # filter(start__gte=dt)  # Returns items starting on or after 'dt'.  Only for date and numerical types
-    # filter(start__lt=dt)  # Returns items starting before 'dt'.  Only for date and numerical types
-    # filter(start__lte=dt)  # Returns items starting on or before 'dt'.  Only for date and numerical types
-    # filter(subject__exact='foo')  #  Returns items where subject is 'foo'. Same as filter(subject='foo')
-    # filter(subject__iexact='foo')  #  Returns items where subject is 'foo', 'FOO' or 'Foo'
-    # filter(subject__contains='foo')  #  Returns items where subject contains 'foo'
-    # filter(subject__icontains='foo')  # Returns items where subject contains 'foo', 'FOO' or 'Foo'
-    # filter(subject__startswith='foo')  # Returns items where subject starts with 'foo'
-    # filter(subject__istartswith='foo')  # Returns items where subject starts with 'foo', 'FOO' or 'Foo'
-    # 
+    item = my_folder.get(subject='unique_string')
+    ordered_items = my_folder.all().order_by('subject')  # Sorting, by one or multiple fields
+    n = my_folder.all().count()  # Efficient counting
+    folder_is_empty = not my_folder.all().exists()  # Efficient tasting
+    ids_as_dict = my_folder.all().values('item_id', 'changekey')  # Return values as dicts, not objects
+    ids_as_list = my_folder.all().values_list('item_id', 'changekey')  # Return values as nested lists
+    all_subjects = my_folder.all().values_list('subject', flat=True)  # Return values as a flat list
+
+    # The syntax for filter() is modeled after Django QuerySet filters. The following filter lookup types 
+    # are supported. Some lookups only work with string attributes, some only with date or numerical 
+    # attributes, and some attributes are not searchable at all:
+    filter(subject='foo')  # Returns items where subject is exactly 'foo'. Case-sensitive
+    filter(start__range=(dt1, dt2))  # Returns items starting within range. Only for date and numerical types
+    filter(subject__in=('foo', 'bar'))  # Return items where subject is either 'foo' or 'bar'
+    filter(subject__not='foo')  # Returns items where subject is not 'foo'
+    filter(start__gt=dt)  # Returns items starting after 'dt'.  Only for date and numerical types
+    filter(start__gte=dt)  # Returns items starting on or after 'dt'.  Only for date and numerical types
+    filter(start__lt=dt)  # Returns items starting before 'dt'.  Only for date and numerical types
+    filter(start__lte=dt)  # Returns items starting on or before 'dt'.  Only for date and numerical types
+    filter(subject__exact='foo')  #  Returns items where subject is 'foo'. Same as filter(subject='foo')
+    filter(subject__iexact='foo')  #  Returns items where subject is 'foo', 'FOO' or 'Foo'
+    filter(subject__contains='foo')  #  Returns items where subject contains 'foo'
+    filter(subject__icontains='foo')  # Returns items where subject contains 'foo', 'FOO' or 'Foo'
+    filter(subject__startswith='foo')  # Returns items where subject starts with 'foo'
+    filter(subject__istartswith='foo')  # Returns items where subject starts with 'foo', 'FOO' or 'Foo'
+
     # filter() also supports Q objects that are modeled after Django Q objects, for building complex
     # boolean logic search expressions.
     #
-    # q = (Q(subject__iexact='foo') | Q(subject__contains='bar')) & ~Q(subject__startswith='baz')
-    # items = my_folder.filter(q)
-    #
+    q = (Q(subject__iexact='foo') | Q(subject__contains='bar')) & ~Q(subject__startswith='baz')
+    items = my_folder.filter(q)
+
     # filter() even accepts a Python-like search expression as a string:
-    #
-    # items = my_folder.filter(
-    #       "start < '2016-01-02T03:04:05T' and end > '2016-01-01T03:04:05T' and categories in ('foo', 'bar')"
-    # )
-    #
+    items = my_folder.filter(
+          "start < '2016-01-02T03:04:05T' and end > '2016-01-01T03:04:05T' and categories in ('foo', 'bar')"
+    )
+
     # In this example, we filter by categories so we only get the items created by us.
     items = account.calendar.filter(
         start__lt=tz.localize(EWSDateTime(year, month, day + 1)),
