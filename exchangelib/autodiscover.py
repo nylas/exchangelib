@@ -408,33 +408,39 @@ def _parse_response(response, encoding='utf-8'):
     primary_smtp_address = get_xml_attr(user, '{%s}AutoDiscoverSMTPAddress' % RESPONSE_NS)
     account_type = get_xml_attr(account, '{%s}AccountType' % RESPONSE_NS)
     assert account_type == 'email'
-    protocols = account.findall('{%s}Protocol' % RESPONSE_NS)
-    # There are three possible protocol types: EXCH, EXPR and WEB. EXPR is for EWS. See
-    # http://blogs.technet.com/b/exchange/archive/2008/09/26/3406344.aspx
-    for protocol in protocols:
-        if get_xml_attr(protocol, '{%s}Type' % RESPONSE_NS) != 'EXPR':
-            continue
-        server = get_xml_attr(protocol, '{%s}Server' % RESPONSE_NS)
-        has_ssl = True if get_xml_attr(protocol, '{%s}SSL' % RESPONSE_NS) == 'On' else False
-        ews_url = get_xml_attr(protocol, '{%s}EwsUrl' % RESPONSE_NS)
-        auth_package = get_xml_attr(protocol, '{%s}AuthPackage' % RESPONSE_NS)
+    protocols = {get_xml_attr(p, '{%s}Type' % RESPONSE_NS): p for p in account.findall('{%s}Protocol' % RESPONSE_NS)}
+    # There are three possible protocol types: EXCH, EXPR and WEB.
+    # EXPR is meant for EWS. See http://blogs.technet.com/b/exchange/archive/2008/09/26/3406344.aspx
+    # We allow fallback to EXCH if EXPR is not available to support installations where EXPR is not available.
+    try:
+        protocol = protocols['EXPR']
+    except KeyError:
         try:
-            ews_auth_type = {
-                'ntlm': transport.NTLM,
-                'basic': transport.BASIC,
-                'digest': transport.DIGEST,
-                None: transport.NOAUTH,
-            }[auth_package.lower() if auth_package else None]
+            protocol = protocols['EXCH']
         except KeyError:
-            log.warning("Unknown auth package '%s'")
-            ews_auth_type = transport.UNKNOWN
-        log.debug('Primary SMTP: %s, EWS endpoint: %s, auth type: %s', primary_smtp_address, ews_url, ews_auth_type)
-        assert server
-        assert has_ssl in (True, False)
-        assert ews_url
-        assert ews_auth_type
-        return server, has_ssl, ews_url, ews_auth_type, primary_smtp_address
-    raise AutoDiscoverFailed('Invalid AutoDiscover response: %s' % response)
+            # Neither type was found. Give up
+            raise AutoDiscoverFailed('Invalid AutoDiscover response: %s' % response)
+
+    server = get_xml_attr(protocol, '{%s}Server' % RESPONSE_NS)
+    has_ssl = True if get_xml_attr(protocol, '{%s}SSL' % RESPONSE_NS) == 'On' else False
+    ews_url = get_xml_attr(protocol, '{%s}EwsUrl' % RESPONSE_NS)
+    auth_package = get_xml_attr(protocol, '{%s}AuthPackage' % RESPONSE_NS)
+    try:
+        ews_auth_type = {
+            'ntlm': transport.NTLM,
+            'basic': transport.BASIC,
+            'digest': transport.DIGEST,
+            None: transport.NOAUTH,
+        }[auth_package.lower() if auth_package else None]
+    except KeyError:
+        log.warning("Unknown auth package '%s'")
+        ews_auth_type = transport.UNKNOWN
+    log.debug('Primary SMTP: %s, EWS endpoint: %s, auth type: %s', primary_smtp_address, ews_url, ews_auth_type)
+    assert server
+    assert has_ssl in (True, False)
+    assert ews_url
+    assert ews_auth_type
+    return server, has_ssl, ews_url, ews_auth_type, primary_smtp_address
 
 
 def _get_canonical_name(hostname):
