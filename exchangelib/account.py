@@ -209,7 +209,7 @@ class Account(object):
             if folder.account != self:
                 raise ValueError('"Folder must belong to this account')
         if message_disposition == SAVE_ONLY and folder is None:
-            raise AttributeError("Folder must be supplied when in send-only mode")
+            raise AttributeError("Folder must be supplied when in save-only mode")
         if message_disposition == SEND_AND_SAVE_COPY and folder is None:
             folder = self.sent  # 'Sent' is default EWS behaviour
         if message_disposition == SEND_ONLY and folder is not None:

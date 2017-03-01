@@ -857,9 +857,10 @@ class GetFolder(EWSAccountService):
     SERVICE_NAME = 'GetFolder'
     element_container_name = '{%s}Folders' % MNS
 
-    def _get_payload(self, distinguished_folder_id, additional_fields, shape):
+    def _get_payload(self, folder, distinguished_folder_id, additional_fields, shape):
         from .credentials import DELEGATE
         from .folders import Mailbox
+        assert folder or distinguished_folder_id
         getfolder = create_element('m:%s' % self.SERVICE_NAME)
         foldershape = create_element('m:FolderShape')
         add_xml_child(foldershape, 't:BaseShape', shape)
@@ -870,11 +871,14 @@ class GetFolder(EWSAccountService):
             foldershape.append(additionalproperties)
         getfolder.append(foldershape)
         folderids = create_element('m:FolderIds')
-        distinguishedfolderid = create_element('t:DistinguishedFolderId', Id=distinguished_folder_id)
-        if self.account.access_type == DELEGATE:
-            mailbox = Mailbox(email_address=self.account.primary_smtp_address)
-            set_xml_value(distinguishedfolderid, mailbox, self.account.version)
-        folderids.append(distinguishedfolderid)
+        if folder:
+            folderids.append(folder.to_xml(version=self.account.version))
+        if distinguished_folder_id:
+            distinguishedfolderid = create_element('t:DistinguishedFolderId', Id=distinguished_folder_id)
+            if self.account.access_type == DELEGATE:
+                mailbox = Mailbox(email_address=self.account.primary_smtp_address)
+                set_xml_value(distinguishedfolderid, mailbox, self.account.version)
+            folderids.append(distinguishedfolderid)
         getfolder.append(folderids)
         return getfolder
 

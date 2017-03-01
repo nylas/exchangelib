@@ -1116,6 +1116,8 @@ class Item(EWSElement):
         if isinstance(res[0], Exception):
             raise res[0]
         fresh_item = res[0]
+        assert self.item_id == fresh_item.item_id
+        assert self.changekey == fresh_item.changekey
         for k in self.__slots__:
             setattr(self, k, getattr(fresh_item, k))
 
@@ -2046,10 +2048,19 @@ class Folder(EWSElement):
     supported_item_models = ITEM_CLASSES  # The Item types that this folder can contain. Default is all
     LOCALIZED_NAMES = dict()  # A map of (str)locale: (tuple)localized_folder_names
     ITEM_MODEL_MAP = {cls.response_tag(): cls for cls in ITEM_CLASSES}
+    FOLDER_FIELDS = 'folder:DisplayName', 'folder:FolderClass', 'folder:TotalCount', 'folder:UnreadCount', \
+                    'folder:ChildFolderCount'
 
-    def __init__(self, account, name=None, folder_class=None, folder_id=None, changekey=None):
+    __slots__ = ('account', 'name', 'total_count', 'unread_count', 'child_folder_count', 'folder_class',
+                 'folder_id', 'changekey')
+
+    def __init__(self, account, name=None, total_count=None, unread_count=None, child_folder_count=None,
+                 folder_class=None, folder_id=None, changekey=None):
         self.account = account
         self.name = name or self.DISTINGUISHED_FOLDER_ID
+        self.total_count = total_count
+        self.unread_count = unread_count
+        self.child_folder_count = child_folder_count
         self.folder_class = folder_class
         self.folder_id = folder_id
         self.changekey = changekey
@@ -2301,9 +2312,14 @@ class Folder(EWSElement):
         fld_id = fld_id_elem.get(FolderId.ID_ATTR)
         changekey = fld_id_elem.get(FolderId.CHANGEKEY_ATTR)
         display_name = get_xml_attr(elem, '{%s}DisplayName' % TNS)
+        total_count = int(get_xml_attr(elem, '{%s}TotalCount' % TNS))
+        unread_count = int(get_xml_attr(elem, '{%s}UnreadCount' % TNS))
+        child_folder_count = int(get_xml_attr(elem, '{%s}ChildFolderCount' % TNS))
         folder_class = get_xml_attr(elem, '{%s}FolderClass' % TNS)
         elem.clear()
-        return cls(account=account, name=display_name, folder_class=folder_class, folder_id=fld_id, changekey=changekey)
+        return cls(account=account, name=display_name, total_count=total_count, unread_count=unread_count,
+                   child_folder_count=child_folder_count, folder_class=folder_class, folder_id=fld_id,
+                   changekey=changekey)
 
     def to_xml(self, version):
         self.clean()
@@ -2315,7 +2331,7 @@ class Folder(EWSElement):
         assert depth in FOLDER_TRAVERSAL_CHOICES
         folders = []
         for elem in FindFolder(folder=self).call(
-                additional_fields=('folder:DisplayName', 'folder:FolderClass'),
+                additional_fields=self.FOLDER_FIELDS,
                 shape=shape,
                 depth=depth,
                 page_size=100,
@@ -2341,7 +2357,7 @@ class Folder(EWSElement):
             except KeyError:
                 folder_cls = self.folder_cls_from_container_class(dummy_fld.folder_class)
                 log.debug('Folder class %s matches container class %s (%s)', folder_cls, dummy_fld.folder_class, dummy_fld.name)
-            folders.append(folder_cls(**dummy_fld.__dict__))
+            folders.append(folder_cls(**{k: getattr(dummy_fld, k) for k in folder_cls.__slots__}))
         return folders
 
     def get_folder_by_name(self, name):
@@ -2364,8 +2380,9 @@ class Folder(EWSElement):
         assert shape in SHAPE_CHOICES
         folders = []
         for elem in GetFolder(account=account).call(
+                folder=None,
                 distinguished_folder_id=cls.DISTINGUISHED_FOLDER_ID,
-                additional_fields=('folder:DisplayName', 'folder:FolderClass'),
+                additional_fields=cls.FOLDER_FIELDS,
                 shape=shape
         ):
             if isinstance(elem, Exception):
@@ -2375,9 +2392,33 @@ class Folder(EWSElement):
         assert len(folders) == 1
         return folders[0]
 
+    def refresh(self):
+        if not self.account:
+            raise ValueError('Folder must have an account')
+        if not self.folder_id:
+            raise ValueError('Folder must have an ID')
+        folders = []
+        for elem in GetFolder(account=self.account).call(
+                folder=self,
+                distinguished_folder_id=None,
+                additional_fields=self.FOLDER_FIELDS,
+                shape=IdOnly
+        ):
+            if isinstance(elem, Exception):
+                folders.append(elem)
+                continue
+            folders.append(self.from_xml(elem=elem, account=self.account))
+        assert len(folders) == 1
+        fresh_folder = folders[0]
+        assert fresh_folder.folder_id == self.folder_id
+        assert fresh_folder.changekey == self.changekey
+        for k in self.__slots__:
+            setattr(self, k, getattr(fresh_folder, k))
+
     def __repr__(self):
         return self.__class__.__name__ + \
-               repr((self.account, self.name, self.folder_class, self.folder_id, self.changekey))
+               repr((self.account, self.name, self.total_count, self.unread_count, self.child_folder_count,
+                     self.folder_class, self.folder_id, self.changekey))
 
     def __str__(self):
         return '%s (%s)' % (self.__class__.__name__, self.name)
@@ -2385,6 +2426,8 @@ class Folder(EWSElement):
 
 class Root(Folder):
     DISTINGUISHED_FOLDER_ID = 'root'
+
+    __slots__ = Folder.__slots__
 
 
 class CalendarView(EWSElement):
@@ -2449,6 +2492,8 @@ class Calendar(Folder):
         'sv_SE': ('Kalender',),
     }
 
+    __slots__ = Folder.__slots__
+
     def view(self, start, end, max_items=None, *args, **kwargs):
         """ Implements the CalendarView option to FindItem. The difference between filter() and view() is that filter()
         only returns the master CalendarItem for recurring items, while view() unfolds recurring items and returns all
@@ -2483,10 +2528,14 @@ class DeletedItems(Folder):
         'sv_SE': ('Borttaget',),
     }
 
+    __slots__ = Folder.__slots__
+
 
 class Messages(Folder):
     CONTAINER_CLASS = 'IPF.Note'
     supported_item_models = (Message, MeetingRequest, MeetingResponse, MeetingCancellation)
+
+    __slots__ = Folder.__slots__
 
 
 class Drafts(Messages):
@@ -2503,6 +2552,8 @@ class Drafts(Messages):
         'sv_SE': ('Utkast',),
     }
 
+    __slots__ = Folder.__slots__
+
 
 class Inbox(Messages):
     DISTINGUISHED_FOLDER_ID = 'inbox'
@@ -2517,6 +2568,8 @@ class Inbox(Messages):
         'ru_RU': ('Входящие',),
         'sv_SE': ('Inkorgen',),
     }
+
+    __slots__ = Folder.__slots__
 
 
 class Outbox(Messages):
@@ -2533,6 +2586,8 @@ class Outbox(Messages):
         'sv_SE': ('Utkorgen',),
     }
 
+    __slots__ = Folder.__slots__
+
 
 class SentItems(Messages):
     DISTINGUISHED_FOLDER_ID = 'sentitems'
@@ -2547,6 +2602,8 @@ class SentItems(Messages):
         'ru_RU': ('Отправленные',),
         'sv_SE': ('Skickat',),
     }
+
+    __slots__ = Folder.__slots__
 
 
 class JunkEmail(Messages):
@@ -2571,6 +2628,8 @@ class RecoverableItemsDeletions(Folder):
     LOCALIZED_NAMES = {
     }
 
+    __slots__ = Folder.__slots__
+
 
 class RecoverableItemsRoot(Folder):
     DISTINGUISHED_FOLDER_ID = 'recoverableitemsroot'
@@ -2578,6 +2637,8 @@ class RecoverableItemsRoot(Folder):
 
     LOCALIZED_NAMES = {
     }
+
+    __slots__ = Folder.__slots__
 
 
 class Tasks(Folder):
@@ -2596,6 +2657,8 @@ class Tasks(Folder):
         'sv_SE': ('Uppgifter',),
     }
 
+    __slots__ = Folder.__slots__
+
 
 class Contacts(Folder):
     DISTINGUISHED_FOLDER_ID = 'contacts'
@@ -2613,14 +2676,16 @@ class Contacts(Folder):
         'sv_SE': ('Kontakter',),
     }
 
+    __slots__ = Folder.__slots__
+
 
 class GenericFolder(Folder):
-    pass
+    __slots__ = Folder.__slots__
 
 
 class WellknownFolder(Folder):
     # Use this class until we have specific folder implementations
-    pass
+    __slots__ = Folder.__slots__
 
 
 # See http://msdn.microsoft.com/en-us/library/microsoft.exchange.webservices.data.wellknownfoldername(v=exchg.80).aspx

@@ -1068,6 +1068,51 @@ class FolderTest(EWSTest):
         f = self.account.root.get_folder_by_name(folder_name)
         self.assertEqual(f.name, folder_name)
 
+    def test_counts(self):
+        # Test count values on a folder
+        # TODO: Subfolder creation isn't supported yet, so we can't test that child_folder_count changes
+        self.assertGreaterEqual(self.account.inbox.total_count, 0)
+        self.assertGreaterEqual(self.account.inbox.unread_count, 0)
+        self.assertGreaterEqual(self.account.inbox.child_folder_count, 0)
+        # Create some items
+        items = []
+        for i in range(3):
+            subject = 'Test Subject %s' % i
+            item = Message(account=self.account, folder=self.account.inbox, is_read=False,
+                           subject=subject, categories=self.categories)
+            items.append(item)
+        ids = self.account.inbox.bulk_create(items=items)
+        # Refresh values
+        self.account.inbox.refresh()
+        self.assertGreaterEqual(self.account.inbox.total_count, 3)
+        self.assertGreaterEqual(self.account.inbox.unread_count, 3)
+        self.assertGreaterEqual(self.account.inbox.child_folder_count, 0)
+        for i in items:
+            i.is_read = True
+            i.save()
+        # Refresh values and see that unread_count changes
+        self.account.inbox.refresh()
+        self.assertGreaterEqual(self.account.inbox.total_count, 3)
+        self.assertGreaterEqual(self.account.inbox.unread_count, 0)
+        self.assertGreaterEqual(self.account.inbox.child_folder_count, 0)
+        self.bulk_delete(ids)
+
+    def test_refresh(self):
+        # Test that we can refresh folders
+        folders = self.account.folders
+        for folder_cls, cls_folders in folders.items():
+            for f in cls_folders:
+                old_values = {}
+                for k in folder_cls.__slots__:
+                    old_values[k] = getattr(f, k)
+                    if k in ('account', 'folder_id', 'changekey'):
+                        # These are needed for a successful refresh()
+                        continue
+                    setattr(f, k, get_random_string(16))
+                f.refresh()
+                for k in folder_cls.__slots__:
+                    self.assertEqual(getattr(f, k), old_values[k])
+
 
 class BaseItemTest(EWSTest):
     TEST_FOLDER = None
