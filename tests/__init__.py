@@ -263,6 +263,68 @@ class RestrictionTest(unittest.TestCase):
         )
 
 
+class QuerySetTest(unittest.TestCase):
+    def test_queryset_copy(self):
+        qs = QuerySet(folder=Inbox(account=None))
+        qs.q = Q()
+        qs.only_fields = ('a', 'b')
+        qs.order_fields = ('c', 'd')
+        qs.return_format = QuerySet.NONE
+
+        # Initially, immutable items have the same id()
+        new_qs = qs.copy()
+        self.assertNotEqual(id(qs), id(new_qs))
+        self.assertEqual(id(qs.folder), id(new_qs.folder))
+        self.assertEqual(id(qs._cache), id(new_qs._cache))
+        self.assertEqual(qs._cache, new_qs._cache)
+        self.assertNotEqual(id(qs.q), id(new_qs.q))
+        self.assertEqual(qs.q, new_qs.q)
+        self.assertEqual(id(qs.only_fields), id(new_qs.only_fields))
+        self.assertEqual(qs.only_fields, new_qs.only_fields)
+        self.assertEqual(id(qs.order_fields), id(new_qs.order_fields))
+        self.assertEqual(qs.order_fields, new_qs.order_fields)
+        self.assertEqual(id(qs.return_format), id(new_qs.return_format))
+        self.assertEqual(qs.return_format, new_qs.return_format)
+
+        # Set the same values, forcing a new id()
+        new_qs.q = Q()
+        new_qs.only_fields = ('a', 'b')
+        new_qs.order_fields = ('c', 'd')
+        new_qs.return_format = QuerySet.NONE
+
+        self.assertNotEqual(id(qs), id(new_qs))
+        self.assertEqual(id(qs.folder), id(new_qs.folder))
+        self.assertEqual(id(qs._cache), id(new_qs._cache))
+        self.assertEqual(qs._cache, new_qs._cache)
+        self.assertNotEqual(id(qs.q), id(new_qs.q))
+        self.assertEqual(qs.q, new_qs.q)
+        self.assertNotEqual(id(qs.only_fields), id(new_qs.only_fields))
+        self.assertEqual(qs.only_fields, new_qs.only_fields)
+        self.assertNotEqual(id(qs.order_fields), id(new_qs.order_fields))
+        self.assertEqual(qs.order_fields, new_qs.order_fields)
+        self.assertEqual(id(qs.return_format), id(new_qs.return_format))  # String literals are also singletons
+        self.assertEqual(qs.return_format, new_qs.return_format)
+
+        # Set the new values, forcing a new id()
+        new_qs.q = Q(foo=5)
+        new_qs.only_fields = ('c', 'd')
+        new_qs.order_fields = ('e', 'f')
+        new_qs.return_format = QuerySet.VALUES
+
+        self.assertNotEqual(id(qs), id(new_qs))
+        self.assertEqual(id(qs.folder), id(new_qs.folder))
+        self.assertEqual(id(qs._cache), id(new_qs._cache))
+        self.assertEqual(qs._cache, new_qs._cache)
+        self.assertNotEqual(id(qs.q), id(new_qs.q))
+        self.assertNotEqual(qs.q, new_qs.q)
+        self.assertNotEqual(id(qs.only_fields), id(new_qs.only_fields))
+        self.assertNotEqual(qs.only_fields, new_qs.only_fields)
+        self.assertNotEqual(id(qs.order_fields), id(new_qs.order_fields))
+        self.assertNotEqual(qs.order_fields, new_qs.order_fields)
+        self.assertNotEqual(id(qs.return_format), id(new_qs.return_format))
+        self.assertNotEqual(qs.return_format, new_qs.return_format)
+
+
 class UtilTest(unittest.TestCase):
     def test_chunkify(self):
         # Test list, tuple, set, range, map and generator
@@ -385,7 +447,6 @@ class EWSTest(unittest.TestCase):
         # Clean up items and check return values
         for res in self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES):
             self.assertEqual(res, True)
-
 
     def random_val(self, field_type):
         if not isinstance(field_type, list) and isanysubclass(field_type, ExtendedProperty):
@@ -677,13 +738,8 @@ class CommonTest(EWSTest):
         ids = self.account.calendar.filter(start__lt=end, end__gt=start, categories__contains=self.categories) \
             .values_list('item_id', 'changekey')
         self.assertEqual(len(ids), len(items))
-        for i, item in enumerate(self.account.fetch(return_ids)):
-            subject = 'Test Subject %s' % i
-            self.assertEqual(item.start, start)
-            self.assertEqual(item.end, end)
-            self.assertEqual(item.subject, subject)
-            self.assertEqual(item.categories, self.categories)
-        self.bulk_delete(ids)
+        return_items = list(self.account.fetch(return_ids))
+        self.bulk_delete(return_items)
 
     def test_magic(self):
         self.assertIn(self.config.protocol.version.api_version, str(self.config.protocol))
@@ -1072,7 +1128,8 @@ class FolderTest(EWSTest):
         # Test count values on a folder
         # TODO: Subfolder creation isn't supported yet, so we can't test that child_folder_count changes
         self.assertGreaterEqual(self.account.inbox.total_count, 0)
-        self.assertGreaterEqual(self.account.inbox.unread_count, 0)
+        if self.account.inbox.unread_count is not None:
+            self.assertGreaterEqual(self.account.inbox.unread_count, 0)
         self.assertGreaterEqual(self.account.inbox.child_folder_count, 0)
         # Create some items
         items = []
@@ -1080,8 +1137,8 @@ class FolderTest(EWSTest):
             subject = 'Test Subject %s' % i
             item = Message(account=self.account, folder=self.account.inbox, is_read=False,
                            subject=subject, categories=self.categories)
+            item.save()
             items.append(item)
-        ids = self.account.inbox.bulk_create(items=items)
         # Refresh values
         self.account.inbox.refresh()
         self.assertGreaterEqual(self.account.inbox.total_count, 3)
@@ -1093,9 +1150,10 @@ class FolderTest(EWSTest):
         # Refresh values and see that unread_count changes
         self.account.inbox.refresh()
         self.assertGreaterEqual(self.account.inbox.total_count, 3)
-        self.assertGreaterEqual(self.account.inbox.unread_count, 0)
+        if self.account.inbox.unread_count is not None:
+            self.assertGreaterEqual(self.account.inbox.unread_count, 0)
         self.assertGreaterEqual(self.account.inbox.child_folder_count, 0)
-        self.bulk_delete(ids)
+        self.bulk_delete(items)
 
     def test_refresh(self):
         # Test that we can refresh folders
@@ -1132,12 +1190,17 @@ class BaseItemTest(EWSTest):
 
     def tearDown(self):
         self.test_folder.filter(categories__contains=self.categories).delete()
+        # Delete all delivery receipts
+        self.test_folder.filter(subject__startswith='Delivered: Subject: ').delete()
 
     def get_random_insert_kwargs(self):
         insert_kwargs = {}
         for f in self.ITEM_CLASS.fieldnames():
             if f in self.ITEM_CLASS.readonly_fields():
                 # These cannot be created
+                continue
+            if f == 'attachments':
+                # Testing attachments is heavy. Leave this to specific tests
                 continue
             if f == 'resources':
                 # The test server doesn't have any resources
@@ -1235,15 +1298,15 @@ class BaseItemTest(EWSTest):
             update_kwargs['end'] = update_kwargs['end'].replace(hour=0, minute=0, second=0, microsecond=0)
         return update_kwargs
 
-    def test_field_names(self):
-        # Test that fieldnames don't clash with Python keywords
-        for f in self.ITEM_CLASS.fieldnames():
-            self.assertNotIn(f, kwlist)
-
     def get_test_item(self, folder=None, categories=None):
         item_kwargs = self.get_random_insert_kwargs()
         item_kwargs['categories'] = categories or self.categories
         return self.ITEM_CLASS(account=self.account, folder=folder or self.test_folder, **item_kwargs)
+
+    def test_field_names(self):
+        # Test that fieldnames don't clash with Python keywords
+        for f in self.ITEM_CLASS.fieldnames():
+            self.assertNotIn(f, kwlist)
 
     def test_magic(self):
         item = self.get_test_item()
@@ -1269,74 +1332,6 @@ class BaseItemTest(EWSTest):
         self.assertEqual(list(self.account.fetch([])), [])
         self.assertEqual(self.account.bulk_update([]), [])
         self.assertEqual(self.account.bulk_delete([]), [])
-
-    def test_error_policy(self):
-        # Test the is_service_account flag. This is difficult to test thoroughly
-        is_service_account = self.account.protocol.credentials.is_service_account
-        self.account.protocol.credentials.is_service_account = False
-        item = self.get_test_item()
-        self.test_folder.all()
-        self.account.protocol.credentials.is_service_account = is_service_account
-
-    def test_queryset_copy(self):
-        qs = QuerySet(self.test_folder)
-        qs.q = Q()
-        qs.only_fields = ('a', 'b')
-        qs.order_fields = ('c', 'd')
-        qs.return_format = QuerySet.NONE
-
-        # Initially, immutable items have the same id()
-        new_qs = qs.copy()
-        self.assertNotEqual(id(qs), id(new_qs))
-        self.assertEqual(id(qs.folder), id(new_qs.folder))
-        self.assertEqual(id(qs._cache), id(new_qs._cache))
-        self.assertEqual(qs._cache, new_qs._cache)
-        self.assertNotEqual(id(qs.q), id(new_qs.q))
-        self.assertEqual(qs.q, new_qs.q)
-        self.assertEqual(id(qs.only_fields), id(new_qs.only_fields))
-        self.assertEqual(qs.only_fields, new_qs.only_fields)
-        self.assertEqual(id(qs.order_fields), id(new_qs.order_fields))
-        self.assertEqual(qs.order_fields, new_qs.order_fields)
-        self.assertEqual(id(qs.return_format), id(new_qs.return_format))
-        self.assertEqual(qs.return_format, new_qs.return_format)
-
-        # Set the same values, forcing a new id()
-        new_qs.q = Q()
-        new_qs.only_fields = ('a', 'b')
-        new_qs.order_fields = ('c', 'd')
-        new_qs.return_format = QuerySet.NONE
-
-        self.assertNotEqual(id(qs), id(new_qs))
-        self.assertEqual(id(qs.folder), id(new_qs.folder))
-        self.assertEqual(id(qs._cache), id(new_qs._cache))
-        self.assertEqual(qs._cache, new_qs._cache)
-        self.assertNotEqual(id(qs.q), id(new_qs.q))
-        self.assertEqual(qs.q, new_qs.q)
-        self.assertNotEqual(id(qs.only_fields), id(new_qs.only_fields))
-        self.assertEqual(qs.only_fields, new_qs.only_fields)
-        self.assertNotEqual(id(qs.order_fields), id(new_qs.order_fields))
-        self.assertEqual(qs.order_fields, new_qs.order_fields)
-        self.assertEqual(id(qs.return_format), id(new_qs.return_format))  # String literals are also singletons
-        self.assertEqual(qs.return_format, new_qs.return_format)
-
-        # Set the new values, forcing a new id()
-        new_qs.q = Q(foo=5)
-        new_qs.only_fields = ('c', 'd')
-        new_qs.order_fields = ('e', 'f')
-        new_qs.return_format = QuerySet.VALUES
-
-        self.assertNotEqual(id(qs), id(new_qs))
-        self.assertEqual(id(qs.folder), id(new_qs.folder))
-        self.assertEqual(id(qs._cache), id(new_qs._cache))
-        self.assertEqual(qs._cache, new_qs._cache)
-        self.assertNotEqual(id(qs.q), id(new_qs.q))
-        self.assertNotEqual(qs.q, new_qs.q)
-        self.assertNotEqual(id(qs.only_fields), id(new_qs.only_fields))
-        self.assertNotEqual(qs.only_fields, new_qs.only_fields)
-        self.assertNotEqual(id(qs.order_fields), id(new_qs.order_fields))
-        self.assertNotEqual(qs.order_fields, new_qs.order_fields)
-        self.assertNotEqual(id(qs.return_format), id(new_qs.return_format))
-        self.assertNotEqual(qs.return_format, new_qs.return_format)
 
     def test_querysets(self):
         test_items = []
@@ -1867,6 +1862,7 @@ class BaseItemTest(EWSTest):
 
     def test_filter_on_all_fields(self):
         # Test that we can filter on all field names that we support filtering on
+        # TODO: Test filtering on subfields of IndexedField
         item = self.get_test_item()
         if hasattr(item, 'is_all_day'):
             item.is_all_day = False  # Make sure start- and end dates don't change
@@ -2390,17 +2386,15 @@ class BaseItemTest(EWSTest):
         # Test __init__(attachments=...) and attach() on new item
         binary_file_content = u'Hello from unicode æøå'.encode('utf-8')
         att1 = FileAttachment(name='my_file_1.txt', content=binary_file_content)
-        self.assertEqual(len(item.attachments), 1)
+        self.assertEqual(len(item.attachments), 0)
         item.attach(att1)
-        self.assertEqual(len(item.attachments), 2)
+        self.assertEqual(len(item.attachments), 1)
         item.save()
         fresh_item = list(self.account.fetch(ids=[item]))[0]
-        self.assertEqual(len(fresh_item.attachments), 2)
+        self.assertEqual(len(fresh_item.attachments), 1)
         fresh_attachments = sorted(fresh_item.attachments, key=lambda a: a.name)
-        self.assertEqual(fresh_attachments[0].name, 'my_file.txt')
-        self.assertEqual(fresh_attachments[0].content, b'test_content')
-        self.assertEqual(fresh_attachments[1].name, 'my_file_1.txt')
-        self.assertEqual(fresh_attachments[1].content, binary_file_content)
+        self.assertEqual(fresh_attachments[0].name, 'my_file_1.txt')
+        self.assertEqual(fresh_attachments[0].content, binary_file_content)
 
         # Test raw call to service
         self.assertEqual(
@@ -2412,30 +2406,26 @@ class BaseItemTest(EWSTest):
 
         # Test attach on saved object
         att2 = FileAttachment(name='my_file_2.txt', content=binary_file_content)
-        self.assertEqual(len(item.attachments), 2)
+        self.assertEqual(len(item.attachments), 1)
         item.attach(att2)
-        self.assertEqual(len(item.attachments), 3)
+        self.assertEqual(len(item.attachments), 2)
         fresh_item = list(self.account.fetch(ids=[item]))[0]
-        self.assertEqual(len(fresh_item.attachments), 3)
+        self.assertEqual(len(fresh_item.attachments), 2)
         fresh_attachments = sorted(fresh_item.attachments, key=lambda a: a.name)
-        self.assertEqual(fresh_attachments[0].name, 'my_file.txt')
-        self.assertEqual(fresh_attachments[0].content, b'test_content')
-        self.assertEqual(fresh_attachments[1].name, 'my_file_1.txt')
+        self.assertEqual(fresh_attachments[0].name, 'my_file_1.txt')
+        self.assertEqual(fresh_attachments[0].content, binary_file_content)
+        self.assertEqual(fresh_attachments[1].name, 'my_file_2.txt')
         self.assertEqual(fresh_attachments[1].content, binary_file_content)
-        self.assertEqual(fresh_attachments[2].name, 'my_file_2.txt')
-        self.assertEqual(fresh_attachments[2].content, binary_file_content)
 
         # Test detach
         item.detach(att1)
         self.assertTrue(att1.attachment_id is None)
         self.assertTrue(att1.parent_item is None)
         fresh_item = list(self.account.fetch(ids=[item]))[0]
-        self.assertEqual(len(fresh_item.attachments), 2)
+        self.assertEqual(len(fresh_item.attachments), 1)
         fresh_attachments = sorted(fresh_item.attachments, key=lambda a: a.name)
-        self.assertEqual(fresh_attachments[0].name, 'my_file.txt')
-        self.assertEqual(fresh_attachments[0].content, b'test_content')
-        self.assertEqual(fresh_attachments[1].name, 'my_file_2.txt')
-        self.assertEqual(fresh_attachments[1].content, binary_file_content)
+        self.assertEqual(fresh_attachments[0].name, 'my_file_2.txt')
+        self.assertEqual(fresh_attachments[0].content, binary_file_content)
 
     def test_item_attachments(self):
         item = self.get_test_item(folder=self.test_folder)
