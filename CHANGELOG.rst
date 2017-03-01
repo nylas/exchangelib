@@ -15,6 +15,8 @@ HEAD
   `ErrorItemNotFound` instances, if only some of the requested `ItemId`s were valid. Other exceptions will be raised
   immediately, e.g. `ErrorNonExistentMailbox` because the exception applies to all items. It is the responsibility of
   the caller to check the type of the returned values.
+* The `Folder` class has new attributes `total_count`, `unread_count` and `child_folder_count`, and a `refresh()`
+  method to update these values.
 
 1.8.1
 -----

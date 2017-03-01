@@ -2312,12 +2312,13 @@ class Folder(EWSElement):
         fld_id = fld_id_elem.get(FolderId.ID_ATTR)
         changekey = fld_id_elem.get(FolderId.CHANGEKEY_ATTR)
         display_name = get_xml_attr(elem, '{%s}DisplayName' % TNS)
-        total_count = int(get_xml_attr(elem, '{%s}TotalCount' % TNS))
-        unread_count = int(get_xml_attr(elem, '{%s}UnreadCount' % TNS))
-        child_folder_count = int(get_xml_attr(elem, '{%s}ChildFolderCount' % TNS))
+        total_count = xml_text_to_value(get_xml_attr(elem, '{%s}TotalCount' % TNS), int)
+        unread_count = xml_text_to_value(get_xml_attr(elem, '{%s}UnreadCount' % TNS), int)  # May be None
+        child_folder_count = xml_text_to_value(get_xml_attr(elem, '{%s}ChildFolderCount' % TNS), int)
         folder_class = get_xml_attr(elem, '{%s}FolderClass' % TNS)
         elem.clear()
-        return cls(account=account, name=display_name, total_count=total_count, unread_count=unread_count,
+        return cls(account=account, name=display_name, total_count=total_count,
+                   unread_count=int(unread_count) if unread_count else None,
                    child_folder_count=child_folder_count, folder_class=folder_class, folder_id=fld_id,
                    changekey=changekey)
 

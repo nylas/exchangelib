@@ -40,11 +40,11 @@ Setup and connecting
     credentials = Credentials(username='MYWINDOMAIN\\myusername', password='topsecret')
 
     # By default, fault-tolerant error handling is enabled. This means that requests to the server
-    # do an exponential backoff and sleep up to one hour before giving up, if the server is 
+    # do an exponential backoff and sleep up to one hour before giving up, if the server is
     # unavailable or responding with error messages. This prevents automated scripts from overwhelming
     # a failing or overloaded server, and hides intermittent service outages that often happen in
     # large Exchange installations.
-    
+
     # If you want to disable the fault tolerance, unset the 'is_service_account' flag:
     credentials = Credentials(username='FOO\\bar', password='topsecret', is_service_account=False)
 
@@ -52,26 +52,26 @@ Setup and connecting
     account = Account(primary_smtp_address='john@example.com', credentials=credentials,
                       autodiscover=True, access_type=DELEGATE)
 
-    # If your credentials have been given impersonation access to the target account, set a 
+    # If your credentials have been given impersonation access to the target account, set a
     # different 'access_type':
     account = Account(primary_smtp_address='john@example.com', credentials=credentials,
                       autodiscover=True, access_type=IMPERSONATION)
 
 
-    # If the server doesn't support autodiscover, use a Configuration object to set the server 
+    # If the server doesn't support autodiscover, use a Configuration object to set the server
     # location:
     config = Configuration(server='mail.example.com', credentials=credentials)
     account = Account(primary_smtp_address='john@example.com', config=config,
                       autodiscover=False, access_type=DELEGATE)
-                      
-    # 'exchangelib' will attempt to guess the server version and authentication method. If you 
-    # have a really bizarre or locked-down installation and the guessing fails, you can set the 
+
+    # 'exchangelib' will attempt to guess the server version and authentication method. If you
+    # have a really bizarre or locked-down installation and the guessing fails, you can set the
     # auth method and version explicitly:
     from exchangelib.version import Build, Version
     version = Version(build=Build(15, 0, 12, 34), api_version='Exchange2013')
     config = Configuration(server='example.com', credentials=credentials, version=version, auth_type=NTLM)
 
-    # If you're connecting to the same account very often, you can cache the autodiscover result for 
+    # If you're connecting to the same account very often, you can cache the autodiscover result for
     # later so you can skip the autodiscover lookup:
     ews_url = account.protocol.service_endpoint
     ews_auth_type = account.protocol.auth_type
@@ -101,6 +101,13 @@ Folders
     foo1_folder = account.inbox.get_folder_by_name('foo')
     foo2_folder = python_dev_mail_folder.get_folder_by_name('foo')
     # For more advanced folder traversing, use some_folder.get_folders()
+
+    # Folders have some useful counters:
+    account.inbox.total_count
+    account.inbox.child_folder_count
+    account.inbox.unread_count
+    # Update the counters
+    account.inbox.refresh()
 
 
 Creating and sending
@@ -175,17 +182,17 @@ Bulk operations
 Searching
 ^^^^^^^^^
 
-Searching is modeled after the Django QuerySet API, and a large part of the API is supported. Like 
-in Django, the QuerySet is lazy and doesn't fetch anything before the QuerySet is iterated. QuerySets 
-support chaining, so you can build the final query in multiple steps, and you can re-use a base 
-QuerySet for multiple sub-searches. The QuerySet returns an iterator, and results are cached when the 
+Searching is modeled after the Django QuerySet API, and a large part of the API is supported. Like
+in Django, the QuerySet is lazy and doesn't fetch anything before the QuerySet is iterated. QuerySets
+support chaining, so you can build the final query in multiple steps, and you can re-use a base
+QuerySet for multiple sub-searches. The QuerySet returns an iterator, and results are cached when the
 QuerySet is fully iterated the first time.
 
 Here are some examples of using the API:
 
 .. code-block:: python
 
-    # Let's get the calendar items we just created. 
+    # Let's get the calendar items we just created.
     all_items = my_folder.all()  # Get everything
     all_items_without_caching = my_folder.all().iterator()  # Get everything, but don't cache
     filtered_items = my_folder.filter(subject__contains='foo').exclude(categories__icontains='bar')  # Chaining
@@ -204,8 +211,8 @@ Here are some examples of using the API:
     ids_as_list = my_folder.all().values_list('item_id', 'changekey')  # Return values as nested lists
     all_subjects = my_folder.all().values_list('subject', flat=True)  # Return values as a flat list
 
-    # The syntax for filter() is modeled after Django QuerySet filters. The following filter lookup types 
-    # are supported. Some lookups only work with string attributes, some only with date or numerical 
+    # The syntax for filter() is modeled after Django QuerySet filters. The following filter lookup types
+    # are supported. Some lookups only work with string attributes, some only with date or numerical
     # attributes, and some attributes are not searchable at all:
     filter(subject='foo')  # Returns items where subject is exactly 'foo'. Case-sensitive
     filter(start__range=(dt1, dt2))  # Returns items starting within range. Only for date and numerical types
@@ -242,7 +249,7 @@ Here are some examples of using the API:
     for item in items:
         print(item.start, item.end, item.subject, item.body, item.location)
 
-    # By default, EWS returns only the master recurring item. If you want recurring calendar 
+    # By default, EWS returns only the master recurring item. If you want recurring calendar
     # items to be expanded, use calendar.view(start=..., end=...) instead.
     items = account.calendar.view(
         start=tz.localize(EWSDateTime(year, month, day + 1)),
@@ -329,7 +336,7 @@ Attachments
 Notes
 ^^^^^
 
-Most, but not all, item attributes are supported. Addeing more attributes is usually uncomplicated. Feel 
+Most, but not all, item attributes are supported. Addeing more attributes is usually uncomplicated. Feel
 free to open a PR or an issue.
 
 Item export and upload is supported, for efficient backup, restore and migration.
