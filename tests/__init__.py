@@ -2100,7 +2100,7 @@ class BaseItemTest(EWSTest):
         item.subject = 'XXX'
         item.refresh()
         self.assertEqual(item.subject, orig_subject)
-        item.delete()
+        item.delete(affected_task_occurrences=ALL_OCCURRENCIES)
         with self.assertRaises(ValueError):
             # Item no longer has an ID
             item.refresh()
