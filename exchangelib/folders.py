@@ -2411,8 +2411,8 @@ class Folder(EWSElement):
             folders.append(self.from_xml(elem=elem, account=self.account))
         assert len(folders) == 1
         fresh_folder = folders[0]
-        assert fresh_folder.folder_id == self.folder_id
-        assert fresh_folder.changekey == self.changekey
+        assert self.folder_id == fresh_folder.folder_id
+        # Apparently, the changekey may get updated
         for k in self.__slots__:
             setattr(self, k, getattr(fresh_folder, k))
 
