@@ -1404,7 +1404,7 @@ class BaseItemTest(EWSTest):
             [i for i in qs.order_by('-subject').values_list('subject', flat=True)],
             ['Subj 3', 'Subj 2', 'Subj 1', 'Subj 0']
         )
-        self.test_folder.filter(categories__contains=self.categories).delete()
+        self.bulk_delete(qs)
 
         # Test order_by() on ExtendedProperty
         test_items = []
@@ -1422,7 +1422,7 @@ class BaseItemTest(EWSTest):
             [i for i in qs.order_by('-extern_id').values_list('extern_id', flat=True)],
             ['ID 3', 'ID 2', 'ID 1', 'ID 0']
         )
-        self.test_folder.filter(categories__contains=self.categories).delete()
+        self.bulk_delete(qs)
 
         # Test order_by() on IndexedField (simple and multi-subfield). Only Contact items have these
         if self.ITEM_CLASS == Contact:
@@ -1442,7 +1442,7 @@ class BaseItemTest(EWSTest):
                 [i[0].email for i in qs.order_by('-email_addresses__%s' % label).values_list('email_addresses', flat=True)],
                 ['3@foo.com', '2@foo.com', '1@foo.com', '0@foo.com']
             )
-            self.test_folder.filter(categories__contains=self.categories).delete()
+            self.bulk_delete(qs)
 
             test_items = []
             label = random.choice(list(PhysicalAddress.LABELS))
@@ -1460,7 +1460,7 @@ class BaseItemTest(EWSTest):
                 [i[0].street for i in qs.order_by('-physical_addresses__%s__street' % label).values_list('physical_addresses', flat=True)],
                 ['Elm St 3', 'Elm St 2', 'Elm St 1', 'Elm St 0']
             )
-            self.test_folder.filter(categories__contains=self.categories).delete()
+            self.bulk_delete(qs)
 
         # Test sorting on multiple fields
         test_items = []
@@ -1500,7 +1500,7 @@ class BaseItemTest(EWSTest):
              {'subject': 'Subj 0', 'extern_id': 'ID 1'},
              {'subject': 'Subj 0', 'extern_id': 'ID 0'}]
         )
-        self.test_folder.filter(categories__contains=self.categories).delete()
+        self.bulk_delete(qs)
 
     def test_finditems(self):
         now = UTC_NOW()
@@ -2092,8 +2092,18 @@ class BaseItemTest(EWSTest):
         moved_item = self.account.trash.get(categories__contains=item.categories)
         self.assertEqual(item.item_id, moved_item.item_id)
         self.assertEqual(item.changekey, moved_item.changekey)
-        # Test that the original item self.updated its ItemId
-        moved_item = list(self.account.fetch(ids=[item]))[0]
+
+    def test_refresh(self):
+        # Test that we can refresh items, and that refresh fails if the item no longer exists on the server
+        item = self.get_test_item().save()
+        orig_subject = item.subject
+        item.subject = 'XXX'
+        item.refresh()
+        self.assertEqual(item.subject, orig_subject)
+        item.delete()
+        with self.assertRaises(ValueError):
+            # Item no longer has an ID
+            item.refresh()
 
     def test_item(self):
         # Test insert

@@ -1107,6 +1107,8 @@ class Item(EWSElement):
         # Updates the item based on fresh data from EWS
         if not self.account:
             raise ValueError('Item must have an account')
+        if not self.item_id:
+            raise ValueError('Item must have an ID')
         res = list(self.account.fetch(ids=[self]))
         if not res:
             raise ValueError('Item disappeared')
@@ -1120,6 +1122,8 @@ class Item(EWSElement):
     def move(self, to_folder):
         if not self.account:
             raise ValueError('Item must have an account')
+        if not self.item_id:
+            raise ValueError('Item must have an ID')
         res = self.account.bulk_move(ids=[self], to_folder=to_folder)
         if not res:
             raise ValueError('Item disappeared')
@@ -1155,6 +1159,8 @@ class Item(EWSElement):
     def _delete(self, delete_type, send_meeting_cancellations, affected_task_occurrences, suppress_read_receipts):
         if not self.account:
             raise ValueError('Item must have an account')
+        if not self.item_id:
+            raise ValueError('Item must have an ID')
         res = self.account.bulk_delete(
             ids=[self], delete_type=delete_type, send_meeting_cancellations=send_meeting_cancellations,
             affected_task_occurrences=affected_task_occurrences, suppress_read_receipts=suppress_read_receipts)
