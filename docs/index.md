@@ -1,3 +1,8 @@
+----
+-layout: default
+-title: exchangelib
+----
+
 ## Exchange Web Services client library
 
 This module provides an well-performing, well-behaving, platform-independent and simple interface 
