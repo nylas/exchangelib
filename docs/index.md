@@ -1,9 +1,3 @@
----
-layout: page
-title: exchangelib
-tagline: A Python client for Microsoft Exchange Web Services
-description: Main page
----
 ## Exchange Web Services client library
 
 This module provides an well-performing, well-behaving, platform-independent and simple interface 
