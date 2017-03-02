@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
-# Tries to get optimal values for concurrent sessions and payload size for deletes and creates
+# Measures bulk create and delete performance for different session pool sizes and payload chunksizes
 import copy
 import logging
 import os
-from datetime import datetime
+import time
 
 from yaml import load
 
@@ -13,31 +13,30 @@ from exchangelib import DELEGATE, services, Credentials, Configuration, Account,
 logging.basicConfig(level=logging.WARNING)
 
 try:
-    with open(os.path.join(os.path.dirname(__file__), 'settings.yml')) as f:
+    with open(os.path.join(os.path.dirname(__file__), '../settings.yml')) as f:
         settings = load(f)
 except FileNotFoundError:
     print('Copy settings.yml.sample to settings.yml and enter values for your test server')
     raise
 
 categories = ['perftest']
-tz = EWSTimeZone.timezone('US/Pacific')
+tz = EWSTimeZone.timezone('America/New_York')
 
 config = Configuration(server=settings['server'],
                        credentials=Credentials(settings['username'], settings['password'], is_service_account=True),
                        verify_ssl=settings['verify_ssl'])
-print(('Exchange server: %s' % config.protocol.server))
+print('Exchange server: %s' % config.protocol.server)
 
 account = Account(config=config, primary_smtp_address=settings['account'], access_type=DELEGATE)
-cal = account.calendar
 
+# Remove leftovers from earlier tests
+account.calendar.filter(categories__contains=categories).delete()
 
 # Calendar item generator
-def calitems():
-    i = 0
+def generate_items(n):
     start = tz.localize(EWSDateTime(2000, 3, 1, 8, 30, 0))
     end = tz.localize(EWSDateTime(2000, 3, 1, 9, 15, 0))
-    item = CalendarItem(
-        subject='Performance optimization test %s by pyexchange' % i,
+    tpl_item = CalendarItem(
         start=start,
         end=end,
         body='This is a performance optimization test of server %s intended to find the optimal batch size and '
@@ -45,46 +44,44 @@ def calitems():
         location="It's safe to delete this",
         categories=categories,
     )
-    while True:
-        itm = copy.copy(item)
-        itm.subject = 'Test %s' % i
-        i += 1
-        yield itm
+    for i in range(n):
+        item = copy.copy(tpl_item)
+        item.subject='Performance optimization test %s by exchangelib' % i,
+        yield item
 
 
 # Worker
-def test(calitems):
-    t1 = datetime.now()
-    ids = cal.bulk_create(items=calitems)
-    t2 = datetime.now()
+def test(items):
+    t1 = time.monotonic()
+    ids = account.calendar.bulk_create(items=items)
+    t2 = time.monotonic()
     account.bulk_delete(ids)
-    t3 = datetime.now()
+    t3 = time.monotonic()
 
     delta1 = t2 - t1
-    rate1 = len(ids) / (delta1.seconds if delta1.seconds != 0 else 1)
+    rate1 = len(ids) / delta1
     delta2 = t3 - t2
-    rate2 = len(ids) / (delta2.seconds if delta2.seconds != 0 else 1)
+    rate2 = len(ids) / delta2
     print(('Time to process %s items (batchsize %s/%s, poolsize %s): %s / %s (%s / %s per sec)' % (
         len(ids), services.CreateItem.CHUNKSIZE, services.DeleteItem.CHUNKSIZE,
         config.protocol.poolsize, delta1, delta2, rate1, rate2)))
 
 
-item_gen = calitems()
-
-n = 1000
-calitems = [next(item_gen) for i in range(n)]
-print(('Generated %s calendar items for import' % len(calitems)))
+# Generate items
+calitems = list(generate_items(500))
 
 print('\nTesting batch size')
 for i in range(1, 11):
-    services.CreateItem.CHUNKSIZE = 10 * i
-    services.DeleteItem.CHUNKSIZE = 10 * i
+    services.CreateItem.CHUNKSIZE = 25 * i
+    services.DeleteItem.CHUNKSIZE = 25 * i
     config.protocol.poolsize = 5
     test(calitems)
+    time.sleep(60)  # Sleep 1 minute. Performance will deteriorate over time if we give the server tie to recover
 
 print('\nTesting pool size')
 for i in range(1, 11):
-    services.CreateItem.CHUNKSIZE = 50
-    services.DeleteItem.CHUNKSIZE = 50
+    services.CreateItem.CHUNKSIZE = 10
+    services.DeleteItem.CHUNKSIZE = 10
     config.protocol.poolsize = i
     test(calitems)
+    time.sleep(60)
