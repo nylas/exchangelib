@@ -143,7 +143,7 @@ def get_docs_authtype(docs_url, verify):
 
 
 def get_service_authtype(service_endpoint, versions, verify, name):
-    # Get auth type by tasting headers from the server. Only do post requests. HEAD is too error prone, and some servers
+    # Get auth type by tasting headers from the server. Only do POST requests. HEAD is too error prone, and some servers
     # are set up to redirect to OWA on all requests except POST to /EWS/Exchange.asmx
     log.debug('Getting service auth type for %s', service_endpoint)
     headers = {'Content-Type': 'text/xml; charset=utf-8'}
@@ -154,7 +154,13 @@ def get_service_authtype(service_endpoint, versions, verify, name):
             data = dummy_xml(version=version, name=name)
             log.debug('Requesting %s from %s', data, service_endpoint)
             r = s.post(url=service_endpoint, headers=headers, data=data, allow_redirects=True, verify=verify)
-            return _get_auth_method_from_response(response=r)
+            try:
+                auth_type = _get_auth_method_from_response(response=r)
+                log.debug('Auth type is %s', auth_type)
+                return auth_type
+            except TransportError:
+                continue
+    raise TransportError('Failed to get auth type from service')
 
 
 def _get_auth_method_from_response(response):
@@ -162,7 +168,6 @@ def _get_auth_method_from_response(response):
     log.debug('Request headers: %s', response.request.headers)
     log.debug('Response headers: %s', response.headers)
     if response.status_code == 200:
-        log.debug('No authentication needed')
         return NOAUTH
     if response.status_code == 302:
         # Some servers are set up to redirect to OWA on all requests except POST to EWS/Exchange.asmx
@@ -185,13 +190,10 @@ def _get_auth_method_from_response(response):
             # Prefer most secure auth method if more than one is offered. See discussion at
             # http://docs.oracle.com/javase/7/docs/technotes/guides/net/http-auth.html
             if 'digest' in vals:
-                log.debug('Auth type is %s', DIGEST)
                 return DIGEST
             if 'ntlm' in vals:
-                log.debug('Auth type is %s', NTLM)
                 return NTLM
             if 'basic' in vals:
-                log.debug('Auth type is %s', BASIC)
                 return BASIC
     raise UnauthorizedError('Got a 401, but no compatible auth type was reported by server')
 
@@ -221,7 +223,6 @@ def _tokenize(val):
 
 
 def dummy_xml(version, name):
-    # Used as a minimal, valid EWS request to force Exchange into accepting the request and returning EWS XML
-    # containing server version info.
+    # Generate a minimal, valid EWS request
     from .services import ResolveNames  # Avoid circular import
     return ResolveNames(protocol=None).payload(version=version, account=None, unresolved_entries=[name])
