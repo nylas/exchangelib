@@ -604,10 +604,6 @@ class CommonTest(EWSTest):
     def test_poolsize(self):
         self.assertEqual(self.config.protocol.SESSION_POOLSIZE, 4)
 
-    def test_credentials(self):
-        self.assertEqual(self.account.access_type, DELEGATE)
-        self.assertTrue(self.config.protocol.test())
-
     def test_get_timezones(self):
         ws = GetServerTimeZones(self.config.protocol)
         data = ws.call()

@@ -21,8 +21,7 @@ from six import text_type, PY2
 from .credentials import Credentials
 from .errors import TransportError
 from .services import GetServerTimeZones, GetRoomLists, GetRooms
-from .transport import get_auth_instance, get_service_authtype, get_docs_authtype, test_credentials, AUTH_TYPE_MAP, \
-    UNKNOWN
+from .transport import get_auth_instance, get_service_authtype, get_docs_authtype, AUTH_TYPE_MAP, UNKNOWN
 from .util import split_url
 from .version import Version, API_VERSIONS
 
@@ -129,14 +128,6 @@ class BaseProtocol(object):
         ))
         log.debug('Server %s: Created session %s', self.server, session.session_id)
         return session
-
-    def test(self):
-        # We need the version for this
-        try:
-            socket.gethostbyname_ex(self.server)[2][0]
-        except socket.gaierror:
-            raise TransportError("Server '%s' does not exist" % self.server)
-        return test_credentials(protocol=self)
 
     def __repr__(self):
         return self.__class__.__name__ + repr((self.service_endpoint, self.credentials, self.auth_type,

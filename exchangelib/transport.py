@@ -35,33 +35,6 @@ AUTH_TYPE_MAP = {
 }
 
 
-def test_credentials(protocol):
-    return _test_docs_credentials(protocol) and _test_service_credentials(protocol)
-
-
-def _test_docs_credentials(protocol):
-    log.debug("Trying auth type '%s' on '%s'", protocol.docs_auth_type, protocol.types_url)
-    # Retrieve the result. We allow 401 errors to happen since the authentication type may be wrong, giving a 401
-    # response.
-    auth = get_auth_instance(credentials=protocol.credentials, auth_type=protocol.docs_auth_type)
-    with requests.sessions.Session() as s:
-        r = s.get(url=protocol.types_url, auth=auth, allow_redirects=False, verify=protocol.verify_ssl)
-    return _test_response(auth=auth, response=r)
-
-
-def _test_service_credentials(protocol):
-    log.debug("Trying auth type '%s' on '%s'", protocol.auth_type, protocol.service_endpoint)
-    # Retrieve the result. We allow 401 errors to happen since the authentication type may be wrong, giving a 401
-    # response.
-    headers = {'Content-Type': 'text/xml; charset=utf-8'}
-    data = dummy_xml(version=protocol.version.api_version, name=protocol.credentials.username)
-    auth = get_auth_instance(credentials=protocol.credentials, auth_type=protocol.auth_type)
-    with requests.sessions.Session() as s:
-        r = s.post(url=protocol.service_endpoint, headers=headers, data=data, auth=auth, allow_redirects=False,
-                   verify=protocol.verify_ssl)
-    return _test_response(auth=auth, response=r)
-
-
 def _test_response(auth, response):
     log.debug('Response headers: %s', response.headers)
     resp = response.text
