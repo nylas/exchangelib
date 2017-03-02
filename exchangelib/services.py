@@ -124,11 +124,11 @@ class EWSService(object):
         from .version import API_VERSIONS, Version
         if isinstance(self, EWSAccountService):
             account = self.account
-            hint = self.account.version.api_version
+            hint = self.account.version
         else:
             account = None
-            hint = self.protocol.version.api_version
-        api_versions = [hint] + [v for v in API_VERSIONS if v != hint]
+            hint = self.protocol.version
+        api_versions = [hint.api_version] + [v for v in API_VERSIONS if v != hint.api_version]
         for api_version in api_versions:
             session = self.protocol.get_session()
             soap_payload = wrap(content=payload, version=api_version, account=account)
@@ -154,9 +154,10 @@ class EWSService(object):
                 # The guessed server version is wrong for this account. Try the next version
                 log.debug('API version %s was invalid for account %s', api_version, account)
                 continue
-            if api_version != hint:
-                # The api_version that worked was different than our hint. Set new version for account
-                log.info('New API version for account %s (%s -> %s)', account, hint, api_version)
+            if api_version != hint.api_version or hint.build is None:
+                # The api_version that worked was different than our hint, or we never got a build version. Set new
+                # version for account.
+                log.info('New API version for account %s (%s -> %s)', account, hint.api_version, api_version)
                 new_version = Version.from_response(requested_api_version=api_version, response=r)
                 if isinstance(self, EWSAccountService):
                     self.account.version = new_version
@@ -166,27 +167,28 @@ class EWSService(object):
         raise ErrorInvalidSchemaVersionForMailboxVersion('Tried versions %s but all were invalid for account %s' %
                                                          (api_versions, account))
 
-    def _get_soap_payload(self, soap_response):
+    @classmethod
+    def _get_soap_payload(cls, soap_response):
         assert isinstance(soap_response, ElementType)
         body = soap_response.find('{%s}Body' % SOAPNS)
         if body is None:
             raise TransportError('No Body element in SOAP response')
-        response = body.find('{%s}%sResponse' % (MNS, self.SERVICE_NAME))
+        response = body.find('{%s}%sResponse' % (MNS, cls.SERVICE_NAME))
         if response is None:
             fault = body.find('{%s}Fault' % SOAPNS)
             if fault is None:
                 raise SOAPError('Unknown SOAP response: %s' % xml_to_str(body))
-            self._raise_soap_errors(fault=fault)  # Will throw SOAPError
+            cls._raise_soap_errors(fault=fault)  # Will throw SOAPError
         response_messages = response.find('{%s}ResponseMessages' % MNS)
         if response_messages is None:
             # Result isn't delivered in a list of FooResponseMessages, but directly in the FooResponse. Consumers expect
             # a list, so return a list
             return [response]
-        return response_messages.findall('{%s}%sResponseMessage' % (MNS, self.SERVICE_NAME))
+        return response_messages.findall('{%s}%sResponseMessage' % (MNS, cls.SERVICE_NAME))
 
-    def _raise_soap_errors(self, fault):
+    @classmethod
+    def _raise_soap_errors(cls, fault):
         assert isinstance(fault, ElementType)
-        log_prefix = 'EWS %s, service %s' % (self.protocol.service_endpoint, self.SERVICE_NAME)
         # Fault: See http://www.w3.org/TR/2000/NOTE-SOAP-20000508/#_Toc478383507
         faultcode = get_xml_attr(fault, 'faultcode')
         faultstring = get_xml_attr(fault, 'faultstring')
@@ -201,7 +203,7 @@ class EWSService(object):
             try:
                 raise vars(errors)[code](msg)
             except KeyError:
-                detail = '%s: code: %s msg: %s (%s)' % (log_prefix, code, msg, xml_to_str(detail))
+                detail = '%s: code: %s msg: %s (%s)' % (cls.SERVICE_NAME, code, msg, xml_to_str(detail))
         try:
             raise vars(errors)[faultcode](faultstring)
         except KeyError:
