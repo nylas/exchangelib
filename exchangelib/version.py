@@ -9,8 +9,8 @@ from future.utils import python_2_unicode_compatible
 from six import text_type
 
 from .errors import TransportError, EWSWarning, ErrorInvalidSchemaVersionForMailboxVersion
-from .transport import TNS, SOAPNS, dummy_xml, get_auth_instance
-from .util import is_xml, to_xml, post_ratelimited
+from .transport import TNS, SOAPNS, get_auth_instance
+from .util import is_xml, to_xml
 
 log = logging.getLogger(__name__)
 
@@ -207,33 +207,16 @@ class Version(object):
 
     @classmethod
     def _guess_version_from_service(cls, protocol, hint=None):
-        # Keep sending requests until we get a valid response. If we have a hint, start guessing that.
-        if hint:
-            api_versions = [hint] + [v for v in API_VERSIONS if v != hint]
-        else:
-            api_versions = API_VERSIONS
-        for api_version in api_versions:
-            try:
-                return cls._get_version_from_service(protocol=protocol, api_version=api_version)
-            except ErrorInvalidSchemaVersionForMailboxVersion:
-                continue
-        raise TransportError('Unable to guess version')
-
-    @classmethod
-    def _get_version_from_service(cls, protocol, api_version):
-        # Create a minimal, valid EWS request to force Exchange into accepting the request and returning EWS xml
-        # containing server version info. Some servers will only reply with their version if a valid POST is sent.
-        assert api_version
-        log.debug('Test if service API version is %s', api_version)
-        xml = dummy_xml(version=api_version, name=protocol.credentials.username)
-        session = protocol.get_session()
-        r, session = post_ratelimited(protocol=protocol, session=session, url=protocol.service_endpoint, headers=None,
-                                      data=xml, timeout=protocol.TIMEOUT, verify=protocol.verify_ssl,
-                                      allow_redirects=False)
-        protocol.release_session(session)
-        version = cls.from_response(requested_api_version=api_version, response=r)
-        log.debug('Service version is: %s', version)
-        return version
+        # The protocol doesn't have a version yet, so add one with our hint, or default to latest supported version.
+        # Use ResolveNames as a minimal request to the server to test if the version is correct. If not, ResolveNames
+        # will try to guess the version automatically.
+        from .services import ResolveNames
+        protocol.version = Version(build=None, api_version=hint or API_VERSIONS[-1])
+        try:
+            ResolveNames(protocol=protocol).call(unresolved_entries=[protocol.credentials.username])
+            return protocol.version
+        except ErrorInvalidSchemaVersionForMailboxVersion:
+            raise TransportError('Unable to guess version')
 
     @classmethod
     def from_response(cls, requested_api_version, response):
