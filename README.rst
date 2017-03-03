@@ -204,12 +204,32 @@ Here are some examples of using the API:
     ))  # Filter by a date range
     # Same as filter() but throws an error if exactly one item isn't returned
     item = my_folder.get(subject='unique_string')
-    ordered_items = my_folder.all().order_by('subject')  # Sorting, by one or multiple fields
+    
+    # You can sort by a single or multiple fields. Prefix a field with '-' to reverse the sorting.
+    # Sorting by a single field is efficient. For multiple fields, the sorting is done client-side
+    # and must fetch all items in the folder first. This can be slow.
+    ordered_items = my_folder.all().order_by('subject')
+    reverse_ordered_items = my_folder.all().order_by('-subject')
+    dont_do_this = my_huge_folder.all().order_by('subject', 'categories')[:10]  # This is painful
+
+    # Counting and exists
     n = my_folder.all().count()  # Efficient counting
     folder_is_empty = not my_folder.all().exists()  # Efficient tasting
+    
+    # Returning values instead of objects
     ids_as_dict = my_folder.all().values('item_id', 'changekey')  # Return values as dicts, not objects
     ids_as_list = my_folder.all().values_list('item_id', 'changekey')  # Return values as nested lists
     all_subjects = my_folder.all().values_list('subject', flat=True)  # Return values as a flat list
+
+    # A QuerySet can be sliced like a normal Python list. Slicing from the start of the QuerySet
+    # is efficient (it only fetches the necessary items), but more exotic slicing requires many or all 
+    # items to be fetched from the server. Slicing from the end is also efficient, but then you might as 
+    # well just reverse the sorting
+    first_ten_emails = my_folder.all().order_by('-datetime_received')[:10]  # Efficient
+    last_ten_emails = my_folder.all().order_by('-datetime_received')[:-10]  # Efficient, but convoluted
+    next_ten_emails = my_folder.all().order_by('-datetime_received')[10:20]  # Still quite efficient
+    eviction_warning = my_folder.all().order_by('-datetime_received')[34298]  # This is looking for trouble
+    some_random_emails = my_folder.all().order_by('-datetime_received')[::3]  # This is just stupid
 
     # The syntax for filter() is modeled after Django QuerySet filters. The following filter lookup types
     # are supported. Some lookups only work with string attributes, some only with date or numerical
