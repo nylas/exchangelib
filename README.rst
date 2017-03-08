@@ -234,20 +234,21 @@ Here are some examples of using the API:
     # The syntax for filter() is modeled after Django QuerySet filters. The following filter lookup types
     # are supported. Some lookups only work with string attributes, some only with date or numerical
     # attributes, and some attributes are not searchable at all:
-    filter(subject='foo')  # Returns items where subject is exactly 'foo'. Case-sensitive
-    filter(start__range=(dt1, dt2))  # Returns items starting within range. Only for date and numerical types
-    filter(subject__in=('foo', 'bar'))  # Return items where subject is either 'foo' or 'bar'
-    filter(subject__not='foo')  # Returns items where subject is not 'foo'
-    filter(start__gt=dt)  # Returns items starting after 'dt'.  Only for date and numerical types
-    filter(start__gte=dt)  # Returns items starting on or after 'dt'.  Only for date and numerical types
-    filter(start__lt=dt)  # Returns items starting before 'dt'.  Only for date and numerical types
-    filter(start__lte=dt)  # Returns items starting on or before 'dt'.  Only for date and numerical types
-    filter(subject__exact='foo')  #  Returns items where subject is 'foo'. Same as filter(subject='foo')
-    filter(subject__iexact='foo')  #  Returns items where subject is 'foo', 'FOO' or 'Foo'
-    filter(subject__contains='foo')  #  Returns items where subject contains 'foo'
-    filter(subject__icontains='foo')  # Returns items where subject contains 'foo', 'FOO' or 'Foo'
-    filter(subject__startswith='foo')  # Returns items where subject starts with 'foo'
-    filter(subject__istartswith='foo')  # Returns items where subject starts with 'foo', 'FOO' or 'Foo'
+    qs = account.calendar.all()
+    qs.filter(subject='foo')  # Returns items where subject is exactly 'foo'. Case-sensitive
+    qs.filter(start__range=(dt1, dt2))  # Returns items starting within range. Only for date and numerical types
+    qs.filter(subject__in=('foo', 'bar'))  # Return items where subject is either 'foo' or 'bar'
+    qs.filter(subject__not='foo')  # Returns items where subject is not 'foo'
+    qs.filter(start__gt=dt)  # Returns items starting after 'dt'.  Only for date and numerical types
+    qs.filter(start__gte=dt)  # Returns items starting on or after 'dt'.  Only for date and numerical types
+    qs.filter(start__lt=dt)  # Returns items starting before 'dt'.  Only for date and numerical types
+    qs.filter(start__lte=dt)  # Returns items starting on or before 'dt'.  Only for date and numerical types
+    qs.filter(subject__exact='foo')  #  Returns items where subject is 'foo'. Same as filter(subject='foo')
+    qs.filter(subject__iexact='foo')  #  Returns items where subject is 'foo', 'FOO' or 'Foo'
+    qs.filter(subject__contains='foo')  #  Returns items where subject contains 'foo'
+    qs.filter(subject__icontains='foo')  # Returns items where subject contains 'foo', 'FOO' or 'Foo'
+    qs.filter(subject__startswith='foo')  # Returns items where subject starts with 'foo'
+    qs.filter(subject__istartswith='foo')  # Returns items where subject starts with 'foo', 'FOO' or 'Foo'
 
     # filter() also supports Q objects that are modeled after Django Q objects, for building complex
     # boolean logic search expressions.
