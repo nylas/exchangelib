@@ -13,7 +13,7 @@ from .autodiscover import discover
 from .credentials import DELEGATE, IMPERSONATION
 from .errors import ErrorFolderNotFound, ErrorAccessDenied
 from .folders import Root, Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Tasks, Contacts, \
-    RecoverableItemsRoot, RecoverableItemsDeletions, Folder, Item, SHALLOW, DEEP, HARD_DELETE, \
+    RecoverableItemsRoot, RecoverableItemsDeletions, Folder, Item, BulkCreateResult, SHALLOW, DEEP, HARD_DELETE, \
     AUTO_RESOLVE, SEND_TO_NONE, SAVE_ONLY, SEND_AND_SAVE_COPY, SEND_ONLY, SPECIFIED_OCCURRENCE_ONLY, \
     DELETE_TYPE_CHOICES, MESSAGE_DISPOSITION_CHOICES, CONFLICT_RESOLUTION_CHOICES, AFFECTED_TASK_OCCURRENCES_CHOICES, \
     SEND_MEETING_INVITATIONS_CHOICES, SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES, \
@@ -230,7 +230,7 @@ class Account(object):
             return []
         return list(
             i if isinstance(i, Exception)
-            else folder.item_model_from_tag(i.tag).from_xml(elem=i, account=self, folder=folder)
+            else BulkCreateResult.from_xml(elem=i, account=self, folder=folder)
             for i in CreateItem(account=self).call(
                 items=items,
                 folder=folder,
@@ -374,11 +374,11 @@ class Account(object):
             # empty 'ids' and return early.
             return
         if only_fields:
-            allowed_field_names = validation_folder.allowed_field_names()
+            allowed_fields = validation_folder.allowed_fields()
             for f in only_fields:
-                assert f in allowed_field_names
+                assert f in allowed_fields
         else:
-            only_fields = validation_folder.allowed_field_names()
+            only_fields = {f for f in validation_folder.allowed_fields() if f.name not in ('item_id', 'changekey')}
         for i in GetItem(account=self).call(items=ids, folder=validation_folder, additional_fields=only_fields):
             if isinstance(i, Exception):
                 yield i

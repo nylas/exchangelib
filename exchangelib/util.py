@@ -130,27 +130,26 @@ def value_to_xml_text(value):
     raise ValueError('Unsupported type: %s (%s)' % (type(value), value))
 
 
-def xml_text_to_value(value, field_type):
+def xml_text_to_value(value, value_type):
     if value is None:
         return None
     from .ewsdatetime import EWSDateTime
-    from .folders import Choice, Email, AnyURI, Body, HTMLBody, MimeContent
-    if field_type == string_type:
+    if value_type == string_type:
         # Return builtin str unprocessed
         return value
-    if field_type == bytes:
+    if value_type == bytes:
         # Return builtin bytes unprocessed. The XML returns binary data as plain strings, so we'll leave it to the
         # caller to decide how to decode.
         return value
-    if field_type in (Choice, Email, AnyURI, Body, HTMLBody, MimeContent):
+    if issubclass(value_type, string_type):
         # Cast string-like values to their intended class
-        return field_type(value)
+        return value_type(value)
     return {
         bool: lambda v: True if v == 'true' else False if v == 'false' else None,
         int: lambda v: int(v),
         Decimal: lambda v: Decimal(v),
         EWSDateTime: lambda v: EWSDateTime.from_string(v),
-    }[field_type](value)
+    }[value_type](value)
 
 
 def set_xml_value(elem, value, version):
@@ -168,7 +167,7 @@ def set_xml_value(elem, value, version):
             elif isinstance(v, string_types):
                 add_xml_child(elem, 't:String', v)
             else:
-                raise AttributeError('Unsupported type %s for list value %s on elem %s' % (type(v), v, elem))
+                raise AttributeError('Unsupported type %s for list element %s on elem %s' % (type(v), v, elem))
     elif isinstance(value, EWSElement):
         assert version
         elem.append(value.to_xml(version=version))
@@ -460,11 +459,3 @@ Response headers: %(response_headers)s'''
         raise TransportError('Unknown failure\n' + log_msg % log_vals)
     log.debug('Session %(session_id)s thread %(thread_id)s: Useful response from %(url)s', log_vals)
     return r, session
-
-
-def isanysubclass(cls, classinfos):
-    try:
-        iter(classinfos)
-        return any([issubclass(cls, c) for c in classinfos])
-    except TypeError:
-        return issubclass(cls, classinfos)

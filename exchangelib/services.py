@@ -17,7 +17,7 @@ import logging
 import traceback
 from xml.parsers.expat import ExpatError
 
-from six import text_type, string_types
+from six import text_type
 
 from . import errors
 from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, ErrorBatchProcessingStopped, \
@@ -248,7 +248,7 @@ class EWSService(object):
         try:
             # Raise the error corresponding to the ResponseCode
             raise vars(errors)[code](text)
-        except KeyError as e:
+        except KeyError:
             # Should not happen
             raise TransportError('Unknown ResponseCode in ResponseMessage: %s (MessageText: %s, MessageXml: %s)' % (
                     code, text, xml))
@@ -473,13 +473,19 @@ class GetItem(EWSPooledAccountService):
         # Takes a list of (item_id, changekey) tuples or Item objects and returns the XML for a GetItem request.
         #
         # We start with an IdOnly request. 'additional_properties' defines the additional fields we want. Supported
-        # fields are available in self.folder.allowed_field_names().
+        # fields are available in self.folder.allowed_fields().
         from .folders import ItemId
         getitem = create_element('m:%s' % self.SERVICE_NAME)
         itemshape = create_element('m:ItemShape')
         add_xml_child(itemshape, 't:BaseShape', IdOnly)
         if additional_fields:
-            additional_property_elems = folder.additional_property_elems(additional_fields)
+            additional_property_elems = []
+            for f in additional_fields:
+                elems = f.field_uri_xml()
+                if isinstance(elems, list):
+                    additional_property_elems.extend(elems)
+                else:
+                    additional_property_elems.append(elems)
             add_xml_child(itemshape, 't:AdditionalProperties', additional_property_elems)
         getitem.append(itemshape)
         item_ids = create_element('m:ItemIds')
@@ -542,28 +548,19 @@ class UpdateItem(EWSPooledAccountService):
     element_container_name = '{%s}Items' % MNS
 
     @staticmethod
-    def _add_delete_item_elem(item_model, parent_elem, fieldname, fielduri):
-        if fieldname in item_model.required_fields():
-            log.warning('%s is a required field and may not be deleted. Skipping', fieldname)
-            return
-        add_xml_child(parent_elem, 't:DeleteItemField', fielduri)
+    def _add_delete_item_elem(parent_elem, field_uri_xml):
+        add_xml_child(parent_elem, 't:DeleteItemField', field_uri_xml)
 
-    def _add_set_item_elem(self, item_model, parent_elem, fieldname, fielduri, value, meeting_timezone_added):
-        from .folders import EWSElement, Body, HTMLBody
+    def _add_set_item_elem(self, item_model, parent_elem, field, value, label, subfield, meeting_timezone_added):
+        from .folders import IndexedField
         setitemfield = create_element('t:SetItemField')
-        setitemfield.append(fielduri)
-        folderitem = create_element(item_model.request_tag())
-        if isinstance(value, (EWSElement, ElementType)) \
-                or (isinstance(value, (tuple, list)) and isinstance(value[0], (EWSElement, ElementType))):
-            set_xml_value(folderitem, value, self.account.version)
+        if isinstance(field, IndexedField):
+            setitemfield.append(field.field_uri_xml(label=label, subfield=subfield))
         else:
-            field_elem = item_model.elem_for_field(fieldname)
-            if fieldname == 'body':
-                body_type = HTMLBody.body_type if isinstance(value, HTMLBody) else Body.body_type
-                field_elem.set('BodyType', body_type)
-            folderitem.append(
-                set_xml_value(field_elem, value, self.account.version)
-            )
+            setitemfield.append(field.field_uri_xml())
+        folderitem = create_element(item_model.request_tag())
+        field_elem = field.to_xml(value, self.account.version)
+        set_xml_value(folderitem, field_elem, self.account.version)
         setitemfield.append(folderitem)
         parent_elem.append(setitemfield)
         if isinstance(value, EWSDateTime):
@@ -580,16 +577,16 @@ class UpdateItem(EWSPooledAccountService):
                 timezone = create_element('t:MeetingTimeZone', TimeZoneName=value.tzinfo.ms_id)
                 meeting_timezone_added = True
             else:
-                if fieldname == 'start':
+                if field.name == 'start':
                     fielduri_tz = create_element('t:FieldURI', FieldURI='calendar:StartTimeZone')
                     timezone = create_element('t:StartTimeZone', Id=value.tzinfo.ms_id, Name=value.tzinfo.ms_name)
-                elif fieldname == 'end':
+                elif field.name == 'end':
                     fielduri_tz = create_element('t:FieldURI', FieldURI='calendar:EndTimeZone')
                     timezone = create_element('t:EndTimeZone', Id=value.tzinfo.ms_id, Name=value.tzinfo.ms_name)
                 else:
                     # EWS does not support updating the timezone for fields that are not the 'start' or 'end'
                     # field. Either supply the date in UTC or in the same timezone as originally created.
-                    log.warning("Skipping timezone for field '%s'", fieldname)
+                    log.warning("Skipping timezone for field '%s'", field.name)
                     return
             setitemfield_tz.append(fielduri_tz)
             folderitem_tz.append(timezone)
@@ -602,7 +599,7 @@ class UpdateItem(EWSPooledAccountService):
         # Takes a list of (Item, fieldnames) tuples where 'Item' is a instance of a subclass of Item and 'fieldnames'
         # are the attribute names that were updated. Returns the XML for an UpdateItem call.
         # an UpdateItem request.
-        from .folders import ItemId, IndexedField, ExtendedProperty, EWSElement, Attendee, Mailbox
+        from .folders import ItemId, IndexedField
         if self.account.version.build >= EXCHANGE_2013:
             updateitem = create_element(
                 'm:%s' % self.SERVICE_NAME,
@@ -627,7 +624,6 @@ class UpdateItem(EWSPooledAccountService):
             if not fieldnames:
                 raise AttributeError('"fieldnames" must not be empty')
             item_model = item.__class__
-            readonly_fields = item_model.readonly_fields()
             itemchange = create_element('t:ItemChange')
             item_id = ItemId(item.item_id, item.changekey)
             log.debug('Updating item %s values %s', item_id, fieldnames)
@@ -635,84 +631,54 @@ class UpdateItem(EWSPooledAccountService):
             updates = create_element('t:Updates')
             meeting_timezone_added = False
             for fieldname in fieldnames:
-                if fieldname in readonly_fields or fieldname in ('item_id', 'changekey'):
-                    log.warning('%s is a read-only field. Skipping', fieldname)
+                try:
+                    field = item_model.ITEM_FIELDS_MAP[fieldname]
+                except KeyError:
+                    raise ValueError("'%s' is not a valid field on '%s'" % (fieldname, item_model))
+                if field.is_read_only:
+                    log.warning('%s is a read-only field. Skipping', field.name)
                     continue
-                val = getattr(item, fieldname)
+                value = getattr(item, field.name)
 
-                # Allow setting attendee and mailbox types as plain strings
-                field_type = item_model.type_for_field(fieldname)
-                if field_type == Mailbox and isinstance(val, string_types):
-                    val = Mailbox(email_address=val)
-                elif field_type == [Mailbox] and val is not None:
-                    val = [Mailbox(email_address=s) if isinstance(s, string_types) else s for s in val]
-                elif field_type == Attendee and isinstance(val, string_types):
-                    val = Attendee(mailbox=Mailbox(email_address=val), response_type='Accept')
-                elif field_type == [Attendee] and val is not None:
-                    val = [Attendee(mailbox=Mailbox(email_address=s), response_type='Accept')
-                           if isinstance(s, string_types) else s for s in val]
-
-                field_uri = item_model.fielduri_for_field(fieldname)
-                if not isinstance(field_uri, text_type) and issubclass(field_uri, ExtendedProperty) \
-                        and val is not None and not isinstance(val, field_uri.__class__):
-                    # For convenience, item attributes implemented as an extended property can be assigned their
-                    # internal value instead of wrapping them in an ExtendedProperty class.
-                    val = field_uri(val)
-                elif isinstance(val, EWSElement) and not isinstance(val, IndexedField) and val is not None:
-                    val = val.__class__.set_field_xml(
-                        field_elem=item_model.elem_for_field(fieldname), items=[val], version=self.account.version)
-                elif isinstance(val, (tuple, list)) and len(val) and isinstance(val[0], EWSElement) \
-                        and not isinstance(val[0], IndexedField):
-                    val = val[0].__class__.set_field_xml(
-                        field_elem=item_model.elem_for_field(fieldname), items=val, version=self.account.version)
-                if isinstance(field_uri, text_type):
-                    fielduri = create_element('t:FieldURI', FieldURI=field_uri)
-                elif issubclass(field_uri, IndexedField):
-                    # TODO: Maybe the set/delete logic should extend into each attribute of a complex type like e.g.
-                    # PhysicalAddress and not just the whole item.
-                    if not val:
-                        # An empty value means we want to remove this value list from the item
-                        for label in field_uri.LABELS:
-                            field_uri_xml = field_uri.field_uri_xml(label=label)
-                            if hasattr(field_uri_xml, '__iter__'):
-                                fielduris = field_uri_xml
-                            else:
-                                fielduris = [field_uri_xml]
-                            for fielduri in fielduris:
-                                self._add_delete_item_elem(
-                                    item_model=item_model, parent_elem=updates, fieldname=fieldname, fielduri=fielduri)
-                    else:
-                        for v in val:
-                            field_uri_xml = field_uri.field_uri_xml(label=v.label)
-                            if hasattr(field_uri_xml, '__iter__'):
-                                fielduris = field_uri_xml
-                                wrapped_vs = []
-                                for k in v.SUB_FIELD_ELEMENT_NAMES.keys():
-                                    # SetItem only accepts items that have the one value set that we want to change.
-                                    # Create a new IndexedField object that has the only one value set.
-                                    simple_v = field_uri(**{'label': v.label, k: getattr(v, k)})
-                                    wrapped_vs.append(set_xml_value(create_element('t:%s' % v.PARENT_ELEMENT_NAME),
-                                                                    simple_v, self.account.version))
-                            else:
-                                fielduris = [field_uri_xml]
-                                wrapped_vs = [set_xml_value(create_element('t:%s' % v.PARENT_ELEMENT_NAME), v,
-                                                            self.account.version)]
-                            for fielduri, wrapped_v in zip(fielduris, wrapped_vs):
-                                meeting_timezone_added = self._add_set_item_elem(
-                                    item_model=item_model, parent_elem=updates, fieldname=fieldname, fielduri=fielduri,
-                                    value=wrapped_v, meeting_timezone_added=meeting_timezone_added)
-                    continue
-                else:
-                    assert issubclass(field_uri, ExtendedProperty)
-                    fielduri = field_uri.field_uri_xml()
-                if val is None or isinstance(val, (tuple, list)) and not len(val):
+                if value is None or (field.is_list and not value):
                     # A value of None or [] means we want to remove this field from the item
-                    self._add_delete_item_elem(
-                        item_model=item_model, parent_elem=updates, fieldname=fieldname, fielduri=fielduri)
+                    if field.is_required:
+                        log.warning('%s is a required field and may not be deleted. Skipping', field.name)
+                        return
+                    field_uri_xml = field.field_uri_xml()
+                    if isinstance(field_uri_xml, list):
+                        fielduri_elems = field_uri_xml
+                    else:
+                        fielduri_elems = [field_uri_xml]
+                    for fielduri_elem in fielduri_elems:
+                        self._add_delete_item_elem(parent_elem=updates, field_uri_xml=fielduri_elem)
                     continue
+
+                if isinstance(field, IndexedField):
+                    # We need to specify the full label/subfield fielduri path to each element in the list, but the
+                    # IndexedField class doesn't know how to do that yet. Generate the XML manually here for now.
+                    # TODO: Maybe the set/delete logic should extend into subfields, not just overwire the whole item.
+                    for v in value:
+                        # TODO: We should also delete the labels that no longer exist in the list
+                        if field.value_cls.SUB_FIELD_ELEMENT_NAMES:
+                            # We have subfields. Generate SetItem XML for each subfield. SetItem only accepts items that
+                            # have the one value set that we want to change. Create a new IndexedField object that has
+                            # only that value set.
+                            for subfield in field.value_cls.SUB_FIELD_ELEMENT_NAMES.keys():
+                                simple_item = field.value_cls(**{'label': v.label, subfield: getattr(v, subfield)})
+                                meeting_timezone_added = self._add_set_item_elem(
+                                    item_model=item_model, parent_elem=updates, field=field, value=simple_item,
+                                    label=v.label, subfield=subfield, meeting_timezone_added=meeting_timezone_added)
+                        else:
+                            # The simpler IndexedFields without subfields
+                            meeting_timezone_added = self._add_set_item_elem(
+                                item_model=item_model, parent_elem=updates, field=field, value=v, label=v.label,
+                                subfield=None, meeting_timezone_added=meeting_timezone_added)
+                    continue
+
                 meeting_timezone_added = self._add_set_item_elem(
-                    item_model=item_model, parent_elem=updates, fieldname=fieldname, fielduri=fielduri,
-                    value=val, meeting_timezone_added=meeting_timezone_added)
+                    item_model=item_model, parent_elem=updates, field=field, value=value, label=None, subfield=None,
+                    meeting_timezone_added=meeting_timezone_added)
             itemchange.append(updates)
             itemchanges.append(itemchange)
         if not n:
@@ -785,7 +751,13 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
         itemshape = create_element('m:ItemShape')
         add_xml_child(itemshape, 't:BaseShape', shape)
         if additional_fields:
-            additional_property_elems = self.folder.additional_property_elems(additional_fields)
+            additional_property_elems = []
+            for f in additional_fields:
+                elems = f.field_uri_xml()
+                if isinstance(elems, list):
+                    additional_property_elems.extend(elems)
+                else:
+                    additional_property_elems.append(elems)
             add_xml_child(itemshape, 't:AdditionalProperties', additional_property_elems)
         finditem.append(itemshape)
         if calendar_view is None:
@@ -800,17 +772,14 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
             finditem.append(restriction.xml)
         if order:
             from .queryset import OrderField
+            from .folders import IndexedField
             assert isinstance(order, OrderField)
-            from .folders import IndexedField, ExtendedProperty
             field_order = create_element('t:FieldOrder', Order='Descending' if order.reverse else 'Ascending')
-            field_uri = self.folder.fielduri_for_field(order.field)
-            if isinstance(field_uri, string_types):
-                field_order.append(create_element('t:FieldURI', FieldURI=field_uri))
-            elif issubclass(field_uri, IndexedField):
-                field_order.append(field_uri.field_uri_xml(label=order.label, subfield=order.subfield))
+            if isinstance(order.field, IndexedField):
+                field_uri = order.field.field_uri_xml(label=order.label, subfield=order.subfield)
             else:
-                assert issubclass(field_uri, ExtendedProperty)
-                field_order.append(field_uri.field_uri_xml())
+                field_uri = order.field.field_uri_xml()
+            field_order.append(field_uri)
             add_xml_child(finditem, 'm:SortOrder', field_order)
         parentfolderids = create_element('m:ParentFolderIds')
         parentfolderids.append(self.folder.to_xml(version=self.account.version))
@@ -836,8 +805,8 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
         add_xml_child(foldershape, 't:BaseShape', shape)
         if additional_fields:
             additionalproperties = create_element('t:AdditionalProperties')
-            for field_uri in additional_fields:
-                additionalproperties.append(create_element('t:FieldURI', FieldURI=field_uri))
+            for field in additional_fields:
+                additionalproperties.append(field.field_uri_xml())
             foldershape.append(additionalproperties)
         findfolder.append(foldershape)
         if self.account.version.build >= EXCHANGE_2010:
@@ -868,8 +837,8 @@ class GetFolder(EWSAccountService):
         add_xml_child(foldershape, 't:BaseShape', shape)
         if additional_fields:
             additionalproperties = create_element('t:AdditionalProperties')
-            for field_uri in additional_fields:
-                additionalproperties.append(create_element('t:FieldURI', FieldURI=field_uri))
+            for field in additional_fields:
+                additionalproperties.append(field.field_uri_xml())
             foldershape.append(additionalproperties)
         getfolder.append(foldershape)
         folderids = create_element('m:FolderIds')

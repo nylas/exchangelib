@@ -27,18 +27,21 @@ from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_
 from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, ExtendedProperty, Choice, Email, Contact, \
     Task, EmailAddress, PhysicalAddress, PhoneNumber, IndexedField, RoomList, Calendar, DeletedItems, Drafts, Inbox, \
     Outbox, SentItems, JunkEmail, Messages, Tasks, Contacts, Item, AnyURI, Body, HTMLBody, FileAttachment, \
-    ItemAttachment, Attachment, ALL_OCCURRENCIES, MimeContent, MessageHeader, Room
+    ItemAttachment, Attachment, ALL_OCCURRENCIES, MimeContent, MessageHeader, Room, ExtendedPropertyField, Subject, \
+    Location
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.restriction import Restriction, Q
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, GetAttachment, TNS
 from exchangelib.transport import NTLM, wrap
-from exchangelib.util import xml_to_str, chunkify, peek, get_redirect_url, isanysubclass, to_xml, BOM, get_domain, \
+from exchangelib.util import xml_to_str, chunkify, peek, get_redirect_url, to_xml, BOM, get_domain, \
     post_ratelimited, create_element, CONNECTION_ERRORS
 from exchangelib.version import Build, Version
 from exchangelib.winzone import generate_map, PYTZ_TO_MS_TIMEZONE_MAP
 
 if PY2:
     FileNotFoundError = OSError
+
+string_type = string_types[0]
 
 
 class BuildTest(unittest.TestCase):
@@ -455,92 +458,93 @@ class EWSTest(unittest.TestCase):
         for res in self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES):
             self.assertEqual(res, True)
 
-    def random_val(self, field_type):
-        if not isinstance(field_type, list) and isanysubclass(field_type, ExtendedProperty):
-            field_type = field_type.python_type()
-        if field_type == string_types[0]:
-            return get_random_string(255)
-        if field_type == Body:
-            return get_random_string(255)
-        if field_type == HTMLBody:
-            return get_random_string(255)
-        if field_type == MimeContent:
-            return get_random_string(255)
-        if field_type == AnyURI:
-            return get_random_url()
-        if field_type == [string_types[0]]:
+    def random_val(self, field):
+        if isinstance(field, ExtendedPropertyField):
+            if field.value_cls.python_type() == string_type:
+                return get_random_string(255)
+            if field.value_cls.python_type() == int:
+                return get_random_int(0, 256)
+            assert False, (field.name, field, field.value_cls.python_type())
+        if field.is_list and field.value_cls == string_type:
             return [get_random_string(16) for _ in range(random.randint(1, 4))]
-        if field_type == int:
+        if field.value_cls == string_type:
+            return get_random_string(255)
+        if field.value_cls == Subject:
+            return get_random_string(Subject.MAXLENGTH)
+        if field.value_cls == Location:
+            return get_random_string(Location.MAXLENGTH)
+        if field.value_cls == Body:
+            return get_random_string(255)
+        if field.value_cls == HTMLBody:
+            return get_random_string(255)
+        if field.value_cls == MimeContent:
+            return get_random_string(255)
+        if field.value_cls == AnyURI:
+            return get_random_url()
+        if field.value_cls == int:
             return get_random_int(0, 256)
-        if field_type == Decimal:
+        if field.value_cls == Decimal:
             return get_random_decimal(1, 99)
-        if field_type == bool:
+        if field.value_cls == bool:
             return get_random_bool()
-        if field_type == EWSDateTime:
+        if field.value_cls == EWSDateTime:
             return get_random_datetime()
-        if field_type == Email:
+        if field.value_cls == Email:
             return get_random_email()
-        if field_type == MessageHeader:
-            return MessageHeader(name=get_random_string(10), value=get_random_string(255))
-        if field_type == [MessageHeader]:
-            return [self.random_val(MessageHeader) for _ in range(random.randint(1, 4))]
-        if field_type == Attachment:
-            return FileAttachment(name='my_file.txt', content=b'test_content')
-        if field_type == [Attachment]:
-            return [self.random_val(Attachment)]
-        if field_type == Mailbox:
+        if field.value_cls == MessageHeader:
+            return [MessageHeader(name=get_random_string(10), value=get_random_string(255))
+                    for _ in range(random.randint(1, 4))]
+        if field.value_cls == Attachment:
+            val = [FileAttachment(name='my_file.txt', content=b'test_content')]
+        if field.value_cls == Mailbox:
             # email_address must be a real account on the server(?)
             # TODO: Mailbox has multiple optional args, but they must match the server account, so we can't easily test.
             if get_random_bool():
-                return Mailbox(email_address=self.account.primary_smtp_address)
+                val = Mailbox(email_address=self.account.primary_smtp_address)
             else:
-                return self.account.primary_smtp_address
-        if field_type == [Mailbox]:
-            # Mailbox must be a real mailbox on the server(?). We're only sure to have one
-            return [self.random_val(Mailbox)]
-        if field_type == Attendee:
+                val = self.account.primary_smtp_address
+            return [val] if field.is_list else val
+        if field.value_cls == Attendee:
+            # Attendee must refer to a real mailbox on the server(?). We're only sure to have one
+            if get_random_bool():
+                mbx = Mailbox(email_address=self.account.primary_smtp_address)
+            else:
+                mbx = self.account.primary_smtp_address
             with_last_response_time = get_random_bool()
             if with_last_response_time:
-                return Attendee(mailbox=self.random_val(Mailbox), response_type='Accept',
-                                last_response_time=self.random_val(EWSDateTime))
+                val = Attendee(mailbox=mbx, response_type='Accept', last_response_time=get_random_datetime())
             else:
                 if get_random_bool():
-                    return Attendee(mailbox=self.random_val(Mailbox), response_type='Accept')
+                    val = Attendee(mailbox=mbx, response_type='Accept')
                 else:
-                    return self.account.primary_smtp_address
-        if field_type == [Attendee]:
-            # Attendee must refer to a real mailbox on the server(?). We're only sure to have one
-            return [self.random_val(Attendee)]
-        if field_type == EmailAddress:
+                    val = self.account.primary_smtp_address
+            return [val] if field.is_list else val
+        if field.value_cls == EmailAddress:
+            if field.is_list:
+                addrs = []
+                for label in EmailAddress.LABELS:
+                    addr = EmailAddress(email=get_random_email())
+                    addr.label = label
+                    addrs.append(addr)
+                return addrs
             return EmailAddress(email=get_random_email())
-        if field_type == [EmailAddress]:
-            addrs = []
-            for label in EmailAddress.LABELS:
-                addr = self.random_val(EmailAddress)
-                addr.label = label
-                addrs.append(addr)
-            return addrs
-        if field_type == PhysicalAddress:
-            return PhysicalAddress(
-                street=get_random_string(32), city=get_random_string(32), state=get_random_string(32),
-                country=get_random_string(32), zipcode=get_random_string(8))
-        if field_type == [PhysicalAddress]:
+        if field.value_cls == PhysicalAddress:
             addrs = []
             for label in PhysicalAddress.LABELS:
-                addr = self.random_val(PhysicalAddress)
+                addr = PhysicalAddress(street=get_random_string(32), city=get_random_string(32),
+                                       state=get_random_string(32), country=get_random_string(32),
+                                       zipcode=get_random_string(8))
                 addr.label = label
                 addrs.append(addr)
             return addrs
-        if field_type == PhoneNumber:
-            return PhoneNumber(phone_number=get_random_string(16))
-        if field_type == [PhoneNumber]:
+        if field.value_cls == PhoneNumber:
             pns = []
             for label in PhoneNumber.LABELS:
-                pn = self.random_val(PhoneNumber)
+                pn = PhoneNumber(phone_number=get_random_string(16))
                 pn.label = label
                 pns.append(pn)
             return pns
-        assert False, 'Unknown field type %s' % field_type
+        assert False, 'Unknown field %s' % field
 
 
 class CommonTest(EWSTest):
@@ -734,7 +738,12 @@ class CommonTest(EWSTest):
         items = []
         for i in range(75):
             subject = 'Test Subject %s' % i
-            item = CalendarItem(start=start, end=end, subject=subject, categories=self.categories)
+            item = CalendarItem(
+                start=start,
+                end=end,
+                subject=subject,
+                categories=self.categories,
+            )
             items.append(item)
         return_ids = self.account.calendar.bulk_create(items=items)
         self.assertEqual(len(return_ids), len(items))
@@ -1138,8 +1147,8 @@ class FolderTest(EWSTest):
         items = []
         for i in range(3):
             subject = 'Test Subject %s' % i
-            item = Message(account=self.account, folder=self.account.inbox, is_read=False,
-                           subject=subject, categories=self.categories)
+            item = Message(account=self.account, folder=self.account.inbox, is_read=False, subject=subject,
+                           categories=self.categories)
             item.save()
             items.append(item)
         # Refresh values
@@ -1198,104 +1207,96 @@ class BaseItemTest(EWSTest):
 
     def get_random_insert_kwargs(self):
         insert_kwargs = {}
-        for f in self.ITEM_CLASS.fieldnames():
-            if f in self.ITEM_CLASS.readonly_fields():
+        for f in self.ITEM_CLASS.ITEM_FIELDS:
+            if f.is_read_only:
                 # These cannot be created
                 continue
-            if f == 'attachments':
+            if f.name == 'attachments':
                 # Testing attachments is heavy. Leave this to specific tests
                 continue
-            if f == 'resources':
+            if f.name == 'resources':
                 # The test server doesn't have any resources
                 continue
-            if f == 'optional_attendees':
+            if f.name == 'optional_attendees':
                 # 'optional_attendees' and 'required_attendees' are mutually exclusive
-                insert_kwargs[f] = None
+                insert_kwargs[f.name] = None
                 continue
-            if f == 'start':
-                insert_kwargs['start'], insert_kwargs['end'] = get_random_datetime_range()
+            if f.name == 'start':
+                insert_kwargs[f.name], insert_kwargs['end'] = get_random_datetime_range()
                 continue
-            if f == 'end':
+            if f.name == 'end':
                 continue
-            if f == 'due_date':
+            if f.name == 'due_date':
                 # start_date must be before due_date
-                insert_kwargs['start_date'], insert_kwargs['due_date'] = get_random_datetime_range()
+                insert_kwargs['start_date'], insert_kwargs[f.name] = get_random_datetime_range()
                 continue
-            if f == 'start_date':
+            if f.name == 'start_date':
                 continue
-            if f == 'status':
+            if f.name == 'status':
                 # Start with an incomplete task
-                status = get_random_choice(Task.choices_for_field(f) - {Task.COMPLETED})
-                insert_kwargs[f] = status
+                status = get_random_choice(f.choices - {Task.COMPLETED})
+                insert_kwargs[f.name] = status
                 insert_kwargs['percent_complete'] = Decimal(0) if status == Task.NOT_STARTED else get_random_decimal(1, 99)
                 continue
-            if f == 'percent_complete':
+            if f.name == 'percent_complete':
                 continue
-            field_type = self.ITEM_CLASS.type_for_field(f)
-            if field_type == Choice:
-                insert_kwargs[f] = get_random_choice(self.ITEM_CLASS.choices_for_field(f))
+            if f.value_cls == Choice:
+                insert_kwargs[f.name] = get_random_choice(f.choices)
                 continue
-            insert_kwargs[f] = self.random_val(field_type)
+            insert_kwargs[f.name] = self.random_val(f)
         return insert_kwargs
 
     def get_random_update_kwargs(self, item, insert_kwargs):
         update_kwargs = {}
         now = UTC_NOW()
-        for f in self.ITEM_CLASS.fieldnames():
-            if f in self.ITEM_CLASS.readonly_fields():
+        for f in self.ITEM_CLASS.ITEM_FIELDS:
+            if f.is_read_only:
                 # These cannot be changed
                 continue
-            if not item.is_draft and f in self.ITEM_CLASS.readonly_after_send_fields():
+            if not item.is_draft and f.is_read_only_after_send:
                 # These cannot be changed when the item is no longer a draft
                 continue
-            if f == 'resources':
+            if f.name == 'resources':
                 # The test server doesn't have any resources
                 continue
-            if f == 'attachments':
+            if f.name == 'attachments':
                 # Attachments are handled separately
                 continue
-            field_type = self.ITEM_CLASS.type_for_field(f)
-            if isinstance(field_type, list):
-                if issubclass(field_type[0], IndexedField):
-                    # TODO: We don't know how to update IndexedField types yet
-                    continue
-            if f == 'start':
-                update_kwargs['start'], update_kwargs['end'] = get_random_datetime_range()
+            if f.name == 'start':
+                update_kwargs[f.name], update_kwargs['end'] = get_random_datetime_range()
                 continue
-            if f == 'end':
+            if f.name == 'end':
                 continue
-            if f == 'due_date':
+            if f.name == 'due_date':
                 # start_date must be before due_date, and before complete_date which must be in the past
-                d1, d2 = get_random_datetime(end_date=now), get_random_datetime(end_date=now)
-                update_kwargs['start_date'], update_kwargs['due_date'] = sorted([d1, d2])
+                update_kwargs['start_date'], update_kwargs[f.name] = get_random_datetime_range(end_date=now)
                 continue
-            if f == 'start_date':
+            if f.name == 'start_date':
                 continue
-            if f == 'status':
+            if f.name == 'status':
                 # Update task to a completed state. complete_date must be a date in the past, and < than start_date
-                update_kwargs[f] = Task.COMPLETED
+                update_kwargs[f.name] = Task.COMPLETED
                 update_kwargs['percent_complete'] = Decimal(100)
                 continue
-            if f == 'percent_complete':
+            if f.name == 'percent_complete':
                 continue
-            if f == 'reminder_is_set' and self.ITEM_CLASS == Task:
+            if f.name == 'reminder_is_set' and self.ITEM_CLASS == Task:
                 # Task type doesn't allow updating 'reminder_is_set' to True. TODO: Really?
-                update_kwargs[f] = False
+                update_kwargs[f.name] = False
                 continue
-            field_type = self.ITEM_CLASS.type_for_field(f)
-            if field_type == bool:
-                update_kwargs[f] = not (insert_kwargs[f])
+            if f.value_cls == bool:
+                update_kwargs[f.name] = not (insert_kwargs[f.name])
                 continue
-            if field_type == Choice:
-                update_kwargs[f] = get_random_choice(self.ITEM_CLASS.choices_for_field(f))
+            if f.value_cls == Choice:
+                update_kwargs[f.name] = get_random_choice(f.choices)
                 continue
-            if field_type in (Mailbox, [Mailbox], Attendee, [Attendee]):
-                if insert_kwargs[f] is None:
-                    update_kwargs[f] = self.random_val(field_type)
+            if f.value_cls in (Mailbox, Attendee):
+                if insert_kwargs[f.name] is None:
+                    update_kwargs[f.name] = self.random_val(f)
                 else:
-                    update_kwargs[f] = None
+                    update_kwargs[f.name] = None
                 continue
-            update_kwargs[f] = self.random_val(field_type)
+            update_kwargs[f.name] = self.random_val(f)
         if update_kwargs.get('is_all_day', False):
             update_kwargs['start'] = update_kwargs['start'].replace(hour=0, minute=0, second=0, microsecond=0)
             update_kwargs['end'] = update_kwargs['end'].replace(hour=0, minute=0, second=0, microsecond=0)
@@ -1308,8 +1309,8 @@ class BaseItemTest(EWSTest):
 
     def test_field_names(self):
         # Test that fieldnames don't clash with Python keywords
-        for f in self.ITEM_CLASS.fieldnames():
-            self.assertNotIn(f, kwlist)
+        for f in self.ITEM_CLASS.ITEM_FIELDS:
+            self.assertNotIn(f.name, kwlist)
 
     def test_magic(self):
         item = self.get_test_item()
@@ -1871,31 +1872,30 @@ class BaseItemTest(EWSTest):
             item.is_all_day = False  # Make sure start- and end dates don't change
         ids = self.test_folder.bulk_create(items=[item])
         common_qs = self.test_folder.filter(categories__contains=self.categories)
-        for f in self.test_folder.allowed_field_names():
-            if f in ('status', 'companies'):
+        for f in self.ITEM_CLASS.ITEM_FIELDS:
+            if f.name in ('status', 'companies'):
                 # For some reason, EWS disallows searching on these, instead throwing ErrorInvalidValueForProperty
                 continue
-            if f in ('percent_complete',):
+            if f.name in ('percent_complete',):
                 # This simply doesn't match anything. Error in EWS?
                 continue
-            field_type = self.ITEM_CLASS.type_for_field(f)
-            if field_type in ([Attachment], [Mailbox], [Attendee], [PhysicalAddress]):
+            if f.is_list and f.value_cls in (Attachment, Mailbox, Attendee, PhysicalAddress):
                 # These are not searchable, either. Maybe EWS just doesn't support it
                 continue
-            val = getattr(item, f)
+            val = getattr(item, f.name)
             if val is None:
                 # We cannot filter on None values
                 continue
-            if isinstance(field_type, list):
+            if f.is_list:
                 # Filter multi-value fields with __in and __contains
-                filter_kwargs = [{'%s__in' % f: val}, {'%s__contains' % f: val}]
+                filter_kwargs = [{'%s__in' % f.name: val}, {'%s__contains' % f.name: val}]
             else:
                 # Filter all others with =, __in and __contains. We could have more filters here, but these should
                 # always match.
-                filter_kwargs = [{f: val}, {'%s__in' % f: [val]}]
-                if field_type in string_types and f not in ('display_name',):
+                filter_kwargs = [{f.name: val}, {'%s__in' % f.name: [val]}]
+                if f.value_cls in string_types and f.name not in ('display_name',):
                     # For some reason, 'display_name__contains' does not match. Error in EWS?
-                    filter_kwargs.append({'%s__contains' % f: val})
+                    filter_kwargs.append({'%s__contains' % f.name: val})
             for kw in filter_kwargs:
                 self.assertEqual(len(common_qs.filter(**kw)), 1)
         self.bulk_delete(ids)
@@ -2005,28 +2005,30 @@ class BaseItemTest(EWSTest):
         items = self.test_folder.filter(categories__contains=item.categories)
         for item in items:
             assert isinstance(item, self.ITEM_CLASS)
-            for f in self.ITEM_CLASS.fieldnames():
-                self.assertTrue(hasattr(item, f))
-                if f in ('optional_attendees', 'required_attendees', 'resources'):
+            for f in self.ITEM_CLASS.ITEM_FIELDS:
+                self.assertTrue(hasattr(item, f.name))
+                if f.name in ('optional_attendees', 'required_attendees', 'resources'):
                     continue
-                elif f in self.ITEM_CLASS.readonly_fields():
+                elif f.is_read_only:
                     continue
-                self.assertIsNotNone(getattr(item, f), (f, getattr(item, f)))
+                self.assertIsNotNone(getattr(item, f.name), (f, getattr(item, f.name)))
         self.assertEqual(len(items), 2)
         only_fields = ('subject', 'body', 'categories')
         items = self.test_folder.filter(categories__contains=item.categories).only(*only_fields)
         for item in items:
             assert isinstance(item, self.ITEM_CLASS)
-            for f in self.ITEM_CLASS.fieldnames():
-                self.assertTrue(hasattr(item, f))
-                if f in only_fields:
-                    self.assertIsNotNone(getattr(item, f), (f, getattr(item, f)))
-                elif f not in self.ITEM_CLASS.required_fields():
-                    v = getattr(item, f)
-                    if f == 'attachments':
-                        self.assertTrue(v is None or v == [], (f, v))
+            for f in self.ITEM_CLASS.ITEM_FIELDS:
+                self.assertTrue(hasattr(item, f.name))
+                if f.name in only_fields:
+                    self.assertIsNotNone(getattr(item, f.name), (f.name, getattr(item, f.name)))
+                elif f.is_required:
+                    v = getattr(item, f.name)
+                    if f.name == 'attachments':
+                        self.assertEqual(v, [], (f.name, v))
+                    elif f.default is None:
+                        self.assertIsNone(v, (f.name, v))
                     else:
-                        self.assertIsNone(v, (f, v))
+                        self.assertEqual(v, f.default, (f.name, v))
         self.assertEqual(len(items), 2)
         self.bulk_delete(items)
 
@@ -2049,14 +2051,14 @@ class BaseItemTest(EWSTest):
             self.assertEqual(getattr(item, k), v, (k, getattr(item, k), v))
         # Test that whatever we have locally also matches whatever is in the DB
         fresh_item = list(self.account.fetch(ids=[item]))[0]
-        for f in item.fieldnames():
-            old, new = getattr(item, f), getattr(fresh_item, f)
-            if f in self.ITEM_CLASS.readonly_fields() and old is None:
+        for f in item.ITEM_FIELDS:
+            old, new = getattr(item, f.name), getattr(fresh_item, f.name)
+            if f.is_read_only and old is None:
                 # Some fields are automatically set server-side
                 continue
-            if isinstance(old, (tuple, list)):
-                old, new = set(old), set(new)
-            self.assertEqual(old, new, (f, old, new))
+            if f.is_list:
+                old, new = set(old or ()), set(new or ())
+            self.assertEqual(old, new, (f.name, old, new))
 
         # Update
         update_kwargs = self.get_random_update_kwargs(item=item, insert_kwargs=insert_kwargs)
@@ -2067,14 +2069,14 @@ class BaseItemTest(EWSTest):
             self.assertEqual(getattr(item, k), v, (k, getattr(item, k), v))
         # Test that whatever we have locally also matches whatever is in the DB
         fresh_item = list(self.account.fetch(ids=[item]))[0]
-        for f in item.fieldnames():
-            old, new = getattr(item, f), getattr(fresh_item, f)
-            if f in self.ITEM_CLASS.readonly_fields() and old is None:
+        for f in item.ITEM_FIELDS:
+            old, new = getattr(item, f.name), getattr(fresh_item, f.name)
+            if f.is_read_only and old is None:
                 # Some fields are automatically updated server-side
                 continue
-            if isinstance(old, (tuple, list)):
-                old, new = set(old), set(new)
-            self.assertEqual(old, new, (f, old, new))
+            if f.is_list:
+                old, new = set(old or ()), set(new or ())
+            self.assertEqual(old, new, (f.name, old, new))
 
         # Hard delete
         item_id = (item.item_id, item.changekey)
@@ -2163,24 +2165,25 @@ class BaseItemTest(EWSTest):
         assert isinstance(insert_ids[0], Item)
         find_ids = self.test_folder.filter(categories__contains=item.categories).values_list('item_id', 'changekey')
         self.assertEqual(len(find_ids), 1)
-        self.assertEqual(len(find_ids[0]), 2)
+        self.assertEqual(len(find_ids[0]), 2, find_ids[0])
         self.assertEqual(insert_ids, list(find_ids))
         # Test with generator as argument
         item = list(self.account.fetch(ids=(i for i in find_ids)))[0]
-        for f in self.ITEM_CLASS.fieldnames():
-            if f in self.ITEM_CLASS.readonly_fields():
+        for f in self.ITEM_CLASS.ITEM_FIELDS:
+            if f.is_read_only:
                 continue
-            if f == 'resources':
+            if f.name == 'resources':
                 # The test server doesn't have any resources
                 continue
-            if f == 'attachments':
+            if f.name == 'attachments':
                 # Attachments are handled separately
                 continue
-            if isinstance(self.ITEM_CLASS.type_for_field(f), list):
-                if not (getattr(item, f) is None and insert_kwargs[f] is None):
-                    self.assertSetEqual(set(getattr(item, f)), set(insert_kwargs[f]), (f, repr(item), insert_kwargs))
+            if f.is_list:
+                if not (getattr(item, f.name) is None and insert_kwargs[f.name] is None):
+                    self.assertSetEqual(set(getattr(item, f.name)), set(insert_kwargs[f.name]),
+                                        (f.name, repr(item), insert_kwargs))
             else:
-                self.assertEqual(getattr(item, f), insert_kwargs[f], (f, repr(item), insert_kwargs))
+                self.assertEqual(getattr(item, f.name), insert_kwargs[f.name], (f.name, repr(item), insert_kwargs))
 
         # Test update
         update_kwargs = self.get_random_update_kwargs(item=item, insert_kwargs=insert_kwargs)
@@ -2194,46 +2197,37 @@ class BaseItemTest(EWSTest):
         self.assertEqual(insert_ids[0].item_id, update_ids[0][0])  # ID should be the same
         self.assertNotEqual(insert_ids[0].changekey, update_ids[0][1])  # Changekey should not be the same when item is updated
         item = list(self.account.fetch(update_ids))[0]
-        for f in self.ITEM_CLASS.fieldnames():
-            if f in self.ITEM_CLASS.readonly_fields():
+        for f in self.ITEM_CLASS.ITEM_FIELDS:
+            if f.is_read_only:
                 continue
-            if f == 'resources':
+            if f.name == 'resources':
                 # The test server doesn't have any resources
                 continue
-            if f == 'attachments':
+            if f.name == 'attachments':
                 # Attachments are handled separately
                 continue
-            field_type = self.ITEM_CLASS.type_for_field(f)
-            if isinstance(field_type, list):
-                if issubclass(field_type[0], IndexedField):
-                    # TODO: We don't know how to update IndexedField types yet
-                    continue
-                if not (getattr(item, f) is None and update_kwargs[f] is None):
-                    self.assertSetEqual(set(getattr(item, f)), set(update_kwargs[f]), (f, repr(item), update_kwargs))
+            if f.is_list:
+                self.assertSetEqual(set(getattr(item, f.name) or ()), set(update_kwargs[f.name] or ()),
+                                    (f.name, repr(item), update_kwargs))
             else:
-                self.assertEqual(getattr(item, f), update_kwargs[f], (f, repr(item), update_kwargs))
+                self.assertEqual(getattr(item, f.name), update_kwargs[f.name], (f.name, repr(item), update_kwargs))
 
-        # Test wiping or removing string, int, Choice and bool fields
+        # Test wiping or removing fields
         wipe_kwargs = {}
-        for f in self.ITEM_CLASS.fieldnames():
-            if f in self.ITEM_CLASS.required_fields():
+        for f in self.ITEM_CLASS.ITEM_FIELDS:
+            if f.is_required:
                 # These cannot be deleted
                 continue
-            if f in self.ITEM_CLASS.readonly_fields():
+            if f.is_read_only:
                 # These cannot be changed
                 continue
-            if f == 'attachments':
+            if f.name == 'attachments':
                 continue
-            if f == 'percent_complete':
+            if f.name == 'percent_complete':
                 continue
-            field_type = self.ITEM_CLASS.type_for_field(f)
-            if isinstance(field_type, list):
-                wipe_kwargs[f] = []
-            elif issubclass(field_type, ExtendedProperty):
-                wipe_kwargs[f] = ''
-            else:
-                wipe_kwargs[f] = None
-        update_fieldnames = wipe_kwargs.keys()
+            if f.is_list:
+                wipe_kwargs[f.name] = []
+            wipe_kwargs[f.name] = None
         for k, v in wipe_kwargs.items():
             setattr(item, k, v)
         wipe_ids = self.account.bulk_update([(item, update_fieldnames), ])
@@ -2243,18 +2237,19 @@ class BaseItemTest(EWSTest):
         self.assertNotEqual(insert_ids[0].changekey,
                             wipe_ids[0][1])  # Changekey should not be the same when item is updated
         item = list(self.account.fetch(wipe_ids))[0]
-        for f in self.ITEM_CLASS.fieldnames():
-            if f in self.ITEM_CLASS.required_fields():
+        for f in self.ITEM_CLASS.ITEM_FIELDS:
+            if f.is_required:
                 continue
-            if f in self.ITEM_CLASS.readonly_fields():
+            if f.is_read_only:
                 continue
-            if f == 'attachments':
+            if f.name == 'attachments':
                 continue
-            if f == 'percent_complete':
+            if f.name == 'percent_complete':
                 continue
-            if isinstance(wipe_kwargs[f], list) and not wipe_kwargs[f]:
-                wipe_kwargs[f] = None
-            self.assertEqual(getattr(item, f), wipe_kwargs[f], (f, repr(item), insert_kwargs))
+            if f.is_list:
+                wipe_kwargs[f.name] = []
+            wipe_kwargs[f.name] = None
+            self.assertEqual(getattr(item, f.name), wipe_kwargs[f.name], (f.name, repr(item), insert_kwargs))
 
         # Test extern_id = None, which deletes the extended property entirely
         extern_id = None
@@ -2295,15 +2290,15 @@ class BaseItemTest(EWSTest):
         def to_dict(item):
             dict_item = {}
             # fieldnames is everything except the ID so we'll use it to compare
-            for attribute in item.fieldnames():
+            for f in item.ITEM_FIELDS:
                 # datetime_created and last_modified_time aren't copied, but instead are added to the new item after
-                # uploading. This means mime_content can also change.
-                if attribute in {'datetime_created', 'last_modified_time', 'mime_content'}:
+                # uploading. This means mime_content can also change. Items also get new IDs on upload.
+                if f.name in {'item_id', 'changekey', 'datetime_created', 'last_modified_time', 'mime_content'}:
                     continue
-                dict_item[attribute] = getattr(item, attribute)
-                if attribute == 'attachments':
+                dict_item[f.name] = getattr(item, f.name)
+                if f.name == 'attachments':
                     # Attachments get new IDs on upload. Wipe them here so we can compare the other fields
-                    for a in dict_item[attribute]:
+                    for a in dict_item[f.name]:
                         a.attachment_id = None
             return dict_item
 
@@ -2349,18 +2344,12 @@ class BaseItemTest(EWSTest):
 
         # Before register
         self.assertNotIn(attr_name, self.ITEM_CLASS.fieldnames())
-        with self.assertRaises(ValueError):
-            self.ITEM_CLASS.fielduri_for_field(attr_name)
-        with self.assertRaises(ValueError):
-            self.ITEM_CLASS.type_for_field(attr_name)
 
         self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=TestProp)
 
         # After register
         self.assertEqual(TestProp.python_type(), int)
-        self.assertIn('dead_beef', self.ITEM_CLASS.fieldnames())
-        self.assertEqual(self.ITEM_CLASS.fielduri_for_field(attr_name), TestProp)
-        self.assertEqual(self.ITEM_CLASS.type_for_field(attr_name), TestProp)
+        self.assertIn(attr_name, self.ITEM_CLASS.fieldnames())
 
         # Test item creation, refresh, and update
         item = self.get_test_item(folder=self.test_folder)
@@ -2378,10 +2367,6 @@ class BaseItemTest(EWSTest):
         # Test deregister
         self.ITEM_CLASS.deregister(attr_name=attr_name)
         self.assertNotIn(attr_name, self.ITEM_CLASS.fieldnames())
-        with self.assertRaises(ValueError):
-            self.ITEM_CLASS.fielduri_for_field(attr_name)
-        with self.assertRaises(ValueError):
-            self.ITEM_CLASS.type_for_field(attr_name)
 
     def test_file_attachments(self):
         item = self.get_test_item(folder=self.test_folder)
@@ -2449,21 +2434,21 @@ class BaseItemTest(EWSTest):
         fresh_attachments = sorted(fresh_item.attachments, key=lambda a: a.name)
         self.assertEqual(fresh_attachments[0].name, 'attachment1')
 
-        for f in self.ITEM_CLASS.fieldnames():
+        for f in self.ITEM_CLASS.ITEM_FIELDS:
             # Normalize some values we don't control
-            if f in self.ITEM_CLASS.readonly_fields():
+            if f.is_read_only:
                 continue
-            if f == 'extern_id':
-                # Attachments don't have this value. It may be possible to request it if we can find the FieldURI
+            if isinstance(f, ExtendedPropertyField):
+                # Attachments don't have these values. It may be possible to request it if we can find the FieldURI
                 continue
-            if f == 'is_read':
+            if f.name == 'is_read':
                 # This is always true for item attachments?
                 continue
-            old_val = getattr(attached_item1, f)
-            new_val = getattr(fresh_attachments[0].item, f)
-            if isinstance(old_val, (tuple, list)):
-                old_val, new_val = set(old_val), set(new_val)
-            self.assertEqual(old_val, new_val, (f, old_val, new_val))
+            old_val = getattr(attached_item1, f.name)
+            new_val = getattr(fresh_attachments[0].item, f.name)
+            if f.is_list:
+                old_val, new_val = set(old_val or ()), set(new_val or ())
+            self.assertEqual(old_val, new_val, (f.name, old_val, new_val))
 
         # Test attach on saved object
         attached_item2 = self.get_test_item(folder=self.test_folder)
@@ -2480,39 +2465,39 @@ class BaseItemTest(EWSTest):
         fresh_attachments = sorted(fresh_item.attachments, key=lambda a: a.name)
         self.assertEqual(fresh_attachments[0].name, 'attachment1')
 
-        for f in self.ITEM_CLASS.fieldnames():
+        for f in self.ITEM_CLASS.ITEM_FIELDS:
             # Normalize some values we don't control
-            if f in self.ITEM_CLASS.readonly_fields():
+            if f.is_read_only:
                 continue
-            if f == 'extern_id':
-                # Attachments don't have this value. It may be possible to request it if we can find the FieldURI
+            if isinstance(f, ExtendedPropertyField):
+                # Attachments don't have these values. It may be possible to request it if we can find the FieldURI
                 continue
-            if f == 'is_read':
+            if f.name == 'is_read':
                 # This is always true for item attachments?
                 continue
-            old_val = getattr(attached_item1, f)
-            new_val = getattr(fresh_attachments[0].item, f)
-            if isinstance(old_val, (tuple, list)):
-                old_val, new_val = set(old_val), set(new_val)
-            self.assertEqual(old_val, new_val, (f, old_val, new_val))
+            old_val = getattr(attached_item1, f.name)
+            new_val = getattr(fresh_attachments[0].item, f.name)
+            if f.is_list:
+                old_val, new_val = set(old_val or ()), set(new_val or ())
+            self.assertEqual(old_val, new_val, (f.name, old_val, new_val))
 
         self.assertEqual(fresh_attachments[1].name, 'attachment2')
 
-        for f in self.ITEM_CLASS.fieldnames():
+        for f in self.ITEM_CLASS.ITEM_FIELDS:
             # Normalize some values we don't control
-            if f in self.ITEM_CLASS.readonly_fields():
+            if f.is_read_only:
                 continue
-            if f == 'extern_id':
-                # Attachments don't have this value. It may be possible to request it if we can find the FieldURI
+            if isinstance(f, ExtendedPropertyField):
+                # Attachments don't have these values. It may be possible to request it if we can find the FieldURI
                 continue
-            if f == 'is_read':
+            if f.name == 'is_read':
                 # This is always true for item attachments?
                 continue
-            old_val = getattr(attached_item2, f)
-            new_val = getattr(fresh_attachments[1].item, f)
-            if isinstance(old_val, (tuple, list)):
-                old_val, new_val = set(old_val), set(new_val)
-            self.assertEqual(old_val, new_val, (f, old_val, new_val))
+            old_val = getattr(attached_item2, f.name)
+            new_val = getattr(fresh_attachments[1].item, f.name)
+            if f.is_list:
+                old_val, new_val = set(old_val or ()), set(new_val or ())
+            self.assertEqual(old_val, new_val, (f.name, old_val, new_val))
 
         # Test detach
         item.detach(attachment2)
@@ -2522,21 +2507,21 @@ class BaseItemTest(EWSTest):
         self.assertEqual(len(fresh_item.attachments), 1)
         fresh_attachments = sorted(fresh_item.attachments, key=lambda a: a.name)
 
-        for f in self.ITEM_CLASS.fieldnames():
+        for f in self.ITEM_CLASS.ITEM_FIELDS:
             # Normalize some values we don't control
-            if f in self.ITEM_CLASS.readonly_fields():
+            if f.is_read_only:
                 continue
-            if f == 'extern_id':
-                # Attachments don't have this value. It may be possible to request it if we can find the FieldURI
+            if isinstance(f, ExtendedPropertyField):
+                # Attachments don't have these values. It may be possible to request it if we can find the FieldURI
                 continue
-            if f == 'is_read':
+            if f.name == 'is_read':
                 # This is always true for item attachments?
                 continue
-            old_val = getattr(attached_item1, f)
-            new_val = getattr(fresh_attachments[0].item, f)
-            if isinstance(old_val, (tuple, list)):
-                old_val, new_val = set(old_val), set(new_val)
-            self.assertEqual(old_val, new_val, (f, old_val, new_val))
+            old_val = getattr(attached_item1, f.name)
+            new_val = getattr(fresh_attachments[0].item, f.name)
+            if f.is_list:
+                old_val, new_val = set(old_val or ()), set(new_val or ())
+            self.assertEqual(old_val, new_val, (f.name, old_val, new_val))
 
         # Test attach with non-saved item
         attached_item3 = self.get_test_item(folder=self.test_folder)
@@ -2584,7 +2569,6 @@ class CalendarTest(BaseItemTest):
             start=self.tz.localize(EWSDateTime(2016, 1, 1, 8)),
             end=self.tz.localize(EWSDateTime(2016, 1, 1, 10)),
             categories=self.categories,
-            is_all_day=False,
         )
         item2 = self.ITEM_CLASS(
             account=self.account,
@@ -2593,7 +2577,6 @@ class CalendarTest(BaseItemTest):
             start=self.tz.localize(EWSDateTime(2016, 2, 1, 8)),
             end=self.tz.localize(EWSDateTime(2016, 2, 1, 10)),
             categories=self.categories,
-            is_all_day=False,
         )
         ids = self.test_folder.bulk_create(items=[item1, item2])
 
@@ -2751,9 +2734,9 @@ def get_random_datetime(start_date=datetime.date(1900, 1, 1), end_date=datetime.
     return UTC.localize(EWSDateTime.from_datetime(random_datetime))
 
 
-def get_random_datetime_range():
+def get_random_datetime_range(start_date=datetime.date(1900, 1, 1), end_date=datetime.date(2100, 1, 1)):
     # Create two random datetimes. Calendar items raise ErrorCalendarDurationIsTooLong if duration is > 5 years.
-    dt1 = get_random_datetime()
+    dt1 = get_random_datetime(start_date=start_date, end_date=end_date)
     dt2 = dt1 + datetime.timedelta(minutes=random.randint(0, 60 * 24 * 365 * 5))
     return dt1, dt2
 

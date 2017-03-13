@@ -145,9 +145,10 @@ class Q(object):
                 if value is None:
                     raise ValueError('Value for filter kwarg "%s" cannot be None' % key)
                 if '__' in key:
-                    field, lookup = key.rsplit('__')
+                    fieldname, lookup = key.rsplit('__')
                 else:
-                    field, lookup = key, None
+                    fieldname, lookup = key, None
+                field = folder_class.get_item_field_by_fieldname(fieldname)
                 cls._validate_field(field, folder_class)
                 # Filtering by category is a bit quirky. The only lookup type I have found to work is:
                 #
@@ -165,14 +166,13 @@ class Q(object):
                 # Exact matching of categories (i.e. match ['a', 'b'] but not ['a', 'b', 'c']) could be implemented by
                 # post-processing items. Fetch 'item:Categories' with additional_fields and remove the items that don't
                 # have an exact match, after the call to FindItems.
-                field_type = folder_class.field_type_for_field(field)
-                if isinstance(field_type, list):
+                if field.is_list:
                     if lookup not in (Q.LOOKUP_CONTAINS, Q.LOOKUP_IN):
                         raise ValueError(
                             "Field '%(field)s' can only be filtered using '%(field)s__contains=['a', 'b', ...]' and "
-                            "'%(field)s__in=['a', 'b', ...]'" % dict(field=field))
+                            "'%(field)s__in=['a', 'b', ...]'" % dict(field=fieldname))
                     if isinstance(value, (list, tuple, set)):
-                        children = [Q(**{field: v}) for v in value]
+                        children = [Q(**{fieldname: v}) for v in value]
                         if lookup == Q.LOOKUP_CONTAINS:
                             kwargs_q &= Q(*children, conn_type=Q.AND)
                         elif lookup == Q.LOOKUP_IN:
@@ -180,11 +180,11 @@ class Q(object):
                         else:
                             assert False
                     else:
-                        kwargs_q &= Q(**{field: value})
+                        kwargs_q &= Q(**{fieldname: value})
                     continue
                 if lookup == Q.LOOKUP_IN and isinstance(value, (list, tuple, set)):
                     # Allow '__in' lookup on non-list field types, specifying a list or a simple value
-                    children = [Q(**{field: v}) for v in value]
+                    children = [Q(**{fieldname: v}) for v in value]
                     kwargs_q &= Q(*children, conn_type=Q.OR)
                     continue
                 if isinstance(value, (list, tuple, set)) and lookup != Q.LOOKUP_RANGE:
@@ -289,15 +289,12 @@ class Q(object):
             # Flatten the tree a bit
             expr = self.children[0].expr()
         else:
+            from .folders import Field
             # Sort children by field name so we get stable output (for easier testing). Children should never be empty.
             expr = (' %s ' % (self.AND if self.conn_type == self.NOT else self.conn_type)).join(
                 (c.expr() if c.is_leaf() or c.conn_type == self.NOT else '(%s)' % c.expr())
-                for c in sorted(
-                    self.children,
-                    key=lambda i: i.field if isinstance(i.field, string_types)
-                    else '' if i.field is None
-                    else i.field.ELEMENT_NAME
-                )
+                for c in sorted(self.children, key=lambda i:
+                (i.field.name if isinstance(i.field, Field) else i.field) if i.field else '')
             )
         if not expr:
             return None  # Should not be necessary, but play safe
@@ -314,8 +311,8 @@ class Q(object):
         if self.translated:
             return self
         if self.field is not None:
+            self.field = folder_class.get_item_field_by_fieldname(self.field)
             self._validate_field(self.field, folder_class)
-            self.field = folder_class.fielduri_for_field(self.field)
         for c in self.children:
             c.translate_fields(folder_class=folder_class)
         self.translated = True
@@ -324,14 +321,13 @@ class Q(object):
     @staticmethod
     def _validate_field(field, folder_class):
         from .folders import Attachment, Mailbox, Attendee, PhysicalAddress
-        if field not in folder_class.allowed_field_names():
-            raise ValueError("'%s' is not a valid field when filtering on %s" % (field, folder_class.__name__))
-        if field in ('status', 'companies'):
-            raise ValueError("EWS does not support filtering on field '%s'" % field)
-        field_type = folder_class.field_type_for_field(field)
-        if field_type in ([Attachment], [Mailbox], [Attendee], [PhysicalAddress]):
-            raise ValueError(
-                "EWS does not support filtering on %s (non-searchable field type [%s])" % (field, field_type.__name__))
+        if field not in folder_class.allowed_fields():
+            raise ValueError("'%s' is not a valid field when filtering on %s" % (field.name, folder_class.__name__))
+        if field.name in ('status', 'companies'):
+            raise ValueError("EWS does not support filtering on field '%s'" % field.name)
+        if field.is_list and field.value_cls in (Attachment, Mailbox, Attendee, PhysicalAddress):
+            raise ValueError("EWS does not support filtering on %s (non-searchable field type [%s])" % (
+                field.name, field.value_cls.__name__))
 
     def to_xml(self, folder_class):
         # Translate this Q object to a valid Restriction XML tree
@@ -351,18 +347,15 @@ class Q(object):
         # Return an XML tree structure of this Q object. First, remove any empty children. If conn_type is AND or OR and
         # there is exactly one child, ignore the AND/OR and treat this node as a leaf. If this is an empty leaf
         # (equivalent of Q()), return None.
-        from .folders import IndexedField, ExtendedProperty
+        from .folders import SimpleField, IndexedField
         if self.is_empty():
             return None
         if self.is_leaf():
             assert self.field and self.op and self.value is not None
             elem = self._op_to_xml(self.op)
-            if isinstance(self.field, string_types):
-                field = create_element('t:FieldURI', FieldURI=self.field)
-            elif issubclass(self.field, IndexedField):
+            if isinstance(self.field, IndexedField):
                 field = self.field.field_uri_xml(label=self.value.label)
             else:
-                assert issubclass(self.field, ExtendedProperty)
                 field = self.field.field_uri_xml()
             elem.append(field)
             constant = create_element('t:Constant')
@@ -381,12 +374,7 @@ class Q(object):
             # We have multiple children. If conn_type is NOT, then group children with AND. We'll add the NOT later
             elem = self._conn_to_xml(self.AND if self.conn_type == self.NOT else self.conn_type)
             # Sort children by field name so we get stable output (for easier testing). Children should never be empty
-            for c in sorted(
-                    self.children,
-                    key=lambda i: i.field if isinstance(i.field, string_types)
-                    else '' if i.field is None
-                    else i.field.ELEMENT_NAME
-                    ):
+            for c in sorted(self.children, key=lambda i: i.field.name if i.field else ''):
                 elem.append(c.xml_elem())
         if elem is None:
             return None  # Should not be necessary, but play safe
