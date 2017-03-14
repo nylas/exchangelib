@@ -33,13 +33,7 @@ class Configuration(object):
     """
 
     def __init__(self, credentials, server=None, has_ssl=True, service_endpoint=None, auth_type=None,
-                 verify_ssl=True, version=None, **kwargs):
-        if kwargs:
-            username = kwargs.pop('username')
-            password = kwargs.pop('password')
-            if username or password:
-                raise DeprecationWarning("'username' and 'password' args are deprecated. Use 'credentials' instead")
-            assert not kwargs
+                 verify_ssl=True, version=None):
         if auth_type is not None and auth_type not in AUTH_TYPE_MAP:
             raise AttributeError('Unsupported auth type %s' % auth_type)
         if not (server or service_endpoint):

@@ -10,7 +10,7 @@ import time
 import unittest
 
 import requests
-from six import PY2, string_types
+from six import PY2, string_types, python_2_unicode_compatible
 from yaml import load
 from xml.etree.ElementTree import ParseError
 
@@ -22,16 +22,16 @@ from exchangelib.credentials import DELEGATE, IMPERSONATION, Credentials
 from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalidOperation, AutoDiscoverRedirect, \
     AutoDiscoverCircularRedirect, AutoDiscoverFailed, ErrorNonExistentMailbox, UnknownTimeZone, \
     ErrorNameResolutionNoResults, TransportError, RedirectError, CASError, RateLimitError, UnauthorizedError, \
-    ErrorInvalidChangeKey, ErrorInvalidIdMalformed
+    ErrorInvalidChangeKey, ErrorInvalidIdMalformed, SOAPError
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, ExtendedProperty, Choice, Email, Contact, \
-    Task, EmailAddress, PhysicalAddress, PhoneNumber, IndexedField, RoomList, Calendar, DeletedItems, Drafts, Inbox, \
+    Task, EmailAddress, PhysicalAddress, PhoneNumber,  RoomList, Calendar, DeletedItems, Drafts, Inbox, \
     Outbox, SentItems, JunkEmail, Messages, Tasks, Contacts, Item, AnyURI, Body, HTMLBody, FileAttachment, \
     ItemAttachment, Attachment, ALL_OCCURRENCIES, MimeContent, MessageHeader, Room, ExtendedPropertyField, Subject, \
     Location
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.restriction import Restriction, Q
-from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, GetAttachment, TNS
+from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, GetAttachment, ResolveNames, TNS
 from exchangelib.transport import NTLM, wrap
 from exchangelib.util import xml_to_str, chunkify, peek, get_redirect_url, to_xml, BOM, get_domain, \
     post_ratelimited, create_element, CONNECTION_ERRORS
@@ -76,6 +76,12 @@ class BuildTest(unittest.TestCase):
         with self.assertRaises(KeyError):
             Build(15, 4).api_version()
 
+
+class VersionTest(unittest.TestCase):
+    def test_default_api_version(self):
+        # Test that a version gets a reasonable api_version value if we don't set one explicitly
+        version = Version(build=Build(15, 1, 2, 3))
+        self.assertEqual(version.api_version, 'Exchange2016')
 
 class ConfigurationTest(unittest.TestCase):
     def test_hardcode_all(self):
@@ -271,11 +277,49 @@ class RestrictionTest(unittest.TestCase):
             "((b contains 'a' AND x contains 5) OR (NOT a contains 'c' AND c == 6 AND f > 3)) "
             "AND NOT (y == 9 AND z contains 'b')"
         )
+        # Test simulated IN expression
+        in_q = Q(foo__in=[1, 2, 3])
+        self.assertEqual(in_q.children[0].conn_type, Q.OR)
+        self.assertEqual(len(in_q.children[0].children), 3)
+
+    def test_q_inversion(self):
+        self.assertEqual((~Q(foo=5)).op, Q.NE)
+        self.assertEqual((~Q(foo__not=5)).op, Q.EQ)
+        self.assertEqual((~Q(foo__lt=5)).op, Q.GTE)
+        self.assertEqual((~Q(foo__lte=5)).op, Q.GT)
+        self.assertEqual((~Q(foo__gt=5)).op, Q.LTE)
+        self.assertEqual((~Q(foo__gte=5)).op, Q.LT)
+
+    def test_q_boolean_ops(self):
+        self.assertEqual((Q(foo=5) & Q(foo=6)).conn_type, Q.AND)
+        self.assertEqual((Q(foo=5) | Q(foo=6)).conn_type, Q.OR)
+
+    def test_q_failures(self):
+        with self.assertRaises(ValueError):
+            # Invalid lookup
+            Q(foo__XXX=5)
+        with self.assertRaises(ValueError):
+            # Invalid value
+            Q(foo=None)
 
 
 class QuerySetTest(unittest.TestCase):
+    @python_2_unicode_compatible
+    class MockAccount(Account):
+        def __init__(self):
+            pass
+        def __str__(self):
+            return ''
+
+    def test_from_folder(self):
+        folder = Inbox(account=self.MockAccount())
+        self.assertIsInstance(folder.all(), QuerySet)
+        self.assertIsInstance(folder.none(), QuerySet)
+        self.assertIsInstance(folder.filter(subject='foo'), QuerySet)
+        self.assertIsInstance(folder.exclude(subject='foo'), QuerySet)
+
     def test_queryset_copy(self):
-        qs = QuerySet(folder=Inbox(account=None))
+        qs = QuerySet(folder=Inbox(account=self.MockAccount()))
         qs.q = Q()
         qs.only_fields = ('a', 'b')
         qs.order_fields = ('c', 'd')
@@ -397,20 +441,11 @@ class UtilTest(unittest.TestCase):
 
     def test_get_redirect_url(self):
         r = requests.get('https://httpbin.org/redirect-to?url=https://example.com/', allow_redirects=False)
-        url, server, has_ssl = get_redirect_url(r)
-        self.assertEqual(url, 'https://example.com/')
-        self.assertEqual(server, 'example.com')
-        self.assertEqual(has_ssl, True)
+        self.assertEqual(get_redirect_url(r), 'https://example.com/')
         r = requests.get('https://httpbin.org/redirect-to?url=http://example.com/', allow_redirects=False)
-        url, server, has_ssl = get_redirect_url(r)
-        self.assertEqual(url, 'http://example.com/')
-        self.assertEqual(server, 'example.com')
-        self.assertEqual(has_ssl, False)
+        self.assertEqual(get_redirect_url(r), 'http://example.com/')
         r = requests.get('https://httpbin.org/redirect-to?url=/example', allow_redirects=False)
-        url, server, has_ssl = get_redirect_url(r)
-        self.assertEqual(url, 'https://httpbin.org/example')
-        self.assertEqual(server, 'httpbin.org')
-        self.assertEqual(has_ssl, True)
+        self.assertEqual(get_redirect_url(r), 'https://httpbin.org/example')
         with self.assertRaises(RelativeRedirect):
             r = requests.get('https://httpbin.org/redirect-to?url=https://example.com', allow_redirects=False)
             get_redirect_url(r, require_relative=True)
@@ -495,7 +530,7 @@ class EWSTest(unittest.TestCase):
             return [MessageHeader(name=get_random_string(10), value=get_random_string(255))
                     for _ in range(random.randint(1, 4))]
         if field.value_cls == Attachment:
-            val = [FileAttachment(name='my_file.txt', content=b'test_content')]
+            return [FileAttachment(name='my_file.txt', content=b'test_content')]
         if field.value_cls == Mailbox:
             # email_address must be a real account on the server(?)
             # TODO: Mailbox has multiple optional args, but they must match the server account, so we can't easily test.
@@ -758,19 +793,22 @@ class CommonTest(EWSTest):
         self.assertIn(self.config.credentials.username, str(self.config.credentials))
         self.assertIn(self.account.primary_smtp_address, str(self.account))
         self.assertIn(str(self.account.version.build.major_version), repr(self.account.version))
-        repr(self.config)
-        repr(self.config.protocol)
-        repr(self.account.version)
-        # Folders
-        repr(self.account.trash)
-        repr(self.account.drafts)
-        repr(self.account.inbox)
-        repr(self.account.outbox)
-        repr(self.account.sent)
-        repr(self.account.junk)
-        repr(self.account.contacts)
-        repr(self.account.tasks)
-        repr(self.account.calendar)
+        for item in (
+                self.config,
+                self.config.protocol,
+                self.account.version,
+                self.account.trash,
+                self.account.drafts,
+                self.account.inbox,
+                self.account.outbox,
+                self.account.sent,
+                self.account.junk,
+                self.account.contacts,
+                self.account.tasks,
+                self.account.calendar):
+            # Just test that these at least don't throw errors
+            repr(item)
+            str(item)
 
     def test_configuration(self):
         with self.assertRaises(AttributeError):
@@ -779,10 +817,6 @@ class CommonTest(EWSTest):
             Configuration(credentials=Credentials(username='foo', password='bar'),
                           service_endpoint='http://example.com/svc',
                           auth_type='XXX')
-        with self.assertRaises(DeprecationWarning):
-            Configuration(credentials=Credentials(username='foo', password='bar'),
-                          username='foo',
-                          password='bar')
 
     def test_failed_login(self):
         with self.assertRaises(UnauthorizedError):
@@ -825,7 +859,6 @@ class CommonTest(EWSTest):
         self.assertEqual(r.text, 'foo')
 
         # Test exceptions raises by the POST request
-        import requests.exceptions
         for exc_cls in CONNECTION_ERRORS:
             session.post = mock_session_exception(exc_cls)
             with self.assertRaises(exc_cls):
@@ -900,6 +933,46 @@ class CommonTest(EWSTest):
         protocol.release_session(session)
         protocol.credentials.is_service_account = is_service_account
 
+    def test_soap_error(self):
+        soap_xml = """\
+<?xml version="1.0" encoding="utf-8" ?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
+               xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+               xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <soap:Header>
+    <t:ServerVersionInfo MajorVersion="8" MinorVersion="0" MajorBuildNumber="685" MinorBuildNumber="8"
+                         xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types" />
+  </soap:Header>
+  <soap:Body>
+    <soap:Fault>
+      <faultcode>{faultcode}</faultcode>
+      <faultstring>{faultstring}</faultstring>
+      <faultactor>https://CAS01.example.com/EWS/Exchange.asmx</faultactor>
+      <detail>
+        <ResponseCode xmlns="http://schemas.microsoft.com/exchange/services/2006/errors">{responsecode}</ResponseCode>
+        <Message xmlns="http://schemas.microsoft.com/exchange/services/2006/errors">{message}</Message>
+      </detail>
+    </soap:Fault>
+  </soap:Body>
+</soap:Envelope>"""
+        with self.assertRaises(SOAPError) as e:
+            ResolveNames._get_soap_payload(to_xml(soap_xml.format(
+                faultcode='YYY', faultstring='AAA', responsecode='XXX', message='ZZZ'
+            ), encoding='utf-8'))
+        self.assertIn('AAA', e.exception.args[0])
+        self.assertIn('YYY', e.exception.args[0])
+        self.assertIn('ZZZ', e.exception.args[0])
+        with self.assertRaises(ErrorNonExistentMailbox) as e:
+            ResolveNames._get_soap_payload(to_xml(soap_xml.format(
+                faultcode='ErrorNonExistentMailbox', faultstring='AAA', responsecode='XXX', message='ZZZ'
+            ), encoding='utf-8'))
+        self.assertIn('AAA', e.exception.args[0])
+        with self.assertRaises(ErrorNonExistentMailbox) as e:
+            ResolveNames._get_soap_payload(to_xml(soap_xml.format(
+                faultcode='XXX', faultstring='AAA', responsecode='ErrorNonExistentMailbox', message='YYY'
+            ), encoding='utf-8'))
+        self.assertIn('YYY', e.exception.args[0])
+
 
 class AccountTest(EWSTest):
     def test_magic(self):
@@ -936,6 +1009,10 @@ class AutodiscoverTest(EWSTest):
         self.assertEqual(primary_smtp_address, self.account.primary_smtp_address)
         self.assertEqual(protocol.service_endpoint.lower(), self.config.protocol.service_endpoint.lower())
         self.assertEqual(protocol.version.build, self.config.protocol.version.build)
+
+    def test_autodiscover_failure(self):
+        with self.assertRaises(ErrorNonExistentMailbox):
+            discover(email='XXX.' + self.account.primary_smtp_address, credentials=self.config.credentials)
 
     def test_close_autodiscover_connections(self):
         discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
@@ -1084,7 +1161,6 @@ class AutodiscoverTest(EWSTest):
             _get_hostname_from_srv('example.com.')
         dns.resolver.Resolver = _orig
 
-
 class FolderTest(EWSTest):
     def test_folders(self):
         folders = self.account.folders
@@ -1105,6 +1181,10 @@ class FolderTest(EWSTest):
         ):
             self.assertIsInstance(f, cls)
             f.test_access()
+            # Test item field lookup
+            self.assertEqual(f.get_item_field_by_fieldname('subject').name, 'subject')
+            with self.assertRaises(ValueError):
+                f.get_item_field_by_fieldname('XXX')
 
     def test_getfolders(self):
         folders = self.account.root.get_folders()
@@ -2578,7 +2658,7 @@ class CalendarTest(BaseItemTest):
             end=self.tz.localize(EWSDateTime(2016, 2, 1, 10)),
             categories=self.categories,
         )
-        ids = self.test_folder.bulk_create(items=[item1, item2])
+        self.test_folder.bulk_create(items=[item1, item2])
 
         # Test missing args
         with self.assertRaises(TypeError):
@@ -2638,9 +2718,27 @@ class MessagesTest(BaseItemTest):
         self.assertIsNone(item.item_id)
         self.assertIsNone(item.changekey)
         time.sleep(5)  # Requests are supposed to be transactional, but apparently not...
-        ids = self.test_folder.filter(categories__contains=item.categories).values_list('item_id', 'changekey')
-        self.assertEqual(len(ids), 1)
-        item.item_id, item.changekey = ids[0]
+        self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 1)
+
+    def test_send_draft(self):
+        item = self.get_test_item()
+        item.folder = self.account.drafts
+        item.is_draft = True
+        item.save()  # Save a draft
+        item.send()  # Send the draft
+        self.assertIsNone(item.item_id)
+        self.assertIsNone(item.changekey)
+        self.assertIsNone(item.folder)
+        self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 0)
+
+    def test_send_and_copy_to_folder(self):
+        item = self.get_test_item()
+        item.send(save_copy=True, copy_to_folder=self.account.sent)  # Send the draft and save to the sent folder
+        self.assertIsNone(item.item_id)
+        self.assertIsNone(item.changekey)
+        self.assertEqual(item.folder, self.account.sent)
+        time.sleep(5)  # Requests are supposed to be transactional, but apparently not...
+        self.assertEqual(len(self.account.sent.filter(categories__contains=item.categories)), 1)
 
     def test_bulk_send(self):
         item = self.get_test_item()
@@ -2652,8 +2750,6 @@ class MessagesTest(BaseItemTest):
         ids = self.account.sent.filter(categories__contains=item.categories).values_list('item_id', 'changekey')
         self.assertEqual(len(ids), 1)
         self.bulk_delete(ids)
-
-    # TODO: test if we can update existing, non-draft messages in the test folder
 
 
 class TasksTest(BaseItemTest):

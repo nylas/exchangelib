@@ -94,7 +94,7 @@ class AutodiscoverCache(object):
         self._protocols.clear()
 
     def __contains__(self, key):
-        domain, credentials, verify_ssl = key
+        domain, _, verify_ssl = key
         with shelve_open(self._storage_file) as db:
             return str(domain) in db
 
@@ -112,7 +112,7 @@ class AutodiscoverCache(object):
 
     def __setitem__(self, key, protocol):
         # Populate both local and persistent cache
-        domain, credentials, verify_ssl = key
+        domain, _, verify_ssl = key
         with shelve_open(self._storage_file) as db:
             db[str(domain)] = (protocol.service_endpoint, protocol.auth_type)
         self._protocols[key] = protocol
@@ -120,7 +120,7 @@ class AutodiscoverCache(object):
     def __delitem__(self, key):
         # Empty both local and persistent cache. Don't fail on non-existing entries because we could end here
         # multiple times due to race conditions.
-        domain, credentials, verify_ssl = key
+        domain, _, verify_ssl = key
         with shelve_open(self._storage_file) as db:
             try:
                 del db[str(domain)]
@@ -299,7 +299,7 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl, verify, auth_t
     r = _get_autodiscover_response(protocol=autodiscover_protocol, email=email)
     domain = get_domain(email)
     try:
-        server, has_ssl, ews_url, ews_auth_type, primary_smtp_address = _parse_response(r.text)
+        has_ssl, ews_url, ews_auth_type, primary_smtp_address = _parse_response(r.text)
         if not primary_smtp_address:
             primary_smtp_address = email
     except (ErrorNonExistentMailbox, AutoDiscoverRedirect):
@@ -322,7 +322,7 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl, verify, auth_t
 
 def _autodiscover_quick(credentials, email, protocol):
     r = _get_autodiscover_response(protocol=protocol, email=email)
-    server, has_ssl, ews_url, ews_auth_type, primary_smtp_address = _parse_response(r.text)
+    has_ssl, ews_url, ews_auth_type, primary_smtp_address = _parse_response(r.text)
     if not primary_smtp_address:
         primary_smtp_address = email
     log.debug('Autodiscover success: %s may connect to %s as primary email %s', email, ews_url, primary_smtp_address)
@@ -421,7 +421,6 @@ def _parse_response(response, encoding='utf-8'):
             # Neither type was found. Give up
             raise AutoDiscoverFailed('Invalid AutoDiscover response: %s' % response)
 
-    server = get_xml_attr(protocol, '{%s}Server' % RESPONSE_NS)
     has_ssl = True if get_xml_attr(protocol, '{%s}SSL' % RESPONSE_NS) == 'On' else False
     ews_url = get_xml_attr(protocol, '{%s}EwsUrl' % RESPONSE_NS)
     auth_package = get_xml_attr(protocol, '{%s}AuthPackage' % RESPONSE_NS)
@@ -436,11 +435,10 @@ def _parse_response(response, encoding='utf-8'):
         log.warning("Unknown auth package '%s'")
         ews_auth_type = transport.UNKNOWN
     log.debug('Primary SMTP: %s, EWS endpoint: %s, auth type: %s', primary_smtp_address, ews_url, ews_auth_type)
-    assert server
     assert has_ssl in (True, False)
     assert ews_url
     assert ews_auth_type
-    return server, has_ssl, ews_url, ews_auth_type, primary_smtp_address
+    return has_ssl, ews_url, ews_auth_type, primary_smtp_address
 
 
 def _get_canonical_name(hostname):
@@ -459,10 +457,11 @@ def _get_canonical_name(hostname):
 
 
 def _get_hostname_from_srv(hostname):
-    # May return e.g.:
+    # An SRV entry may contain e.g.:
     #   canonical name = mail.ucl.dk.
     #   service = 8 100 443 webmail.ucn.dk.
     # or throw dns.resolver.NoAnswer
+    # The first three numbers in the service line are priority, weight, port
     log.debug('Attempting to get SRV record on %s', hostname)
     resolver = dns.resolver.Resolver()
     resolver.timeout = TIMEOUT
@@ -471,7 +470,7 @@ def _get_hostname_from_srv(hostname):
         for rdata in answers:
             try:
                 vals = rdata.to_text().strip().rstrip('.').split(' ')
-                priority, weight, port, svr = int(vals[0]), int(vals[1]), int(vals[2]), vals[3]
+                _, _, _, svr = int(vals[0]), int(vals[1]), int(vals[2]), vals[3]
             except (ValueError, KeyError) as e:
                 raise_from(AutoDiscoverFailed('Incompatible SRV record for %s (%s)' % (hostname, rdata.to_text())), e)
             else:

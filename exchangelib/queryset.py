@@ -122,7 +122,7 @@ class QuerySet(object):
         for f in field_names:
             if not isinstance(f, string_types):
                 raise ValueError("Fieldname '%s' must be a string" % f)
-            field_name, label, subfield, reverse = split_fieldname(f)
+            field_name = split_fieldname(f)[0]
             field = self.folder.get_item_field_by_fieldname(field_name)
             fields.append(field)
         return tuple(fields)

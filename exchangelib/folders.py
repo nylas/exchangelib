@@ -931,15 +931,6 @@ class Attendee(EWSElement):
         elem.clear()
         return res
 
-    @classmethod
-    def set_field_xml(cls, field_elem, items, version):
-        # Builds the XML for a SetItemField element
-        for item in items:
-            attendee = create_element(cls.request_tag())
-            set_xml_value(attendee, item.mailbox, version)
-            field_elem.append(attendee)
-        return field_elem
-
     def __hash__(self):
         # TODO: maybe take 'response_type' and 'last_response_time' into account?
         return hash(self.mailbox)
@@ -1047,8 +1038,8 @@ class Field(object):
                         body_type = field_elem.get('BodyType')
                         try:
                             val = {
-                                Body.body_type: lambda v: Body(v),
-                                HTMLBody.body_type: lambda v: HTMLBody(v),
+                                Body.body_type: Body,
+                                HTMLBody.body_type: HTMLBody,
                             }[body_type](val)
                         except KeyError:
                             assert False, "Unknown BodyType '%s'" % body_type
@@ -1069,9 +1060,6 @@ class Field(object):
         raise NotImplementedError()
 
     def field_uri_xml(self):
-        raise NotImplementedError()
-
-    def set_field_xml(self):
         raise NotImplementedError()
 
     def request_tag(self):
@@ -1283,8 +1271,9 @@ class Item(EWSElement):
 
         for f in self.ITEM_FIELDS:
             setattr(self, f.name, kwargs.pop(f.name, None))
-        for k, v in kwargs.items():
-            raise TypeError("'%s' is an invalid keyword argument for this function" % k)
+        if kwargs:
+            raise TypeError("%s are invalid keyword arguments for this function" %
+                            ', '.join("'%s'" % k for k in kwargs.keys()))
         # self.clean()
         if self.attachments is None:
             self.attachments = []
@@ -1476,22 +1465,6 @@ class Item(EWSElement):
     def fieldnames(cls):
         # Return non-ID field names
         return set(f.name for f in cls.ITEM_FIELDS if f.name not in ('item_id', 'changekey'))
-
-    @classmethod
-    def required_fields(cls):
-        return set(f for f in cls.ITEM_FIELDS if f.is_required)
-
-    @classmethod
-    def readonly_fields(cls):
-        return set(f for f in cls.ITEM_FIELDS if f.is_read_only)
-
-    @classmethod
-    def readonly_after_send_fields(cls):
-        return set(f for f in cls.ITEM_FIELDS if f.is_read_only_after_send)
-
-    @classmethod
-    def complex_fields(cls):
-        return set(f for f in cls.ITEM_FIELDS if f.is_complex)
 
     @classmethod
     def id_from_xml(cls, elem):
@@ -1999,14 +1972,16 @@ class Folder(EWSElement):
     __slots__ = ('account',) + tuple(f.name for f in FOLDER_FIELDS)
 
     def __init__(self, account, **kwargs):
+        from .account import Account
+        assert isinstance(account, Account)
         self.account = account
-
         for f in self.FOLDER_FIELDS:
             setattr(self, f.name, kwargs.pop(f.name, None))
-        for k, v in kwargs.items():
-            raise TypeError("'%s' is an invalid keyword argument for this function" % k)
+        if kwargs:
+            raise TypeError("%s are invalid keyword arguments for this function" %
+                            ', '.join("'%s'" % k for k in kwargs.keys()))
         self.clean()
-        log.debug('%s created for %s', self, account)
+        log.debug('%s created for %s', self, self.account)
 
     def clean(self):
         if self.name is None:
@@ -2056,7 +2031,9 @@ class Folder(EWSElement):
     def complex_fields(cls):
         fields = set()
         for item_model in cls.supported_item_models:
-            fields.update(item_model.complex_fields())
+            for f in item_model.ITEM_FIELDS:
+                if f.is_complex:
+                    fields.add(f)
         return fields
 
     @classmethod
@@ -2175,38 +2152,10 @@ class Folder(EWSElement):
                 else:
                     yield self.item_model_from_tag(i.tag).from_xml(elem=i, account=self.account, folder=self)
 
-    def add_items(self, *args, **kwargs):
-        warnings.warn('add_items() is deprecated. Use bulk_create() instead', PendingDeprecationWarning)
-        return self.bulk_create(*args, **kwargs)
-
     def bulk_create(self, items, *args, **kwargs):
         return self.account.bulk_create(folder=self, items=items, *args, **kwargs)
 
-    def delete_items(self, ids, *args, **kwargs):
-        warnings.warn('delete_items() is deprecated. Use bulk_delete() instead', PendingDeprecationWarning)
-        return self.bulk_delete(ids, *args, **kwargs)
-
-    def bulk_delete(self, ids, *args, **kwargs):
-        warnings.warn('Folder.bulk_delete() is deprecated. Use Account.bulk_delete() instead', PendingDeprecationWarning)
-        return self.account.bulk_delete(ids, *args, **kwargs)
-
-    def update_items(self, items, *args, **kwargs):
-        warnings.warn('update_items() is deprecated. Use bulk_update() instead', PendingDeprecationWarning)
-        return self.bulk_update(items, *args, **kwargs)
-
-    def bulk_update(self, items, *args, **kwargs):
-        warnings.warn('Folder.bulk_update() is deprecated. Use Account.bulk_update() instead', PendingDeprecationWarning)
-        return self.account.bulk_update(items, *args, **kwargs)
-
-    def get_items(self, *args, **kwargs):
-        warnings.warn('get_items() is deprecated. Use fetch() instead', PendingDeprecationWarning)
-        return self.fetch(*args, **kwargs)
-
     def fetch(self, *args, **kwargs):
-        if hasattr(self, 'with_extra_fields'):
-            raise DeprecationWarning(
-                "'%(cls)s.with_extra_fields' is deprecated. Use 'fetch(ids, only_fields=[...])' instead"
-                % dict(cls=self.__class__.__name__))
         return self.account.fetch(folder=self, *args, **kwargs)
 
     def test_access(self):

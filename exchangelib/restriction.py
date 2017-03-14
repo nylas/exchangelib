@@ -293,8 +293,9 @@ class Q(object):
             # Sort children by field name so we get stable output (for easier testing). Children should never be empty.
             expr = (' %s ' % (self.AND if self.conn_type == self.NOT else self.conn_type)).join(
                 (c.expr() if c.is_leaf() or c.conn_type == self.NOT else '(%s)' % c.expr())
-                for c in sorted(self.children, key=lambda i:
-                (i.field.name if isinstance(i.field, Field) else i.field) if i.field else '')
+                for c in sorted(
+                    self.children,
+                    key=lambda i: (i.field.name if isinstance(i.field, Field) else i.field) if i.field else '')
             )
         if not expr:
             return None  # Should not be necessary, but play safe
@@ -347,7 +348,7 @@ class Q(object):
         # Return an XML tree structure of this Q object. First, remove any empty children. If conn_type is AND or OR and
         # there is exactly one child, ignore the AND/OR and treat this node as a leaf. If this is an empty leaf
         # (equivalent of Q()), return None.
-        from .folders import SimpleField, IndexedField
+        from .folders import IndexedField
         if self.is_empty():
             return None
         if self.is_leaf():

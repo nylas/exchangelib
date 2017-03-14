@@ -3,14 +3,13 @@ from __future__ import unicode_literals
 
 import logging
 
-from six import text_type
 import requests.sessions
 import requests.auth
 import requests_ntlm
 
 from .credentials import IMPERSONATION
 from .errors import UnauthorizedError, TransportError, RedirectError, RelativeRedirect
-from .util import create_element, add_xml_child, is_xml, get_redirect_url, xml_to_str
+from .util import create_element, add_xml_child, get_redirect_url, xml_to_str
 
 log = logging.getLogger(__name__)
 
@@ -33,34 +32,6 @@ AUTH_TYPE_MAP = {
     DIGEST: requests.auth.HTTPDigestAuth,
     NOAUTH: None,
 }
-
-
-def _test_response(auth, response):
-    log.debug('Response headers: %s', response.headers)
-    resp = response.text
-    log.debug('Response data: %s [...]', text_type(resp[:1000]))
-    if is_xml(resp):
-        log.debug('This is XML')
-        # Assume that any XML response is good news
-        return True
-    elif _is_unauthorized(resp):
-        # Exchange brilliantly sends an unauth message as a non-401 page. Clever.
-        raise UnauthorizedError('Unauthorized (non-401)')
-    elif isinstance(auth, requests_ntlm.HttpNtlmAuth) and not resp:
-        # It seems the NTLM handler doesn't throw 401 errors. If the request is invalid, it doesn't bother
-        # responding with anything. Even more clever.
-        raise UnauthorizedError('Unauthorized (NTLM, empty response)')
-    else:
-        raise TransportError('Unknown response from Exchange:\n\n%s' % resp)
-
-
-def _is_unauthorized(txt):
-    """
-    Helper function. Test if response contains an "Unauthorized" message
-    """
-    if txt.lower().count('unauthorized') > 0:
-        return True
-    return False
 
 
 def wrap(content, version, account, ewstimezone=None, encoding='utf-8'):
@@ -120,7 +91,7 @@ def get_autodiscover_authtype(service_endpoint, data, timeout, verify):
         r = s.head(url=service_endpoint, headers=headers, timeout=timeout, allow_redirects=False, verify=verify)
         if r.status_code == 302:
             try:
-                redirect_url, redirect_server, redirect_has_ssl = get_redirect_url(r, require_relative=True)
+                redirect_url = get_redirect_url(r, require_relative=True)
                 log.debug('Autodiscover HTTP redirect to %s', redirect_url)
             except RelativeRedirect as e:
                 # We were redirected to a different domain or sheme. Raise RedirectError so higher-level code can
@@ -172,7 +143,7 @@ def _get_auth_method_from_response(response):
     if response.status_code == 302:
         # Some servers are set up to redirect to OWA on all requests except POST to EWS/Exchange.asmx
         try:
-            redirect_url, redirect_server, redirect_has_ssl = get_redirect_url(response, allow_relative=False)
+            redirect_url = get_redirect_url(response, allow_relative=False)
         except RelativeRedirect:
             raise TransportError('Circular redirect')
         raise RedirectError(url=redirect_url)

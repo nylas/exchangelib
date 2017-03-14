@@ -82,15 +82,20 @@ class Build(object):
 
     @classmethod
     def from_xml(cls, elem):
-        keys = 'MajorVersion', 'MinorVersion', 'MajorBuildNumber', 'MinorBuildNumber'
-        vals = []
-        for k in keys:
-            v = elem.get(k)
+        xml_elems_map = {
+            'major_version': 'MajorVersion',
+            'minor_version': 'MinorVersion',
+            'major_build': 'MajorBuildNumber',
+            'minor_build': 'MinorBuildNumber',
+        }
+        kwargs = {}
+        for k, xml_elem in xml_elems_map.items():
+            v = elem.get(xml_elem)
             if v is None:
                 raise ValueError()
-            vals.append(int(v))  # Also raises ValueError
+            kwargs[k] = int(v)  # Also raises ValueError
         elem.clear()
-        return cls(*vals)
+        return cls(**kwargs)
 
     def api_version(self):
         if self.major_version == 15 and self.minor_version == 0 and self.major_build >= 847:
@@ -148,9 +153,11 @@ class Version(object):
     Holds information about the server version
     """
 
-    def __init__(self, build, api_version):
+    def __init__(self, build, api_version=None):
         self.build = build
         self.api_version = api_version
+        if self.build is not None and self.api_version is None:
+            self.api_version = build.api_version()
 
     @property
     def fullname(self):

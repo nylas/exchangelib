@@ -165,7 +165,7 @@ class CachingProtocol(type):
     @classmethod
     def clear_cache(mcs):
         for key, protocol in mcs._protocol_cache.items():
-            service_endpoint, credentials, verify_ssl = key
+            service_endpoint, _, verify_ssl = key
             log.debug("Service endpoint '%s': Closing sessions", service_endpoint)
             protocol.close()
             del protocol
@@ -248,7 +248,7 @@ class EWSSession(requests.sessions.Session):
         # Close underlying socket. This ensures we don't leave stray sockets around after program exit.
         adapter = self.get_adapter(url)
         pool = adapter.get_connection(url)
-        for i in range(pool.pool.qsize()):
+        for _ in range(pool.pool.qsize()):
             conn = pool._get_conn()
             if conn.sock:
                 log.debug('Closing socket %s', text_type(conn.sock.getsockname()))

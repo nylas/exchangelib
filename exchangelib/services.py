@@ -195,7 +195,7 @@ class EWSService(object):
         faultactor = get_xml_attr(fault, 'faultactor')
         detail = fault.find('detail')
         if detail is not None:
-            code, msg = None, None
+            code, msg = None, ''
             if detail.find('{%s}ResponseCode' % ENS) is not None:
                 code = get_xml_attr(detail, '{%s}ResponseCode' % ENS)
             if detail.find('{%s}Message' % ENS) is not None:
@@ -331,11 +331,6 @@ class PagingEWSMixIn(EWSService):
         return rootfolder, next_offset
 
 
-class ExpectResponseErrorsMixin(EWSService):
-    """Don't raise errors in the response, just return them as if they're warnings"""
-    ERRORS_TO_CATCH_IN_RESPONSE = ResponseMessageError
-
-
 class GetServerTimeZones(EWSService):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/dd899371(v=exchg.150).aspx
@@ -444,21 +439,7 @@ class EWSPooledMixIn(EWSService):
                 yield elem
 
 
-class EWSPooledAccountService(EWSAccountService, EWSPooledMixIn):
-    CHUNKSIZE = None
-
-    def call(self, **kwargs):
-        return self._pool_requests(payload_func=self._get_payload, **kwargs)
-
-
-class EWSPooledFolderService(EWSFolderService, EWSPooledMixIn):
-    CHUNKSIZE = None
-
-    def call(self, **kwargs):
-        return self._pool_requests(payload_func=self._get_payload, **kwargs)
-
-
-class GetItem(EWSPooledAccountService):
+class GetItem(EWSAccountService, EWSPooledMixIn):
     """
     Take a list of (id, changekey) tuples and returns all items in 'account', optionally expanded with
     'additional_fields' fields, in stable order.
@@ -469,7 +450,7 @@ class GetItem(EWSPooledAccountService):
     SERVICE_NAME = 'GetItem'
     element_container_name = '{%s}Items' % MNS
 
-    def _get_payload(self, items, folder, additional_fields):
+    def _get_payload(self, items, additional_fields):
         # Takes a list of (item_id, changekey) tuples or Item objects and returns the XML for a GetItem request.
         #
         # We start with an IdOnly request. 'additional_properties' defines the additional fields we want. Supported
@@ -501,7 +482,7 @@ class GetItem(EWSPooledAccountService):
         return getitem
 
 
-class CreateItem(EWSPooledAccountService):
+class CreateItem(EWSAccountService, EWSPooledMixIn):
     """
     Takes folder and a list of items. Returns result of creation as a list of tuples (success[True|False],
     errormessage), in the same order as the input list.
@@ -539,7 +520,7 @@ class CreateItem(EWSPooledAccountService):
         return createitem
 
 
-class UpdateItem(EWSPooledAccountService):
+class UpdateItem(EWSAccountService, EWSPooledMixIn):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa580254(v=exchg.150).aspx
     """
@@ -687,7 +668,7 @@ class UpdateItem(EWSPooledAccountService):
         return updateitem
 
 
-class DeleteItem(EWSPooledAccountService):
+class DeleteItem(EWSAccountService, EWSPooledMixIn):
     """
     Takes a folder and a list of (id, changekey) tuples. Returns result of deletion as a list of tuples
     (success[True|False], errormessage), in the same order as the input list.
@@ -1029,20 +1010,19 @@ class DeleteAttachment(EWSAccountService):
         return payload
 
 
-class ExportItems(EWSPooledAccountService, ExpectResponseErrorsMixin):
+class ExportItems(EWSAccountService, EWSPooledMixIn):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/ff709523(v=exchg.150).aspx
     """
+    ERRORS_TO_CATCH_IN_RESPONSE = ResponseMessageError
     CHUNKSIZE = 100
     SERVICE_NAME = 'ExportItems'
     element_container_name = "{%s}Data" % MNS
 
     def call(self, item_ids):
-        return self._pool_requests(
-            payload_func=self._get_payload, items=item_ids, version=self.account.version
-        )
+        return self._pool_requests(payload_func=self._get_payload, items=item_ids)
 
-    def _get_payload(self, items, version):
+    def _get_payload(self, items):
         from .folders import ItemId
         exportitems = create_element('m:%s' % self.SERVICE_NAME)
         itemids = create_element('m:ItemIds')
@@ -1060,7 +1040,7 @@ class ExportItems(EWSPooledAccountService, ExpectResponseErrorsMixin):
         return [container.text]
 
 
-class UploadItems(EWSPooledAccountService):
+class UploadItems(EWSAccountService, EWSPooledMixIn):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/ff709490(v=exchg.150).aspx
 
@@ -1080,9 +1060,7 @@ class UploadItems(EWSPooledAccountService):
         and the second element is a Data string returned from an ExportItems
         call.
         """
-        return self._pool_requests(
-            payload_func=self._get_payload, items=data
-        )
+        return self._pool_requests(payload_func=self._get_payload, items=data)
 
     def _get_payload(self, items):
         uploaditems = create_element('m:%s' % self.SERVICE_NAME)

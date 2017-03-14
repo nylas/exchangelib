@@ -379,7 +379,7 @@ class Account(object):
                 assert f in allowed_fields
         else:
             only_fields = {f for f in validation_folder.allowed_fields() if f.name not in ('item_id', 'changekey')}
-        for i in GetItem(account=self).call(items=ids, folder=validation_folder, additional_fields=only_fields):
+        for i in GetItem(account=self).call(items=ids, additional_fields=only_fields):
             if isinstance(i, Exception):
                 yield i
             else:

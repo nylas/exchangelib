@@ -131,9 +131,9 @@ def value_to_xml_text(value):
 
 
 def xml_text_to_value(value, value_type):
+    from .ewsdatetime import EWSDateTime
     if value is None:
         return None
-    from .ewsdatetime import EWSDateTime
     if value_type == string_type:
         # Return builtin str unprocessed
         return value
@@ -146,9 +146,9 @@ def xml_text_to_value(value, value_type):
         return value_type(value)
     return {
         bool: lambda v: True if v == 'true' else False if v == 'false' else None,
-        int: lambda v: int(v),
-        Decimal: lambda v: Decimal(v),
-        EWSDateTime: lambda v: EWSDateTime.from_string(v),
+        int: int,
+        Decimal: Decimal,
+        EWSDateTime: EWSDateTime.from_string,
     }[value_type](value)
 
 
@@ -267,7 +267,7 @@ def get_redirect_url(response, allow_relative=True, require_relative=False):
     redirect_has_ssl, redirect_server, redirect_path = split_url(redirect_url)
     # The response may have been redirected already. Get the original URL
     request_url = response.history[0] if response.history else response.url
-    request_has_ssl, request_server, request_path = split_url(request_url)
+    request_has_ssl, request_server, _ = split_url(request_url)
     response_has_ssl, response_server, response_path = split_url(response.url)
 
     if not redirect_server:
@@ -285,7 +285,7 @@ def get_redirect_url(response, allow_relative=True, require_relative=False):
         raise RelativeRedirect(redirect_url)
     if require_relative and (request_has_ssl != response_has_ssl or request_server != redirect_server):
         raise RelativeRedirect(redirect_url)
-    return redirect_url, redirect_server, redirect_has_ssl
+    return redirect_url
 
 
 MAX_WAIT = 3600  # seconds
@@ -397,7 +397,7 @@ Response headers: %(response_headers)s'''
             if r.status_code == 302:
                 # If we get a normal 302 redirect, requests will issue a GET to that URL. We still want to POST
                 try:
-                    redirect_url, server, has_ssl = get_redirect_url(response=r, allow_relative=False)
+                    redirect_url = get_redirect_url(response=r, allow_relative=False)
                 except RelativeRedirect as e:
                     log.debug("'allow_redirects' only supports relative redirects (%s -> %s)", url, e.value)
                     raise RedirectError(url=e.value)
