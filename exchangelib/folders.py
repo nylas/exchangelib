@@ -982,7 +982,8 @@ class Field(object):
 
         # For value_cls that are subclasses of string types, convert simple string values to their subclass equivalent
         # (e.g. str to Body and str to Subject) so we can call value.clean()
-        if issubclass(self.value_cls, string_types) and self.value_cls not in string_types and type(value) in string_types:
+        if issubclass(self.value_cls, string_types) and self.value_cls != string_type \
+                and not isinstance(value, self.value_cls):
             value = self.value_cls(value)
         elif self.value_cls == Mailbox:
             if self.is_list:

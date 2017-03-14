@@ -131,7 +131,7 @@ class Q(object):
             q_args = []
             for arg in args:
                 # Convert all search expressions to q objects
-                if isinstance(arg, str):
+                if isinstance(arg, string_types):
                     q_args.append(Restriction.from_source(args[0], folder_class=folder_class).q)
                 else:
                     if not isinstance(arg, Q):
