@@ -10,7 +10,7 @@ import time
 import unittest
 
 import requests
-from six import PY2, string_types, python_2_unicode_compatible
+from six import PY2, text_type, string_types, python_2_unicode_compatible
 from yaml import load
 from xml.etree.ElementTree import ParseError
 
@@ -973,6 +973,26 @@ class CommonTest(EWSTest):
             ), encoding='utf-8'))
         self.assertIn('YYY', e.exception.args[0])
 
+    def test_from_xml(self):
+        # Test for all EWSElement classes that they handle None input
+        from exchangelib import folders
+        for k, v in vars(folders).items():
+            if type(v) != type:
+                continue
+            if not issubclass(v, folders.EWSElement):
+                continue
+            if v in (folders.EWSElement, folders.IndexedElement, folders.CalendarView):
+                # These do not support implement from_xml()
+                with self.assertRaises(NotImplementedError):
+                    v.from_xml(None)
+                continue
+            if issubclass(v, (folders.Item, folders.Folder, folders.ExtendedProperty)):
+                # These do not support None input
+                with self.assertRaises(Exception):
+                    v.from_xml(None)
+                continue
+            v.from_xml(None)  # This should work for all others
+
 
 class AccountTest(EWSTest):
     def test_magic(self):
@@ -1400,9 +1420,13 @@ class BaseItemTest(EWSTest):
     def test_validation(self):
         item = self.get_test_item()
         item.clean()
-        with self.assertRaises(ValueError):
-            item.subject = 'a' * 256
-            item.clean()
+        for f in self.ITEM_CLASS.ITEM_FIELDS:
+            # Test field maxlength
+            if issubclass(f.value_cls, text_type) and hasattr(f.value_cls, 'MAXLENGTH'):
+                with self.assertRaises(ValueError):
+                    setattr(item, f.name, 'a' * (f.value_cls.MAXLENGTH + 1))
+                    item.clean()
+                    setattr(item, f.name, 'a')
 
     def test_empty_args(self):
         # We allow empty sequences for these methods

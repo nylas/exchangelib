@@ -2167,7 +2167,6 @@ class Folder(EWSElement):
 
     @classmethod
     def from_xml(cls, elem, account=None):
-        assert account
         # fld_type = re.sub('{.*}', '', elem.tag)
         fld_id_elem = elem.find(FolderId.response_tag())
         fld_id = fld_id_elem.get(FolderId.ID_ATTR)
