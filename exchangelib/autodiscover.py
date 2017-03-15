@@ -299,13 +299,13 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl, verify, auth_t
     r = _get_autodiscover_response(protocol=autodiscover_protocol, email=email)
     domain = get_domain(email)
     try:
-        has_ssl, ews_url, ews_auth_type, primary_smtp_address = _parse_response(r.text)
+        ews_url, primary_smtp_address = _parse_response(r.text)
         if not primary_smtp_address:
             primary_smtp_address = email
     except (ErrorNonExistentMailbox, AutoDiscoverRedirect):
         # These are both valid responses from an autodiscover server, showing that we have found the correct
         # server for the original domain. Fill cache before re-raising
-        log.debug('Adding cache entry for %s (hostname %s, has_ssl %s)', domain, hostname, has_ssl)
+        log.debug('Adding cache entry for %s (hostname %s)', domain, hostname)
         _autodiscover_cache[(domain, credentials, verify)] = autodiscover_protocol
         raise
 
@@ -322,7 +322,7 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl, verify, auth_t
 
 def _autodiscover_quick(credentials, email, protocol):
     r = _get_autodiscover_response(protocol=protocol, email=email)
-    has_ssl, ews_url, ews_auth_type, primary_smtp_address = _parse_response(r.text)
+    ews_url, primary_smtp_address = _parse_response(r.text)
     if not primary_smtp_address:
         primary_smtp_address = email
     log.debug('Autodiscover success: %s may connect to %s as primary email %s', email, ews_url, primary_smtp_address)
@@ -421,24 +421,10 @@ def _parse_response(response, encoding='utf-8'):
             # Neither type was found. Give up
             raise AutoDiscoverFailed('Invalid AutoDiscover response: %s' % response)
 
-    has_ssl = True if get_xml_attr(protocol, '{%s}SSL' % RESPONSE_NS) == 'On' else False
     ews_url = get_xml_attr(protocol, '{%s}EwsUrl' % RESPONSE_NS)
-    auth_package = get_xml_attr(protocol, '{%s}AuthPackage' % RESPONSE_NS)
-    try:
-        ews_auth_type = {
-            'ntlm': transport.NTLM,
-            'basic': transport.BASIC,
-            'digest': transport.DIGEST,
-            None: transport.NOAUTH,
-        }[auth_package.lower() if auth_package else None]
-    except KeyError:
-        log.warning("Unknown auth package '%s'")
-        ews_auth_type = transport.UNKNOWN
-    log.debug('Primary SMTP: %s, EWS endpoint: %s, auth type: %s', primary_smtp_address, ews_url, ews_auth_type)
-    assert has_ssl in (True, False)
+    log.debug('Primary SMTP: %s, EWS endpoint: %s', primary_smtp_address, ews_url)
     assert ews_url
-    assert ews_auth_type
-    return has_ssl, ews_url, ews_auth_type, primary_smtp_address
+    return ews_url, primary_smtp_address
 
 
 def _get_canonical_name(hostname):
