@@ -2068,7 +2068,7 @@ class Folder(EWSElement):
 
         'depth' controls the whether to return soft-deleted items or not.
 
-        Non-keyword args may be a search expression as supported by Restriction.from_source(), or a list of Q instances.
+        Non-keyword args may be a list of Q instances.
 
         Optional extra keyword arguments follow a Django-like QuerySet filter syntax (see
            https://docs.djangoproject.com/en/1.10/ref/models/querysets/#field-lookups).

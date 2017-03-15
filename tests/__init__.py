@@ -199,33 +199,6 @@ class RestrictionTest(unittest.TestCase):
     def setUp(self):
         self.maxDiff = None
 
-    def test_parse(self):
-        r = Restriction.from_source("start > '2016-01-15T13:45:56Z' and (not subject == 'EWS Test')",
-                                    folder_class=Calendar)
-        result = '''\
-<m:Restriction>
-    <t:And>
-        <t:Not>
-            <t:IsEqualTo>
-                <t:FieldURI FieldURI="item:Subject" />
-                <t:FieldURIOrConstant>
-                    <t:Constant Value="EWS Test" />
-                </t:FieldURIOrConstant>
-            </t:IsEqualTo>
-        </t:Not>
-        <t:IsGreaterThan>
-            <t:FieldURI FieldURI="calendar:Start" />
-            <t:FieldURIOrConstant>
-                <t:Constant Value="2016-01-15T13:45:56Z" />
-            </t:FieldURIOrConstant>
-        </t:IsGreaterThan>
-    </t:And>
-</m:Restriction>'''
-        self.assertEqual(xml_to_str(r.xml), ''.join(l.lstrip() for l in result.split('\n')))
-        # from_source() calls from parser.expr which is a security risk. Make sure stupid things can't happen
-        with self.assertRaises(SyntaxError):
-            Restriction.from_source('raise Exception()', folder_class=Calendar)
-
     def test_q(self):
         tz = EWSTimeZone.timezone('Europe/Copenhagen')
         start = tz.localize(EWSDateTime(1900, 9, 26, 8, 0, 0))
@@ -1659,21 +1632,6 @@ class BaseItemTest(EWSTest):
         # No arguments. There may be leftover items in the folder, so just make sure there's at least one.
         self.assertGreaterEqual(
             len(self.test_folder.filter()),
-            1
-        )
-        # Search expr
-        self.assertEqual(
-            len(self.test_folder.filter("subject == '%s'" % item.subject)),
-            1
-        )
-        # Search expr with Q
-        self.assertEqual(
-            len(self.test_folder.filter("subject == '%s'" % item.subject, Q())),
-            1
-        )
-        # Search expr with kwargs
-        self.assertEqual(
-            len(self.test_folder.filter("subject == '%s'" % item.subject, categories__contains=item.categories)),
             1
         )
         # Q object

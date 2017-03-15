@@ -130,13 +130,9 @@ class Q(object):
         if args:
             q_args = []
             for arg in args:
-                # Convert all search expressions to q objects
-                if isinstance(arg, string_types):
-                    q_args.append(Restriction.from_source(args[0], folder_class=folder_class).q)
-                else:
-                    if not isinstance(arg, Q):
-                        raise ValueError("Non-keyword arg '%s' must be a Q object" % arg)
-                    q_args.append(arg)
+                if not isinstance(arg, Q):
+                    raise ValueError("Non-keyword arg '%s' must be a Q object" % arg)
+                q_args.append(arg)
             # AND all the given Q objects together
             q = functools.reduce(lambda a, b: a & b, q_args)
         if kwargs:
@@ -454,107 +450,6 @@ class Restriction(object):
     def xml(self):
         # folder=None is OK since q has already been translated
         return self.q.to_xml(folder_class=None)
-
-    @classmethod
-    def from_source(cls, source, folder_class):
-        """
-        'source' is a search expression in Python syntax using Item attributes as labels.
-        'folder' is the Folder class the search expression is intended for.
-        Example search expression for a CalendarItem:
-
-            start > '2009-01-15T13:45:56Z' and not (subject == 'EWS Test' or subject == 'Foo')
-
-        """
-        from .folders import Folder
-        assert issubclass(folder_class, Folder)
-        with _source_cache_lock:
-            # Something within the parser module seems to be deadlocking. Wrap in lock
-            if source not in _source_cache:
-                from parser import expr
-                log.debug('Parsing source: %s', source)
-                st = expr(source).tolist()
-                q = cls._parse_syntaxtree(st)
-                q.translate_fields(folder_class=folder_class)
-                _source_cache[source] = q
-        return cls(_source_cache[source])
-
-    @classmethod
-    def _parse_syntaxtree(cls, slist):
-        """
-        Takes a Python syntax tree containing a search restriction expression and returns a Q object
-        """
-        from token import NAME, EQEQUAL, NOTEQUAL, GREATEREQUAL, LESSEQUAL, LESS, GREATER, STRING, LPAR, RPAR, \
-            NEWLINE, ENDMARKER
-        from symbol import and_test, or_test, not_test, comparison, eval_input, sym_name, atom
-        key = slist[0]
-        if isinstance(slist[1], list):
-            if len(slist) == 2:
-                # Let nested 2-element lists pass transparently
-                return cls._parse_syntaxtree(slist[1])
-            if key == atom:
-                # This is a parens with contents. Continue without the parens since they are unnecessary when building
-                # a tree - a node *is* the parens.
-                assert slist[1][0] == LPAR
-                assert slist[3][0] == RPAR
-                return cls._parse_syntaxtree(slist[2])
-            if key == or_test:
-                children = []
-                for item in [cls._parse_syntaxtree(l) for l in slist[1:]]:
-                    if item is not None:
-                        children.append(item)
-                return Q(*children, conn_type=Q.OR)
-            if key == and_test:
-                children = []
-                for item in [cls._parse_syntaxtree(l) for l in slist[1:]]:
-                    if item is not None:
-                        children.append(item)
-                return Q(*children, conn_type=Q.AND)
-            if key == not_test:
-                children = []
-                for item in [cls._parse_syntaxtree(l) for l in slist[1:]]:
-                    if item is not None:
-                        children.append(item)
-                return Q(*children, conn_type=Q.NOT)
-            if key == comparison:
-                lookup = cls._parse_syntaxtree(slist[2])
-                field = cls._parse_syntaxtree(slist[1])
-                value = cls._parse_syntaxtree(slist[3])
-                if lookup:
-                    return Q(**{'%s__%s' % (field, lookup): value})
-                else:
-                    return Q(**{field: value})
-            if key == eval_input:
-                children = []
-                for item in [cls._parse_syntaxtree(l) for l in slist[1:]]:
-                    if item is not None:
-                        children.append(item)
-                return Q(*children, conn_type=Q.AND)
-            raise ValueError('Unknown element type: %s %s (slist %s len %s)' % (key, sym_name[key], slist, len(slist)))
-        else:
-            val = slist[1]
-            if key == NAME:
-                if val in ('and', 'or', 'not'):
-                    return None
-                if val == 'in':
-                    return Q.LOOKUP_CONTAINS
-                # Field name
-                return val
-            if key == STRING:
-                # This is a string value, so strip single/double quotes
-                return val.strip('"\'')
-            if key in (LPAR, RPAR, NEWLINE, ENDMARKER):
-                return None
-            try:
-                return {
-                    EQEQUAL: None,
-                    NOTEQUAL: Q.LOOKUP_NOT,
-                    GREATER: Q.LOOKUP_GT,
-                    GREATEREQUAL: Q.LOOKUP_GTE,
-                    LESS: Q.LOOKUP_LT,
-                    LESSEQUAL: Q.LOOKUP_LTE,
-                }[key]
-            except KeyError:
-                raise ValueError('Unknown token type: %s %s' % (key, val))
 
     def __and__(self, other):
         # Return a new Q with two children and conn_type AND

@@ -204,7 +204,7 @@ Here are some examples of using the API:
     ))  # Filter by a date range
     # Same as filter() but throws an error if exactly one item isn't returned
     item = my_folder.get(subject='unique_string')
-    
+
     # You can sort by a single or multiple fields. Prefix a field with '-' to reverse the sorting.
     # Sorting by a single field is efficient. For multiple fields, the sorting is done client-side
     # and must fetch all items in the folder first. This can be slow.
@@ -215,15 +215,15 @@ Here are some examples of using the API:
     # Counting and exists
     n = my_folder.all().count()  # Efficient counting
     folder_is_empty = not my_folder.all().exists()  # Efficient tasting
-    
+
     # Returning values instead of objects
     ids_as_dict = my_folder.all().values('item_id', 'changekey')  # Return values as dicts, not objects
     ids_as_list = my_folder.all().values_list('item_id', 'changekey')  # Return values as nested lists
     all_subjects = my_folder.all().values_list('subject', flat=True)  # Return values as a flat list
 
     # A QuerySet can be sliced like a normal Python list. Slicing from the start of the QuerySet
-    # is efficient (it only fetches the necessary items), but more exotic slicing requires many or all 
-    # items to be fetched from the server. Slicing from the end is also efficient, but then you might as 
+    # is efficient (it only fetches the necessary items), but more exotic slicing requires many or all
+    # items to be fetched from the server. Slicing from the end is also efficient, but then you might as
     # well just reverse the sorting
     first_ten_emails = my_folder.all().order_by('-datetime_received')[:10]  # Efficient
     last_ten_emails = my_folder.all().order_by('-datetime_received')[:-10]  # Efficient, but convoluted
@@ -255,11 +255,6 @@ Here are some examples of using the API:
     #
     q = (Q(subject__iexact='foo') | Q(subject__contains='bar')) & ~Q(subject__startswith='baz')
     items = my_folder.filter(q)
-
-    # filter() even accepts a Python-like search expression as a string:
-    items = my_folder.filter(
-          "start < '2016-01-02T03:04:05T' and end > '2016-01-01T03:04:05T' and categories in ('foo', 'bar')"
-    )
 
     # In this example, we filter by categories so we only get the items created by us.
     items = account.calendar.filter(

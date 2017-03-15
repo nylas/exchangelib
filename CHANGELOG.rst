@@ -17,6 +17,9 @@ HEAD
   the caller to check the type of the returned values.
 * The `Folder` class has new attributes `total_count`, `unread_count` and `child_folder_count`, and a `refresh()`
   method to update these values.
+* The argument to `Account.upload()` was renamed from `upload_data` to just `data`
+* Support for using a string search expression for `Folder.filter()` was removed. It was a cool idea but using QuerySet
+  chaining and `Q` objects is even cooler and provides the same functionality, and more.
 
 1.8.1
 -----
