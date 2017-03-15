@@ -10,7 +10,6 @@ from __future__ import unicode_literals
 
 import base64
 import mimetypes
-import warnings
 from decimal import Decimal
 from logging import getLogger
 

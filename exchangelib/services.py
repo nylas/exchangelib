@@ -67,10 +67,10 @@ class EWSService(object):
     def call(self, **kwargs):
         return self._get_elements(payload=self._get_payload(**kwargs))
 
-    def payload(self, version, account, *args, **kwargs):
-        return wrap(content=self._get_payload(*args, **kwargs), version=version, account=account)
+    def payload(self, version, account,  **kwargs):
+        return wrap(content=self._get_payload(**kwargs), version=version, account=account)
 
-    def _get_payload(self, *args, **kwargs):
+    def _get_payload(self, **kwargs):
         raise NotImplementedError()
 
     def _get_elements(self, payload):
@@ -1019,9 +1019,6 @@ class ExportItems(EWSAccountService, EWSPooledMixIn):
     SERVICE_NAME = 'ExportItems'
     element_container_name = "{%s}Data" % MNS
 
-    def call(self, item_ids):
-        return self._pool_requests(payload_func=self._get_payload, items=item_ids)
-
     def _get_payload(self, items):
         from .folders import ItemId
         exportitems = create_element('m:%s' % self.SERVICE_NAME)
@@ -1052,7 +1049,11 @@ class UploadItems(EWSAccountService, EWSPooledMixIn):
     SERVICE_NAME = 'UploadItems'
     element_container_name = '{%s}ItemId' % MNS
 
-    def call(self, data):
+    def call(self, **kwargs):
+        kwargs['items'] = kwargs.pop('data')  # _pool_requests expects 'items', not 'data'
+        return self._pool_requests(payload_func=self._get_payload, **kwargs)
+
+    def _get_payload(self, items):
         """Upload given items to given account
 
         data is an iterable of tuples where the first element is a Folder
@@ -1060,9 +1061,6 @@ class UploadItems(EWSAccountService, EWSPooledMixIn):
         and the second element is a Data string returned from an ExportItems
         call.
         """
-        return self._pool_requests(payload_func=self._get_payload, items=data)
-
-    def _get_payload(self, items):
         uploaditems = create_element('m:%s' % self.SERVICE_NAME)
         itemselement = create_element('m:Items')
         uploaditems.append(itemselement)

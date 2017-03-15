@@ -94,7 +94,7 @@ class AutodiscoverCache(object):
         self._protocols.clear()
 
     def __contains__(self, key):
-        domain, _, verify_ssl = key
+        domain = key[0]
         with shelve_open(self._storage_file) as db:
             return str(domain) in db
 
@@ -112,7 +112,7 @@ class AutodiscoverCache(object):
 
     def __setitem__(self, key, protocol):
         # Populate both local and persistent cache
-        domain, _, verify_ssl = key
+        domain = key[0]
         with shelve_open(self._storage_file) as db:
             db[str(domain)] = (protocol.service_endpoint, protocol.auth_type)
         self._protocols[key] = protocol
@@ -120,7 +120,7 @@ class AutodiscoverCache(object):
     def __delitem__(self, key):
         # Empty both local and persistent cache. Don't fail on non-existing entries because we could end here
         # multiple times due to race conditions.
-        domain, _, verify_ssl = key
+        domain = key[0]
         with shelve_open(self._storage_file) as db:
             try:
                 del db[str(domain)]
@@ -456,7 +456,8 @@ def _get_hostname_from_srv(hostname):
         for rdata in answers:
             try:
                 vals = rdata.to_text().strip().rstrip('.').split(' ')
-                _, _, _, svr = int(vals[0]), int(vals[1]), int(vals[2]), vals[3]
+                int(vals[0]), int(vals[1]), int(vals[2])  # Just to raise errors if these are not ints
+                svr = vals[3]
             except (ValueError, KeyError) as e:
                 raise_from(AutoDiscoverFailed('Incompatible SRV record for %s (%s)' % (hostname, rdata.to_text())), e)
             else:

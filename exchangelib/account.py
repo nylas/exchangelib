@@ -168,9 +168,9 @@ class Account(object):
             # We accept generators, so it's not always convenient for caller to know up-front if 'items' is empty. Allow
             # empty 'items' and return early.
             return []
-        return list(ExportItems(self).call(items))
+        return list(ExportItems(self).call(items=items))
 
-    def upload(self, upload_data):
+    def upload(self, data):
         """
         Adds objects retrieved from export into the given folders
 
@@ -187,12 +187,12 @@ class Account(object):
                         (account.calendar, "ABCXYZ...")])
         -> [("idA", "changekey"), ("idB", "changekey"), ("idC", "changekey")]
         """
-        is_empty, upload_data = peek(upload_data)
+        is_empty, data = peek(data)
         if is_empty:
             # We accept generators, so it's not always convenient for caller to know up-front if 'upload_data' is empty.
             # Allow empty 'upload_data' and return early.
             return []
-        return list(UploadItems(self).call(upload_data))
+        return list(UploadItems(self).call(data=data))
 
     def bulk_create(self, folder, items, message_disposition=SAVE_ONLY, send_meeting_invitations=SEND_TO_NONE):
         """

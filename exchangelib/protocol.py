@@ -165,7 +165,7 @@ class CachingProtocol(type):
     @classmethod
     def clear_cache(mcs):
         for key, protocol in mcs._protocol_cache.items():
-            service_endpoint, _, verify_ssl = key
+            service_endpoint = key[0]
             log.debug("Service endpoint '%s': Closing sessions", service_endpoint)
             protocol.close()
             del protocol
