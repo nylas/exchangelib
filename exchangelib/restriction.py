@@ -5,7 +5,6 @@ import functools
 import logging
 from threading import Lock
 
-from six import string_types
 from future.utils import python_2_unicode_compatible
 
 from .ewsdatetime import EWSDateTime, UTC
