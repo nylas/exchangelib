@@ -4,38 +4,38 @@ Change Log
 
 HEAD
 ----
-* Expand support for `ExtendedPropery` to include all possible attributes. This required renaming the `property_id`
-  attribute to `property_set_id`.
-* When `Credentials` is created with `is_service_account=False`, `UnauthorizedError` is now raised if the credentials
+* Expand support for ``ExtendedProperty`` to include all possible attributes. This required renaming the ``property_id``
+  attribute to ``property_set_id``.
+* When ``Credentials`` is created with ``is_service_account=False``, ``UnauthorizedError`` is now raised if the credentials
   are wrong.
-* Add a new `version` attribute to `Configuration`, to force the server version if version guessing does not work.
-  Accepts a `exchangelib.version.Version` object.
-* Rework bulk operations (`Account.buk_*()` and `Account.fetch()`) to return some exceptions unraised, if it is deemed
-  the exception does not apply to all items. This means that e.g. `fetch()` can return a mix of `Item` and
-  `ErrorItemNotFound` instances, if only some of the requested `ItemId`s were valid. Other exceptions will be raised
-  immediately, e.g. `ErrorNonExistentMailbox` because the exception applies to all items. It is the responsibility of
+* Add a new ``version`` attribute to ``Configuration``, to force the server version if version guessing does not work.
+  Accepts a ``exchangelib.version.Version`` object.
+* Rework bulk operations ``Account.bulk_foo()`` and ``Account.fetch()`` to return some exceptions unraised, if it is deemed
+  the exception does not apply to all items. This means that e.g. ``fetch()`` can return a mix of ```Item`` and
+  ``ErrorItemNotFound`` instances, if only some of the requested ``ItemId`` were valid. Other exceptions will be raised
+  immediately, e.g. ``ErrorNonExistentMailbox`` because the exception applies to all items. It is the responsibility of
   the caller to check the type of the returned values.
-* The `Folder` class has new attributes `total_count`, `unread_count` and `child_folder_count`, and a `refresh()`
+* The ``Folder`` class has new attributes ``total_count``, ``unread_count`` and ``child_folder_count``, and a ``refresh()``
   method to update these values.
-* The argument to `Account.upload()` was renamed from `upload_data` to just `data`
-* Support for using a string search expression for `Folder.filter()` was removed. It was a cool idea but using QuerySet
-  chaining and `Q` objects is even cooler and provides the same functionality, and more.
+* The argument to ``Account.upload()`` was renamed from ``upload_data`` to just ``data``
+* Support for using a string search expression for ``Folder.filter()`` was removed. It was a cool idea but using QuerySet
+  chaining and ``Q`` objects is even cooler and provides the same functionality, and more.
 
 1.8.1
 -----
-* Fix completely botched `Message.from` field renaming in 1.8.0
-* Improve performance of QuerySet slicing and indexing. For example, `account.inbox.all()[10]` and
-  `account.inbox.all()[:10]` now only fetch 10 items from the server even though `account.inbox.all()` could contain
+* Fix completely botched ``Message.from`` field renaming in 1.8.0
+* Improve performance of QuerySet slicing and indexing. For example, ``account.inbox.all()[10]`` and
+  ``account.inbox.all()[:10]`` now only fetch 10 items from the server even though ``account.inbox.all()`` could contain
   thousands of messages.
 
 1.8.0
 -----
-* Renamed `Message.from` field to `Message.author`. `from` is a Python keyword so `from` could only be accessed as
-  `Getattr(my_essage, 'from')` which is just stupid.
-* Make `EWSTimeZone` Windows timezone name translation more robust
-* Add read-only `Message.message_id` which holds the Internet Message Id
-* Memory and speed improvements when sorting querysets using `order_by()` on a single field.
-* Allow setting `Mailbox` and `Attendee`-type attributes as plain strings, e.g.:
+* Renamed ``Message.from`` field to ``Message.author``. ``from`` is a Python keyword so ``from`` could only be accessed as
+  ``Getattr(my_essage, 'from')`` which is just stupid.
+* Make ``EWSTimeZone`` Windows timezone name translation more robust
+* Add read-only ``Message.message_id`` which holds the Internet Message Id
+* Memory and speed improvements when sorting querysets using ``order_by()`` on a single field.
+* Allow setting ``Mailbox`` and ``Attendee``-type attributes as plain strings, e.g.:
 
   .. code-block:: python
 
@@ -51,9 +51,9 @@ HEAD
 
 1.7.5
 -----
-* `Account.fetch()` and `Folder.fetch()` are now generators. They will do nothing before being evaluated.
-* Added optional `page_size` attribute to `QuerySet.iterator()` to specify the number of items to return per HTTP
-  request for large query results. Default `page_size` is 100.
+* ``Account.fetch()`` and ``Folder.fetch()`` are now generators. They will do nothing before being evaluated.
+* Added optional ``page_size`` attribute to ``QuerySet.iterator()`` to specify the number of items to return per HTTP
+  request for large query results. Default ``page_size`` is 100.
 * Many minor changes to make queries less greedy and return earlier
 
 1.7.4
@@ -94,9 +94,9 @@ HEAD
       item.detach(my_file)
 
   Be aware that adding and deleting attachments from items that are already created in Exchange (items that have an
-  `item_id`) will update the `changekey` of the item.
+  ``item_id``) will update the ``changekey`` of the item.
 
-* Implement `Item.headers` which contains custom Internet message headers. Primarily useful for `Message` objects.
+* Implement ``Item.headers`` which contains custom Internet message headers. Primarily useful for ``Message`` objects.
   Read-only for now.
 
 
