@@ -940,7 +940,8 @@ class Field(object):
     Holds information related to an item field
     """
     def __init__(self, name, value_cls, from_version=None, choices=None, default=None, is_list=False,
-                 is_complex=False, is_required=False, is_read_only=False, is_read_only_after_send=False):
+                 is_complex=False, is_required=False, is_required_after_save=False, is_read_only=False,
+                 is_read_only_after_send=False):
         self.name = name
         self.value_cls = value_cls
         self.from_version = from_version
@@ -952,11 +953,14 @@ class Field(object):
         #   The FindItem operation returns only the first 512 bytes of any streamable property. For Unicode, it returns
         #   the first 255 characters by using a null-terminated Unicode string. It does not return any of the message
         #   body formats or the recipient lists.
+        #
         self.is_complex = is_complex
         self.is_required = is_required
-        self.is_read_only = is_read_only
-        # Set this for fields that raise ErrorInvalidPropertyUpdateSentMessage on update after send
-        self.is_read_only_after_send = is_read_only_after_send
+        # Some fields cannot be deleted on update. Default to True if 'is_required' is set
+        self.is_required_after_save = is_required or is_required_after_save
+        # Set this for fields that raise ErrorInvalidPropertyUpdateSentMessage on update after send. Default to True
+        # if 'is_read_only' is set
+        self.is_read_only_after_send = is_read_only or is_read_only_after_send
 
     def clean(self, value):
         if value is None:

@@ -623,9 +623,9 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
 
                 if value is None or (field.is_list and not value):
                     # A value of None or [] means we want to remove this field from the item
-                    if field.is_required:
+                    if field.is_required or field.is_required_after_save:
                         log.warning('%s is a required field and may not be deleted. Skipping', field.name)
-                        return
+                        continue
                     field_uri_xml = field.field_uri_xml()
                     if isinstance(field_uri_xml, list):
                         fielduri_elems = field_uri_xml
