@@ -196,11 +196,17 @@ class Account(object):
 
     def bulk_create(self, folder, items, message_disposition=SAVE_ONLY, send_meeting_invitations=SEND_TO_NONE):
         """
-        Creates new items in 'folder'. 'items' is an iterable of Item objects. Returns a list of Item objects
-        in the same order as the input. The returned Item objects only contain item_id and changekey of the created
-        item, and item_id on any attachments that were also created.
-        'message_disposition' is only applicable to Message items.
-        'send_meeting_invitations' is only applicable to CalendarItem items.
+        Creates new items in 'folder'
+
+        :param folder: the folder to create the items in
+        :param items: an iterable of Item objects
+        :param message_disposition: only applicable to Message items. Possible values are specified in
+               MESSAGE_DISPOSITION_CHOICES
+        :param send_meeting_invitations: only applicable to CalendarItem items. Possible values are specified in
+               SEND_MEETING_INVITATIONS_CHOICES
+        :return: a list of either BulkCreateResult or exception instances in the same order as the input. The returned
+                 BulkCreateResult objects are normal Item objects except they only contain the 'item_id' and 'changekey'
+                 of the created item, and the 'item_id' on any attachments that were also created.
         """
         assert message_disposition in MESSAGE_DISPOSITION_CHOICES
         assert send_meeting_invitations in SEND_MEETING_INVITATIONS_CHOICES
@@ -242,14 +248,20 @@ class Account(object):
     def bulk_update(self, items, conflict_resolution=AUTO_RESOLVE, message_disposition=SAVE_ONLY,
                     send_meeting_invitations_or_cancellations=SEND_TO_NONE, suppress_read_receipts=True):
         """
-        Updates items in the folder. 'items' is a dict containing:
+        Updates items in the folder
+
+        :param items: a dict containing:
 
             Key: An Item object (calendar item, message, task or contact)
             Value: a list of attributes that have changed on this object
 
-        'message_disposition' is only applicable to Message items.
-        'send_meeting_invitations_or_cancellations' is only applicable to CalendarItem items.
-        'suppress_read_receipts' is only supported from Exchange 2013.
+        :param conflict_resolution: Possible values are specified in CONFLICT_RESOLUTION_CHOICES
+        :param message_disposition: only applicable to Message items. Possible values are specified in
+               MESSAGE_DISPOSITION_CHOICES
+        :param send_meeting_invitations_or_cancellations: only applicable to CalendarItem items. Possible values are
+               specified in SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES
+        :param suppress_read_receipts: nly supported from Exchange 2013. True or False
+        :return: a list of either ItemId or exception instances in the same order as the input.
         """
         assert conflict_resolution in CONFLICT_RESOLUTION_CHOICES
         assert message_disposition in MESSAGE_DISPOSITION_CHOICES
@@ -287,11 +299,16 @@ class Account(object):
     def bulk_delete(self, ids, delete_type=HARD_DELETE, send_meeting_cancellations=SEND_TO_NONE,
                     affected_task_occurrences=SPECIFIED_OCCURRENCE_ONLY, suppress_read_receipts=True):
         """
-        Deletes items.
-        'ids' is an iterable of either (item_id, changekey) tuples or Item objects.
-        'send_meeting_cancellations' is only applicable to CalendarItem items.
-        'affected_task_occurrences' is only applicable for recurring Task items.
-        'suppress_read_receipts' is only supported from Exchange 2013.
+        Bulk deletes items.
+
+        :param ids: an iterable of either (item_id, changekey) tuples or Item objects.
+        :param delete_type: the type of delete to perform. Possible values are specified in DELETE_TYPE_CHOICES
+        :param send_meeting_cancellations: only applicable to CalendarItem. Possible values are specified in
+               SEND_MEETING_CANCELLATIONS_CHOICES.
+        :param affected_task_occurrences: only applicable for recurring Task items. Possible values are specified in
+               AFFECTED_TASK_OCCURRENCES_CHOICES.
+        :param suppress_read_receipts: only supported from Exchange 2013. True or False.
+        :return: a list of either True or exception instances in the same order as the input.
         """
         assert delete_type in DELETE_TYPE_CHOICES
         assert send_meeting_cancellations in SEND_MEETING_CANCELLATIONS_CHOICES
