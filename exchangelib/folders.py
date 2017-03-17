@@ -958,6 +958,7 @@ class Field(object):
         self.is_required = is_required
         # Some fields cannot be deleted on update. Default to True if 'is_required' is set
         self.is_required_after_save = is_required or is_required_after_save
+        self.is_read_only = is_read_only
         # Set this for fields that raise ErrorInvalidPropertyUpdateSentMessage on update after send. Default to True
         # if 'is_read_only' is set
         self.is_read_only_after_send = is_read_only or is_read_only_after_send
@@ -1254,7 +1255,12 @@ class Item(EWSElement):
                     is_read_only=True),
         SimpleField('datetime_sent', field_uri='item:DateTimeSent', value_cls=EWSDateTime, is_read_only=True),
         SimpleField('datetime_created', field_uri='item:DateTimeCreated', value_cls=EWSDateTime, is_read_only=True),
+        # Reminder related fields
         SimpleField('reminder_is_set', field_uri='item:ReminderIsSet', value_cls=bool, is_required=True, default=False),
+        SimpleField('reminder_due_by', field_uri='item:ReminderDueBy', value_cls=EWSDateTime, is_required=False,
+                    is_required_after_save=True),
+        SimpleField('reminder_minutes_before_start', field_uri='item:ReminderMinutesBeforeStart', value_cls=int,
+                    is_required_after_save=True, default=0),
         # ExtendedProperty fields go here
         SimpleField('last_modified_name', field_uri='item:LastModifiedName', value_cls=string_type, is_read_only=True),
         SimpleField('last_modified_time', field_uri='item:LastModifiedTime', value_cls=EWSDateTime, is_read_only=True),

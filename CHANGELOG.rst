@@ -20,6 +20,8 @@ HEAD
 * The argument to ``Account.upload()`` was renamed from ``upload_data`` to just ``data``
 * Support for using a string search expression for ``Folder.filter()`` was removed. It was a cool idea but using QuerySet
   chaining and ``Q`` objects is even cooler and provides the same functionality, and more.
+* Add support for ``reminder_due_by`` and ``reminder_minutes_before_start`` fields on ``Item`` objects. Submitted by
+  ``@vikipha``.
 
 1.8.1
 -----

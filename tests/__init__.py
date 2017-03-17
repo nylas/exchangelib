@@ -1353,12 +1353,15 @@ class BaseItemTest(EWSTest):
                 continue
             if f.name == 'percent_complete':
                 continue
-            if f.name == 'reminder_is_set' and self.ITEM_CLASS == Task:
-                # Task type doesn't allow updating 'reminder_is_set' to True. TODO: Really?
-                update_kwargs[f.name] = False
+            if f.name == 'reminder_is_set':
+                if self.ITEM_CLASS == Task:
+                    # Task type doesn't allow updating 'reminder_is_set' to True
+                    update_kwargs[f.name] = False
+                else:
+                    update_kwargs[f.name] = not insert_kwargs[f.name]
                 continue
             if f.value_cls == bool:
-                update_kwargs[f.name] = not (insert_kwargs[f.name])
+                update_kwargs[f.name] = not insert_kwargs[f.name]
                 continue
             if f.value_cls == Choice:
                 update_kwargs[f.name] = get_random_choice(f.choices)
@@ -1371,8 +1374,12 @@ class BaseItemTest(EWSTest):
                 continue
             update_kwargs[f.name] = self.random_val(f)
         if update_kwargs.get('is_all_day', False):
+            # For is_all_day items, EWS will remove the time part of start and end values
             update_kwargs['start'] = update_kwargs['start'].replace(hour=0, minute=0, second=0, microsecond=0)
             update_kwargs['end'] = update_kwargs['end'].replace(hour=0, minute=0, second=0, microsecond=0)
+        if self.ITEM_CLASS == CalendarItem:
+            # EWS always sets due date to 'start'
+            update_kwargs['reminder_due_by'] = update_kwargs['start']
         return update_kwargs
 
     def get_test_item(self, folder=None, categories=None):
@@ -1935,7 +1942,7 @@ class BaseItemTest(EWSTest):
         ids = self.test_folder.bulk_create(items=[item])
         common_qs = self.test_folder.filter(categories__contains=self.categories)
         for f in self.ITEM_CLASS.ITEM_FIELDS:
-            if f.name in ('status', 'companies'):
+            if f.name in ('status', 'companies', 'reminder_due_by'):
                 # For some reason, EWS disallows searching on these, instead throwing ErrorInvalidValueForProperty
                 continue
             if f.name in ('percent_complete',):
@@ -2118,6 +2125,9 @@ class BaseItemTest(EWSTest):
             if f.is_read_only and old is None:
                 # Some fields are automatically set server-side
                 continue
+            if f.name == 'reminder_due_by':
+                # EWS sets a default value if it is not set on insert. Ignore
+                continue
             if f.is_list:
                 old, new = set(old or ()), set(new or ())
             self.assertEqual(old, new, (f.name, old, new))
@@ -2138,7 +2148,7 @@ class BaseItemTest(EWSTest):
                 continue
             if f.is_list:
                 old, new = set(old or ()), set(new or ())
-            self.assertEqual(old, new, (f.name, old, new))
+            self.assertEqual(old, new, (f.name, old, new, update_kwargs.get(f.name)))
 
         # Hard delete
         item_id = (item.item_id, item.changekey)
@@ -2240,10 +2250,12 @@ class BaseItemTest(EWSTest):
             if f.name == 'attachments':
                 # Attachments are handled separately
                 continue
+            if f.name == 'reminder_due_by':
+                # EWS sets a default value if it is not set on insert. Ignore
+                continue
             if f.is_list:
-                if not (getattr(item, f.name) is None and insert_kwargs[f.name] is None):
-                    self.assertSetEqual(set(getattr(item, f.name)), set(insert_kwargs[f.name]),
-                                        (f.name, repr(item), insert_kwargs))
+                self.assertSetEqual(set(getattr(item, f.name) or ()), set(insert_kwargs[f.name] or ()),
+                                    (f.name, repr(item), insert_kwargs))
             else:
                 self.assertEqual(getattr(item, f.name), insert_kwargs[f.name], (f.name, repr(item), insert_kwargs))
 
@@ -2277,7 +2289,7 @@ class BaseItemTest(EWSTest):
         # Test wiping or removing fields
         wipe_kwargs = {}
         for f in self.ITEM_CLASS.ITEM_FIELDS:
-            if f.is_required:
+            if f.is_required or f.is_required_after_save:
                 # These cannot be deleted
                 continue
             if f.is_read_only:
@@ -2298,7 +2310,7 @@ class BaseItemTest(EWSTest):
                             wipe_ids[0][1])  # Changekey should not be the same when item is updated
         item = list(self.account.fetch(wipe_ids))[0]
         for f in self.ITEM_CLASS.ITEM_FIELDS:
-            if f.is_required:
+            if f.is_required or f.is_required_after_save:
                 continue
             if f.is_read_only:
                 continue
@@ -2502,6 +2514,9 @@ class BaseItemTest(EWSTest):
             if f.name == 'is_read':
                 # This is always true for item attachments?
                 continue
+            if f.name == 'reminder_due_by':
+                # EWS sets a default value if it is not set on insert. Ignore
+                continue
             old_val = getattr(attached_item1, f.name)
             new_val = getattr(fresh_attachments[0].item, f.name)
             if f.is_list:
@@ -2530,6 +2545,9 @@ class BaseItemTest(EWSTest):
             if isinstance(f, ExtendedPropertyField):
                 # Attachments don't have these values. It may be possible to request it if we can find the FieldURI
                 continue
+            if f.name == 'reminder_due_by':
+                # EWS sets a default value if it is not set on insert. Ignore
+                continue
             if f.name == 'is_read':
                 # This is always true for item attachments?
                 continue
@@ -2547,6 +2565,9 @@ class BaseItemTest(EWSTest):
                 continue
             if isinstance(f, ExtendedPropertyField):
                 # Attachments don't have these values. It may be possible to request it if we can find the FieldURI
+                continue
+            if f.name == 'reminder_due_by':
+                # EWS sets a default value if it is not set on insert. Ignore
                 continue
             if f.name == 'is_read':
                 # This is always true for item attachments?
@@ -2571,6 +2592,9 @@ class BaseItemTest(EWSTest):
                 continue
             if isinstance(f, ExtendedPropertyField):
                 # Attachments don't have these values. It may be possible to request it if we can find the FieldURI
+                continue
+            if f.name == 'reminder_due_by':
+                # EWS sets a default value if it is not set on insert. Ignore
                 continue
             if f.name == 'is_read':
                 # This is always true for item attachments?

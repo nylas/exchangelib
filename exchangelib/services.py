@@ -569,7 +569,7 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
                     # EWS does not support updating the timezone for fields that are not the 'start' or 'end'
                     # field. Either supply the date in UTC or in the same timezone as originally created.
                     log.warning("Skipping timezone for field '%s'", field.name)
-                    return
+                    return meeting_timezone_added
             setitemfield_tz.append(fielduri_tz)
             folderitem_tz.append(timezone)
             setitemfield_tz.append(folderitem_tz)

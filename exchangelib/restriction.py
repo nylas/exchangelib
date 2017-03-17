@@ -319,7 +319,7 @@ class Q(object):
         from .folders import Attachment, Mailbox, Attendee, PhysicalAddress
         if field not in folder_class.allowed_fields():
             raise ValueError("'%s' is not a valid field when filtering on %s" % (field.name, folder_class.__name__))
-        if field.name in ('status', 'companies'):
+        if field.name in ('status', 'companies', 'reminder_due_by'):
             raise ValueError("EWS does not support filtering on field '%s'" % field.name)
         if field.is_list and field.value_cls in (Attachment, Mailbox, Attendee, PhysicalAddress):
             raise ValueError("EWS does not support filtering on %s (non-searchable field type [%s])" % (
