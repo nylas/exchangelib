@@ -2285,8 +2285,6 @@ class BaseItemTest(EWSTest):
                 continue
             if f.name == 'attachments':
                 continue
-            if f.name == 'percent_complete':
-                continue
             if f.is_list:
                 wipe_kwargs[f.name] = []
             wipe_kwargs[f.name] = None
@@ -2305,8 +2303,6 @@ class BaseItemTest(EWSTest):
             if f.is_read_only:
                 continue
             if f.name == 'attachments':
-                continue
-            if f.name == 'percent_complete':
                 continue
             if f.is_list:
                 wipe_kwargs[f.name] = []
