@@ -529,10 +529,16 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
     element_container_name = '{%s}Items' % MNS
 
     @staticmethod
-    def _add_delete_item_elem(parent_elem, field_uri_xml):
-        add_xml_child(parent_elem, 't:DeleteItemField', field_uri_xml)
+    def _get_delete_item_elem(field, label=None, subfield=None):
+        from .folders import IndexedField
+        deleteitemfield = create_element('t:DeleteItemField')
+        if isinstance(field, IndexedField):
+            deleteitemfield.append(field.field_uri_xml(label=label, subfield=subfield))
+        else:
+            deleteitemfield.append(field.field_uri_xml())
+        return deleteitemfield
 
-    def _add_set_item_elem(self, item_model, parent_elem, field, value, label, subfield, meeting_timezone_added):
+    def _get_set_item_elem(self, item_model, field, value, label=None, subfield=None):
         from .folders import IndexedField
         setitemfield = create_element('t:SetItemField')
         if isinstance(field, IndexedField):
@@ -543,45 +549,100 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
         field_elem = field.to_xml(value, self.account.version)
         set_xml_value(folderitem, field_elem, self.account.version)
         setitemfield.append(folderitem)
-        parent_elem.append(setitemfield)
-        if isinstance(value, EWSDateTime) and value.tzinfo != UTC:
-            # Always set timezone explicitly when updating date fields, except for UTC datetimes which do not need to
-            # supply an explicit timezone. Exchange 2007 wants "MeetingTimeZone" instead of explicit timezone on each
-            # datetime field.
-            setitemfield_tz = create_element('t:SetItemField')
-            folderitem_tz = create_element(item_model.request_tag())
-            if self.account.version.build < EXCHANGE_2010:
-                if meeting_timezone_added:
+        return setitemfield
+
+    def _get_meeting_timezone_elem(self, item_model, field, value):
+        # Always set timezone explicitly when updating date fields, except for UTC datetimes which do not need to
+        # supply an explicit timezone. Exchange 2007 wants "MeetingTimeZone" instead of explicit timezone on each
+        # datetime field.
+        setitemfield_tz = create_element('t:SetItemField')
+        folderitem_tz = create_element(item_model.request_tag())
+        if self.account.version.build < EXCHANGE_2010:
+            fielduri_tz = create_element('t:FieldURI', FieldURI='calendar:MeetingTimeZone')
+            timezone = create_element('t:MeetingTimeZone', TimeZoneName=value.tzinfo.ms_id)
+        else:
+            if field.name == 'start':
+                fielduri_tz = create_element('t:FieldURI', FieldURI='calendar:StartTimeZone')
+                timezone = create_element('t:StartTimeZone', Id=value.tzinfo.ms_id, Name=value.tzinfo.ms_name)
+            elif field.name == 'end':
+                fielduri_tz = create_element('t:FieldURI', FieldURI='calendar:EndTimeZone')
+                timezone = create_element('t:EndTimeZone', Id=value.tzinfo.ms_id, Name=value.tzinfo.ms_name)
+            else:
+                raise ValueError('Cannot set timezone for other datetime values than start and end')
+        setitemfield_tz.append(fielduri_tz)
+        folderitem_tz.append(timezone)
+        setitemfield_tz.append(folderitem_tz)
+        return setitemfield_tz
+
+    def _get_item_update_elems(self, item, fieldnames):
+        from .folders import IndexedField
+        item_model = item.__class__
+        meeting_timezone_added = False
+        for fieldname in fieldnames:
+            try:
+                field = item_model.ITEM_FIELDS_MAP[fieldname]
+            except KeyError:
+                raise ValueError("'%s' is not a valid field on '%s'" % (fieldname, item_model))
+            if field.is_read_only:
+                log.warning('%s is a read-only field. Skipping', field.name)
+                continue
+            value = getattr(item, field.name)
+
+            if value is None or (field.is_list and not value):
+                # A value of None or [] means we want to remove this field from the item
+                if field.is_required or field.is_required_after_save:
+                    log.warning('%s is a required field and may not be deleted. Skipping', field.name)
+                    continue
+                if isinstance(field, IndexedField):
+                    for label in field.value_cls.LABELS:
+                        if field.value_cls.SUB_FIELD_ELEMENT_NAMES:
+                            for subfield in field.value_cls.SUB_FIELD_ELEMENT_NAMES.keys():
+                                yield self._get_delete_item_elem(field=field, label=label, subfield=subfield)
+                        else:
+                            yield self._get_delete_item_elem(field=field, label=label)
+                else:
+                    yield self._get_delete_item_elem(field=field)
+                continue
+
+            if isinstance(field, IndexedField):
+                # We need to specify the full label/subfield fielduri path to each element in the list, but the
+                # IndexedField class doesn't know how to do that yet. Generate the XML manually here for now.
+                # TODO: Maybe the set/delete logic should extend into subfields, not just overwrite the whole item.
+                for v in value:
+                    # TODO: We should also delete the labels that no longer exist in the list
+                    if field.value_cls.SUB_FIELD_ELEMENT_NAMES:
+                        # We have subfields. Generate SetItem XML for each subfield. SetItem only accepts items that
+                        # have the one value set that we want to change. Create a new IndexedField object that has
+                        # only that value set.
+                        for subfield in field.value_cls.SUB_FIELD_ELEMENT_NAMES.keys():
+                            simple_item = field.value_cls(**{'label': v.label, subfield: getattr(v, subfield)})
+                            yield self._get_set_item_elem(item_model=item_model, field=field, value=simple_item,
+                                                          label=v.label, subfield=subfield)
+                    else:
+                        # The simpler IndexedFields without subfields
+                        yield self._get_set_item_elem(item_model=item_model, field=field, value=v, label=v.label)
+                continue
+
+            yield self._get_set_item_elem(item_model=item_model, field=field, value=value)
+            if issubclass(field.value_cls, EWSDateTime) and value.tzinfo != UTC:
+                if self.account.version.build < EXCHANGE_2010 and not meeting_timezone_added:
                     # Let's hope that we're not changing timezone, or that both 'start' and 'end' are supplied.
                     # Exchange 2007 doesn't support different timezone on start and end.
-                    return
-                fielduri_tz = create_element('t:FieldURI', FieldURI='calendar:MeetingTimeZone')
-                timezone = create_element('t:MeetingTimeZone', TimeZoneName=value.tzinfo.ms_id)
-                meeting_timezone_added = True
-            else:
-                if field.name == 'start':
-                    fielduri_tz = create_element('t:FieldURI', FieldURI='calendar:StartTimeZone')
-                    timezone = create_element('t:StartTimeZone', Id=value.tzinfo.ms_id, Name=value.tzinfo.ms_name)
-                elif field.name == 'end':
-                    fielduri_tz = create_element('t:FieldURI', FieldURI='calendar:EndTimeZone')
-                    timezone = create_element('t:EndTimeZone', Id=value.tzinfo.ms_id, Name=value.tzinfo.ms_name)
-                else:
+                    yield self._get_meeting_timezone_elem(item_model=item_model, field=field, value=value)
+                    meeting_timezone_added = True
+                elif field.name in ('start', 'end'):
                     # EWS does not support updating the timezone for fields that are not the 'start' or 'end'
                     # field. Either supply the date in UTC or in the same timezone as originally created.
+                    yield self._get_meeting_timezone_elem(item_model=item_model, field=field, value=value)
+                else:
                     log.warning("Skipping timezone for field '%s'", field.name)
-                    return meeting_timezone_added
-            setitemfield_tz.append(fielduri_tz)
-            folderitem_tz.append(timezone)
-            setitemfield_tz.append(folderitem_tz)
-            parent_elem.append(setitemfield_tz)
-        return meeting_timezone_added
 
     def _get_payload(self, items, conflict_resolution, message_disposition,
                      send_meeting_invitations_or_cancellations, suppress_read_receipts):
         # Takes a list of (Item, fieldnames) tuples where 'Item' is a instance of a subclass of Item and 'fieldnames'
         # are the attribute names that were updated. Returns the XML for an UpdateItem call.
         # an UpdateItem request.
-        from .folders import ItemId, IndexedField
+        from .folders import ItemId
         if self.account.version.build >= EXCHANGE_2013:
             updateitem = create_element(
                 'm:%s' % self.SERVICE_NAME,
@@ -598,72 +659,21 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
                 SendMeetingInvitationsOrCancellations=send_meeting_invitations_or_cancellations,
             )
         itemchanges = create_element('m:ItemChanges')
-
-        n = 0
+        is_empty = True
         for item, fieldnames in items:
-            item.clean()
-            n += 1
+            is_empty = False
             if not fieldnames:
                 raise AttributeError('"fieldnames" must not be empty')
-            item_model = item.__class__
+            item.clean()
             itemchange = create_element('t:ItemChange')
-            item_id = ItemId(item.item_id, item.changekey)
-            log.debug('Updating item %s values %s', item_id, fieldnames)
-            set_xml_value(itemchange, item_id, self.account.version)
+            log.debug('Updating item %s values %s', item.item_id, fieldnames)
+            set_xml_value(itemchange, ItemId(item.item_id, item.changekey), self.account.version)
             updates = create_element('t:Updates')
-            meeting_timezone_added = False
-            for fieldname in fieldnames:
-                try:
-                    field = item_model.ITEM_FIELDS_MAP[fieldname]
-                except KeyError:
-                    raise ValueError("'%s' is not a valid field on '%s'" % (fieldname, item_model))
-                if field.is_read_only:
-                    log.warning('%s is a read-only field. Skipping', field.name)
-                    continue
-                value = getattr(item, field.name)
-
-                if value is None or (field.is_list and not value):
-                    # A value of None or [] means we want to remove this field from the item
-                    if field.is_required or field.is_required_after_save:
-                        log.warning('%s is a required field and may not be deleted. Skipping', field.name)
-                        continue
-                    field_uri_xml = field.field_uri_xml()
-                    if isinstance(field_uri_xml, list):
-                        fielduri_elems = field_uri_xml
-                    else:
-                        fielduri_elems = [field_uri_xml]
-                    for fielduri_elem in fielduri_elems:
-                        self._add_delete_item_elem(parent_elem=updates, field_uri_xml=fielduri_elem)
-                    continue
-
-                if isinstance(field, IndexedField):
-                    # We need to specify the full label/subfield fielduri path to each element in the list, but the
-                    # IndexedField class doesn't know how to do that yet. Generate the XML manually here for now.
-                    # TODO: Maybe the set/delete logic should extend into subfields, not just overwire the whole item.
-                    for v in value:
-                        # TODO: We should also delete the labels that no longer exist in the list
-                        if field.value_cls.SUB_FIELD_ELEMENT_NAMES:
-                            # We have subfields. Generate SetItem XML for each subfield. SetItem only accepts items that
-                            # have the one value set that we want to change. Create a new IndexedField object that has
-                            # only that value set.
-                            for subfield in field.value_cls.SUB_FIELD_ELEMENT_NAMES.keys():
-                                simple_item = field.value_cls(**{'label': v.label, subfield: getattr(v, subfield)})
-                                meeting_timezone_added = self._add_set_item_elem(
-                                    item_model=item_model, parent_elem=updates, field=field, value=simple_item,
-                                    label=v.label, subfield=subfield, meeting_timezone_added=meeting_timezone_added)
-                        else:
-                            # The simpler IndexedFields without subfields
-                            meeting_timezone_added = self._add_set_item_elem(
-                                item_model=item_model, parent_elem=updates, field=field, value=v, label=v.label,
-                                subfield=None, meeting_timezone_added=meeting_timezone_added)
-                    continue
-
-                meeting_timezone_added = self._add_set_item_elem(
-                    item_model=item_model, parent_elem=updates, field=field, value=value, label=None, subfield=None,
-                    meeting_timezone_added=meeting_timezone_added)
+            for elem in self._get_item_update_elems(item=item, fieldnames=fieldnames):
+                updates.append(elem)
             itemchange.append(updates)
             itemchanges.append(itemchange)
-        if not n:
+        if is_empty:
             raise AttributeError('"items" must not be empty')
         updateitem.append(itemchanges)
         return updateitem
