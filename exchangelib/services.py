@@ -28,7 +28,7 @@ from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, 
     ErrorTooManyObjectsOpened, ErrorInvalidLicense, ErrorInvalidSchemaVersionForMailboxVersion, \
     ErrorInvalidServerVersion, ErrorItemNotFound, ErrorADUnavailable, ResponseMessageError, ErrorInvalidChangeKey, \
     ErrorItemSave, ErrorInvalidIdMalformed
-from .ewsdatetime import EWSDateTime
+from .ewsdatetime import EWSDateTime, UTC
 from .transport import wrap, SOAPNS, TNS, MNS, ENS
 from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, ElementType, \
     xml_to_str, set_xml_value
@@ -544,9 +544,10 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
         set_xml_value(folderitem, field_elem, self.account.version)
         setitemfield.append(folderitem)
         parent_elem.append(setitemfield)
-        if isinstance(value, EWSDateTime):
-            # Always set timezone explicitly when updating date fields. Exchange 2007 wants "MeetingTimeZone"
-            # instead of explicit timezone on each datetime field.
+        if isinstance(value, EWSDateTime) and value.tzinfo != UTC:
+            # Always set timezone explicitly when updating date fields, except for UTC datetimes which do not need to
+            # supply an explicit timezone. Exchange 2007 wants "MeetingTimeZone" instead of explicit timezone on each
+            # datetime field.
             setitemfield_tz = create_element('t:SetItemField')
             folderitem_tz = create_element(item_model.request_tag())
             if self.account.version.build < EXCHANGE_2010:
