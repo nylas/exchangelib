@@ -2174,7 +2174,7 @@ class BaseItemTest(EWSTest):
         item.refresh()
         self.assertEqual(item.subject, 'XXX')
         self.assertNotEqual(item.body, 'YYY')
-        item.delete()
+        self.bulk_delete([item])
 
     def test_soft_delete(self):
         # First, empty trash bin
