@@ -2,7 +2,7 @@
 from .account import Account  # noqa
 from .autodiscover import discover  # noqa
 from .configuration import Configuration  # noqa
-from .credentials import DELEGATE, IMPERSONATION, Credentials  # noqa
+from .credentials import DELEGATE, IMPERSONATION, Credentials, ServiceAccount  # noqa
 from .ewsdatetime import EWSDateTime, EWSTimeZone  # noqa
 from .folders import CalendarItem, Contact, Message, Task, Mailbox, Attendee, Body, HTMLBody  # noqa
 from .restriction import Q  # noqa

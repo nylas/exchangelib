@@ -39,14 +39,14 @@ Setup and connecting
     # ('myusername@example.com') format. UPN format is also supported.
     credentials = Credentials(username='MYWINDOMAIN\\myusername', password='topsecret')
 
-    # By default, fault-tolerant error handling is enabled. This means that requests to the server
-    # do an exponential backoff and sleep up to one hour before giving up, if the server is
-    # unavailable or responding with error messages. This prevents automated scripts from overwhelming
-    # a failing or overloaded server, and hides intermittent service outages that often happen in
-    # large Exchange installations.
+    # If you're running long-running jobs, you may want to enable fault-tolerance. Fault-tolerance
+    # means that requests to the server do an exponential backoff and sleep for up to a certain
+    # threshold before giving up, if the server is unavailable or responding with error messages.
+    # This prevents automated scripts from overwhelming a failing or overloaded server, and hides
+    # intermittent service outages that often happen in large Exchange installations.
 
-    # If you want to disable the fault tolerance, unset the 'is_service_account' flag:
-    credentials = Credentials(username='FOO\\bar', password='topsecret', is_service_account=False)
+    # If you want to enable the fault tolerance, create credentials as a service account instead:
+    credentials = ServiceAccount(username='FOO\\bar', password='topsecret')
 
     # Set up a target account and do an autodiscover lookup to find the target EWS endpoint:
     account = Account(primary_smtp_address='john@example.com', credentials=credentials,

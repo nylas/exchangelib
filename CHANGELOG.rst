@@ -6,8 +6,7 @@ HEAD
 ----
 * Expand support for ``ExtendedProperty`` to include all possible attributes. This required renaming the ``property_id``
   attribute to ``property_set_id``.
-* When ``Credentials`` is created with ``is_service_account=False``, ``UnauthorizedError`` is now raised if the credentials
-  are wrong.
+* When using the ``Credentials`` class, ``UnauthorizedError`` is now raised if the credentials are wrong.
 * Add a new ``version`` attribute to ``Configuration``, to force the server version if version guessing does not work.
   Accepts a ``exchangelib.version.Version`` object.
 * Rework bulk operations ``Account.bulk_foo()`` and ``Account.fetch()`` to return some exceptions unraised, if it is deemed
@@ -22,6 +21,10 @@ HEAD
   chaining and ``Q`` objects is even cooler and provides the same functionality, and more.
 * Add support for ``reminder_due_by`` and ``reminder_minutes_before_start`` fields on ``Item`` objects. Submitted by
   ``@vikipha``.
+* Added a new ``ServiceAccount`` class which is like ``Credentials`` but does what ``is_service_account`` did before. If
+  you need fault-tolerane and used ``Credentials(..., is_service_account=True)`` before, use ``ServiceAccount`` now. This
+  also disables fault-tolerance for the ``Credentials`` class, which is in line with what most users expected.
+
 
 1.8.1
 -----

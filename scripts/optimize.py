@@ -8,7 +8,7 @@ import time
 
 from yaml import load
 
-from exchangelib import DELEGATE, services, Credentials, Configuration, Account, EWSDateTime, EWSTimeZone, CalendarItem
+from exchangelib import DELEGATE, services, ServiceAccount, Configuration, Account, EWSDateTime, EWSTimeZone, CalendarItem
 
 logging.basicConfig(level=logging.WARNING)
 
@@ -23,7 +23,7 @@ categories = ['perftest']
 tz = EWSTimeZone.timezone('America/New_York')
 
 config = Configuration(server=settings['server'],
-                       credentials=Credentials(settings['username'], settings['password'], is_service_account=True),
+                       credentials=ServiceAccount(settings['username'], settings['password']),
                        verify_ssl=settings['verify_ssl'])
 print('Exchange server: %s' % config.protocol.server)
 

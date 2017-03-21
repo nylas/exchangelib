@@ -18,7 +18,7 @@ from exchangelib import close_connections
 from exchangelib.account import Account
 from exchangelib.autodiscover import AutodiscoverProtocol, discover
 from exchangelib.configuration import Configuration
-from exchangelib.credentials import DELEGATE, IMPERSONATION, Credentials
+from exchangelib.credentials import DELEGATE, IMPERSONATION, Credentials, ServiceAccount
 from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalidOperation, AutoDiscoverRedirect, \
     AutoDiscoverCircularRedirect, AutoDiscoverFailed, ErrorNonExistentMailbox, UnknownTimeZone, \
     ErrorNameResolutionNoResults, TransportError, RedirectError, CASError, RateLimitError, UnauthorizedError, \
@@ -90,7 +90,7 @@ class ConfigurationTest(unittest.TestCase):
         Configuration(
             server='example.com',
             has_ssl=True,
-            credentials=Credentials('foo', 'bar', is_service_account=False),
+            credentials=Credentials('foo', 'bar'),
             auth_type=NTLM,
             verify_ssl=True,
             version=Version(build=Build(15, 1, 2, 3), api_version='foo'),
@@ -795,13 +795,13 @@ class CommonTest(EWSTest):
         with self.assertRaises(UnauthorizedError):
             Configuration(
                 service_endpoint=self.config.protocol.service_endpoint,
-                credentials=Credentials(self.config.protocol.credentials.username, 'WRONG_PASSWORD', is_service_account=False),
+                credentials=Credentials(self.config.protocol.credentials.username, 'WRONG_PASSWORD'),
                 verify_ssl=self.config.protocol.verify_ssl)
         with self.assertRaises(AutoDiscoverFailed):
             Account(
                 primary_smtp_address=self.account.primary_smtp_address,
                 access_type=DELEGATE,
-                credentials=Credentials(self.config.protocol.credentials.username, 'WRONG_PASSWORD', is_service_account=False),
+                credentials=Credentials(self.config.protocol.credentials.username, 'WRONG_PASSWORD'),
                 autodiscover=True,
                 locale='da_DK')
 
@@ -820,9 +820,9 @@ class CommonTest(EWSTest):
             return raise_exc
 
         protocol = self.config.protocol
+        credentials = protocol.credentials
         # Make sure we fail fast in error cases
-        is_service_account = protocol.credentials.is_service_account
-        protocol.credentials.is_service_account = False
+        protocol.credentials = Credentials(username=credentials.username, password=credentials.password)
 
         session = protocol.get_session()
 
@@ -890,21 +890,20 @@ class CommonTest(EWSTest):
         with self.assertRaises(TransportError):
             r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
 
-        # Rate limit exceeded. Only raised when is_service_account=True
-        exchangelib.util.MAX_WAIT = 1
-        protocol.credentials.is_service_account = True
+        # Rate limit exceeded
+        protocol.credentials = ServiceAccount(username=credentials.username, password=credentials.password, max_wait=1)
         session.post = mock_session_post(503, {'connection': 'close'}, '')
         protocol.renew_session = lambda s: s  # Return the same session so it's still mocked
         with self.assertRaises(RateLimitError):
             r, session = post_ratelimited(protocol=protocol, session=session, url='', headers=None, data='')
         # Test something larger than the default wait, so we retry at least once
-        exchangelib.util.MAX_WAIT = 15
+        protocol.credentials.max_wait = 15
         session.post = mock_session_post(503, {'connection': 'close'}, '')
         with self.assertRaises(RateLimitError):
             r, session = post_ratelimited(protocol=protocol, session=session, url='', headers=None, data='')
 
         protocol.release_session(session)
-        protocol.credentials.is_service_account = is_service_account
+        protocol.credentials = credentials
 
     def test_soap_error(self):
         soap_xml = """\
@@ -1042,7 +1041,7 @@ class AutodiscoverTest(EWSTest):
         # Poison the cache. discover() must survive and rebuild the cache
         _autodiscover_cache[cache_key] = AutodiscoverProtocol(
             service_endpoint='https://example.com/blackhole.asmx',
-            credentials=Credentials('leet_user', 'cannaguess', is_service_account=False),
+            credentials=Credentials('leet_user', 'cannaguess'),
             auth_type=NTLM,
             verify_ssl=True
         )

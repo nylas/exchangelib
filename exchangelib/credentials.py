@@ -19,16 +19,21 @@ DELEGATE = 'delegate'
 
 @python_2_unicode_compatible
 class Credentials(object):
-    # Keeps login info the way Exchange likes it. Usernames for authentication are of one of these forms:
-    #
-    #    * PrimarySMTPAddress
-    #    * WINDOMAIN\username
-    #    * User Principal Name (UPN)
+    """
+    Keeps login info the way Exchange likes it.
+
+    :param username: Usernames for authentication are of one of these forms:
+    * PrimarySMTPAddress
+    * WINDOMAIN\\username
+    * User Principal Name (UPN)
+
+    :param password: Clear-text password
+    """
     EMAIL = 'email'
     DOMAIN = 'domain'
     UPN = 'upn'
 
-    def __init__(self, username, password, is_service_account=True):
+    def __init__(self, username, password):
         if username.count('@') == 1:
             self.type = self.EMAIL
         elif username.count('\\') == 1:
@@ -38,9 +43,11 @@ class Credentials(object):
         self.username = username
         self.password = password
 
+    @property
+    def fail_fast(self):
         # Used to choose the error handling policy. When True, a fault-tolerant policy is used. False, a fail-fast
         # policy is used.
-        self.is_service_account = is_service_account
+        return True
 
     def __hash__(self):
         return hash((self.username, self.password))
@@ -53,3 +60,17 @@ class Credentials(object):
 
     def __str__(self):
         return self.username
+
+
+class ServiceAccount(Credentials):
+    def __init__(self, username, password, max_wait=3600):
+        """
+        A Credentials class that enables fault-tolerance handling. Tells internal methods to do an exponential backoff
+        when requests start failing, and wait up to max_wait seconds before failing.
+        """
+        super(ServiceAccount, self).__init__(username, password)
+        self.max_wait = max_wait
+
+    @property
+    def fail_fast(self):
+        return False

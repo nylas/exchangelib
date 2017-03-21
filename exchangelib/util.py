@@ -294,7 +294,6 @@ def get_redirect_url(response, allow_relative=True, require_relative=False):
     return redirect_url
 
 
-MAX_WAIT = 3600  # seconds
 MAX_REDIRECTS = 5  # Define a max redirection count. We don't want to be sent into an endless redirect loop
 
 # A collection of error classes we want to handle as general connection errors
@@ -384,11 +383,11 @@ Response headers: %(response_headers)s'''
                 if r.status_code not in (302, 401, 503):
                     # Only retry if we didn't get a useful response
                     break
-                if not protocol.credentials.is_service_account:
+                if protocol.credentials.fail_fast:
                     break
                 log_vals['i'] += 1
                 log_vals['wait'] = wait
-                if wait > MAX_WAIT:
+                if wait > protocol.credentials.max_wait:
                     # We lost patience. Session is cleaned up in outer loop
                     raise RateLimitError(
                         'Session %(session_id)s URL %(url)s: Max timeout reached' % log_vals)
@@ -449,7 +448,7 @@ Response headers: %(response_headers)s'''
             raise ErrorInvalidSchemaVersionForMailboxVersion('Invalid server version')
         if 'The referenced account is currently locked out' in r.text:
             raise TransportError('The service account is currently locked out')
-        if r.status_code == 401 and not protocol.credentials.is_service_account:
+        if r.status_code == 401 and protocol.credentials.fail_fast:
             # This is a login failure
             raise UnauthorizedError('Wrong username or password for %s' % url)
         # This could be anything. Let higher layers handle this
