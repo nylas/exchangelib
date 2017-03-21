@@ -575,7 +575,7 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
         return setitemfield_tz
 
     def _get_item_update_elems(self, item, fieldnames):
-        from .folders import IndexedField
+        from .folders import IndexedField, MultiFieldIndexedElement
         item_model = item.__class__
         meeting_timezone_added = False
         for fieldname in fieldnames:
@@ -595,8 +595,8 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
                     continue
                 if isinstance(field, IndexedField):
                     for label in field.value_cls.LABELS:
-                        if field.value_cls.SUB_FIELD_ELEMENT_NAMES:
-                            for subfield in field.value_cls.SUB_FIELD_ELEMENT_NAMES.keys():
+                        if issubclass(field.value_cls, MultiFieldIndexedElement):
+                            for subfield in field.value_cls.SUB_FIELDS:
                                 yield self._get_delete_item_elem(field=field, label=label, subfield=subfield)
                         else:
                             yield self._get_delete_item_elem(field=field, label=label)
@@ -610,14 +610,14 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
                 # TODO: Maybe the set/delete logic should extend into subfields, not just overwrite the whole item.
                 for v in value:
                     # TODO: We should also delete the labels that no longer exist in the list
-                    if field.value_cls.SUB_FIELD_ELEMENT_NAMES:
+                    if issubclass(field.value_cls, MultiFieldIndexedElement):
                         # We have subfields. Generate SetItem XML for each subfield. SetItem only accepts items that
                         # have the one value set that we want to change. Create a new IndexedField object that has
                         # only that value set.
-                        for subfield in field.value_cls.SUB_FIELD_ELEMENT_NAMES.keys():
-                            simple_item = field.value_cls(**{'label': v.label, subfield: getattr(v, subfield)})
+                        for f in field.value_cls.SUB_FIELDS:
+                            simple_item = field.value_cls(**{'label': v.label, f.name: getattr(v, f.name)})
                             yield self._get_set_item_elem(item_model=item_model, field=field, value=simple_item,
-                                                          label=v.label, subfield=subfield)
+                                                          label=v.label, subfield=f)
                     else:
                         # The simpler IndexedFields without subfields
                         yield self._get_set_item_elem(item_model=item_model, field=field, value=v, label=v.label)

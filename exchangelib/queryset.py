@@ -42,7 +42,7 @@ class OrderField(object):
     """ Holds values needed to call server-side sorting on a single field """
     def __init__(self, field, label=None, subfield=None, reverse=False):
         # 'label' and 'subfield' are only used for IndexedField fields, and 'subfield' only for the fields that have
-        # multiple subfields (see IndexedField.SUB_FIELD_ELEMENT_NAMES).
+        # multiple subfields (MultiFieldIndexedField).
         self.field = field
         self.label = label
         self.subfield = subfield
@@ -50,17 +50,19 @@ class OrderField(object):
 
     @classmethod
     def from_string(cls, s, folder):
-        from .folders import IndexedField
+        from .folders import IndexedField, SingleFieldIndexedElement, MultiFieldIndexedElement
         field, label, subfield, reverse = split_fieldname(s)
         field = folder.get_item_field_by_fieldname(field)
         if isinstance(field, IndexedField):
             if not label:
                 raise ValueError(
                     "IndexedField order_by() value '%s' must specify label, e.g. 'email_addresses__EmailAddress1'" % s)
-            if field.value_cls.SUB_FIELD_ELEMENT_NAMES and not subfield:
-                raise ValueError("IndexedField order_by() value '%s' must specify subfield, e.g. "
-                                 "'physical_addresses__Business__zipcode'" % s)
-            if not field.value_cls.SUB_FIELD_ELEMENT_NAMES and subfield:
+            if issubclass(field.value_cls, MultiFieldIndexedElement):
+                if not subfield:
+                    raise ValueError("IndexedField order_by() value '%s' must specify subfield, e.g. "
+                                     "'physical_addresses__Business__zipcode'" % s)
+                subfield = field.value_cls.SUB_FIELDS_MAP[subfield]
+            if issubclass(field.value_cls, SingleFieldIndexedElement) and subfield:
                 raise ValueError("IndexedField order_by() value '%s' must not specify subfield, e.g. just "
                                  "'email_addresses__EmailAddress1'" % s)
         return cls(field=field, label=label, subfield=subfield, reverse=reverse)

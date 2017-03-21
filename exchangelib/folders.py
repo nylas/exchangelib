@@ -324,145 +324,6 @@ class AttachmentId(EWSElement):
         return res
 
 
-class IndexedElement(EWSElement):
-    LABELS = set()
-    SUB_FIELD_ELEMENT_NAMES = dict()
-    __slots__ = tuple()
-
-
-class EmailAddress(IndexedElement):
-    # MSDN:  https://msdn.microsoft.com/en-us/library/office/aa564757(v=exchg.150).aspx
-    ELEMENT_NAME = 'Entry'
-    LABELS = {'EmailAddress1', 'EmailAddress2', 'EmailAddress3'}
-
-    __slots__ = ('label', 'email')
-
-    def __init__(self, email, label='EmailAddress1'):
-        self.label = label
-        self.email = email
-        self.clean()
-
-    def clean(self):
-        assert self.label in self.LABELS, self.label
-        assert isinstance(self.email, string_types), self.email
-
-    def to_xml(self, version):
-        self.clean()
-        entry = create_element(self.request_tag(), Key=self.label)
-        set_xml_value(entry, self.email, version)
-        return entry
-
-    @classmethod
-    def from_xml(cls, elem):
-        if elem is None:
-            return None
-        assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
-        res = cls(
-            label=elem.get('Key'),
-            email=elem.text or elem.get('Name'),  # Sometimes elem.text is empty. Exchange saves the same in 'Name' attr
-        )
-        elem.clear()
-        return res
-
-
-class PhoneNumber(IndexedElement):
-    # MSDN: https://msdn.microsoft.com/en-us/library/office/aa565941(v=exchg.150).aspx
-    ELEMENT_NAME = 'Entry'
-    LABELS = {
-        'AssistantPhone', 'BusinessFax', 'BusinessPhone', 'BusinessPhone2', 'Callback', 'CarPhone', 'CompanyMainPhone',
-        'HomeFax', 'HomePhone', 'HomePhone2', 'Isdn', 'MobilePhone', 'OtherFax', 'OtherTelephone', 'Pager',
-        'PrimaryPhone', 'RadioPhone', 'Telex', 'TtyTddPhone',
-    }
-
-    __slots__ = ('label', 'phone_number')
-
-    def __init__(self, phone_number, label='PrimaryPhone'):
-        self.label = label
-        self.phone_number = phone_number
-        self.clean()
-
-    def clean(self):
-        assert self.label in self.LABELS, self.label
-        assert isinstance(self.phone_number, (int, string_type)), self.phone_number
-
-    def to_xml(self, version):
-        self.clean()
-        entry = create_element(self.request_tag(), Key=self.label)
-        set_xml_value(entry, text_type(self.phone_number), version)
-        return entry
-
-    @classmethod
-    def from_xml(cls, elem):
-        if elem is None:
-            return None
-        assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
-        res = cls(
-            label=elem.get('Key'),
-            phone_number=elem.text,
-        )
-        elem.clear()
-        return res
-
-
-class PhysicalAddress(IndexedElement):
-    # MSDN: https://msdn.microsoft.com/en-us/library/office/aa564323(v=exchg.150).aspx
-    ELEMENT_NAME = 'Entry'
-    LABELS = {'Business', 'Home', 'Other'}
-    SUB_FIELD_ELEMENT_NAMES = {
-        'street': 'Street',
-        'city': 'City',
-        'state': 'State',
-        'country': 'CountryOrRegion',
-        'zipcode': 'PostalCode',
-    }
-
-    __slots__ = ('label', 'street', 'city', 'state', 'country', 'zipcode')
-
-    def __init__(self, street=None, city=None, state=None, country=None, zipcode=None, label='Business'):
-        self.label = label
-        self.street = street  # Street *and* house number (and similar info)
-        self.city = city
-        self.state = state
-        self.country = country
-        self.zipcode = zipcode
-        self.clean()
-
-    def clean(self):
-        assert self.label in self.LABELS, self.label
-        if self.street is not None:
-            assert isinstance(self.street, string_types), self.street
-        if self.city is not None:
-            assert isinstance(self.city, string_types), self.city
-        if self.state is not None:
-            assert isinstance(self.state, string_types), self.state
-        if self.country is not None:
-            assert isinstance(self.country, string_types), self.country
-        if self.zipcode is not None:
-            assert isinstance(self.zipcode, (string_type, int)), self.zipcode
-
-    def to_xml(self, version):
-        self.clean()
-        entry = create_element(self.request_tag(), Key=self.label)
-        for attr in self.__slots__:
-            if attr == 'label':
-                continue
-            val = getattr(self, attr)
-            if val is not None:
-                add_xml_child(entry, 't:%s' % self.SUB_FIELD_ELEMENT_NAMES[attr], val)
-        return entry
-
-    @classmethod
-    def from_xml(cls, elem):
-        if elem is None:
-            return None
-        assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
-        kwargs = dict(label=elem.get('Key'))
-        for k, v in cls.SUB_FIELD_ELEMENT_NAMES.items():
-            kwargs[k] = get_xml_attr(elem, '{%s}%s' % (TNS, v))
-        elem.clear()
-        return cls(**kwargs)
-
-
 class Mailbox(EWSElement):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa565036(v=exchg.150).aspx
     ELEMENT_NAME = 'Mailbox'
@@ -958,7 +819,10 @@ class SimpleField(Field):
         # See all valid FieldURI values at https://msdn.microsoft.com/en-us/library/office/aa494315(v=exchg.150).aspx
         # field_uri_prefix is the prefix part of the FieldURI.
         self.field_uri = field_uri
-        self.field_uri_prefix, self.field_uri_postfix = field_uri.split(':')
+        if ':' in field_uri:
+            self.field_uri_prefix, self.field_uri_postfix = field_uri.split(':')
+        else:
+            self.field_uri_prefix, self.field_uri_postfix = None, field_uri
 
     def to_xml(self, value, version):
         field_elem = create_element(self.request_tag())
@@ -987,7 +851,6 @@ class SimpleField(Field):
 
 class IndexedField(SimpleField):
     PARENT_ELEMENT_NAME = None
-    VALUE_CLS = None
 
     def __init__(self, *args, **kwargs):
         super(IndexedField, self).__init__(*args, **kwargs)
@@ -1004,13 +867,12 @@ class IndexedField(SimpleField):
                 else:
                     elems.append(elem)
             return elems
-        if self.value_cls.SUB_FIELD_ELEMENT_NAMES:
+        if issubclass(self.value_cls, MultiFieldIndexedElement):
             if not subfield:
                 # Return elements for all sub-fields
-                return [self.field_uri_xml(label=label, subfield=s)
-                        for s in self.value_cls.SUB_FIELD_ELEMENT_NAMES.keys()]
-            assert subfield in self.value_cls.SUB_FIELD_ELEMENT_NAMES, (subfield, self.value_cls.SUB_FIELD_ELEMENT_NAMES)
-            field_uri = '%s:%s' % (self.field_uri, self.value_cls.SUB_FIELD_ELEMENT_NAMES[subfield])
+                return [self.field_uri_xml(label=label, subfield=f) for f in self.value_cls.SUB_FIELDS]
+            assert subfield in self.value_cls.SUB_FIELDS
+            field_uri = '%s:%s' % (self.field_uri, subfield.field_uri)
         else:
             field_uri = self.field_uri
         assert label in self.value_cls.LABELS, (label, self.value_cls.LABELS)
@@ -1098,6 +960,146 @@ class ExtendedPropertyField(Field):
 
     def __hash__(self):
         return hash(self.name)
+
+
+class LabelField(SimpleField):
+    def from_xml(self, elem):
+        return elem.get(self.field_uri)
+
+
+class IndexedElement(EWSElement):
+    LABELS = set()
+    LABEL_FIELD = None
+    SUB_FIELDS = tuple()
+    SUB_FIELDS_MAP = {f.name: f for f in SUB_FIELDS}
+    __slots__ = tuple()
+
+    def __init__(self, **kwargs):
+        self.label = kwargs.pop('label', None)
+        for f in self.SUB_FIELDS:
+            setattr(self, f.name, kwargs.pop(f.name, None))
+        if kwargs:
+            raise TypeError("%s are invalid keyword arguments for this function" %
+                            ', '.join("'%s'" % k for k in kwargs.keys()))
+
+    def clean(self):
+        self.LABEL_FIELD.clean(self.label)
+        for f in self.SUB_FIELDS:
+            value = getattr(self, f.name)
+            setattr(self, f.name, f.clean(value))
+
+
+class SubField(SimpleField):
+    def __init__(self, *args, **kwargs):
+        kwargs['field_uri'] = ''
+        super(SubField, self).__init__(*args, **kwargs)
+
+    def from_xml(self, elem):
+        return elem.text
+
+    def to_xml(self, value, version):
+        return value
+
+
+class EmailSubField(SubField):
+    def from_xml(self, elem):
+        return elem.text or elem.get('Name')  # Sometimes elem.text is empty. Exchange saves the same in 'Name' attr
+
+
+class SingleFieldIndexedElement(IndexedElement):
+    __slots__ = tuple()
+
+    @classmethod
+    def from_xml(cls, elem):
+        if elem is None:
+            return None
+        assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
+        kwargs = {f.name: f.from_xml(elem) for f in cls.SUB_FIELDS}
+        kwargs[cls.LABEL_FIELD.name] = elem.get(cls.LABEL_FIELD.field_uri)
+        elem.clear()
+        return cls(**kwargs)
+
+    def to_xml(self, version):
+        self.clean()
+        entry = create_element(self.request_tag(), Key=self.label)
+        for f in self.SUB_FIELDS:
+            set_xml_value(entry, f.to_xml(getattr(self, f.name), version=version), version)
+        return entry
+
+
+class EmailAddress(SingleFieldIndexedElement):
+    # MSDN:  https://msdn.microsoft.com/en-us/library/office/aa564757(v=exchg.150).aspx
+    ELEMENT_NAME = 'Entry'
+    LABELS = {'EmailAddress1', 'EmailAddress2', 'EmailAddress3'}
+    LABEL_FIELD = LabelField('label', field_uri='Key', value_cls=Choice, choices=LABELS, default='EmailAddress1')
+    SUB_FIELDS = (
+        EmailSubField('email', value_cls=string_type),
+    )
+    SUB_FIELDS_MAP = {f.name: f for f in SUB_FIELDS}
+
+    __slots__ = ('label',) + tuple(f.name for f in SUB_FIELDS)
+
+
+class PhoneNumber(SingleFieldIndexedElement):
+    # MSDN: https://msdn.microsoft.com/en-us/library/office/aa565941(v=exchg.150).aspx
+    ELEMENT_NAME = 'Entry'
+    LABELS = {
+        'AssistantPhone', 'BusinessFax', 'BusinessPhone', 'BusinessPhone2', 'Callback', 'CarPhone', 'CompanyMainPhone',
+        'HomeFax', 'HomePhone', 'HomePhone2', 'Isdn', 'MobilePhone', 'OtherFax', 'OtherTelephone', 'Pager',
+        'PrimaryPhone', 'RadioPhone', 'Telex', 'TtyTddPhone',
+    }
+    LABEL_FIELD = LabelField('label', field_uri='Key', value_cls=Choice, choices=LABELS, default='PrimaryPhone')
+    SUB_FIELDS = (
+        SubField('phone_number', value_cls=string_type),
+    )
+    SUB_FIELDS_MAP = {f.name: f for f in SUB_FIELDS}
+
+    __slots__ = ('label',) + tuple(f.name for f in SUB_FIELDS)
+
+
+class MultiFieldIndexedElement(IndexedElement):
+    __slots__ = tuple()
+
+    @classmethod
+    def from_xml(cls, elem):
+        if elem is None:
+            return None
+        assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
+        kwargs = {f.name: f.from_xml(elem) for f in cls.SUB_FIELDS}
+        kwargs['label'] = cls.LABEL_FIELD.from_xml(elem)
+        elem.clear()
+        return cls(**kwargs)
+
+    def to_xml(self, version):
+        self.clean()
+        entry = create_element(self.request_tag(), Key=self.label)
+        for f in self.SUB_FIELDS:
+            value = getattr(self, f.name)
+            if value is not None:
+                add_xml_child(entry, f.request_tag(), value)
+        return entry
+
+
+class PhysicalAddress(MultiFieldIndexedElement):
+    # MSDN: https://msdn.microsoft.com/en-us/library/office/aa564323(v=exchg.150).aspx
+    ELEMENT_NAME = 'Entry'
+    LABELS = {'Business', 'Home', 'Other'}
+    LABEL_FIELD = LabelField('label', field_uri='Key', value_cls=Choice, choices=LABELS, default='Business')
+    SUB_FIELDS = (
+        SimpleField('street', field_uri='Street', value_cls=string_type), # Street *and* house number (and similar info)
+        SimpleField('city', field_uri='City', value_cls=string_type),
+        SimpleField('state', field_uri='State', value_cls=string_type),
+        SimpleField('country', field_uri='CountryOrRegion', value_cls=string_type),
+        SimpleField('zipcode', field_uri='PostalCode', value_cls=string_type),
+    )
+    SUB_FIELDS_MAP = {f.name: f for f in SUB_FIELDS}
+
+    __slots__ = ('label',) + tuple(f.name for f in SUB_FIELDS)
+
+    def clean(self):
+        if isinstance(self.zipcode, int):
+            self.zipcode = string_type(self.zipcode)
+        super(PhysicalAddress, self).clean()
 
 
 class Attachment(EWSElement):

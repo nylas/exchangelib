@@ -2173,7 +2173,7 @@ class BaseItemTest(EWSTest):
         item.save(update_fields=['subject'])
         item.refresh()
         self.assertEqual(item.subject, 'XXX')
-        self.assertNotEqual(item.location, 'YYY')
+        self.assertNotEqual(item.body, 'YYY')
         item.delete()
 
     def test_soft_delete(self):
