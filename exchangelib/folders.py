@@ -1595,6 +1595,8 @@ class BulkCreateResult(Item):
     )
     ITEM_FIELDS_MAP = {f.name: f for f in ITEM_FIELDS}
 
+    __slots__ = ('item_id', 'changekey', 'attachments')
+
     @classmethod
     def from_xml(cls, elem, account=None, folder=None):
         item_id, changekey = cls.id_from_xml(elem)
@@ -1827,8 +1829,6 @@ class MeetingRequest(Item):
     )
     ITEM_FIELDS_MAP = {f.name: f for f in ITEM_FIELDS}
 
-    #__slots__ = ('account', 'folder') + tuple(f.name for f in ITEM_FIELDS)
-
 
 class MeetingResponse(Item):
     # Supported attrs: https://msdn.microsoft.com/en-us/library/office/aa564337(v=exchg.150).aspx
@@ -1844,8 +1844,6 @@ class MeetingResponse(Item):
     )
     ITEM_FIELDS_MAP = {f.name: f for f in ITEM_FIELDS}
 
-    #__slots__ = ('account', 'folder') + tuple(f.name for f in ITEM_FIELDS)
-
 
 class MeetingCancellation(Item):
     # Supported attrs: https://msdn.microsoft.com/en-us/library/office/aa564685(v=exchg.150).aspx
@@ -1860,8 +1858,6 @@ class MeetingCancellation(Item):
         SimpleField('end', field_uri='calendar:End', value_cls=EWSDateTime, is_read_only=True),
     )
     ITEM_FIELDS_MAP = {f.name: f for f in ITEM_FIELDS}
-
-    #__slots__ = ('account', 'folder') + tuple(f.name for f in ITEM_FIELDS)
 
 
 class FileAttachment(Attachment):
