@@ -2159,6 +2159,23 @@ class BaseItemTest(EWSTest):
         items = self.test_folder.filter(categories__contains=item.categories)
         self.assertEqual(len(items), 0)
 
+    def test_save_with_update_fields(self):
+        # Create a test item
+        insert_kwargs = self.get_random_insert_kwargs()
+        if 'is_all_day' in insert_kwargs:
+            insert_kwargs['is_all_day'] = False
+        item = self.ITEM_CLASS(account=self.account, folder=self.test_folder, **insert_kwargs)
+        with self.assertRaises(ValueError):
+            item.save(update_fields=['subject'])  # update_fields does not work on item creation
+        item.save()
+        item.subject = 'XXX'
+        item.body = 'YYY'
+        item.save(update_fields=['subject'])
+        item.refresh()
+        self.assertEqual(item.subject, 'XXX')
+        self.assertNotEqual(item.location, 'YYY')
+        item.delete()
+
     def test_soft_delete(self):
         # First, empty trash bin
         self.account.trash.filter(categories__contains=self.categories).delete()

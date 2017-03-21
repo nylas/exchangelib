@@ -202,6 +202,7 @@ HEAD
   ``order_by()``, ``reverse()````values()`` and ``values_list()`` that all allow for chaining. ``QuerySet`` also has
   methods ``iterator()``, ``get()``, ``count()``, ``exists()`` and ``delete()``. All these methods behave like their
   counterparts in Django.
+* Added an optional ``update_fields`` attribute to ``save()`` to specify only some  fields to be updated.
 
 
 1.6.2
