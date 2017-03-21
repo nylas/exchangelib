@@ -954,8 +954,8 @@ class CommonTest(EWSTest):
                 continue
             if not issubclass(v, folders.EWSElement):
                 continue
-            if v in (folders.EWSElement, folders.IndexedElement, folders.CalendarView):
-                # These do not support implement from_xml()
+            if v in (folders.EWSElement, folders.IndexedElement, folders.CalendarView, folders.Attachment):
+                # These are only for inheritance and do not support implement from_xml()
                 with self.assertRaises(NotImplementedError):
                     v.from_xml(None)
                 continue
@@ -2459,7 +2459,7 @@ class BaseItemTest(EWSTest):
             list(GetAttachment(account=item.account).call(
                 items=[att1.attachment_id],
                 include_mime_content=False)
-            )[0].find('{%s}%s' % (TNS, FileAttachment.ATTACHMENT_FIELDS['content'][0])).text,
+            )[0].find('{%s}Content' % TNS).text,
             'SGVsbG8gZnJvbSB1bmljb2RlIMOmw7jDpQ==')
 
         # Test attach on saved object
@@ -2503,6 +2503,7 @@ class BaseItemTest(EWSTest):
         self.assertEqual(len(fresh_item.attachments), 1)
         fresh_attachments = sorted(fresh_item.attachments, key=lambda a: a.name)
         self.assertEqual(fresh_attachments[0].name, 'attachment1')
+        self.assertIsInstance(fresh_attachments[0].item, self.ITEM_CLASS)
 
         for f in self.ITEM_CLASS.ITEM_FIELDS:
             # Normalize some values we don't control
@@ -2537,6 +2538,7 @@ class BaseItemTest(EWSTest):
         self.assertEqual(len(fresh_item.attachments), 2)
         fresh_attachments = sorted(fresh_item.attachments, key=lambda a: a.name)
         self.assertEqual(fresh_attachments[0].name, 'attachment1')
+        self.assertIsInstance(fresh_attachments[0].item, self.ITEM_CLASS)
 
         for f in self.ITEM_CLASS.ITEM_FIELDS:
             # Normalize some values we don't control
@@ -2558,6 +2560,7 @@ class BaseItemTest(EWSTest):
             self.assertEqual(old_val, new_val, (f.name, old_val, new_val))
 
         self.assertEqual(fresh_attachments[1].name, 'attachment2')
+        self.assertIsInstance(fresh_attachments[1].item, self.ITEM_CLASS)
 
         for f in self.ITEM_CLASS.ITEM_FIELDS:
             # Normalize some values we don't control

@@ -324,155 +324,6 @@ class AttachmentId(EWSElement):
         return res
 
 
-class Attachment(EWSElement):
-    """
-    Parent class for FileAttachment and ItemAttachment
-    """
-    # TODO: Rewrite these as tuple of Field() elements
-    ATTACHMENT_FIELDS = {
-        'name': ('Name', string_type),
-        'content_type': ('ContentType', string_type),
-        'attachment_id': (AttachmentId, AttachmentId),
-        'content_id': ('ContentId', string_type),
-        'content_location': ('ContentLocation', AnyURI),
-        'size': ('Size', int),
-        'last_modified_time': ('LastModifiedTime', EWSDateTime),
-        'is_inline': ('IsInline', bool),
-    }
-    ORDERED_FIELDS = (
-        'attachment_id', 'name', 'content_type', 'content_id', 'content_location', 'size', 'last_modified_time',
-        'is_inline',
-    )
-
-    __slots__ = ('parent_item',) + ORDERED_FIELDS
-
-    def __init__(self, parent_item=None, attachment_id=None, name=None, content_type=None, content_id=None,
-                 content_location=None, size=None, last_modified_time=None, is_inline=None):
-        self.parent_item = parent_item
-        self.name = name
-        self.content_type = content_type
-        self.attachment_id = attachment_id
-        self.content_id = content_id
-        self.content_location = content_location
-        self.size = size  # Size is attachment size in bytes
-        self.last_modified_time = last_modified_time
-        self.is_inline = is_inline
-        self.clean()
-
-    def clean(self):
-        if self.content_type is None and self.name is not None:
-            self.content_type = mimetypes.guess_type(self.name)[0] or 'application/octet-stream'
-
-    def to_xml(self, version):
-        self.clean()
-        entry = create_element(self.request_tag())
-        for field_name in self.ORDERED_FIELDS:
-            if field_name == 'size':
-                # 'Size' is read-only
-                continue
-            val = getattr(self, field_name)
-            if field_name == 'content':
-                # EWS wants file content base64-encoded
-                if val is None:
-                    raise ValueError("File attachment must contain data")
-                val = base64.b64encode(val).decode('ascii')
-            if val is None:
-                continue
-            field_uri = self.ATTACHMENT_FIELDS[field_name][0]
-            if isinstance(field_uri, string_types):
-                add_xml_child(entry, 't:%s' % field_uri, val)
-            elif issubclass(field_uri, EWSElement):
-                set_xml_value(entry, val, version)
-            else:
-                assert False, 'field_uri %s not supported' % field_uri
-        return entry
-
-    @classmethod
-    def from_xml(cls, elem, parent_item=None):
-        if elem is None:
-            return None
-        assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
-        kwargs = {}
-        for field_name, (field_uri, field_type) in cls.ATTACHMENT_FIELDS.items():
-            if field_name == 'item':
-                kwargs[field_name] = None
-                for item_cls in ITEM_CLASSES:
-                    item_elem = elem.find(item_cls.response_tag())
-                    if item_elem is not None:
-                        account = parent_item.account if parent_item else None
-                        kwargs[field_name] = item_cls.from_xml(elem=item_elem, account=account)
-                        break
-                continue
-            if issubclass(field_type, EWSElement):
-                kwargs[field_name] = field_type.from_xml(elem=elem.find(field_type.response_tag()))
-                continue
-            response_tag = '{%s}%s' % (TNS, field_uri)
-            val = get_xml_attr(elem, response_tag)
-            if field_name == 'content':
-                kwargs[field_name] = None if val is None else base64.b64decode(val)
-                continue
-            if field_name == 'last_modified_time' and val is not None and not val.endswith('Z'):
-                # Sometimes, EWS will send timestamps without the 'Z' for UTC. It seems like the values are still
-                # UTC, so mark them as such so EWSDateTime can still interpret the timestamps.
-                val += 'Z'
-            kwargs[field_name] = xml_text_to_value(value=val, value_type=field_type)
-        elem.clear()
-        return cls(parent_item=parent_item, **kwargs)
-
-    def attach(self):
-        # Adds this attachment to an item and updates the item_id and updated changekey on the parent item
-        if self.attachment_id:
-            raise ValueError('This attachment has already been created')
-        if not self.parent_item.account:
-            raise ValueError('Parent item %s must have an account' % self.parent_item)
-        items = list(
-            i if isinstance(i, Exception) else self.from_xml(elem=i)
-            for i in CreateAttachment(account=self.parent_item.account).call(parent_item=self.parent_item, items=[self])
-        )
-        assert len(items) == 1
-        root_item_id = items[0]
-        if isinstance(root_item_id, Exception):
-            raise root_item_id
-        attachment_id = root_item_id.attachment_id
-        assert attachment_id.root_id == self.parent_item.item_id
-        assert attachment_id.root_changekey != self.parent_item.changekey
-        self.parent_item.changekey = attachment_id.root_changekey
-        # EWS does not like receiving root_id and root_changekey on subsequent requests
-        attachment_id.root_id = None
-        attachment_id.root_changekey = None
-        self.attachment_id = attachment_id
-
-    def detach(self):
-        # Deletes an attachment remotely and returns the item_id and updated changekey of the parent item
-        if not self.attachment_id:
-            raise ValueError('This attachment has not been created')
-        if not self.parent_item:
-            raise ValueError('This attachment is not attached to an item')
-        items = list(
-            i if isinstance(i, Exception) else RootItemId.from_xml(elem=i)
-            for i in DeleteAttachment(account=self.parent_item.account).call(items=[self.attachment_id])
-        )
-        assert len(items) == 1
-        root_item_id = items[0]
-        if isinstance(root_item_id, Exception):
-            raise root_item_id
-        assert root_item_id.id == self.parent_item.item_id
-        assert root_item_id.changekey != self.parent_item.changekey
-        self.parent_item.changekey = root_item_id.changekey
-        self.parent_item = None
-        self.attachment_id = None
-
-    def __hash__(self):
-        if self.attachment_id is None:
-            return hash(tuple(getattr(self, f) for f in self.__slots__[1:]))
-        return hash(self.attachment_id)
-
-    def __repr__(self):
-        return self.__class__.__name__ + '(%s)' % ', '.join(
-            '%s=%s' % (k, repr(getattr(self, k))) for k in self.ORDERED_FIELDS if k not in ('item', 'content')
-        )
-
-
 class IndexedElement(EWSElement):
     LABELS = set()
     SUB_FIELD_ELEMENT_NAMES = dict()
@@ -1249,6 +1100,109 @@ class ExtendedPropertyField(Field):
         return hash(self.name)
 
 
+class Attachment(EWSElement):
+    """
+    Parent class for FileAttachment and ItemAttachment
+    """
+    # TODO: Rewrite these as tuple of Field() elements
+    ATTACHMENT_FIELDS = (
+        SimpleField('attachment_id', field_uri='attachment:AttachmentId', value_cls=AttachmentId),
+        SimpleField('name', field_uri='attachment:Name', value_cls=string_type),
+        SimpleField('content_type', field_uri='attachment:ContentType', value_cls=string_type),
+        SimpleField('content_id', field_uri='attchment:ContentId', value_cls=string_type),
+        SimpleField('content_location', field_uri='attachment:ContentLocation', value_cls=AnyURI),
+        SimpleField('size', field_uri='attachment:Size', value_cls=int, is_read_only=True),  # Attachment size in bytes
+        SimpleField('last_modified_time', field_uri='attachment:LastModifiedTime', value_cls=EWSDateTime),
+        SimpleField('is_inline', field_uri='attachment:IsInline', value_cls=bool),
+    )
+
+    __slots__ = ('parent_item',) + tuple(f.name for f in ATTACHMENT_FIELDS)
+
+    def __init__(self, **kwargs):
+        self.parent_item = kwargs.pop('parent_item', None)
+        if self.parent_item is not None:
+            assert isinstance(self.parent_item, Item)
+        for f in self.ATTACHMENT_FIELDS:
+            setattr(self, f.name, kwargs.pop(f.name, None))
+        if kwargs:
+            raise TypeError("%s are invalid keyword arguments for this function" %
+                            ', '.join("'%s'" % k for k in kwargs.keys()))
+        self.clean()
+
+    def clean(self):
+        for f in self.ATTACHMENT_FIELDS:
+            val = getattr(self, f.name)
+            setattr(self, f.name, f.clean(val))
+        if self.content_type is None and self.name is not None:
+            self.content_type = mimetypes.guess_type(self.name)[0] or 'application/octet-stream'
+
+    def to_xml(self, version):
+        self.clean()
+        i = create_element(self.request_tag())
+        for f in self.ATTACHMENT_FIELDS:
+            if f.is_read_only:
+                continue
+            value = getattr(self, f.name)
+            if value is None or (f.is_list and not value):
+                continue
+            i.append(f.to_xml(value, version=version))
+        return i
+
+    def attach(self):
+        # Adds this attachment to an item and updates the item_id and updated changekey on the parent item
+        if self.attachment_id:
+            raise ValueError('This attachment has already been created')
+        if not self.parent_item.account:
+            raise ValueError('Parent item %s must have an account' % self.parent_item)
+        items = list(
+            i if isinstance(i, Exception) else self.from_xml(elem=i)
+            for i in CreateAttachment(account=self.parent_item.account).call(parent_item=self.parent_item, items=[self])
+        )
+        assert len(items) == 1
+        root_item_id = items[0]
+        if isinstance(root_item_id, Exception):
+            raise root_item_id
+        attachment_id = root_item_id.attachment_id
+        assert attachment_id.root_id == self.parent_item.item_id
+        assert attachment_id.root_changekey != self.parent_item.changekey
+        self.parent_item.changekey = attachment_id.root_changekey
+        # EWS does not like receiving root_id and root_changekey on subsequent requests
+        attachment_id.root_id = None
+        attachment_id.root_changekey = None
+        self.attachment_id = attachment_id
+
+    def detach(self):
+        # Deletes an attachment remotely and returns the item_id and updated changekey of the parent item
+        if not self.attachment_id:
+            raise ValueError('This attachment has not been created')
+        if not self.parent_item:
+            raise ValueError('This attachment is not attached to an item')
+        items = list(
+            i if isinstance(i, Exception) else RootItemId.from_xml(elem=i)
+            for i in DeleteAttachment(account=self.parent_item.account).call(items=[self.attachment_id])
+        )
+        assert len(items) == 1
+        root_item_id = items[0]
+        if isinstance(root_item_id, Exception):
+            raise root_item_id
+        assert root_item_id.id == self.parent_item.item_id
+        assert root_item_id.changekey != self.parent_item.changekey
+        self.parent_item.changekey = root_item_id.changekey
+        self.parent_item = None
+        self.attachment_id = None
+
+    def __hash__(self):
+        if self.attachment_id is None:
+            return hash(tuple(getattr(self, f) for f in self.__slots__[1:]))
+        return hash(self.attachment_id)
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(%s)' % ', '.join(
+            '%s=%s' % (f.name, repr(getattr(self, f.name))) for f in self.ATTACHMENT_FIELDS
+            if f.name not in ('item', 'content')
+        )
+
+
 class Item(EWSElement):
     ELEMENT_NAME = 'Item'
 
@@ -1866,28 +1820,16 @@ class FileAttachment(Attachment):
     """
     # TODO: This class is most likely inefficient for large data. Investigate methods to reduce copying
     ELEMENT_NAME = 'FileAttachment'
-    ATTACHMENT_FIELDS = {
-        'content': ('Content', bytes),
-        'is_contact_photo': ('IsContactPhoto', bool),
-    }
-    ATTACHMENT_FIELDS.update(Attachment.ATTACHMENT_FIELDS)
-    ORDERED_FIELDS = (
-        'attachment_id', 'name', 'content_type', 'content_id', 'content_location', 'size', 'last_modified_time',
-        'is_inline', 'is_contact_photo', 'content',
+    ATTACHMENT_FIELDS = Attachment.ATTACHMENT_FIELDS + (
+        SimpleField('is_contact_photo', field_uri='attachment:IsContactPhoto', value_cls=bool),
+        SimpleField('_content', field_uri='attachment:Content', value_cls=Content),
     )
 
-    __slots__ = ('parent_item',) + tuple(ORDERED_FIELDS[:-1]) + ('_content',)
+    __slots__ = ('parent_item',) + tuple(f.name for f in ATTACHMENT_FIELDS)
 
-    def __init__(self, *args, **kwargs):
-        self._content = kwargs.pop('content', None)
-        self.is_contact_photo = kwargs.pop('is_contact_photo', None)
-        super(FileAttachment, self).__init__(*args, **kwargs)
-        for field_name, (_, field_type) in self.ATTACHMENT_FIELDS.items():
-            if field_name == 'content':
-                field_name = '_content'
-            val = getattr(self, field_name)
-            if val is not None and not isinstance(val, field_type):
-                raise ValueError("Field '%s' must be of type '%s'" % (field_name, field_type))
+    def __init__(self, **kwargs):
+        kwargs['_content'] = kwargs.pop('content', None)
+        super(FileAttachment, self).__init__(**kwargs)
 
     @property
     def content(self):
@@ -1906,7 +1848,7 @@ class FileAttachment(Attachment):
             raise elem
         assert not isinstance(elem, tuple), elem
         # Don't use get_xml_attr() here because we want to handle empty file content as '', not None
-        val = elem.find('{%s}%s' % (TNS, self.ATTACHMENT_FIELDS['content'][0]))
+        val = elem.find('{%s}Content' % TNS)
         if val is None:
             self._content = None
         else:
@@ -1919,32 +1861,43 @@ class FileAttachment(Attachment):
         assert isinstance(value, bytes)
         self._content = value
 
+    @classmethod
+    def from_xml(cls, elem, parent_item=None):
+        if elem is None:
+            return None
+        assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
+        kwargs = {f.name: f.from_xml(elem) for f in cls.ATTACHMENT_FIELDS}
+        kwargs['content'] = kwargs.pop('_content')
+        elem.clear()
+        return cls(parent_item=parent_item, **kwargs)
+
+
+class ItemField(SimpleField):
+    def from_xml(self, elem):
+        for item_cls in ITEM_CLASSES:
+            item_elem = elem.find(item_cls.response_tag())
+            if item_elem is not None:
+                return item_cls.from_xml(elem=item_elem)
+
+    def to_xml(self, value, version):
+        # We don't want to wrap in an Item element
+        return value.to_xml(version=version)
+
 
 class ItemAttachment(Attachment):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa562997(v=exchg.150).aspx
     """
     ELEMENT_NAME = 'ItemAttachment'
-    ATTACHMENT_FIELDS = {
-        'item': (Item, Item),
-    }
-    ATTACHMENT_FIELDS.update(Attachment.ATTACHMENT_FIELDS)
-    ORDERED_FIELDS = (
-        'attachment_id', 'name', 'content_type', 'content_id', 'content_location', 'size', 'last_modified_time',
-        'is_inline', 'item',
+    ATTACHMENT_FIELDS = Attachment.ATTACHMENT_FIELDS + (
+        ItemField('_item', field_uri='attachment:Item', value_cls=Item),
     )
 
-    __slots__ = ('parent_item',) + tuple(ORDERED_FIELDS[:-1]) + ('_item',)
+    __slots__ = ('parent_item',) + tuple(f.name for f in ATTACHMENT_FIELDS)
 
-    def __init__(self, *args, **kwargs):
-        self._item = kwargs.pop('item', None)
-        super(ItemAttachment, self).__init__(*args, **kwargs)
-        for field_name, (_, field_type) in self.ATTACHMENT_FIELDS.items():
-            if field_name == 'item':
-                field_name = '_item'
-            val = getattr(self, field_name)
-            if val is not None and not isinstance(val, field_type):
-                raise ValueError("Field '%s' must be of type '%s'" % (field_name, field_type))
+    def __init__(self, **kwargs):
+        kwargs['_item'] = kwargs.pop('item', None)
+        super(ItemAttachment, self).__init__(**kwargs)
 
     @property
     def item(self):
@@ -1961,16 +1914,27 @@ class ItemAttachment(Attachment):
                 items=[self.attachment_id], include_mime_content=True)
         )
         assert len(items) == 1
-        _attachment = items[0]
-        if isinstance(_attachment, Exception):
-            raise _attachment
-        self._item = _attachment._item
+        attachment = items[0]
+        if isinstance(attachment, Exception):
+            raise attachment
+        assert attachment._item is not None, 'GetAttachment returned no item'
+        self._item = attachment._item
         return self._item
 
     @item.setter
     def item(self, value):
         assert isinstance(value, Item)
         self._item = value
+
+    @classmethod
+    def from_xml(cls, elem, parent_item=None):
+        if elem is None:
+            return None
+        assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
+        kwargs = {f.name: f.from_xml(elem) for f in cls.ATTACHMENT_FIELDS}
+        kwargs['item'] = kwargs.pop('_item')
+        elem.clear()
+        return cls(parent_item=parent_item, **kwargs)
 
 
 ITEM_CLASSES = (CalendarItem, Contact, Message, Task, MeetingRequest, MeetingResponse, MeetingCancellation)
