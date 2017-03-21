@@ -111,6 +111,15 @@ class Location(text_type):
             raise ValueError("'%s' value '%s' exceeds length %s" % (self.__class__.__name__, self, self.MAXLENGTH))
 
 
+class Content(bytes):
+    # Helper to work with the base64 encoded binary Attachment content field
+    def b64encode(self):
+        return base64.b64encode(self).decode('ascii')
+
+    def b64decode(self):
+        return base64.b64decode(self)
+
+
 class MimeContent(text_type):
     # Helper to work with the base64 encoded MimeContent Message field
     def b64encode(self):

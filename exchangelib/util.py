@@ -110,13 +110,15 @@ def get_xml_attrs(tree, name):
 
 def value_to_xml_text(value):
     from .ewsdatetime import EWSDateTime
-    from .folders import Attendee, Mailbox, EmailAddress, PhoneNumber
+    from .folders import Attendee, Mailbox, EmailAddress, PhoneNumber, Content
     if isinstance(value, string_types):
         return safe_xml_value(value)
     if isinstance(value, bool):
         return '1' if value else '0'
     if isinstance(value, (int, Decimal)):
         return text_type(value)
+    if isinstance(value, Content):
+        return value.b64encode()
     if isinstance(value, EWSDateTime):
         return value.ewsformat()
     if isinstance(value, PhoneNumber):
@@ -132,6 +134,7 @@ def value_to_xml_text(value):
 
 def xml_text_to_value(value, value_type):
     from .ewsdatetime import EWSDateTime
+    from .folders import Content
     if value is None:
         return None
     if value_type == string_type:
@@ -144,6 +147,9 @@ def xml_text_to_value(value, value_type):
     if issubclass(value_type, string_type):
         # Cast string-like values to their intended class
         return value_type(value)
+    if issubclass(value_type, bytes):
+        # Cast bytes-like values to their intended class
+        return value_type(value)
     return {
         bool: lambda v: True if v == 'true' else False if v == 'false' else None,
         int: int,
@@ -155,7 +161,7 @@ def xml_text_to_value(value, value_type):
 def set_xml_value(elem, value, version):
     from .folders import EWSElement
     from .ewsdatetime import EWSDateTime
-    if isinstance(value, (string_types + (bool, int, Decimal, EWSDateTime))):
+    if isinstance(value, string_types + (bool, int, bytes, Decimal, EWSDateTime)):
         elem.text = value_to_xml_text(value)
     elif isinstance(value, (tuple, list)):
         for v in value:
