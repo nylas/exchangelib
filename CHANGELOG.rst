@@ -24,6 +24,7 @@ HEAD
 * Added a new ``ServiceAccount`` class which is like ``Credentials`` but does what ``is_service_account`` did before. If
   you need fault-tolerane and used ``Credentials(..., is_service_account=True)`` before, use ``ServiceAccount`` now. This
   also disables fault-tolerance for the ``Credentials`` class, which is in line with what most users expected.
+* Added an optional ``update_fields`` attribute to ``save()`` to specify only some  fields to be updated.
 
 
 1.8.1
@@ -202,7 +203,6 @@ HEAD
   ``order_by()``, ``reverse()````values()`` and ``values_list()`` that all allow for chaining. ``QuerySet`` also has
   methods ``iterator()``, ``get()``, ``count()``, ``exists()`` and ``delete()``. All these methods behave like their
   counterparts in Django.
-* Added an optional ``update_fields`` attribute to ``save()`` to specify only some  fields to be updated.
 
 
 1.6.2
