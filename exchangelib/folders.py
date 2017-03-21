@@ -2078,22 +2078,8 @@ class Folder(EWSElement):
         return QuerySet(self).none()
 
     def filter(self, *args, **kwargs):
-        return QuerySet(self).filter(*args, **kwargs)
-
-    def exclude(self, *args, **kwargs):
-        return QuerySet(self).exclude(*args, **kwargs)
-
-    def get(self, *args, **kwargs):
-        return QuerySet(self).get(*args, **kwargs)
-
-    def find_items(self, *args, **kwargs):
         """
         Finds items in the folder.
-
-        'shape' controls the exact fields returned are governed by. Be aware that complex elements can only be fetched
-        with fetch().
-
-        'depth' controls the whether to return soft-deleted items or not.
 
         Non-keyword args may be a list of Q instances.
 
@@ -2114,18 +2100,35 @@ class Folder(EWSElement):
             my_account.tasks.filter(subject__contains='Foo')
             my_account.tasks.filter(subject__icontains='foo')
 
+        'endswith' and 'iendswith' could be emulated by searching with 'contains' or 'icontains' and then
+        post-processing items. Fetch the field in question with additional_fields and remove items where the search
+        string is not a postfix.
         """
-        # 'endswith' and 'iendswith' could be implemented by searching with 'contains' or 'icontains' and then
-        # post-processing items. Fetch the field in question with additional_fields and remove items where the search
-        # string is not a postfix.
+        return QuerySet(self).filter(*args, **kwargs)
 
-        shape = kwargs.pop('shape', IdOnly)
-        depth = kwargs.pop('depth', SHALLOW)
+    def exclude(self, *args, **kwargs):
+        return QuerySet(self).exclude(*args, **kwargs)
+
+    def get(self, *args, **kwargs):
+        return QuerySet(self).get(*args, **kwargs)
+
+    def find_items(self, q, shape=IdOnly, depth=SHALLOW, additional_fields=tuple(), order=None, calendar_view=None,
+                   page_size=None):
+        """
+        Private method to call the FindItem service
+
+        :param q: a Q instance containing any restrictions
+        :param shape: controls the exact fields returned are governed by. Be aware that complex elements can only be
+                      fetched with fetch().
+        :param depth: controls the whether to return soft-deleted items or not.
+        :param additional_fields: the extra properties we want on the return objects
+        :param order: the SortOrder field, if any
+        :param calendar_view: a CalendarView instance, if any
+        :param page_size: the requested number of items per page
+        :return: a generator for the returned item IDs or items
+        """
         assert shape in SHAPE_CHOICES
         assert depth in ITEM_TRAVERSAL_CHOICES
-
-        # Define the extra properties we want on the return objects
-        additional_fields = kwargs.pop('additional_fields', tuple())
         if additional_fields:
             allowed_fields = self.allowed_fields()
             complex_fields = self.complex_fields()
@@ -2134,22 +2137,18 @@ class Folder(EWSElement):
                     raise ValueError("'%s' is not a field on %s" % (f, self.supported_item_models))
                 if f in complex_fields:
                     raise ValueError("find_items() does not support field '%s'. Use fetch() instead" % f)
-
-        # Get the SortOrder field, if any
-        order = kwargs.pop('order', None)
-
-        # Get the CalendarView, if any
-        calendar_view = kwargs.pop('calendar_view', None)
-
-        # Get the requested number of items per page. Set a sane default and disallow None
-        page_size = kwargs.pop('page_size', None) or FindItem.CHUNKSIZE
+        if calendar_view is not None:
+            assert isinstance(calendar_view, CalendarView)
+        if page_size is None:
+            # Set a sane default
+            page_size = FindItem.CHUNKSIZE
+        assert isinstance(page_size, int)
 
         # Build up any restrictions
-        q = Q.from_filter_args(self.__class__, *args, **kwargs)
-        if q and not q.is_empty():
-            restriction = Restriction(q.translate_fields(folder_class=self.__class__))
-        else:
+        if q.is_empty():
             restriction = None
+        else:
+            restriction = Restriction(q.translate_fields(folder_class=self.__class__))
         log.debug(
             'Finding %s items for %s (shape: %s, depth: %s, additional_fields: %s, restriction: %s)',
             self.DISTINGUISHED_FOLDER_ID,
