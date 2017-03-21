@@ -989,6 +989,9 @@ class Field(object):
         if issubclass(self.value_cls, string_types) and self.value_cls != string_type \
                 and not isinstance(value, self.value_cls):
             value = self.value_cls(value)
+        elif issubclass(self.value_cls, bytes) and self.value_cls != bytes \
+                and not isinstance(value, self.value_cls):
+            value = self.value_cls(value)
         elif self.value_cls == Mailbox:
             if self.is_list:
                 value = [Mailbox(email_address=s) if isinstance(s, string_types) else s for s in value]
@@ -1038,24 +1041,30 @@ class Field(object):
                 assert False, 'Field %s type %s not supported' % (self.name, self.value_cls)
         else:
             field_elem = elem.find(self.response_tag())
-            if issubclass(self.value_cls, (bool, int, Decimal, string_type, EWSDateTime)):
+            if issubclass(self.value_cls, (bool, int, Decimal, bytes, string_type, EWSDateTime)):
                 val = None if field_elem is None else field_elem.text or None
                 if val is not None:
+                    if issubclass(self.value_cls, EWSDateTime) and not val.endswith('Z'):
+                        # Sometimes, EWS will send timestamps without the 'Z' for UTC. It seems like the values are
+                        # still UTC, so mark them as such so EWSDateTime can still interpret the timestamps.
+                        val += 'Z'
                     try:
                         val = xml_text_to_value(value=val, value_type=self.value_cls)
                     except ValueError:
                         pass
                     except KeyError:
                         assert False, 'Field %s type %s not supported' % (self.name, self.value_cls)
-                    if self.name == 'body':
+                    if issubclass(self.value_cls, Body):
                         body_type = field_elem.get('BodyType')
                         try:
-                            val = {
+                            return {
                                 Body.body_type: Body,
                                 HTMLBody.body_type: HTMLBody,
                             }[body_type](val)
                         except KeyError:
                             assert False, "Unknown BodyType '%s'" % body_type
+                    if issubclass(self.value_cls, Content):
+                        return val.b64decode()
                     return val
             elif issubclass(self.value_cls, EWSElement):
                 sub_elem = elem.find(self.response_tag())
@@ -1102,9 +1111,14 @@ class SimpleField(Field):
 
     def to_xml(self, value, version):
         field_elem = create_element(self.request_tag())
-        if self.name == 'body':
-            body_type = HTMLBody.body_type if isinstance(value, HTMLBody) else Body.body_type
+        if issubclass(self.value_cls, Body):
+            body_type = {
+                Body: Body.body_type,
+                HTMLBody: HTMLBody.body_type,
+            }[type(value)]
             field_elem.set('BodyType', body_type)
+        if issubclass(self.value_cls, Content):
+            value = value.b64encode()
         return set_xml_value(field_elem, value, version=version)
 
     def field_uri_xml(self):
@@ -1508,9 +1522,7 @@ class Item(EWSElement):
             if f.is_read_only:
                 continue
             value = getattr(self, f.name)
-            if value is None:
-                continue
-            if f.is_list and not value:
+            if value is None or (f.is_list and not value):
                 continue
             i.append(f.to_xml(value, version=version))
         return i
@@ -1565,7 +1577,7 @@ class Item(EWSElement):
         ))
 
     def __str__(self):
-        return '\n'.join('%s: %s' % (f, getattr(self, f.name)) for f in self.ITEM_FIELDS)
+        return '\n'.join('%s: %s' % (f.name, getattr(self, f.name)) for f in self.ITEM_FIELDS)
 
     def __repr__(self):
         return self.__class__.__name__ + '(%s)' % ', '.join(
