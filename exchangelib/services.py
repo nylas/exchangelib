@@ -939,9 +939,10 @@ class GetAttachment(EWSAccountService):
         payload = create_element('m:%s' % self.SERVICE_NAME)
         # TODO: Support additional properties of AttachmentShape. See
         # https://msdn.microsoft.com/en-us/library/office/aa563727(v=exchg.150).aspx
-        attachment_shape = create_element('m:AttachmentShape')
-        add_xml_child(attachment_shape, 't:IncludeMimeContent', 'true' if include_mime_content else 'false')
-        payload.append(attachment_shape)
+        if include_mime_content:
+            attachment_shape = create_element('m:AttachmentShape')
+            add_xml_child(attachment_shape, 't:IncludeMimeContent', 'true')
+            payload.append(attachment_shape)
         attachment_ids = create_element('m:AttachmentIds')
         n = 0
         for item in items:
