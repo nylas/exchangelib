@@ -306,7 +306,7 @@ if not PY2:
 
 def post_ratelimited(protocol, session, url, headers, data, timeout=None, verify=True, allow_redirects=False):
     """
-    There are two error-handling policies implemented here: a fail-fast policy intended for stnad-alone scripts which
+    There are two error-handling policies implemented here: a fail-fast policy intended for stand-alone scripts which
     fails on all responses except HTTP 200. The other policy is intended for long-running tasks that need to respect
     rate-limiting errors from the server and paper over outages of up to 1 hour.
 

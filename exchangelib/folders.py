@@ -1692,7 +1692,8 @@ class Task(Item):
         SimpleField('is_team_task', field_uri='task:IsTeamTask', value_cls=bool, is_read_only=True),
         SimpleField('mileage', field_uri='task:Mileage', value_cls=string_type),
         SimpleField('owner', field_uri='task:Owner', value_cls=string_type, is_read_only=True),
-        SimpleField('percent_complete', field_uri='task:PercentComplete', value_cls=Decimal, is_required=True),
+        SimpleField('percent_complete', field_uri='task:PercentComplete', value_cls=Decimal, is_required=True,
+                    default=Decimal(0.0)),
         SimpleField('start_date', field_uri='task:StartDate', value_cls=EWSDateTime),
         SimpleField('status', field_uri='task:Status', value_cls=Choice, choices={
             NOT_STARTED, 'InProgress', COMPLETED, 'WaitingOnOthers', 'Deferred'
