@@ -29,7 +29,7 @@ Setup and connecting
 
 .. code-block:: python
 
-    from exchangelib import DELEGATE, IMPERSONATION, Account, Credentials, \
+    from exchangelib import DELEGATE, IMPERSONATION, Account, Credentials, ServiceAccount, \
         EWSDateTime, EWSTimeZone, Configuration, NTLM, CalendarItem, Message, \
         Mailbox, Attendee, Q
     from exchangelib.folders import Calendar, ExtendedProperty, FileAttachment, ItemAttachment, \
@@ -65,10 +65,10 @@ Setup and connecting
                       autodiscover=False, access_type=DELEGATE)
 
     # 'exchangelib' will attempt to guess the server version and authentication method. If you
-    # have a really bizarre or locked-down installation and the guessing fails, you can set the
-    # auth method and version explicitly:
+    # have a really bizarre or locked-down installation and the guessing fails, or you want to avoid
+    # the extra network traffic, you can set the auth method and version explicitly instead:
     from exchangelib.version import Build, Version
-    version = Version(build=Build(15, 0, 12, 34), api_version='Exchange2013')
+    version = Version(build=Build(15, 0, 12, 34))
     config = Configuration(server='example.com', credentials=credentials, version=version, auth_type=NTLM)
 
     # If you're connecting to the same account very often, you can cache the autodiscover result for
