@@ -11,10 +11,10 @@ from datetime import datetime
 from decimal import Decimal
 from xml.etree.ElementTree import Element
 
+import requests.exceptions
 from future.moves.urllib.parse import urlparse
 from future.utils import PY2
 from six import text_type, string_types
-import requests.exceptions
 
 from .errors import TransportError, RateLimitError, RedirectError, RelativeRedirect, CASError, UnauthorizedError, \
     ErrorInvalidSchemaVersionForMailboxVersion
@@ -110,7 +110,8 @@ def get_xml_attrs(tree, name):
 
 def value_to_xml_text(value):
     from .ewsdatetime import EWSDateTime
-    from .folders import Attendee, Mailbox, EmailAddress, PhoneNumber, Content
+    from .indexed_properties import PhoneNumber, EmailAddress
+    from .properties import Content, Mailbox, Attendee
     if isinstance(value, string_types):
         return safe_xml_value(value)
     if isinstance(value, bool):
@@ -134,7 +135,6 @@ def value_to_xml_text(value):
 
 def xml_text_to_value(value, value_type):
     from .ewsdatetime import EWSDateTime
-    from .folders import Content
     if value is None:
         return None
     if value_type == string_type:

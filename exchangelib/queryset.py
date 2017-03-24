@@ -50,7 +50,8 @@ class OrderField(object):
 
     @classmethod
     def from_string(cls, s, folder):
-        from .folders import IndexedField, SingleFieldIndexedElement, MultiFieldIndexedElement
+        from .fields import IndexedField
+        from .indexed_properties import SingleFieldIndexedElement, MultiFieldIndexedElement
         field, label, subfield, reverse = split_fieldname(s)
         field = folder.get_item_field_by_fieldname(field)
         if isinstance(field, IndexedField):
@@ -484,7 +485,7 @@ class QuerySet(object):
 
     def delete(self):
         """ Delete the items matching the query, with as little effort as possible """
-        from .folders import ALL_OCCURRENCIES
+        from .items import ALL_OCCURRENCIES
         if self._cache is not None:
             return self.folder.account.bulk_delete(ids=self._cache, affected_task_occurrences=ALL_OCCURRENCIES)
         new_qs = self.copy()

@@ -3,8 +3,8 @@ from __future__ import unicode_literals
 
 import logging
 
-import requests.sessions
 import requests.auth
+import requests.sessions
 import requests_ntlm
 
 from .credentials import IMPERSONATION

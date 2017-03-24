@@ -369,7 +369,7 @@ class GetRoomLists(EWSService):
         if self.protocol.version.build < EXCHANGE_2010:
             raise NotImplementedError('%s is only supported for Exchange 2010 servers and later' % self.SERVICE_NAME)
         elements = super(GetRoomLists, self).call(**kwargs)
-        from .folders import RoomList
+        from .properties import RoomList
         return [RoomList.from_xml(elem) for elem in elements]
 
     def _get_payload(self):
@@ -387,7 +387,7 @@ class GetRooms(EWSService):
         if self.protocol.version.build < EXCHANGE_2010:
             raise NotImplementedError('%s is only supported for Exchange 2010 servers and later' % self.SERVICE_NAME)
         elements = super(GetRooms, self).call(**kwargs)
-        from .folders import Room
+        from .properties import Room
         return [Room.from_xml(elem) for elem in elements]
 
     def _get_payload(self, roomlist):
@@ -530,7 +530,7 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
 
     @staticmethod
     def _get_delete_item_elem(field, label=None, subfield=None):
-        from .folders import IndexedField
+        from .fields import IndexedField
         deleteitemfield = create_element('t:DeleteItemField')
         if isinstance(field, IndexedField):
             deleteitemfield.append(field.field_uri_xml(label=label, subfield=subfield))
@@ -539,7 +539,7 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
         return deleteitemfield
 
     def _get_set_item_elem(self, item_model, field, value, label=None, subfield=None):
-        from .folders import IndexedField
+        from .fields import IndexedField
         setitemfield = create_element('t:SetItemField')
         if isinstance(field, IndexedField):
             setitemfield.append(field.field_uri_xml(label=label, subfield=subfield))
@@ -575,7 +575,8 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
         return setitemfield_tz
 
     def _get_item_update_elems(self, item, fieldnames):
-        from .folders import IndexedField, MultiFieldIndexedElement
+        from .fields import IndexedField
+        from .indexed_properties import MultiFieldIndexedElement
         item_model = item.__class__
         meeting_timezone_added = False
         for fieldname in fieldnames:
@@ -763,8 +764,8 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
         if restriction:
             finditem.append(restriction.xml)
         if order:
+            from .fields import IndexedField
             from .queryset import OrderField
-            from .folders import IndexedField
             assert isinstance(order, OrderField)
             field_order = create_element('t:FieldOrder', Order='Descending' if order.reverse else 'Ascending')
             if isinstance(order.field, IndexedField):
@@ -822,7 +823,7 @@ class GetFolder(EWSAccountService):
 
     def _get_payload(self, folder, distinguished_folder_id, additional_fields, shape):
         from .credentials import DELEGATE
-        from .folders import Mailbox
+        from .properties import Mailbox
         assert folder or distinguished_folder_id
         getfolder = create_element('m:%s' % self.SERVICE_NAME)
         foldershape = create_element('m:FolderShape')
@@ -935,7 +936,7 @@ class GetAttachment(EWSAccountService):
         return super(GetAttachment, self).call(**kwargs)
 
     def _get_payload(self, items, include_mime_content):
-        from .folders import AttachmentId
+        from .attachments import AttachmentId
         payload = create_element('m:%s' % self.SERVICE_NAME)
         # TODO: Support additional properties of AttachmentShape. See
         # https://msdn.microsoft.com/en-us/library/office/aa563727(v=exchg.150).aspx
@@ -968,7 +969,7 @@ class CreateAttachment(EWSAccountService):
         return super(CreateAttachment, self).call(**kwargs)
 
     def _get_payload(self, parent_item, items):
-        from .folders import ParentItemId
+        from .properties import ParentItemId
         payload = create_element('m:%s' % self.SERVICE_NAME)
         parent_id = ParentItemId(*(parent_item if isinstance(parent_item, tuple)
                                    else (parent_item.item_id, parent_item.changekey)))
@@ -996,7 +997,7 @@ class DeleteAttachment(EWSAccountService):
         res = super(DeleteAttachment, self)._get_element_container(message=message, name=name)
         if not res:
             return res
-        from .folders import RootItemId
+        from .properties import RootItemId
         fake_elem = create_element('FakeContainer')
         for elem in message.findall(RootItemId.response_tag()):
             fake_elem.append(elem)
@@ -1008,7 +1009,7 @@ class DeleteAttachment(EWSAccountService):
         return super(DeleteAttachment, self).call(**kwargs)
 
     def _get_payload(self, items):
-        from .folders import AttachmentId
+        from .attachments import AttachmentId
         payload = create_element('m:%s' % self.SERVICE_NAME)
         attachment_ids = create_element('m:AttachmentIds')
         n = 0

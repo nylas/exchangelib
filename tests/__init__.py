@@ -1,21 +1,22 @@
 # coding=utf-8
-from collections import namedtuple
 import datetime
-from decimal import Decimal
-from keyword import kwlist
 import os
 import random
 import string
 import time
 import unittest
+from collections import namedtuple
+from decimal import Decimal
+from keyword import kwlist
+from xml.etree.ElementTree import ParseError
 
 import requests
 from six import PY2, text_type, string_types, python_2_unicode_compatible
 from yaml import load
-from xml.etree.ElementTree import ParseError
 
 from exchangelib import close_connections
 from exchangelib.account import Account
+from exchangelib.attachments import Attachment, FileAttachment, ItemAttachment
 from exchangelib.autodiscover import AutodiscoverProtocol, discover
 from exchangelib.configuration import Configuration
 from exchangelib.credentials import DELEGATE, IMPERSONATION, Credentials, ServiceAccount
@@ -24,16 +25,19 @@ from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalid
     ErrorNameResolutionNoResults, TransportError, RedirectError, CASError, RateLimitError, UnauthorizedError, \
     ErrorInvalidChangeKey, ErrorInvalidIdMalformed, SOAPError
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
-from exchangelib.folders import CalendarItem, Attendee, Mailbox, Message, ExtendedProperty, Choice, Email, Contact, \
-    Task, EmailAddress, PhysicalAddress, PhoneNumber,  RoomList, Calendar, DeletedItems, Drafts, Inbox, \
-    Outbox, SentItems, JunkEmail, Messages, Tasks, Contacts, Item, AnyURI, Body, HTMLBody, FileAttachment, \
-    ItemAttachment, Attachment, ALL_OCCURRENCIES, MimeContent, MessageHeader, Room, ExtendedPropertyField, Subject, \
-    Location
+from exchangelib.extended_properties import ExtendedProperty
+from exchangelib.fields import ExtendedPropertyField
+from exchangelib.folders import Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Messages, Tasks, \
+    Contacts, CalendarView, Folder
+from exchangelib.indexed_properties import IndexedElement, EmailAddress, PhysicalAddress, PhoneNumber
+from exchangelib.items import Item, CalendarItem, Message, Contact, Task, ALL_OCCURRENCIES
+from exchangelib.properties import Attendee, Mailbox, Choice, Email, RoomList, AnyURI, Body, HTMLBody, MimeContent, \
+    MessageHeader, Room, Subject, Location, EWSElement
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.restriction import Restriction, Q
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, GetAttachment, ResolveNames, TNS
 from exchangelib.transport import NTLM, wrap
-from exchangelib.util import xml_to_str, chunkify, peek, get_redirect_url, to_xml, BOM, get_domain, \
+from exchangelib.util import chunkify, peek, get_redirect_url, to_xml, BOM, get_domain, \
     post_ratelimited, create_element, CONNECTION_ERRORS
 from exchangelib.version import Build, Version
 from exchangelib.winzone import generate_map, PYTZ_TO_MS_TIMEZONE_MAP
@@ -947,18 +951,18 @@ class CommonTest(EWSTest):
 
     def test_from_xml(self):
         # Test for all EWSElement classes that they handle None input
-        from exchangelib import folders
-        for k, v in vars(folders).items():
+        import exchangelib.folders
+        for k, v in vars(exchangelib.folders).items():
             if type(v) != type:
                 continue
-            if not issubclass(v, folders.EWSElement):
+            if not issubclass(v, EWSElement):
                 continue
-            if v in (folders.EWSElement, folders.IndexedElement, folders.CalendarView, folders.Attachment):
+            if v in (EWSElement, IndexedElement, CalendarView, Attachment):
                 # These are only for inheritance and do not support implement from_xml()
                 with self.assertRaises(NotImplementedError):
                     v.from_xml(None)
                 continue
-            if issubclass(v, (folders.Item, folders.Folder, folders.ExtendedProperty)):
+            if issubclass(v, (Item, Folder, ExtendedProperty)):
                 # These do not support None input
                 with self.assertRaises(Exception):
                     v.from_xml(None)

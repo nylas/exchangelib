@@ -284,7 +284,7 @@ class Q(object):
             # Flatten the tree a bit
             expr = self.children[0].expr()
         else:
-            from .folders import Field
+            from .fields import Field
             # Sort children by field name so we get stable output (for easier testing). Children should never be empty.
             expr = (' %s ' % (self.AND if self.conn_type == self.NOT else self.conn_type)).join(
                 (c.expr() if c.is_leaf() or c.conn_type == self.NOT else '(%s)' % c.expr())
@@ -316,7 +316,9 @@ class Q(object):
 
     @staticmethod
     def _validate_field(field, folder_class):
-        from .folders import Attachment, Mailbox, Attendee, PhysicalAddress
+        from .attachments import Attachment
+        from .properties import Mailbox, Attendee
+        from .indexed_properties import PhysicalAddress
         if field not in folder_class.allowed_fields():
             raise ValueError("'%s' is not a valid field when filtering on %s" % (field.name, folder_class.__name__))
         if field.name in ('status', 'companies', 'reminder_due_by'):
@@ -343,7 +345,7 @@ class Q(object):
         # Return an XML tree structure of this Q object. First, remove any empty children. If conn_type is AND or OR and
         # there is exactly one child, ignore the AND/OR and treat this node as a leaf. If this is an empty leaf
         # (equivalent of Q()), return None.
-        from .folders import IndexedField
+        from .fields import IndexedField
         if self.is_empty():
             return None
         if self.is_leaf():

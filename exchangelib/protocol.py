@@ -13,9 +13,9 @@ import socket
 from multiprocessing.pool import ThreadPool
 from threading import Lock
 
-from future.utils import with_metaclass, python_2_unicode_compatible
 import requests.adapters
 import requests.sessions
+from future.utils import with_metaclass, python_2_unicode_compatible
 from six import text_type, PY2
 
 from .credentials import Credentials
@@ -217,7 +217,7 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
         return GetRoomLists(protocol=self).call()
 
     def get_rooms(self, roomlist):
-        from .folders import RoomList
+        from .properties import RoomList
         return GetRooms(protocol=self).call(roomlist=RoomList(email_address=roomlist))
 
     def __str__(self):

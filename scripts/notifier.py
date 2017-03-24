@@ -42,10 +42,11 @@ from netrc import netrc
 import sys
 import warnings
 
-from exchangelib import DELEGATE, Configuration, Credentials, Account
-from exchangelib.ewsdatetime import UTC_NOW, EWSTimeZone
-import sh
+from exchangelib import DELEGATE, Credentials, Account, EWSTimeZone
+from exchangelib.ewsdatetime import UTC_NOW
+
 from bs4 import BeautifulSoup
+import sh
 
 # Disable insecure SSL warnings
 warnings.filterwarnings("ignore")
