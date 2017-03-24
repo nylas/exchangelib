@@ -31,9 +31,8 @@ Setup and connecting
 
     from exchangelib import DELEGATE, IMPERSONATION, Account, Credentials, ServiceAccount, \
         EWSDateTime, EWSTimeZone, Configuration, NTLM, CalendarItem, Message, \
-        Mailbox, Attendee, Q
-    from exchangelib.folders import Calendar, ExtendedProperty, FileAttachment, ItemAttachment, \
-        HTMLBody
+        Mailbox, Attendee, Q, Calendar, ExtendedProperty, FileAttachment, ItemAttachment, \
+        HTMLBody, Build, Version
 
     # Username in WINDOMAIN\username format. Office365 wants usernames in PrimarySMTPAddress
     # ('myusername@example.com') format. UPN format is also supported.
@@ -67,7 +66,6 @@ Setup and connecting
     # 'exchangelib' will attempt to guess the server version and authentication method. If you
     # have a really bizarre or locked-down installation and the guessing fails, or you want to avoid
     # the extra network traffic, you can set the auth method and version explicitly instead:
-    from exchangelib.version import Build, Version
     version = Version(build=Build(15, 0, 12, 34))
     config = Configuration(server='example.com', credentials=credentials, version=version, auth_type=NTLM)
 

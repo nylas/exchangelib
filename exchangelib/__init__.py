@@ -1,15 +1,17 @@
 # Add noqa on top-level convenience imports
 from .account import Account  # noqa
+from .attachments import FileAttachment, ItemAttachment
 from .autodiscover import discover  # noqa
 from .configuration import Configuration  # noqa
 from .credentials import DELEGATE, IMPERSONATION, Credentials, ServiceAccount  # noqa
-from .ewsdatetime import EWSDateTime, EWSTimeZone  # noqa
-from .extended_properties import ExternId
+from .ewsdatetime import EWSDateTime, EWSTimeZone, UTC, UTC_NOW  # noqa
+from .extended_properties import ExtendedProperty, ExternId
 from .items import CalendarItem, Contact, Message, Task
-from .properties import Mailbox, Attendee, Body, HTMLBody  # noqa
+from .properties import ItemId, Mailbox, Attendee, Room, RoomList, Body, HTMLBody  # noqa
 from .restriction import Q  # noqa
 from .services import SHALLOW, DEEP  # noqa
 from .transport import NTLM, DIGEST, BASIC  # noqa
+from .version import Build, Version
 
 
 def close_connections():

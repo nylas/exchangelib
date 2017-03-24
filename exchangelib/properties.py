@@ -273,42 +273,6 @@ class Mailbox(EWSElement):
         return hash(self.email_address.lower())
 
 
-class RoomList(Mailbox):
-    # MSDN: https://msdn.microsoft.com/en-us/library/office/dd899514(v=exchg.150).aspx
-    ELEMENT_NAME = 'RoomList'
-    # In a GetRoomLists response, room lists are delivered as Address elements
-    # MSDN: https://msdn.microsoft.com/en-us/library/office/dd899404(v=exchg.150).aspx
-    RESPONSE_ELEMENT_NAME = 'Address'
-
-    @classmethod
-    def request_tag(cls):
-        return 'm:%s' % cls.ELEMENT_NAME
-
-    @classmethod
-    def response_tag(cls):
-        return '{%s}%s' % (TNS, cls.RESPONSE_ELEMENT_NAME)
-
-
-class Room(Mailbox):
-    # MSDN: https://msdn.microsoft.com/en-us/library/office/dd899479(v=exchg.150).aspx
-    ELEMENT_NAME = 'Room'
-
-    @classmethod
-    def from_xml(cls, elem):
-        if elem is None:
-            return None
-        assert elem.tag == cls.response_tag(), (elem.tag, cls.response_tag())
-        id_elem = elem.find('{%s}Id' % TNS)
-        res = cls(
-            name=get_xml_attr(id_elem, '{%s}Name' % TNS),
-            email_address=get_xml_attr(id_elem, '{%s}EmailAddress' % TNS),
-            mailbox_type=get_xml_attr(id_elem, '{%s}MailboxType' % TNS),
-            item_id=ItemId.from_xml(elem=id_elem.find(ItemId.response_tag())),
-        )
-        elem.clear()
-        return res
-
-
 class Attendee(EWSElement):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa580339(v=exchg.150).aspx
     ELEMENT_NAME = 'Attendee'
@@ -356,3 +320,39 @@ class Attendee(EWSElement):
     def __hash__(self):
         # TODO: maybe take 'response_type' and 'last_response_time' into account?
         return hash(self.mailbox)
+
+
+class RoomList(Mailbox):
+    # MSDN: https://msdn.microsoft.com/en-us/library/office/dd899514(v=exchg.150).aspx
+    ELEMENT_NAME = 'RoomList'
+    # In a GetRoomLists response, room lists are delivered as Address elements
+    # MSDN: https://msdn.microsoft.com/en-us/library/office/dd899404(v=exchg.150).aspx
+    RESPONSE_ELEMENT_NAME = 'Address'
+
+    @classmethod
+    def request_tag(cls):
+        return 'm:%s' % cls.ELEMENT_NAME
+
+    @classmethod
+    def response_tag(cls):
+        return '{%s}%s' % (TNS, cls.RESPONSE_ELEMENT_NAME)
+
+
+class Room(Mailbox):
+    # MSDN: https://msdn.microsoft.com/en-us/library/office/dd899479(v=exchg.150).aspx
+    ELEMENT_NAME = 'Room'
+
+    @classmethod
+    def from_xml(cls, elem):
+        if elem is None:
+            return None
+        assert elem.tag == cls.response_tag(), (elem.tag, cls.response_tag())
+        id_elem = elem.find('{%s}Id' % TNS)
+        res = cls(
+            name=get_xml_attr(id_elem, '{%s}Name' % TNS),
+            email_address=get_xml_attr(id_elem, '{%s}EmailAddress' % TNS),
+            mailbox_type=get_xml_attr(id_elem, '{%s}MailboxType' % TNS),
+            item_id=ItemId.from_xml(elem=id_elem.find(ItemId.response_tag())),
+        )
+        elem.clear()
+        return res
