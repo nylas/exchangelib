@@ -258,9 +258,10 @@ class EWSSession(requests.sessions.Session):
     def __enter__(self):
         return super(EWSSession, self).__enter__()
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if exc_type is None:
-            self.protocol.release_session(self)
-        else:
+    def __exit__(self, *args):
+        if any(args):
+            # We arrived here due to an exception
             self.protocol.retire_session(self)
-        # return super().__exit__()  # We want to close the session socket explicitly
+        else:
+            self.protocol.release_session(self)
+        # Don't call super().__exit__()  because it always closes the socket
