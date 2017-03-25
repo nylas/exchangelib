@@ -416,14 +416,14 @@ class Calendar(Folder):
     supported_item_models = (CalendarItem,)
 
     LOCALIZED_NAMES = {
-        'da_DK': ('Kalender',),
-        'de_DE': ('Kalender',),
-        'en_US': ('Calendar',),
-        'es_ES': ('Calendario',),
-        'fr_CA': ('Calendrier',),
-        'nl_NL': ('Agenda',),
-        'ru_RU': ('Календарь',),
-        'sv_SE': ('Kalender',),
+        'da_DK': (u'Kalender',),
+        'de_DE': (u'Kalender',),
+        'en_US': (u'Calendar',),
+        'es_ES': (u'Calendario',),
+        'fr_CA': (u'Calendrier',),
+        'nl_NL': (u'Agenda',),
+        'ru_RU': (u'Календарь',),
+        'sv_SE': (u'Kalender',),
     }
 
     __slots__ = Folder.__slots__
@@ -452,14 +452,14 @@ class DeletedItems(Folder):
     supported_item_models = ITEM_CLASSES
 
     LOCALIZED_NAMES = {
-        'da_DK': ('Slettet post',),
-        'de_DE': ('Gelöschte Elemente',),
-        'en_US': ('Deleted Items',),
-        'es_ES': ('Elementos eliminados',),
-        'fr_CA': ('Éléments supprimés',),
-        'nl_NL': ('Verwijderde items',),
-        'ru_RU': ('Удаленные',),
-        'sv_SE': ('Borttaget',),
+        'da_DK': (u'Slettet post',),
+        'de_DE': (u'Gelöschte Elemente',),
+        'en_US': (u'Deleted Items',),
+        'es_ES': (u'Elementos eliminados',),
+        'fr_CA': (u'Éléments supprimés',),
+        'nl_NL': (u'Verwijderde items',),
+        'ru_RU': (u'Удаленные',),
+        'sv_SE': (u'Borttaget',),
     }
 
     __slots__ = Folder.__slots__
@@ -476,14 +476,14 @@ class Drafts(Messages):
     DISTINGUISHED_FOLDER_ID = 'drafts'
 
     LOCALIZED_NAMES = {
-        'da_DK': ('Kladder',),
-        'de_DE': ('Entwürfe',),
-        'en_US': ('Drafts',),
-        'es_ES': ('Borradores',),
-        'fr_CA': ('Brouillons',),
-        'nl_NL': ('Concepten',),
-        'ru_RU': ('Черновики',),
-        'sv_SE': ('Utkast',),
+        'da_DK': (u'Kladder',),
+        'de_DE': (u'Entwürfe',),
+        'en_US': (u'Drafts',),
+        'es_ES': (u'Borradores',),
+        'fr_CA': (u'Brouillons',),
+        'nl_NL': (u'Concepten',),
+        'ru_RU': (u'Черновики',),
+        'sv_SE': (u'Utkast',),
     }
 
     __slots__ = Folder.__slots__
@@ -493,14 +493,14 @@ class Inbox(Messages):
     DISTINGUISHED_FOLDER_ID = 'inbox'
 
     LOCALIZED_NAMES = {
-        'da_DK': ('Indbakke',),
-        'de_DE': ('Posteingang',),
-        'en_US': ('Inbox',),
-        'es_ES': ('Bandeja de entrada',),
-        'fr_CA': ('Boîte de réception',),
-        'nl_NL': ('Postvak IN',),
-        'ru_RU': ('Входящие',),
-        'sv_SE': ('Inkorgen',),
+        'da_DK': (u'Indbakke',),
+        'de_DE': (u'Posteingang',),
+        'en_US': (u'Inbox',),
+        'es_ES': (u'Bandeja de entrada',),
+        'fr_CA': (u'Boîte de réception',),
+        'nl_NL': (u'Postvak IN',),
+        'ru_RU': (u'Входящие',),
+        'sv_SE': (u'Inkorgen',),
     }
 
     __slots__ = Folder.__slots__
@@ -510,14 +510,14 @@ class Outbox(Messages):
     DISTINGUISHED_FOLDER_ID = 'outbox'
 
     LOCALIZED_NAMES = {
-        'da_DK': ('Udbakke',),
-        'de_DE': ('Kalender',),
-        'en_US': ('Outbox',),
-        'es_ES': ('Bandeja de salida',),
-        'fr_CA': ("Boîte d'envoi",),
-        'nl_NL': ('Postvak UIT',),
-        'ru_RU': ('Исходящие',),
-        'sv_SE': ('Utkorgen',),
+        'da_DK': (u'Udbakke',),
+        'de_DE': (u'Kalender',),
+        'en_US': (u'Outbox',),
+        'es_ES': (u'Bandeja de salida',),
+        'fr_CA': (u"Boîte d'envoi",),
+        'nl_NL': (u'Postvak UIT',),
+        'ru_RU': (u'Исходящие',),
+        'sv_SE': (u'Utkorgen',),
     }
 
     __slots__ = Folder.__slots__
@@ -527,14 +527,14 @@ class SentItems(Messages):
     DISTINGUISHED_FOLDER_ID = 'sentitems'
 
     LOCALIZED_NAMES = {
-        'da_DK': ('Sendt post',),
-        'de_DE': ('Gesendete Elemente',),
-        'en_US': ('Sent Items',),
-        'es_ES': ('Elementos enviados',),
-        'fr_CA': ('Éléments envoyés',),
-        'nl_NL': ('Verzonden items',),
-        'ru_RU': ('Отправленные',),
-        'sv_SE': ('Skickat',),
+        'da_DK': (u'Sendt post',),
+        'de_DE': (u'Gesendete Elemente',),
+        'en_US': (u'Sent Items',),
+        'es_ES': (u'Elementos enviados',),
+        'fr_CA': (u'Éléments envoyés',),
+        'nl_NL': (u'Verzonden items',),
+        'ru_RU': (u'Отправленные',),
+        'sv_SE': (u'Skickat',),
     }
 
     __slots__ = Folder.__slots__
@@ -544,14 +544,14 @@ class JunkEmail(Messages):
     DISTINGUISHED_FOLDER_ID = 'junkemail'
 
     LOCALIZED_NAMES = {
-        'da_DK': ('Uønsket e-mail',),
-        'de_DE': ('Junk-E-Mail',),
-        'en_US': ('Junk E-mail',),
-        'es_ES': ('Correo no deseado',),
-        'fr_CA': ('Courrier indésirables',),
-        'nl_NL': ('Ongewenste e-mail',),
-        'ru_RU': ('Нежелательная почта',),
-        'sv_SE': ('Skräppost',),
+        'da_DK': (u'Uønsket e-mail',),
+        'de_DE': (u'Junk-E-Mail',),
+        'en_US': (u'Junk E-mail',),
+        'es_ES': (u'Correo no deseado',),
+        'fr_CA': (u'Courrier indésirables',),
+        'nl_NL': (u'Ongewenste e-mail',),
+        'ru_RU': (u'Нежелательная почта',),
+        'sv_SE': (u'Skräppost',),
     }
 
 
@@ -581,14 +581,14 @@ class Tasks(Folder):
     supported_item_models = (Task,)
 
     LOCALIZED_NAMES = {
-        'da_DK': ('Opgaver',),
-        'de_DE': ('Aufgaben',),
-        'en_US': ('Tasks',),
-        'es_ES': ('Tareas',),
-        'fr_CA': ('Tâches',),
-        'nl_NL': ('Taken',),
-        'ru_RU': ('Задачи',),
-        'sv_SE': ('Uppgifter',),
+        'da_DK': (u'Opgaver',),
+        'de_DE': (u'Aufgaben',),
+        'en_US': (u'Tasks',),
+        'es_ES': (u'Tareas',),
+        'fr_CA': (u'Tâches',),
+        'nl_NL': (u'Taken',),
+        'ru_RU': (u'Задачи',),
+        'sv_SE': (u'Uppgifter',),
     }
 
     __slots__ = Folder.__slots__
@@ -600,14 +600,14 @@ class Contacts(Folder):
     supported_item_models = (Contact,)
 
     LOCALIZED_NAMES = {
-        'da_DK': ('Kontaktpersoner',),
-        'de_DE': ('Kontakte',),
-        'en_US': ('Contacts',),
-        'es_ES': ('Contactos',),
-        'fr_CA': ('Contacts',),
-        'nl_NL': ('Contactpersonen',),
-        'ru_RU': ('Контакты',),
-        'sv_SE': ('Kontakter',),
+        'da_DK': (u'Kontaktpersoner',),
+        'de_DE': (u'Kontakte',),
+        'en_US': (u'Contacts',),
+        'es_ES': (u'Contactos',),
+        'fr_CA': (u'Contacts',),
+        'nl_NL': (u'Contactpersonen',),
+        'ru_RU': (u'Контакты',),
+        'sv_SE': (u'Kontakter',),
     }
 
     __slots__ = Folder.__slots__
