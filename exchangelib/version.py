@@ -152,6 +152,7 @@ class Version(object):
     """
     Holds information about the server version
     """
+    __slots__ = ('build', 'api_version')
 
     def __init__(self, build, api_version=None):
         self.build = build

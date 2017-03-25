@@ -70,7 +70,6 @@ class Attachment(EWSElement):
     """
     Parent class for FileAttachment and ItemAttachment
     """
-    # TODO: Rewrite these as tuple of Field() elements
     ATTACHMENT_FIELDS = (
         SimpleField('attachment_id', field_uri='attachment:AttachmentId', value_cls=AttachmentId),
         SimpleField('name', field_uri='attachment:Name', value_cls=string_type),
@@ -82,7 +81,8 @@ class Attachment(EWSElement):
         SimpleField('is_inline', field_uri='attachment:IsInline', value_cls=bool),
     )
 
-    __slots__ = ('parent_item',) + tuple(f.name for f in ATTACHMENT_FIELDS)
+    __slots__ = ('parent_item', 'attachment_id', 'name', 'content_type', 'content_id', 'content_location', 'size',
+                 'last_modified_time', 'is_inline')
 
     def __init__(self, **kwargs):
         from .items import Item
@@ -181,7 +181,8 @@ class FileAttachment(Attachment):
         SimpleField('_content', field_uri='attachment:Content', value_cls=Content),
     )
 
-    __slots__ = ('parent_item',) + tuple(f.name for f in ATTACHMENT_FIELDS)
+    __slots__ = ('parent_item', 'attachment_id', 'name', 'content_type', 'content_id', 'content_location', 'size',
+                 'last_modified_time', 'is_inline', 'is_contact_photo', '_content')
 
     def __init__(self, **kwargs):
         kwargs['_content'] = kwargs.pop('content', None)
@@ -237,7 +238,8 @@ class ItemAttachment(Attachment):
         ItemField('_item', field_uri='attachment:Item'),
     )
 
-    __slots__ = ('parent_item',) + tuple(f.name for f in ATTACHMENT_FIELDS)
+    __slots__ = ('parent_item', 'attachment_id', 'name', 'content_type', 'content_id', 'content_location', 'size',
+                 'last_modified_time', 'is_inline', '_item')
 
     def __init__(self, **kwargs):
         kwargs['_item'] = kwargs.pop('item', None)

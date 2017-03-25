@@ -96,6 +96,8 @@ class Item(EWSElement):
     )
     ITEM_FIELDS_MAP = {f.name: f for f in ITEM_FIELDS}
 
+    # We can't use __slots__ because we need to add extended properties dynamically
+
     def __init__(self, **kwargs):
         # 'account' is optional but allows calling 'send()' and 'delete()'
         # 'folder' is optional but allows calling 'save()'

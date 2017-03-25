@@ -33,7 +33,7 @@ class IndexedElement(EWSElement):
 
 
 class SingleFieldIndexedElement(IndexedElement):
-    __slots__ = tuple()
+    __slots__ = ('label',)
 
     @classmethod
     def from_xml(cls, elem):
@@ -63,7 +63,7 @@ class EmailAddress(SingleFieldIndexedElement):
     )
     SUB_FIELDS_MAP = {f.name: f for f in SUB_FIELDS}
 
-    __slots__ = ('label',) + tuple(f.name for f in SUB_FIELDS)
+    __slots__ = ('label', 'email')
 
 
 class PhoneNumber(SingleFieldIndexedElement):
@@ -80,11 +80,11 @@ class PhoneNumber(SingleFieldIndexedElement):
     )
     SUB_FIELDS_MAP = {f.name: f for f in SUB_FIELDS}
 
-    __slots__ = ('label',) + tuple(f.name for f in SUB_FIELDS)
+    __slots__ = ('label', 'phone_number')
 
 
 class MultiFieldIndexedElement(IndexedElement):
-    __slots__ = tuple()
+    __slots__ = ('label',)
 
     @classmethod
     def from_xml(cls, elem):
@@ -120,7 +120,7 @@ class PhysicalAddress(MultiFieldIndexedElement):
     )
     SUB_FIELDS_MAP = {f.name: f for f in SUB_FIELDS}
 
-    __slots__ = ('label',) + tuple(f.name for f in SUB_FIELDS)
+    __slots__ = ('label', 'street', 'city', 'state', 'country', 'zipcode')
 
     def clean(self):
         if isinstance(self.zipcode, int):

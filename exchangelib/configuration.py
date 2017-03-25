@@ -31,7 +31,6 @@ class Configuration(object):
         account = Account(primary_smtp_address='john@example.com', credentials=credentials, autodiscover=True)
 
     """
-
     def __init__(self, credentials, server=None, has_ssl=True, service_endpoint=None, auth_type=None,
                  verify_ssl=True, version=None):
         if auth_type is not None and auth_type not in AUTH_TYPE_MAP:

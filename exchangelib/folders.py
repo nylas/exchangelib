@@ -91,7 +91,8 @@ class Folder(EWSElement):
     )
     FOLDER_FIELDS_MAP = {f.name: f for f in FOLDER_FIELDS}
 
-    __slots__ = ('account',) + tuple(f.name for f in FOLDER_FIELDS)
+    __slots__ = ('account', 'folder_id', 'changekey', 'name', 'folder_class', 'total_count', 'unread_count',
+                 'child_folder_count')
 
     def __init__(self, account, **kwargs):
         from .account import Account
