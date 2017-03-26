@@ -239,7 +239,7 @@ class Version(object):
         if info is None:
             raise TransportError('No ServerVersionInfo in response: %s' % response.text)
         try:
-            build = Build.from_xml(info)
+            build = Build.from_xml(elem=info)
         except ValueError:
             raise TransportError('Bad ServerVersionInfo in response: %s' % response.text)
         # Not all Exchange servers send the Version element

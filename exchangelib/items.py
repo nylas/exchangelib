@@ -321,12 +321,12 @@ class Item(EWSElement):
         return id_elem.get(ItemId.ID_ATTR), id_elem.get(ItemId.CHANGEKEY_ATTR)
 
     @classmethod
-    def from_xml(cls, elem, account=None, folder=None):
+    def from_xml(cls, elem):
         assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
         item_id, changekey = cls.id_from_xml(elem)
-        kwargs = {f.name: f.from_xml(elem) for f in cls.ITEM_FIELDS if f.name not in ('item_id', 'changekey')}
+        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.ITEM_FIELDS if f.name not in ('item_id', 'changekey')}
         elem.clear()
-        return cls(item_id=item_id, changekey=changekey, account=account, folder=folder, **kwargs)
+        return cls(item_id=item_id, changekey=changekey, **kwargs)
 
     def to_xml(self, version):
         self.clean()
@@ -413,11 +413,11 @@ class BulkCreateResult(Item):
     __slots__ = ('item_id', 'changekey', 'attachments')
 
     @classmethod
-    def from_xml(cls, elem, account=None, folder=None):
+    def from_xml(cls, elem):
         item_id, changekey = cls.id_from_xml(elem)
-        kwargs = {f.name: f.from_xml(elem) for f in cls.ITEM_FIELDS if f.name not in ('item_id', 'changekey')}
+        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.ITEM_FIELDS if f.name not in ('item_id', 'changekey')}
         elem.clear()
-        return cls(item_id=item_id, changekey=changekey, account=account, folder=folder, **kwargs)
+        return cls(item_id=item_id, changekey=changekey, **kwargs)
 
 
 @python_2_unicode_compatible

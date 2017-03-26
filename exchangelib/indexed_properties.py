@@ -40,7 +40,7 @@ class SingleFieldIndexedElement(IndexedElement):
         if elem is None:
             return None
         assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
-        kwargs = {f.name: f.from_xml(elem) for f in cls.SUB_FIELDS}
+        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.SUB_FIELDS}
         kwargs[cls.LABEL_FIELD.name] = elem.get(cls.LABEL_FIELD.field_uri)
         elem.clear()
         return cls(**kwargs)
@@ -91,8 +91,8 @@ class MultiFieldIndexedElement(IndexedElement):
         if elem is None:
             return None
         assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
-        kwargs = {f.name: f.from_xml(elem) for f in cls.SUB_FIELDS}
-        kwargs['label'] = cls.LABEL_FIELD.from_xml(elem)
+        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.SUB_FIELDS}
+        kwargs['label'] = cls.LABEL_FIELD.from_xml(elem=elem)
         elem.clear()
         return cls(**kwargs)
 

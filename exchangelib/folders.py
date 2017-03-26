@@ -94,21 +94,20 @@ class Folder(EWSElement):
     __slots__ = ('account', 'folder_id', 'changekey', 'name', 'folder_class', 'total_count', 'unread_count',
                  'child_folder_count')
 
-    def __init__(self, account, **kwargs):
-        from .account import Account
-        assert isinstance(account, Account)
-        self.account = account
+    def __init__(self, **kwargs):
+        self.account = kwargs.pop('account', None)
         for f in self.FOLDER_FIELDS:
             setattr(self, f.name, kwargs.pop(f.name, None))
         if kwargs:
             raise TypeError("%s are invalid keyword arguments for this function" %
                             ', '.join("'%s'" % k for k in kwargs.keys()))
-        self.clean()
+        if self.name is None:
+            self.name = self.DISTINGUISHED_FOLDER_ID
         log.debug('%s created for %s', self, self.account)
 
     def clean(self):
-        if self.name is None:
-            self.name = self.DISTINGUISHED_FOLDER_ID
+        from .account import Account
+        assert isinstance(self.account, Account)
         if not self.is_distinguished:
             assert self.folder_id
         if self.folder_id:
@@ -272,7 +271,9 @@ class Folder(EWSElement):
                 if isinstance(i, Exception):
                     yield i
                 else:
-                    yield self.item_model_from_tag(i.tag).from_xml(elem=i, account=self.account, folder=self)
+                    item = self.item_model_from_tag(i.tag).from_xml(elem=i)
+                    item.account, item.folder = self.account, self
+                    yield item
 
     def bulk_create(self, items, *args, **kwargs):
         return self.account.bulk_create(folder=self, items=items, *args, **kwargs)
@@ -289,14 +290,14 @@ class Folder(EWSElement):
         return True
 
     @classmethod
-    def from_xml(cls, elem, account=None):
+    def from_xml(cls, elem):
         # fld_type = re.sub('{.*}', '', elem.tag)
         fld_id_elem = elem.find(FolderId.response_tag())
         fld_id = fld_id_elem.get(FolderId.ID_ATTR)
         changekey = fld_id_elem.get(FolderId.CHANGEKEY_ATTR)
-        kwargs = {f.name: f.from_xml(elem) for f in cls.FOLDER_FIELDS if f.name not in ('folder_id', 'changekey')}
+        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.FOLDER_FIELDS if f.name not in ('folder_id', 'changekey')}
         elem.clear()
-        return cls(account=account, folder_id=fld_id, changekey=changekey, **kwargs)
+        return cls(folder_id=fld_id, changekey=changekey, **kwargs)
 
     def to_xml(self, version):
         return FolderId(id=self.folder_id, changekey=self.changekey).to_xml(version=version)
@@ -326,7 +327,7 @@ class Folder(EWSElement):
             if isinstance(elem, Exception):
                 folders.append(elem)
                 continue
-            dummy_fld = Folder.from_xml(elem=elem, account=self.account)  # We use from_xml() only to parse elem
+            dummy_fld = Folder.from_xml(elem=elem)  # We use from_xml() only to parse elem
             try:
                 folder_cls = self.folder_cls_from_folder_name(folder_name=dummy_fld.name, locale=self.account.locale)
                 log.debug('Folder class %s matches localized folder name %s', folder_cls, dummy_fld.name)
@@ -366,7 +367,9 @@ class Folder(EWSElement):
             if isinstance(elem, Exception):
                 folders.append(elem)
                 continue
-            folders.append(cls.from_xml(elem=elem, account=account))
+            folder = cls.from_xml(elem=elem)
+            folder.account = account
+            folders.append(folder)
         assert len(folders) == 1
         return folders[0]
 
@@ -385,7 +388,9 @@ class Folder(EWSElement):
             if isinstance(elem, Exception):
                 folders.append(elem)
                 continue
-            folders.append(self.from_xml(elem=elem, account=self.account))
+            folder = self.from_xml(elem=elem)
+            folder.account = self.account
+            folders.append(folder)
         assert len(folders) == 1
         fresh_folder = folders[0]
         assert self.folder_id == fresh_folder.folder_id

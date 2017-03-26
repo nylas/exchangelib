@@ -237,7 +237,7 @@ class Account(object):
             return []
         return list(
             i if isinstance(i, Exception)
-            else BulkCreateResult.from_xml(elem=i, account=self, folder=folder)
+            else BulkCreateResult.from_xml(elem=i)
             for i in CreateItem(account=self).call(
                 items=items,
                 folder=folder,
@@ -401,7 +401,9 @@ class Account(object):
             if isinstance(i, Exception):
                 yield i
             else:
-                yield validation_folder.item_model_from_tag(i.tag).from_xml(elem=i, account=self, folder=folder)
+                item = validation_folder.item_model_from_tag(i.tag).from_xml(elem=i)
+                item.account, item.folder = self, folder
+                yield item
 
     def __str__(self):
         txt = '%s' % self.primary_smtp_address

@@ -370,7 +370,7 @@ class GetRoomLists(EWSService):
             raise NotImplementedError('%s is only supported for Exchange 2010 servers and later' % self.SERVICE_NAME)
         elements = super(GetRoomLists, self).call(**kwargs)
         from .properties import RoomList
-        return [RoomList.from_xml(elem) for elem in elements]
+        return [RoomList.from_xml(elem=elem) for elem in elements]
 
     def _get_payload(self):
         return create_element('m:%s' % self.SERVICE_NAME)
@@ -388,7 +388,7 @@ class GetRooms(EWSService):
             raise NotImplementedError('%s is only supported for Exchange 2010 servers and later' % self.SERVICE_NAME)
         elements = super(GetRooms, self).call(**kwargs)
         from .properties import Room
-        return [Room.from_xml(elem) for elem in elements]
+        return [Room.from_xml(elem=elem) for elem in elements]
 
     def _get_payload(self, roomlist):
         getrooms = create_element('m:%s' % self.SERVICE_NAME)

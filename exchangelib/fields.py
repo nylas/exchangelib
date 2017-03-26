@@ -103,12 +103,12 @@ class Field(object):
                     attachments = []
                     for att_type in (FileAttachment, ItemAttachment):
                         attachments.extend(
-                            [att_type.from_xml(e) for e in iter_elem.findall(att_type.response_tag())]
+                            [att_type.from_xml(elem=e) for e in iter_elem.findall(att_type.response_tag())]
                         )
                     return attachments
             elif issubclass(self.value_cls, EWSElement):
                 if iter_elem is not None:
-                    return [self.value_cls.from_xml(e) for e in iter_elem.findall(self.value_cls.response_tag())]
+                    return [self.value_cls.from_xml(elem=e) for e in iter_elem.findall(self.value_cls.response_tag())]
             else:
                 assert False, 'Field %s type %s not supported' % (self.name, self.value_cls)
         else:
@@ -143,9 +143,9 @@ class Field(object):
                 if sub_elem is not None:
                     if self.value_cls == Mailbox:
                         # We want the nested Mailbox, not the wrapper element
-                        return self.value_cls.from_xml(sub_elem.find(Mailbox.response_tag()))
+                        return self.value_cls.from_xml(elem=sub_elem.find(Mailbox.response_tag()))
                     else:
-                        return self.value_cls.from_xml(sub_elem)
+                        return self.value_cls.from_xml(elem=sub_elem)
             else:
                 assert False, 'Field %s type %s not supported' % (self.name, self.value_cls)
         return self.default
@@ -302,7 +302,7 @@ class ExtendedPropertyField(Field):
 
     def from_xml(self, elem):
         extended_properties = elem.findall(self.response_tag())
-        return self.value_cls.from_xml(extended_properties)
+        return self.value_cls.from_xml(elems=extended_properties)
 
     def to_xml(self, value, version):
         extended_property = create_element(self.request_tag())

@@ -85,10 +85,7 @@ class Attachment(EWSElement):
                  'last_modified_time', 'is_inline')
 
     def __init__(self, **kwargs):
-        from .items import Item
         self.parent_item = kwargs.pop('parent_item', None)
-        if self.parent_item is not None:
-            assert isinstance(self.parent_item, Item)
         for f in self.ATTACHMENT_FIELDS:
             setattr(self, f.name, kwargs.pop(f.name, None))
         if kwargs:
@@ -97,6 +94,9 @@ class Attachment(EWSElement):
         self.clean()
 
     def clean(self):
+        from .items import Item
+        if self.parent_item is not None:
+            assert isinstance(self.parent_item, Item)
         for f in self.ATTACHMENT_FIELDS:
             val = getattr(self, f.name)
             setattr(self, f.name, f.clean(val))
@@ -219,14 +219,14 @@ class FileAttachment(Attachment):
         self._content = value
 
     @classmethod
-    def from_xml(cls, elem, parent_item=None):
+    def from_xml(cls, elem):
         if elem is None:
             return None
         assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
-        kwargs = {f.name: f.from_xml(elem) for f in cls.ATTACHMENT_FIELDS}
+        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.ATTACHMENT_FIELDS}
         kwargs['content'] = kwargs.pop('_content')
         elem.clear()
-        return cls(parent_item=parent_item, **kwargs)
+        return cls(**kwargs)
 
 
 class ItemAttachment(Attachment):
@@ -274,11 +274,11 @@ class ItemAttachment(Attachment):
         self._item = value
 
     @classmethod
-    def from_xml(cls, elem, parent_item=None):
+    def from_xml(cls, elem):
         if elem is None:
             return None
         assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
-        kwargs = {f.name: f.from_xml(elem) for f in cls.ATTACHMENT_FIELDS}
+        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.ATTACHMENT_FIELDS}
         kwargs['item'] = kwargs.pop('_item')
         elem.clear()
-        return cls(parent_item=parent_item, **kwargs)
+        return cls(**kwargs)
