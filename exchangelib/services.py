@@ -67,9 +67,6 @@ class EWSService(object):
     def call(self, **kwargs):
         return self._get_elements(payload=self._get_payload(**kwargs))
 
-    def payload(self, version, account,  **kwargs):
-        return wrap(content=self._get_payload(**kwargs), version=version, account=account)
-
     def _get_payload(self, **kwargs):
         raise NotImplementedError()
 

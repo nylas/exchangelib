@@ -131,16 +131,20 @@ class Item(EWSElement):
             setattr(self, f.name, f.clean(val))
 
     def save(self, update_fields=None, conflict_resolution=AUTO_RESOLVE, send_meeting_invitations=SEND_TO_NONE):
-        item = self._save(update_fieldnames=update_fields, message_disposition=SAVE_ONLY,
-                          conflict_resolution=conflict_resolution, send_meeting_invitations=send_meeting_invitations)
         if self.item_id:
-            # _save() returns tuple()
-            item_id, changekey = item
+            item_id, changekey = self._update(
+                update_fieldnames=update_fields,
+                message_disposition=SAVE_ONLY,
+                conflict_resolution=conflict_resolution,
+                send_meeting_invitations=send_meeting_invitations
+            )
             assert self.item_id == item_id
             assert self.changekey != changekey
             self.changekey = changekey
         else:
-            # _save() returns Item
+            if update_fields:
+                raise ValueError("'update_fields' is only valid for updates")
+            item = self._create(message_disposition=SAVE_ONLY, send_meeting_invitations=send_meeting_invitations)
             self.item_id, self.changekey = item.item_id, item.changekey
             for old_att, new_att in zip(self.attachments, item.attachments):
                 assert old_att.attachment_id is None
@@ -148,59 +152,59 @@ class Item(EWSElement):
                 old_att.attachment_id = new_att.attachment_id
         return self
 
-    def _save(self, update_fieldnames, message_disposition, conflict_resolution, send_meeting_invitations):
+    def _create(self, message_disposition, send_meeting_invitations):
         if not self.account:
             raise ValueError('Item must have an account')
-        if self.item_id:
-            assert self.changekey
-            if not update_fieldnames:
-                # The fields to update was not specified explicitly. Update all fields where update is possible
-                update_fieldnames = []
-                for f in self.ITEM_FIELDS:
-                    if f.name == 'attachments':
-                        # Attachments are handled separately after item creation
-                        continue
-                    if f.is_read_only:
-                        # These cannot be changed
-                        continue
-                    if f.is_required or f.is_required_after_save:
-                        if getattr(self, f.name) is None or (f.is_list and not getattr(self, f.name)):
-                            # These are required and cannot be deleted
-                            continue
-                    if not self.is_draft and f.is_read_only_after_send:
-                        # These cannot be changed when the item is no longer a draft
-                        continue
-                    update_fieldnames.append(f.name)
-            # bulk_update() returns a tuple
-            res = self.account.bulk_update(
-                items=[(self, update_fieldnames)], message_disposition=message_disposition,
-                conflict_resolution=conflict_resolution,
-                send_meeting_invitations_or_cancellations=send_meeting_invitations)
-            if message_disposition == SEND_AND_SAVE_COPY:
-                assert len(res) == 0
-                return None
-            else:
-                if not res:
-                    raise ValueError('Item disappeared')
-                assert len(res) == 1, res
-                if isinstance(res[0], Exception):
-                    raise res[0]
-                return res[0]
+        # bulk_create() returns an Item because we want to return item_id on both main item *and* attachments
+        res = self.account.bulk_create(
+            items=[self], folder=self.folder, message_disposition=message_disposition,
+            send_meeting_invitations=send_meeting_invitations)
+        if message_disposition in (SEND_ONLY, SEND_AND_SAVE_COPY):
+            assert len(res) == 0
+            return None
         else:
-            if update_fieldnames:
-                raise ValueError("'update_fields' can only be specified when updating an item")
-            # bulk_create() returns an Item because we want to return item_id on both main item *and* attachments
-            res = self.account.bulk_create(
-                items=[self], folder=self.folder, message_disposition=message_disposition,
-                send_meeting_invitations=send_meeting_invitations)
-            if message_disposition in (SEND_ONLY, SEND_AND_SAVE_COPY):
-                assert len(res) == 0
-                return None
-            else:
-                assert len(res) == 1, res
-                if isinstance(res[0], Exception):
-                    raise res[0]
-                return res[0]
+            assert len(res) == 1, res
+            if isinstance(res[0], Exception):
+                raise res[0]
+            return res[0]
+
+    def _update(self, update_fieldnames, message_disposition, conflict_resolution, send_meeting_invitations):
+        if not self.account:
+            raise ValueError('Item must have an account')
+        assert self.changekey
+        if not update_fieldnames:
+            # The fields to update was not specified explicitly. Update all fields where update is possible
+            update_fieldnames = []
+            for f in self.ITEM_FIELDS:
+                if f.name == 'attachments':
+                    # Attachments are handled separately after item creation
+                    continue
+                if f.is_read_only:
+                    # These cannot be changed
+                    continue
+                if f.is_required or f.is_required_after_save:
+                    if getattr(self, f.name) is None or (f.is_list and not getattr(self, f.name)):
+                        # These are required and cannot be deleted
+                        continue
+                if not self.is_draft and f.is_read_only_after_send:
+                    # These cannot be changed when the item is no longer a draft
+                    continue
+                update_fieldnames.append(f.name)
+        # bulk_update() returns a tuple
+        res = self.account.bulk_update(
+            items=[(self, update_fieldnames)], message_disposition=message_disposition,
+            conflict_resolution=conflict_resolution,
+            send_meeting_invitations_or_cancellations=send_meeting_invitations)
+        if message_disposition == SEND_AND_SAVE_COPY:
+            assert len(res) == 0
+            return None
+        else:
+            if not res:
+                raise ValueError('Item disappeared')
+            assert len(res) == 1, res
+            if isinstance(res[0], Exception):
+                raise res[0]
+            return res[0]
 
     def refresh(self):
         # Updates the item based on fresh data from EWS
@@ -509,15 +513,24 @@ class Message(Item):
                 return self.send_and_save(conflict_resolution=conflict_resolution,
                                           send_meeting_invitations=send_meeting_invitations)
             assert copy_to_folder is None
-            res = self._save(update_fieldnames=None, message_disposition=SEND_ONLY,
-                             conflict_resolution=conflict_resolution, send_meeting_invitations=send_meeting_invitations)
+            res = self._create(message_disposition=SEND_ONLY, send_meeting_invitations=send_meeting_invitations)
             assert res is None
 
     def send_and_save(self, update_fields=None, conflict_resolution=AUTO_RESOLVE,
                       send_meeting_invitations=SEND_TO_NONE):
         # Sends Message and saves a copy in the parent folder. Does not return an ItemId.
-        res = self._save(update_fieldnames=update_fields, message_disposition=SEND_AND_SAVE_COPY,
-                         conflict_resolution=conflict_resolution, send_meeting_invitations=send_meeting_invitations)
+        if self.item_id:
+            res = self._update(
+                update_fieldnames=update_fields,
+                message_disposition=SEND_AND_SAVE_COPY,
+                conflict_resolution=conflict_resolution,
+                send_meeting_invitations=send_meeting_invitations
+            )
+        else:
+            res = self._create(
+                message_disposition=SEND_AND_SAVE_COPY,
+                send_meeting_invitations=send_meeting_invitations
+            )
         assert res is None
 
 

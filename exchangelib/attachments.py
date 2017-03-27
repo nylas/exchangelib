@@ -210,7 +210,7 @@ class FileAttachment(Attachment):
             self._content = None
         else:
             self._content = base64.b64decode(val.text)
-            elem.clear()
+        elem.clear()
         return self._content
 
     @content.setter
@@ -263,8 +263,8 @@ class ItemAttachment(Attachment):
         attachment = items[0]
         if isinstance(attachment, Exception):
             raise attachment
-        assert attachment._item is not None, 'GetAttachment returned no item'
-        self._item = attachment._item
+        assert attachment.item is not None, 'GetAttachment returned no item'
+        self._item = attachment.item
         return self._item
 
     @item.setter

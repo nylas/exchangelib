@@ -34,7 +34,7 @@ AUTH_TYPE_MAP = {
 }
 
 
-def wrap(content, version, account, ewstimezone=None, encoding='utf-8'):
+def wrap(content, version, account=None, ewstimezone=None, encoding='utf-8'):
     """
     Generate the necessary boilerplate XML for a raw SOAP request. The XML is specific to the server version.
     ExchangeImpersonation allows to act as the user we want to impersonate.
@@ -196,4 +196,4 @@ def _tokenize(val):
 def dummy_xml(version, name):
     # Generate a minimal, valid EWS request
     from .services import ResolveNames  # Avoid circular import
-    return ResolveNames(protocol=None).payload(version=version, account=None, unresolved_entries=[name])
+    return wrap(content=ResolveNames(protocol=None)._get_payload(unresolved_entries=[name]), version=version)
