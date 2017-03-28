@@ -3,26 +3,11 @@ from __future__ import unicode_literals
 
 import datetime
 import logging
-import shelve
 
 import pytz
-from future.utils import PY2
 
 from .errors import UnknownTimeZone
 from .winzone import PYTZ_TO_MS_TIMEZONE_MAP
-
-if PY2:
-    from contextlib import contextmanager
-
-    @contextmanager
-    def shelve_open(*args, **kwargs):
-        shelve_handle = shelve.open(*args, **kwargs)
-        try:
-            yield shelve_handle
-        finally:
-            shelve_handle.close()
-else:
-    shelve_open = shelve.open
 
 log = logging.getLogger(__name__)
 
