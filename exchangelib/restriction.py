@@ -62,9 +62,7 @@ class Q(object):
             self.conn_type = self.AND
         assert self.conn_type in self.CONN_TYPES
 
-        self.translated = False  # Make sure we don't translate field names twice
-
-        self.field = None
+        self.fieldname = None  # Name of the field we want to filter on
         self.op = None
         self.value = None
 
@@ -83,26 +81,26 @@ class Q(object):
             if value is None:
                 raise ValueError('Value for Q kwarg "%s" cannot be None' % key)
             if '__' in key:
-                field, lookup = key.rsplit('__')
+                fieldname, lookup = key.rsplit('__')
                 if lookup == self.LOOKUP_RANGE:
                     # EWS doesn't have a 'range' operator. Emulate 'foo__range=(1, 2)' as 'foo__gte=1 and foo__lte=2'
                     # (both values inclusive).
                     if len(value) != 2:
                         raise ValueError("Value of kwarg '%s' must have exactly 2 elements" % key)
-                    self.children.append(self.__class__(**{'%s__gte' % field: value[0]}))
-                    self.children.append(self.__class__(**{'%s__lte' % field: value[1]}))
+                    self.children.append(self.__class__(**{'%s__gte' % fieldname: value[0]}))
+                    self.children.append(self.__class__(**{'%s__lte' % fieldname: value[1]}))
                     continue
                 if lookup == self.LOOKUP_IN:
                     # EWS doesn't have an 'in' operator. Emulate 'foo in (1, 2, ...)' as 'foo==1 or foo==2 or ...'
                     or_args = []
                     for val in value:
-                        or_args.append(self.__class__(**{field: val}))
+                        or_args.append(self.__class__(**{fieldname: val}))
                     self.children.append(Q(*or_args, conn_type=self.OR))
                     continue
                 else:
                     op = self._lookup_to_op(lookup)
             else:
-                field, op = key, self.EQ
+                fieldname, op = key, self.EQ
 
             assert op in self.OP_TYPES
             try:
@@ -110,12 +108,12 @@ class Q(object):
             except ValueError:
                 raise ValueError('Value "%s" for filter kwarg "%s" is unsupported' % (value, key))
             if len(args) == 0 and len(kwargs) == 1:
-                self.field = field
+                self.fieldname = fieldname
                 self.op = op
                 if isinstance(value, EWSDateTime):
                     # We want to convert all values to UTC
                     if not getattr(value, 'tzinfo'):
-                        raise ValueError("'%s' must be timezone aware" % field)
+                        raise ValueError("'%s' must be timezone aware" % fieldname)
                     self.value = value.astimezone(UTC)
                 else:
                     self.value = value
@@ -272,25 +270,22 @@ class Q(object):
         return not self.children
 
     def is_empty(self):
-        return self.is_leaf() and self.field is None
+        return self.is_leaf() and self.fieldname is None
 
     def expr(self):
         if self.is_empty():
             return None
         if self.is_leaf():
-            assert self.field and self.op and self.value is not None
-            expr = '%s %s %s' % (self.field, self.op, repr(self.value))
+            assert self.fieldname and self.op and self.value is not None
+            expr = '%s %s %s' % (self.fieldname, self.op, repr(self.value))
         elif len(self.children) == 1:
             # Flatten the tree a bit
             expr = self.children[0].expr()
         else:
-            from .fields import Field
             # Sort children by field name so we get stable output (for easier testing). Children should never be empty.
             expr = (' %s ' % (self.AND if self.conn_type == self.NOT else self.conn_type)).join(
                 (c.expr() if c.is_leaf() or c.conn_type == self.NOT else '(%s)' % c.expr())
-                for c in sorted(
-                    self.children,
-                    key=lambda i: (i.field.name if isinstance(i.field, Field) else i.field) if i.field else '')
+                for c in sorted(self.children, key=lambda i: i.fieldname or '')
             )
         if not expr:
             return None  # Should not be necessary, but play safe
@@ -301,18 +296,6 @@ class Q(object):
             else:
                 expr = self.conn_type + ' (%s)' % expr
         return expr
-
-    def translate_fields(self, folder_class):
-        # Recursively translate Python attribute names to EWS FieldURI values
-        if self.translated:
-            return self
-        if self.field is not None:
-            self.field = folder_class.get_item_field_by_fieldname(self.field)
-            self._validate_field(self.field, folder_class)
-        for c in self.children:
-            c.translate_fields(folder_class=folder_class)
-        self.translated = True
-        return self
 
     @staticmethod
     def _validate_field(field, folder_class):
@@ -329,11 +312,7 @@ class Q(object):
 
     def to_xml(self, folder_class):
         # Translate this Q object to a valid Restriction XML tree
-        from .folders import Folder
-        if not self.translated:
-            assert issubclass(folder_class, Folder)
-        self.translate_fields(folder_class=folder_class)
-        elem = self.xml_elem()
+        elem = self.xml_elem(folder_class=folder_class)
         if elem is None:
             return None
         from xml.etree.ElementTree import ElementTree
@@ -341,7 +320,7 @@ class Q(object):
         restriction.append(elem)
         return ElementTree(restriction).getroot()
 
-    def xml_elem(self):
+    def xml_elem(self, folder_class):
         # Return an XML tree structure of this Q object. First, remove any empty children. If conn_type is AND or OR and
         # there is exactly one child, ignore the AND/OR and treat this node as a leaf. If this is an empty leaf
         # (equivalent of Q()), return None.
@@ -349,13 +328,15 @@ class Q(object):
         if self.is_empty():
             return None
         if self.is_leaf():
-            assert self.field and self.op and self.value is not None
+            assert self.fieldname and self.op and self.value is not None
             elem = self._op_to_xml(self.op)
-            if isinstance(self.field, IndexedField):
-                field = self.field.field_uri_xml(label=self.value.label)
+            field = folder_class.get_item_field_by_fieldname(self.fieldname)
+            self._validate_field(field=field, folder_class=folder_class)
+            if isinstance(field, IndexedField):
+                field_uri = field.field_uri_xml(label=self.value.label)
             else:
-                field = self.field.field_uri_xml()
-            elem.append(field)
+                field_uri = field.field_uri_xml()
+            elem.append(field_uri)
             constant = create_element('t:Constant')
             # Use .set() to not fill up the create_element() cache with unique values
             constant.set('Value', value_to_xml_text(self.value))
@@ -367,13 +348,13 @@ class Q(object):
                 elem.append(uriorconst)
         elif len(self.children) == 1:
             # Flatten the tree a bit
-            elem = self.children[0].xml_elem()
+            elem = self.children[0].xml_elem(folder_class=folder_class)
         else:
             # We have multiple children. If conn_type is NOT, then group children with AND. We'll add the NOT later
             elem = self._conn_to_xml(self.AND if self.conn_type == self.NOT else self.conn_type)
             # Sort children by field name so we get stable output (for easier testing). Children should never be empty
-            for c in sorted(self.children, key=lambda i: i.field.name if i.field else ''):
-                elem.append(c.xml_elem())
+            for c in sorted(self.children, key=lambda i: i.fieldname or ''):
+                elem.append(c.xml_elem(folder_class=folder_class))
         if elem is None:
             return None  # Should not be necessary, but play safe
         if self.conn_type == self.NOT:
@@ -425,7 +406,7 @@ class Q(object):
 
     def __repr__(self):
         if self.is_leaf():
-            return self.__class__.__name__ + '(%s %s %s)' % (self.field, self.op, repr(self.value))
+            return self.__class__.__name__ + '(%s %s %s)' % (self.fieldname, self.op, repr(self.value))
         if self.conn_type == self.NOT or len(self.children) > 1:
             return self.__class__.__name__ + repr((self.conn_type,) + tuple(self.children))
         return self.__class__.__name__ + repr(tuple(self.children))
@@ -438,30 +419,21 @@ class Restriction(object):
 
     """
 
-    def __init__(self, q):
+    def __init__(self, q, folder_class):
         if not isinstance(q, Q):
             raise ValueError("'q' must be a Q object (%s)", type(q))
-        if not q.translated:
-            raise ValueError("'%s' must be a translated Q object", q)
         if q.is_empty():
             raise ValueError("Q object must not be empty")
+        from .folders import Folder
+        assert issubclass(folder_class, Folder)
         self.q = q
+        self.folder_class = folder_class
 
-    @property
-    def xml(self):
-        # folder=None is OK since q has already been translated
-        return self.q.to_xml(folder_class=None)
-
-    def __and__(self, other):
-        # Return a new Q with two children and conn_type AND
-        return Q(self, other, conn_type=Q.AND)
-
-    def __or__(self, other):
-        # Return a new Q with two children and conn_type OR
-        return Q(self, other, conn_type=Q.OR)
+    def to_xml(self, version):
+        return self.q.to_xml(folder_class=self.folder_class)
 
     def __str__(self):
         """
         Prints the XML syntax tree
         """
-        return xml_to_str(self.xml)
+        return xml_to_str(self.to_xml(version=None))

@@ -235,13 +235,13 @@ class RestrictionTest(unittest.TestCase):
     </t:And>
 </m:Restriction>'''
         q = Q(Q(categories__contains='FOO') | Q(categories__contains='BAR'), start__lt=end, end__gt=start)
-        r = Restriction(q.translate_fields(folder_class=Calendar))
+        r = Restriction(q, folder_class=Calendar)
         self.assertEqual(str(r), ''.join(l.lstrip() for l in result.split('\n')))
         # Test empty Q
         q = Q()
         self.assertEqual(q.to_xml(folder_class=Calendar), None)
         with self.assertRaises(ValueError):
-            Restriction(q.translate_fields(folder_class=Calendar))
+            Restriction(q, folder_class=Calendar)
 
     def test_q_expr(self):
         self.assertEqual(Q().expr(), None)

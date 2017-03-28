@@ -244,7 +244,7 @@ class Folder(EWSElement):
         if q.is_empty():
             restriction = None
         else:
-            restriction = Restriction(q.translate_fields(folder_class=self.__class__))
+            restriction = Restriction(q, folder_class=self.__class__)
         log.debug(
             'Finding %s items for %s (shape: %s, depth: %s, additional_fields: %s, restriction: %s)',
             self.DISTINGUISHED_FOLDER_ID,

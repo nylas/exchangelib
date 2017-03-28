@@ -27,7 +27,7 @@ from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, 
     ErrorMailboxMoveInProgress, ErrorAccessDenied, ErrorConnectionFailed, RateLimitError, ErrorServerBusy, \
     ErrorTooManyObjectsOpened, ErrorInvalidLicense, ErrorInvalidSchemaVersionForMailboxVersion, \
     ErrorInvalidServerVersion, ErrorItemNotFound, ErrorADUnavailable, ResponseMessageError, ErrorInvalidChangeKey, \
-    ErrorItemSave, ErrorInvalidIdMalformed
+    ErrorItemSave, ErrorInvalidIdMalformed, UnauthorizedError
 from .ewsdatetime import EWSDateTime, UTC
 from .transport import wrap, SOAPNS, TNS, MNS, ENS
 from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, ElementType, \
@@ -99,6 +99,7 @@ class EWSService(object):
                 ErrorTimeoutExpired,
                 ErrorTooManyObjectsOpened,
                 RateLimitError,
+                UnauthorizedError,
         ):
             # These are known and understood, and don't require a backtrace
             # TODO: ErrorTooManyObjectsOpened means there are too many connections to the database. We should be able to
@@ -759,7 +760,7 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
             view_type = calendar_view.to_xml(version=self.account.version)
         finditem.append(view_type)
         if restriction:
-            finditem.append(restriction.xml)
+            finditem.append(restriction.to_xml(version=self.account.version))
         if order:
             from .fields import IndexedField
             from .queryset import OrderField
