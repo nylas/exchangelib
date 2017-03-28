@@ -147,6 +147,12 @@ class Q(object):
                     fieldname, lookup = key, None
                 field = folder_class.get_item_field_by_fieldname(fieldname)
                 cls._validate_field(field, folder_class)
+                if lookup == Q.LOOKUP_EXISTS:
+                    if value:
+                        kwargs_q &= Q(**{key: True})
+                    else:
+                        kwargs_q &= ~Q(**{key: True})
+                    continue
                 # Filtering by category is a bit quirky. The only lookup type I have found to work is:
                 #
                 #     item:Categories == 'foo' AND item:Categories == 'bar' AND ...
@@ -164,10 +170,10 @@ class Q(object):
                 # post-processing items. Fetch 'item:Categories' with additional_fields and remove the items that don't
                 # have an exact match, after the call to FindItems.
                 if field.is_list:
-                    if lookup not in (Q.LOOKUP_CONTAINS, Q.LOOKUP_IN, Q.LOOKUP_EXISTS):
+                    if lookup not in (Q.LOOKUP_CONTAINS, Q.LOOKUP_IN):
                         raise ValueError(
                             "Field '%(field)s' can only be filtered using '%(field)s__contains=['a', 'b', ...]' and "
-                            "'%(field)s__in=['a', 'b', ...]'" % dict(field=fieldname))
+                            "'%(field)s__in=['a', 'b', ...]' and '%(field)s__exists=True|False'" % dict(field=fieldname))
                     if isinstance(value, (list, tuple, set)):
                         children = [Q(**{fieldname: v}) for v in value]
                         if lookup == Q.LOOKUP_CONTAINS:
@@ -177,10 +183,7 @@ class Q(object):
                         else:
                             assert False
                     else:
-                        if value:
-                            kwargs_q &= Q(**{key: True})
-                        else:
-                            kwargs_q &= ~Q(**{key: True})
+                        kwargs_q &= Q(**{fieldname: value})
                     continue
                 if lookup == Q.LOOKUP_IN and isinstance(value, (list, tuple, set)):
                     # Allow '__in' lookup on non-list field types, specifying a list or a simple value
