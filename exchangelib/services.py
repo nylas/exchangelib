@@ -215,7 +215,7 @@ class EWSService(object):
         # ResponseCode, MessageText: See http://msdn.microsoft.com/en-us/library/aa580757(v=EXCHG.140).aspx
         response_code = get_xml_attr(message, '{%s}ResponseCode' % MNS)
         msg_text = get_xml_attr(message, '{%s}MessageText' % MNS)
-        msg_xml = get_xml_attr(message, '{%s}MessageXml' % MNS)
+        msg_xml = message.find('{%s}MessageXml' % MNS)
         if response_class == 'Success' and response_code == 'NoError':
             if not name:
                 return True
@@ -223,32 +223,37 @@ class EWSService(object):
             if container is None:
                 raise TransportError('No %s elements in ResponseMessage (%s)' % (name, xml_to_str(message)))
             return container
+        if response_code == 'NoError':
+            return True
         # Raise any non-acceptable errors in the container, or return the container or the acceptable exception instance
         if response_class == 'Warning':
             try:
-                return self._raise_errors(code=response_code, text=msg_text, xml=msg_xml)
+                return self._raise_errors(code=response_code, text=msg_text, msg_xml=msg_xml)
             except self.WARNINGS_TO_CATCH_IN_RESPONSE as e:
                 return e
         # rspclass == 'Error', or 'Success' and not 'NoError'
         try:
-            return self._raise_errors(code=response_code, text=msg_text, xml=msg_xml)
+            return self._raise_errors(code=response_code, text=msg_text, msg_xml=msg_xml)
         except self.ERRORS_TO_CATCH_IN_RESPONSE as e:
             return e
 
     @classmethod
-    def _raise_errors(cls, code, text, xml):
-        if code == 'NoError':
-            return True
+    def _raise_errors(cls, code, text, msg_xml):
         if not code:
             raise TransportError('Empty ResponseCode in ResponseMessage (MessageText: %s, MessageXml: %s)' % (
-                text, xml))
+                text, msg_xml))
+        if msg_xml is not None:
+            # If this is an ErrorInvalidPropertyRequest error, the xml may contain a specific FieldURI
+            field_uri_elem = msg_xml.find('{%s}FieldURI' % TNS)
+            if field_uri_elem is not None:
+                text += " (FieldURI='%s')" % field_uri_elem.get('FieldURI')
         try:
             # Raise the error corresponding to the ResponseCode
             raise vars(errors)[code](text)
         except KeyError:
             # Should not happen
             raise TransportError('Unknown ResponseCode in ResponseMessage: %s (MessageText: %s, MessageXml: %s)' % (
-                    code, text, xml))
+                    code, text, msg_xml))
 
     def _get_elements_in_response(self, response):
         assert isinstance(response, list)
