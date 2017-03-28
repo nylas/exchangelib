@@ -37,7 +37,8 @@ class Q(object):
     ICONTAINS = 'icontains'
     STARTSWITH = 'startswith'
     ISTARTSWITH = 'istartswith'
-    OP_TYPES = (EQ, NE, GT, GTE, LT, LTE, EXACT, IEXACT, CONTAINS, ICONTAINS, STARTSWITH, ISTARTSWITH)
+    EXISTS = 'exists'
+    OP_TYPES = (EQ, NE, GT, GTE, LT, LTE, EXACT, IEXACT, CONTAINS, ICONTAINS, STARTSWITH, ISTARTSWITH, EXISTS)
     CONTAINS_OPS = (EXACT, IEXACT, CONTAINS, ICONTAINS, STARTSWITH, ISTARTSWITH)
 
     # Valid lookups
@@ -54,6 +55,7 @@ class Q(object):
     LOOKUP_ICONTAINS = 'icontains'
     LOOKUP_STARTSWITH = 'startswith'
     LOOKUP_ISTARTSWITH = 'istartswith'
+    LOOKUP_EXISTS = 'exists'
 
     def __init__(self, *args, **kwargs):
         if 'conn_type' in kwargs:
@@ -162,7 +164,7 @@ class Q(object):
                 # post-processing items. Fetch 'item:Categories' with additional_fields and remove the items that don't
                 # have an exact match, after the call to FindItems.
                 if field.is_list:
-                    if lookup not in (Q.LOOKUP_CONTAINS, Q.LOOKUP_IN):
+                    if lookup not in (Q.LOOKUP_CONTAINS, Q.LOOKUP_IN, Q.LOOKUP_EXISTS):
                         raise ValueError(
                             "Field '%(field)s' can only be filtered using '%(field)s__contains=['a', 'b', ...]' and "
                             "'%(field)s__in=['a', 'b', ...]'" % dict(field=fieldname))
@@ -175,7 +177,10 @@ class Q(object):
                         else:
                             assert False
                     else:
-                        kwargs_q &= Q(**{fieldname: value})
+                        if value:
+                            kwargs_q &= Q(**{key: True})
+                        else:
+                            kwargs_q &= ~Q(**{key: True})
                     continue
                 if lookup == Q.LOOKUP_IN and isinstance(value, (list, tuple, set)):
                     # Allow '__in' lookup on non-list field types, specifying a list or a simple value
@@ -203,6 +208,7 @@ class Q(object):
                 cls.LOOKUP_ICONTAINS: cls.ICONTAINS,
                 cls.LOOKUP_STARTSWITH: cls.STARTSWITH,
                 cls.LOOKUP_ISTARTSWITH: cls.ISTARTSWITH,
+                cls.LOOKUP_EXISTS: cls.EXISTS,
             }[lookup]
         except KeyError:
             raise ValueError("Lookup '%s' is not supported" % lookup)
@@ -231,6 +237,8 @@ class Q(object):
             return create_element('t:IsLessThan')
         if op == cls.GT:
             return create_element('t:IsGreaterThan')
+        if op == cls.EXISTS:
+            return create_element('t:Exists')
         if op in (cls.EXACT, cls.IEXACT, cls.CONTAINS, cls.ICONTAINS, cls.STARTSWITH, cls.ISTARTSWITH):
             # For description of Contains attribute values, see
             #     https://msdn.microsoft.com/en-us/library/office/aa580702(v=exchg.150).aspx
@@ -357,14 +365,15 @@ class Q(object):
                 field = self.field.field_uri_xml()
             elem.append(field)
             constant = create_element('t:Constant')
-            # Use .set() to not fill up the create_element() cache with unique values
-            constant.set('Value', value_to_xml_text(self.value))
-            if self.op in self.CONTAINS_OPS:
-                elem.append(constant)
-            else:
-                uriorconst = create_element('t:FieldURIOrConstant')
-                uriorconst.append(constant)
-                elem.append(uriorconst)
+            if self.op != self.EXISTS:
+                # Use .set() to not fill up the create_element() cache with unique values
+                constant.set('Value', value_to_xml_text(self.value))
+                if self.op in self.CONTAINS_OPS:
+                    elem.append(constant)
+                else:
+                    uriorconst = create_element('t:FieldURIOrConstant')
+                    uriorconst.append(constant)
+                    elem.append(uriorconst)
         elif len(self.children) == 1:
             # Flatten the tree a bit
             elem = self.children[0].xml_elem()

@@ -247,6 +247,10 @@ Here are some examples of using the API:
     qs.filter(subject__icontains='foo')  # Returns items where subject contains 'foo', 'FOO' or 'Foo'
     qs.filter(subject__startswith='foo')  # Returns items where subject starts with 'foo'
     qs.filter(subject__istartswith='foo')  # Returns items where subject starts with 'foo', 'FOO' or 'Foo'
+    # Returns items that have at least one category set, i.e. the field exists on the item on the server
+    qs.filter(categories__exists=True)
+    # Returns items that have no categories set, i.e. the field does not exist on the item on the server
+    qs.filter(categories__exists=False)
 
     # filter() also supports Q objects that are modeled after Django Q objects, for building complex
     # boolean logic search expressions.
