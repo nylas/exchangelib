@@ -950,24 +950,26 @@ class CommonTest(EWSTest):
         self.assertIn('YYY', e.exception.args[0])
 
     def test_from_xml(self):
-        # Test for all EWSElement classes that they handle None input
-        import exchangelib.folders
-        for k, v in vars(exchangelib.folders).items():
-            if type(v) != type:
-                continue
-            if not issubclass(v, EWSElement):
-                continue
-            if v in (EWSElement, IndexedElement, CalendarView, Attachment):
-                # These are only for inheritance and do not support implement from_xml()
-                with self.assertRaises(NotImplementedError):
-                    v.from_xml(None)
-                continue
-            if issubclass(v, (Item, Folder, ExtendedProperty)):
-                # These do not support None input
-                with self.assertRaises(Exception):
-                    v.from_xml(None)
-                continue
-            v.from_xml(None)  # This should work for all others
+        # Test for all EWSElement classes that they handle None as input to from_xml()
+        import exchangelib
+        for module in (exchangelib.attachments, exchangelib.extended_properties, exchangelib.indexed_properties,
+                       exchangelib.folders, exchangelib.items, exchangelib.properties):
+            for k, v in vars(module).items():
+                if type(v) != type:
+                    continue
+                if not issubclass(v, EWSElement):
+                    continue
+                if v in (EWSElement, IndexedElement, CalendarView, Attachment):
+                    # These are only for inheritance and do not implement from_xml()
+                    with self.assertRaises(NotImplementedError):
+                        v.from_xml(None)
+                    continue
+                if issubclass(v, (Item, Folder, ExtendedProperty)):
+                    # These do not support None input
+                    with self.assertRaises(Exception):
+                        v.from_xml(None)
+                    continue
+                v.from_xml(None)  # This should work for all others
 
 
 class AccountTest(EWSTest):

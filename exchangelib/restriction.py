@@ -37,7 +37,8 @@ class Q(object):
     ICONTAINS = 'icontains'
     STARTSWITH = 'startswith'
     ISTARTSWITH = 'istartswith'
-    OP_TYPES = (EQ, NE, GT, GTE, LT, LTE, EXACT, IEXACT, CONTAINS, ICONTAINS, STARTSWITH, ISTARTSWITH)
+    EXISTS = 'exists'
+    OP_TYPES = (EQ, NE, GT, GTE, LT, LTE, EXACT, IEXACT, CONTAINS, ICONTAINS, STARTSWITH, ISTARTSWITH, EXISTS)
     CONTAINS_OPS = (EXACT, IEXACT, CONTAINS, ICONTAINS, STARTSWITH, ISTARTSWITH)
 
     # Valid lookups
@@ -54,6 +55,7 @@ class Q(object):
     LOOKUP_ICONTAINS = 'icontains'
     LOOKUP_STARTSWITH = 'startswith'
     LOOKUP_ISTARTSWITH = 'istartswith'
+    LOOKUP_EXISTS = 'exists'
 
     def __init__(self, *args, **kwargs):
         if 'conn_type' in kwargs:
@@ -143,6 +145,12 @@ class Q(object):
                     fieldname, lookup = key, None
                 field = folder_class.get_item_field_by_fieldname(fieldname)
                 cls._validate_field(field, folder_class)
+                if lookup == Q.LOOKUP_EXISTS:
+                    if value:
+                        kwargs_q &= Q(**{key: True})
+                    else:
+                        kwargs_q &= ~Q(**{key: True})
+                    continue
                 # Filtering by category is a bit quirky. The only lookup type I have found to work is:
                 #
                 #     item:Categories == 'foo' AND item:Categories == 'bar' AND ...
@@ -163,7 +171,7 @@ class Q(object):
                     if lookup not in (Q.LOOKUP_CONTAINS, Q.LOOKUP_IN):
                         raise ValueError(
                             "Field '%(field)s' can only be filtered using '%(field)s__contains=['a', 'b', ...]' and "
-                            "'%(field)s__in=['a', 'b', ...]'" % dict(field=fieldname))
+                            "'%(field)s__in=['a', 'b', ...]' and '%(field)s__exists=True|False'" % dict(field=fieldname))
                     if isinstance(value, (list, tuple, set)):
                         children = [Q(**{fieldname: v}) for v in value]
                         if lookup == Q.LOOKUP_CONTAINS:
@@ -201,6 +209,7 @@ class Q(object):
                 cls.LOOKUP_ICONTAINS: cls.ICONTAINS,
                 cls.LOOKUP_STARTSWITH: cls.STARTSWITH,
                 cls.LOOKUP_ISTARTSWITH: cls.ISTARTSWITH,
+                cls.LOOKUP_EXISTS: cls.EXISTS,
             }[lookup]
         except KeyError:
             raise ValueError("Lookup '%s' is not supported" % lookup)
@@ -229,6 +238,8 @@ class Q(object):
             return create_element('t:IsLessThan')
         if op == cls.GT:
             return create_element('t:IsGreaterThan')
+        if op == cls.EXISTS:
+            return create_element('t:Exists')
         if op in (cls.EXACT, cls.IEXACT, cls.CONTAINS, cls.ICONTAINS, cls.STARTSWITH, cls.ISTARTSWITH):
             # For description of Contains attribute values, see
             #     https://msdn.microsoft.com/en-us/library/office/aa580702(v=exchg.150).aspx
@@ -338,14 +349,15 @@ class Q(object):
                 field_uri = field.field_uri_xml()
             elem.append(field_uri)
             constant = create_element('t:Constant')
-            # Use .set() to not fill up the create_element() cache with unique values
-            constant.set('Value', value_to_xml_text(self.value))
-            if self.op in self.CONTAINS_OPS:
-                elem.append(constant)
-            else:
-                uriorconst = create_element('t:FieldURIOrConstant')
-                uriorconst.append(constant)
-                elem.append(uriorconst)
+            if self.op != self.EXISTS:
+                # Use .set() to not fill up the create_element() cache with unique values
+                constant.set('Value', value_to_xml_text(self.value))
+                if self.op in self.CONTAINS_OPS:
+                    elem.append(constant)
+                else:
+                    uriorconst = create_element('t:FieldURIOrConstant')
+                    uriorconst.append(constant)
+                    elem.append(uriorconst)
         elif len(self.children) == 1:
             # Flatten the tree a bit
             elem = self.children[0].xml_elem(folder_class=folder_class)

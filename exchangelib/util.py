@@ -451,16 +451,16 @@ Response headers: %(response_headers)s'''
         if r.status_code == 401 and protocol.credentials.fail_fast:
             # This is a login failure
             raise UnauthorizedError('Wrong username or password for %s' % url)
+        if 'TimeoutException' in r.headers:
+            raise r.headers['TimeoutException']
         # This could be anything. Let higher layers handle this
         log_msg += '\nRequest data: %(data)s'
         log_vals['data'] = data
+        log_msg += '\nResponse data: %(text)s'
         try:
-            log_msg += '\nResponse data: %(text)s'
             log_vals['text'] = r.text
         except (NameError, AttributeError):
-            pass
-        if 'TimeoutException' in r.headers:
-            raise r.headers['TimeoutException']
+            log_vals['text'] = ''
         raise TransportError('Unknown failure\n' + log_msg % log_vals)
     log.debug('Session %(session_id)s thread %(thread_id)s: Useful response from %(url)s', log_vals)
     return r, session

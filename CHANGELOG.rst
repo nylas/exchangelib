@@ -25,8 +25,10 @@ HEAD
   you need fault-tolerane and used ``Credentials(..., is_service_account=True)`` before, use ``ServiceAccount`` now. This
   also disables fault-tolerance for the ``Credentials`` class, which is in line with what most users expected.
 * Added an optional ``update_fields`` attribute to ``save()`` to specify only some  fields to be updated.
-* Code in in `folders.py` has been split into multiple files, and some classes will have new import locaions. The most
+* Code in in ``folders.py`` has been split into multiple files, and some classes will have new import locaions. The most
   commonly used classes have a shortcut in __init__.py
+* Added support for the ``exists`` lookup in filters, e.g. ``my_folder.filter(categories__exists=True|False)`` to filter
+  on the existence of that field on items in the folder.
 
 
 1.8.1
