@@ -170,8 +170,8 @@ class Q(object):
                 if field.is_list:
                     if lookup not in (Q.LOOKUP_CONTAINS, Q.LOOKUP_IN):
                         raise ValueError(
-                            "Field '%(field)s' can only be filtered using '%(field)s__contains=['a', 'b', ...]' and "
-                            "'%(field)s__in=['a', 'b', ...]' and '%(field)s__exists=True|False'" % dict(field=fieldname))
+                            "Field '%(field)s' can only be filtered using '%(field)s__contains=['a', 'b', ...]' or "
+                            "'%(field)s__in=['a', 'b', ...]' or '%(field)s__exists=True|False'" % dict(field=fieldname))
                     if isinstance(value, (list, tuple, set)):
                         children = [Q(**{fieldname: v}) for v in value]
                         if lookup == Q.LOOKUP_CONTAINS:

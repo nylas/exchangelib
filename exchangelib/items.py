@@ -115,7 +115,6 @@ class Item(EWSElement):
         if kwargs:
             raise TypeError("%s are invalid keyword arguments for this function" %
                             ', '.join("'%s'" % k for k in kwargs.keys()))
-        # self.clean()
         if self.attachments is None:
             self.attachments = []
         for a in self.attachments:
