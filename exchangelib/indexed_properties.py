@@ -11,15 +11,18 @@ log = logging.getLogger(__name__)
 
 
 class IndexedElement(EWSElement):
+    __metaclass__ = EWSElement
+
     LABELS = set()
     LABEL_FIELD = None
-    SUB_FIELDS = tuple()
-    SUB_FIELDS_MAP = {f.name: f for f in SUB_FIELDS}
+    FIELDS = tuple()
+    FIELDS_MAP = {f.name: f for f in FIELDS}
+
     __slots__ = ('label',)
 
     def __init__(self, **kwargs):
         self.label = kwargs.pop('label', None)
-        for f in self.SUB_FIELDS:
+        for f in self.FIELDS:
             setattr(self, f.name, kwargs.pop(f.name, None))
         if kwargs:
             raise TypeError("%s are invalid keyword arguments for this function" %
@@ -27,12 +30,13 @@ class IndexedElement(EWSElement):
 
     def clean(self):
         self.LABEL_FIELD.clean(self.label)
-        for f in self.SUB_FIELDS:
+        for f in self.FIELDS:
             value = getattr(self, f.name)
             setattr(self, f.name, f.clean(value))
 
 
 class SingleFieldIndexedElement(IndexedElement):
+    __metaclass__ = IndexedElement
     __slots__ = ('label',)
 
     @classmethod
@@ -40,7 +44,7 @@ class SingleFieldIndexedElement(IndexedElement):
         if elem is None:
             return None
         assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
-        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.SUB_FIELDS}
+        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.FIELDS}
         kwargs[cls.LABEL_FIELD.name] = elem.get(cls.LABEL_FIELD.field_uri)
         elem.clear()
         return cls(**kwargs)
@@ -48,7 +52,7 @@ class SingleFieldIndexedElement(IndexedElement):
     def to_xml(self, version):
         self.clean()
         entry = create_element(self.request_tag(), Key=self.label)
-        for f in self.SUB_FIELDS:
+        for f in self.FIELDS:
             set_xml_value(entry, f.to_xml(getattr(self, f.name), version=version), version)
         return entry
 
@@ -58,10 +62,10 @@ class EmailAddress(SingleFieldIndexedElement):
     ELEMENT_NAME = 'Entry'
     LABELS = {'EmailAddress1', 'EmailAddress2', 'EmailAddress3'}
     LABEL_FIELD = LabelField('label', field_uri='Key', value_cls=Choice, choices=LABELS, default='EmailAddress1')
-    SUB_FIELDS = (
+    FIELDS = (
         EmailSubField('email', value_cls=string_type),
     )
-    SUB_FIELDS_MAP = {f.name: f for f in SUB_FIELDS}
+    FIELDS_MAP = {f.name: f for f in FIELDS}
 
     __slots__ = ('label', 'email')
 
@@ -75,15 +79,16 @@ class PhoneNumber(SingleFieldIndexedElement):
         'PrimaryPhone', 'RadioPhone', 'Telex', 'TtyTddPhone',
     }
     LABEL_FIELD = LabelField('label', field_uri='Key', value_cls=Choice, choices=LABELS, default='PrimaryPhone')
-    SUB_FIELDS = (
+    FIELDS = (
         SubField('phone_number', value_cls=string_type),
     )
-    SUB_FIELDS_MAP = {f.name: f for f in SUB_FIELDS}
+    FIELDS_MAP = {f.name: f for f in FIELDS}
 
     __slots__ = ('label', 'phone_number')
 
 
 class MultiFieldIndexedElement(IndexedElement):
+    __metaclass__ = IndexedElement
     __slots__ = ('label',)
 
     @classmethod
@@ -91,7 +96,7 @@ class MultiFieldIndexedElement(IndexedElement):
         if elem is None:
             return None
         assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
-        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.SUB_FIELDS}
+        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.FIELDS}
         kwargs['label'] = cls.LABEL_FIELD.from_xml(elem=elem)
         elem.clear()
         return cls(**kwargs)
@@ -99,7 +104,7 @@ class MultiFieldIndexedElement(IndexedElement):
     def to_xml(self, version):
         self.clean()
         entry = create_element(self.request_tag(), Key=self.label)
-        for f in self.SUB_FIELDS:
+        for f in self.FIELDS:
             value = getattr(self, f.name)
             if value is not None:
                 add_xml_child(entry, f.request_tag(), value)
@@ -111,14 +116,14 @@ class PhysicalAddress(MultiFieldIndexedElement):
     ELEMENT_NAME = 'Entry'
     LABELS = {'Business', 'Home', 'Other'}
     LABEL_FIELD = LabelField('label', field_uri='Key', value_cls=Choice, choices=LABELS, default='Business')
-    SUB_FIELDS = (
+    FIELDS = (
         SimpleField('street', field_uri='Street', value_cls=string_type),  # Street, house number, etc.
         SimpleField('city', field_uri='City', value_cls=string_type),
         SimpleField('state', field_uri='State', value_cls=string_type),
         SimpleField('country', field_uri='CountryOrRegion', value_cls=string_type),
         SimpleField('zipcode', field_uri='PostalCode', value_cls=string_type),
     )
-    SUB_FIELDS_MAP = {f.name: f for f in SUB_FIELDS}
+    FIELDS_MAP = {f.name: f for f in FIELDS}
 
     __slots__ = ('label', 'street', 'city', 'state', 'country', 'zipcode')
 

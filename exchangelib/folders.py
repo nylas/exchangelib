@@ -74,13 +74,15 @@ class CalendarView(EWSElement):
 
 @python_2_unicode_compatible
 class Folder(EWSElement):
+    __metaclass__ = EWSElement
+
     DISTINGUISHED_FOLDER_ID = None  # See https://msdn.microsoft.com/en-us/library/office/aa580808(v=exchg.150).aspx
     # Default item type for this folder. See http://msdn.microsoft.com/en-us/library/hh354773(v=exchg.80).aspx
     CONTAINER_CLASS = None
     supported_item_models = ITEM_CLASSES  # The Item types that this folder can contain. Default is all
     LOCALIZED_NAMES = dict()  # A map of (str)locale: (tuple)localized_folder_names
     ITEM_MODEL_MAP = {cls.response_tag(): cls for cls in ITEM_CLASSES}
-    FOLDER_FIELDS = (
+    FIELDS = (
         SimpleField('folder_id', field_uri='folder:FolderId', value_cls=string_type),
         SimpleField('changekey', field_uri='folder:Changekey', value_cls=string_type),
         SimpleField('name', field_uri='folder:DisplayName', value_cls=string_type),
@@ -89,14 +91,14 @@ class Folder(EWSElement):
         SimpleField('unread_count', field_uri='folder:UnreadCount', value_cls=int),
         SimpleField('child_folder_count', field_uri='folder:ChildFolderCount', value_cls=int),
     )
-    FOLDER_FIELDS_MAP = {f.name: f for f in FOLDER_FIELDS}
+    FIELDS_MAP = {f.name: f for f in FIELDS}
 
     __slots__ = ('account', 'folder_id', 'changekey', 'name', 'folder_class', 'total_count', 'unread_count',
                  'child_folder_count')
 
     def __init__(self, **kwargs):
         self.account = kwargs.pop('account', None)
-        for f in self.FOLDER_FIELDS:
+        for f in self.FIELDS:
             setattr(self, f.name, kwargs.pop(f.name, None))
         if kwargs:
             raise TypeError("%s are invalid keyword arguments for this function" %
@@ -146,14 +148,14 @@ class Folder(EWSElement):
     def allowed_fields(cls):
         fields = set()
         for item_model in cls.supported_item_models:
-            fields.update(item_model.ITEM_FIELDS)
+            fields.update(item_model.FIELDS)
         return fields
 
     @classmethod
     def complex_fields(cls):
         fields = set()
         for item_model in cls.supported_item_models:
-            for f in item_model.ITEM_FIELDS:
+            for f in item_model.FIELDS:
                 if f.is_complex:
                     fields.add(f)
         return fields
@@ -162,7 +164,7 @@ class Folder(EWSElement):
     def get_item_field_by_fieldname(cls, fieldname):
         for item_model in cls.supported_item_models:
             try:
-                return item_model.ITEM_FIELDS_MAP[fieldname]
+                return item_model.FIELDS_MAP[fieldname]
             except KeyError:
                 pass
         raise ValueError("Unknown fieldname '%s' on class '%s'" % (fieldname, cls.__name__))
@@ -295,7 +297,7 @@ class Folder(EWSElement):
         fld_id_elem = elem.find(FolderId.response_tag())
         fld_id = fld_id_elem.get(FolderId.ID_ATTR)
         changekey = fld_id_elem.get(FolderId.CHANGEKEY_ATTR)
-        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.FOLDER_FIELDS if f.name not in ('folder_id', 'changekey')}
+        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.FIELDS if f.name not in ('folder_id', 'changekey')}
         elem.clear()
         return cls(folder_id=fld_id, changekey=changekey, **kwargs)
 
@@ -308,7 +310,7 @@ class Folder(EWSElement):
         assert depth in FOLDER_TRAVERSAL_CHOICES
         folders = []
         for elem in FindFolder(folder=self).call(
-                additional_fields=[f for f in self.FOLDER_FIELDS if f.name not in ('folder_id', 'changekey')],
+                additional_fields=[f for f in self.FIELDS if f.name not in ('folder_id', 'changekey')],
                 shape=shape,
                 depth=depth,
                 page_size=100,
@@ -336,7 +338,7 @@ class Folder(EWSElement):
                 log.debug('Folder class %s matches container class %s (%s)', folder_cls, dummy_fld.folder_class,
                           dummy_fld.name)
             folders.append(folder_cls(account=self.account,
-                                      **{f.name: getattr(dummy_fld, f.name) for f in folder_cls.FOLDER_FIELDS}))
+                                      **{f.name: getattr(dummy_fld, f.name) for f in folder_cls.FIELDS}))
         return folders
 
     def get_folder_by_name(self, name):
@@ -361,7 +363,7 @@ class Folder(EWSElement):
         for elem in GetFolder(account=account).call(
                 folder=None,
                 distinguished_folder_id=cls.DISTINGUISHED_FOLDER_ID,
-                additional_fields=[f for f in cls.FOLDER_FIELDS if f.name not in ('folder_id', 'changekey')],
+                additional_fields=[f for f in cls.FIELDS if f.name not in ('folder_id', 'changekey')],
                 shape=shape
         ):
             if isinstance(elem, Exception):
@@ -382,7 +384,7 @@ class Folder(EWSElement):
         for elem in GetFolder(account=self.account).call(
                 folder=self,
                 distinguished_folder_id=None,
-                additional_fields=[f for f in self.FOLDER_FIELDS if f.name not in ('folder_id', 'changekey')],
+                additional_fields=[f for f in self.FIELDS if f.name not in ('folder_id', 'changekey')],
                 shape=IdOnly
         ):
             if isinstance(elem, Exception):
@@ -395,7 +397,7 @@ class Folder(EWSElement):
         fresh_folder = folders[0]
         assert self.folder_id == fresh_folder.folder_id
         # Apparently, the changekey may get updated
-        for f in self.FOLDER_FIELDS:
+        for f in self.FIELDS:
             setattr(self, f.name, getattr(fresh_folder, f.name))
 
     def __repr__(self):

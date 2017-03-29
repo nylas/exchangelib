@@ -1285,7 +1285,7 @@ class BaseItemTest(EWSTest):
 
     def get_random_insert_kwargs(self):
         insert_kwargs = {}
-        for f in self.ITEM_CLASS.ITEM_FIELDS:
+        for f in self.ITEM_CLASS.FIELDS:
             if f.is_read_only:
                 # These cannot be created
                 continue
@@ -1327,7 +1327,7 @@ class BaseItemTest(EWSTest):
     def get_random_update_kwargs(self, item, insert_kwargs):
         update_kwargs = {}
         now = UTC_NOW()
-        for f in self.ITEM_CLASS.ITEM_FIELDS:
+        for f in self.ITEM_CLASS.FIELDS:
             if f.is_read_only:
                 # These cannot be changed
                 continue
@@ -1394,7 +1394,7 @@ class BaseItemTest(EWSTest):
 
     def test_field_names(self):
         # Test that fieldnames don't clash with Python keywords
-        for f in self.ITEM_CLASS.ITEM_FIELDS:
+        for f in self.ITEM_CLASS.FIELDS:
             self.assertNotIn(f.name, kwlist)
 
     def test_magic(self):
@@ -1405,7 +1405,7 @@ class BaseItemTest(EWSTest):
     def test_validation(self):
         item = self.get_test_item()
         item.clean()
-        for f in self.ITEM_CLASS.ITEM_FIELDS:
+        for f in self.ITEM_CLASS.FIELDS:
             # Test field maxlength
             if issubclass(f.value_cls, text_type) and hasattr(f.value_cls, 'MAXLENGTH'):
                 with self.assertRaises(ValueError):
@@ -1946,7 +1946,7 @@ class BaseItemTest(EWSTest):
             item.is_all_day = False  # Make sure start- and end dates don't change
         ids = self.test_folder.bulk_create(items=[item])
         common_qs = self.test_folder.filter(categories__contains=self.categories)
-        for f in self.ITEM_CLASS.ITEM_FIELDS:
+        for f in self.ITEM_CLASS.FIELDS:
             if f.name in ('status', 'companies', 'reminder_due_by'):
                 # For some reason, EWS disallows searching on these, instead throwing ErrorInvalidValueForProperty
                 continue
@@ -2079,7 +2079,7 @@ class BaseItemTest(EWSTest):
         items = self.test_folder.filter(categories__contains=item.categories)
         for item in items:
             assert isinstance(item, self.ITEM_CLASS)
-            for f in self.ITEM_CLASS.ITEM_FIELDS:
+            for f in self.ITEM_CLASS.FIELDS:
                 self.assertTrue(hasattr(item, f.name))
                 if f.name in ('optional_attendees', 'required_attendees', 'resources'):
                     continue
@@ -2091,7 +2091,7 @@ class BaseItemTest(EWSTest):
         items = self.test_folder.filter(categories__contains=item.categories).only(*only_fields)
         for item in items:
             assert isinstance(item, self.ITEM_CLASS)
-            for f in self.ITEM_CLASS.ITEM_FIELDS:
+            for f in self.ITEM_CLASS.FIELDS:
                 self.assertTrue(hasattr(item, f.name))
                 if f.name in only_fields:
                     self.assertIsNotNone(getattr(item, f.name), (f.name, getattr(item, f.name)))
@@ -2125,7 +2125,7 @@ class BaseItemTest(EWSTest):
             self.assertEqual(getattr(item, k), v, (k, getattr(item, k), v))
         # Test that whatever we have locally also matches whatever is in the DB
         fresh_item = list(self.account.fetch(ids=[item]))[0]
-        for f in item.ITEM_FIELDS:
+        for f in item.FIELDS:
             old, new = getattr(item, f.name), getattr(fresh_item, f.name)
             if f.is_read_only and old is None:
                 # Some fields are automatically set server-side
@@ -2146,7 +2146,7 @@ class BaseItemTest(EWSTest):
             self.assertEqual(getattr(item, k), v, (k, getattr(item, k), v))
         # Test that whatever we have locally also matches whatever is in the DB
         fresh_item = list(self.account.fetch(ids=[item]))[0]
-        for f in item.ITEM_FIELDS:
+        for f in item.FIELDS:
             old, new = getattr(item, f.name), getattr(fresh_item, f.name)
             if f.is_read_only and old is None:
                 # Some fields are automatically updated server-side
@@ -2263,7 +2263,7 @@ class BaseItemTest(EWSTest):
         self.assertEqual(insert_ids, list(find_ids))
         # Test with generator as argument
         item = list(self.account.fetch(ids=(i for i in find_ids)))[0]
-        for f in self.ITEM_CLASS.ITEM_FIELDS:
+        for f in self.ITEM_CLASS.FIELDS:
             if f.is_read_only:
                 continue
             if f.name == 'resources':
@@ -2293,7 +2293,7 @@ class BaseItemTest(EWSTest):
         self.assertEqual(insert_ids[0].item_id, update_ids[0][0])  # ID should be the same
         self.assertNotEqual(insert_ids[0].changekey, update_ids[0][1])  # Changekey should not be the same when item is updated
         item = list(self.account.fetch(update_ids))[0]
-        for f in self.ITEM_CLASS.ITEM_FIELDS:
+        for f in self.ITEM_CLASS.FIELDS:
             if f.is_read_only:
                 continue
             if f.name == 'resources':
@@ -2310,7 +2310,7 @@ class BaseItemTest(EWSTest):
 
         # Test wiping or removing fields
         wipe_kwargs = {}
-        for f in self.ITEM_CLASS.ITEM_FIELDS:
+        for f in self.ITEM_CLASS.FIELDS:
             if f.is_required or f.is_required_after_save:
                 # These cannot be deleted
                 continue
@@ -2331,7 +2331,7 @@ class BaseItemTest(EWSTest):
         self.assertNotEqual(insert_ids[0].changekey,
                             wipe_ids[0][1])  # Changekey should not be the same when item is updated
         item = list(self.account.fetch(wipe_ids))[0]
-        for f in self.ITEM_CLASS.ITEM_FIELDS:
+        for f in self.ITEM_CLASS.FIELDS:
             if f.is_required or f.is_required_after_save:
                 continue
             if f.is_read_only:
@@ -2382,7 +2382,7 @@ class BaseItemTest(EWSTest):
         def to_dict(item):
             dict_item = {}
             # fieldnames is everything except the ID so we'll use it to compare
-            for f in item.ITEM_FIELDS:
+            for f in item.FIELDS:
                 # datetime_created and last_modified_time aren't copied, but instead are added to the new item after
                 # uploading. This means mime_content can also change. Items also get new IDs on upload.
                 if f.name in {'item_id', 'changekey', 'datetime_created', 'last_modified_time', 'mime_content'}:
@@ -2527,7 +2527,7 @@ class BaseItemTest(EWSTest):
         self.assertEqual(fresh_attachments[0].name, 'attachment1')
         self.assertIsInstance(fresh_attachments[0].item, self.ITEM_CLASS)
 
-        for f in self.ITEM_CLASS.ITEM_FIELDS:
+        for f in self.ITEM_CLASS.FIELDS:
             # Normalize some values we don't control
             if f.is_read_only:
                 continue
@@ -2562,7 +2562,7 @@ class BaseItemTest(EWSTest):
         self.assertEqual(fresh_attachments[0].name, 'attachment1')
         self.assertIsInstance(fresh_attachments[0].item, self.ITEM_CLASS)
 
-        for f in self.ITEM_CLASS.ITEM_FIELDS:
+        for f in self.ITEM_CLASS.FIELDS:
             # Normalize some values we don't control
             if f.is_read_only:
                 continue
@@ -2584,7 +2584,7 @@ class BaseItemTest(EWSTest):
         self.assertEqual(fresh_attachments[1].name, 'attachment2')
         self.assertIsInstance(fresh_attachments[1].item, self.ITEM_CLASS)
 
-        for f in self.ITEM_CLASS.ITEM_FIELDS:
+        for f in self.ITEM_CLASS.FIELDS:
             # Normalize some values we don't control
             if f.is_read_only:
                 continue
@@ -2611,7 +2611,7 @@ class BaseItemTest(EWSTest):
         self.assertEqual(len(fresh_item.attachments), 1)
         fresh_attachments = sorted(fresh_item.attachments, key=lambda a: a.name)
 
-        for f in self.ITEM_CLASS.ITEM_FIELDS:
+        for f in self.ITEM_CLASS.FIELDS:
             # Normalize some values we don't control
             if f.is_read_only:
                 continue

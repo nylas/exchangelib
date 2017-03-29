@@ -70,7 +70,7 @@ class Attachment(EWSElement):
     """
     Parent class for FileAttachment and ItemAttachment
     """
-    ATTACHMENT_FIELDS = (
+    FIELDS = (
         SimpleField('attachment_id', field_uri='attachment:AttachmentId', value_cls=AttachmentId),
         SimpleField('name', field_uri='attachment:Name', value_cls=string_type),
         SimpleField('content_type', field_uri='attachment:ContentType', value_cls=string_type),
@@ -86,7 +86,7 @@ class Attachment(EWSElement):
 
     def __init__(self, **kwargs):
         self.parent_item = kwargs.pop('parent_item', None)
-        for f in self.ATTACHMENT_FIELDS:
+        for f in self.FIELDS:
             setattr(self, f.name, kwargs.pop(f.name, None))
         if kwargs:
             raise TypeError("%s are invalid keyword arguments for this function" %
@@ -97,7 +97,7 @@ class Attachment(EWSElement):
         from .items import Item
         if self.parent_item is not None:
             assert isinstance(self.parent_item, Item)
-        for f in self.ATTACHMENT_FIELDS:
+        for f in self.FIELDS:
             val = getattr(self, f.name)
             setattr(self, f.name, f.clean(val))
         if self.content_type is None and self.name is not None:
@@ -106,7 +106,7 @@ class Attachment(EWSElement):
     def to_xml(self, version):
         self.clean()
         i = create_element(self.request_tag())
-        for f in self.ATTACHMENT_FIELDS:
+        for f in self.FIELDS:
             if f.is_read_only:
                 continue
             value = getattr(self, f.name)
@@ -165,7 +165,7 @@ class Attachment(EWSElement):
 
     def __repr__(self):
         return self.__class__.__name__ + '(%s)' % ', '.join(
-            '%s=%s' % (f.name, repr(getattr(self, f.name))) for f in self.ATTACHMENT_FIELDS
+            '%s=%s' % (f.name, repr(getattr(self, f.name))) for f in self.FIELDS
             if f.name not in ('item', 'content')
         )
 
@@ -176,7 +176,7 @@ class FileAttachment(Attachment):
     """
     # TODO: This class is most likely inefficient for large data. Investigate methods to reduce copying
     ELEMENT_NAME = 'FileAttachment'
-    ATTACHMENT_FIELDS = Attachment.ATTACHMENT_FIELDS + (
+    FIELDS = Attachment.FIELDS + (
         SimpleField('is_contact_photo', field_uri='attachment:IsContactPhoto', value_cls=bool),
         SimpleField('_content', field_uri='attachment:Content', value_cls=Content),
     )
@@ -223,7 +223,7 @@ class FileAttachment(Attachment):
         if elem is None:
             return None
         assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
-        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.ATTACHMENT_FIELDS}
+        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.FIELDS}
         kwargs['content'] = kwargs.pop('_content')
         elem.clear()
         return cls(**kwargs)
@@ -234,7 +234,7 @@ class ItemAttachment(Attachment):
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa562997(v=exchg.150).aspx
     """
     ELEMENT_NAME = 'ItemAttachment'
-    ATTACHMENT_FIELDS = Attachment.ATTACHMENT_FIELDS + (
+    FIELDS = Attachment.FIELDS + (
         ItemField('_item', field_uri='attachment:Item'),
     )
 
@@ -278,7 +278,7 @@ class ItemAttachment(Attachment):
         if elem is None:
             return None
         assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
-        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.ATTACHMENT_FIELDS}
+        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.FIELDS}
         kwargs['item'] = kwargs.pop('_item')
         elem.clear()
         return cls(**kwargs)

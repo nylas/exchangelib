@@ -1,3 +1,4 @@
+import abc
 import base64
 import logging
 
@@ -76,18 +77,23 @@ class MimeContent(text_type):
 
 
 class EWSElement(object):
+    __metaclass__ = abc.ABCMeta
+
     ELEMENT_NAME = None
+    FIELDS = tuple()
 
     __slots__ = tuple()
 
+    @abc.abstractmethod
     def clean(self):
         # Perform any attribute validation here
-        pass
+        return
 
+    @abc.abstractmethod
     def to_xml(self, version):
         raise NotImplementedError()
 
-    @classmethod
+    @abc.abstractclassmethod
     def from_xml(cls, elem):
         raise NotImplementedError()
 

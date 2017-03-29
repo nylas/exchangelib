@@ -56,15 +56,17 @@ DELETE_TYPE_CHOICES = (HARD_DELETE, SOFT_DELETE, MOVE_TO_DELETED_ITEMS)
 
 
 class Item(EWSElement):
+    __metaclass__ = EWSElement
+
     ELEMENT_NAME = 'Item'
 
-    # ITEM_FIELDS is an ordered list of attributes supported by this item class. Not all possible attributes are
+    # FIELDS is an ordered list of attributes supported by this item class. Not all possible attributes are
     # supported. See full list at
     # https://msdn.microsoft.com/en-us/library/office/aa580790(v=exchg.150).aspx
 
     # 'extern_id' is not a native EWS Item field. We use it for identification when item originates in an external
     # system. The field is implemented as an extended property on the Item.
-    ITEM_FIELDS = (
+    FIELDS = (
         SimpleField('item_id', field_uri='item:ItemId', value_cls=string_type, is_read_only=True),
         SimpleField('changekey', field_uri='item:ChangeKey', value_cls=string_type, is_read_only=True),
         # TODO: MimeContent actually supports writing, but is still untested
@@ -94,7 +96,7 @@ class Item(EWSElement):
         SimpleField('last_modified_name', field_uri='item:LastModifiedName', value_cls=string_type, is_read_only=True),
         SimpleField('last_modified_time', field_uri='item:LastModifiedTime', value_cls=EWSDateTime, is_read_only=True),
     )
-    ITEM_FIELDS_MAP = {f.name: f for f in ITEM_FIELDS}
+    FIELDS_MAP = {f.name: f for f in FIELDS}
 
     # We can't use __slots__ because we need to add extended properties dynamically
 
@@ -110,7 +112,7 @@ class Item(EWSElement):
         if self.folder is not None:
             assert isinstance(self.folder, Folder)
 
-        for f in self.ITEM_FIELDS:
+        for f in self.FIELDS:
             setattr(self, f.name, kwargs.pop(f.name, None))
         if kwargs:
             raise TypeError("%s are invalid keyword arguments for this function" %
@@ -125,7 +127,7 @@ class Item(EWSElement):
             self.attach(self.attachments)
 
     def clean(self):
-        for f in self.ITEM_FIELDS:
+        for f in self.FIELDS:
             val = getattr(self, f.name)
             setattr(self, f.name, f.clean(val))
 
@@ -174,7 +176,7 @@ class Item(EWSElement):
         if not update_fieldnames:
             # The fields to update was not specified explicitly. Update all fields where update is possible
             update_fieldnames = []
-            for f in self.ITEM_FIELDS:
+            for f in self.FIELDS:
                 if f.name == 'attachments':
                     # Attachments are handled separately after item creation
                     continue
@@ -220,7 +222,7 @@ class Item(EWSElement):
         fresh_item = res[0]
         assert self.item_id == fresh_item.item_id
         assert self.changekey == fresh_item.changekey
-        for f in self.ITEM_FIELDS:
+        for f in self.FIELDS:
             setattr(self, f.name, getattr(fresh_item, f.name))
 
     def move(self, to_folder):
@@ -314,7 +316,7 @@ class Item(EWSElement):
     @classmethod
     def fieldnames(cls):
         # Return non-ID field names
-        return set(f.name for f in cls.ITEM_FIELDS if f.name not in ('item_id', 'changekey'))
+        return set(f.name for f in cls.FIELDS if f.name not in ('item_id', 'changekey'))
 
     @classmethod
     def id_from_xml(cls, elem):
@@ -327,7 +329,7 @@ class Item(EWSElement):
     def from_xml(cls, elem):
         assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
         item_id, changekey = cls.id_from_xml(elem)
-        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.ITEM_FIELDS if f.name not in ('item_id', 'changekey')}
+        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.FIELDS if f.name not in ('item_id', 'changekey')}
         elem.clear()
         return cls(item_id=item_id, changekey=changekey, **kwargs)
 
@@ -336,7 +338,7 @@ class Item(EWSElement):
         # WARNING: The order of addition of XML elements is VERY important. Exchange expects XML elements in a
         # specific, non-documented order and will fail with meaningless errors if the order is wrong.
         i = create_element(self.request_tag())
-        for f in self.ITEM_FIELDS:
+        for f in self.FIELDS:
             if f.is_read_only:
                 continue
             value = getattr(self, f.name)
@@ -350,20 +352,20 @@ class Item(EWSElement):
         """
         Register a custom extended property in this item class so they can be accessed just like any other attribute
         """
-        if attr_name in cls.ITEM_FIELDS_MAP:
+        if attr_name in cls.FIELDS_MAP:
             raise AttributeError("%s' is already registered" % attr_name)
         if not issubclass(attr_cls, ExtendedProperty):
             raise ValueError("'%s' must be a subclass of ExtendedProperty" % attr_cls)
-        # Find the correct index for the extended property and insert the new field. See Item.ITEM_FIELDS for comment
+        # Find the correct index for the extended property and insert the new field. See Item.FIELDS for comment
         updated_item_fields = []
-        for f in cls.ITEM_FIELDS:
+        for f in cls.FIELDS:
             updated_item_fields.append(f)
             if f.name == 'reminder_is_set':
                 # This is a bit hacky and will need to change if we add new item fields after 'reminder_is_set'
                 updated_item_fields.append(ExtendedPropertyField(attr_name, value_cls=attr_cls))
-        cls.ITEM_FIELDS = tuple(updated_item_fields)
+        cls.FIELDS = tuple(updated_item_fields)
         # Rebuild map
-        cls.ITEM_FIELDS_MAP = {f.name: f for f in cls.ITEM_FIELDS}
+        cls.FIELDS_MAP = {f.name: f for f in cls.FIELDS}
 
     @classmethod
     def deregister(cls, attr_name):
@@ -372,13 +374,13 @@ class Item(EWSElement):
         """
         # TODO: ExtendedProperty goes in between <HasAttachments/><ExtendedProperty/><Culture/>
         # TODO: See https://msdn.microsoft.com/en-us/library/office/aa580790(v=exchg.150).aspx
-        if attr_name not in cls.ITEM_FIELDS_MAP:
+        if attr_name not in cls.FIELDS_MAP:
             raise AttributeError("%s' is not registered" % attr_name)
-        if not isinstance(cls.ITEM_FIELDS_MAP[attr_name], ExtendedPropertyField):
+        if not isinstance(cls.FIELDS_MAP[attr_name], ExtendedPropertyField):
             raise AttributeError("'%s' is not registered as an ExtendedProperty" % attr_name)
-        cls.ITEM_FIELDS = tuple(f for f in cls.ITEM_FIELDS if f.name != attr_name)
+        cls.FIELDS = tuple(f for f in cls.FIELDS if f.name != attr_name)
         # Rebuild map
-        cls.ITEM_FIELDS_MAP = {f.name: f for f in cls.ITEM_FIELDS}
+        cls.FIELDS_MAP = {f.name: f for f in cls.FIELDS}
 
     def __eq__(self, other):
         if isinstance(other, tuple):
@@ -391,34 +393,34 @@ class Item(EWSElement):
         if self.item_id:
             return hash((self.item_id, self.changekey))
         return hash(tuple(
-            tuple(tuple(getattr(self, f.name) or ()) if f.is_list else getattr(self, f.name) for f in self.ITEM_FIELDS)
+            tuple(tuple(getattr(self, f.name) or ()) if f.is_list else getattr(self, f.name) for f in self.FIELDS)
         ))
 
     def __str__(self):
-        return '\n'.join('%s: %s' % (f.name, getattr(self, f.name)) for f in self.ITEM_FIELDS)
+        return '\n'.join('%s: %s' % (f.name, getattr(self, f.name)) for f in self.FIELDS)
 
     def __repr__(self):
         return self.__class__.__name__ + '(%s)' % ', '.join(
-            '%s=%s' % (f.name, repr(getattr(self, f.name))) for f in self.ITEM_FIELDS
+            '%s=%s' % (f.name, repr(getattr(self, f.name))) for f in self.FIELDS
         )
 
 
 @python_2_unicode_compatible
 class BulkCreateResult(Item):
-    ITEM_FIELDS = (
+    FIELDS = (
         SimpleField('item_id', field_uri='item:ItemId', value_cls=string_type, is_read_only=True, is_required=True),
         SimpleField('changekey', field_uri='item:ChangeKey', value_cls=string_type, is_read_only=True, is_required=True),
         SimpleField('attachments', field_uri='item:Attachments', value_cls=Attachment, default=(), is_list=True,
                     is_complex=True),  # ItemAttachment or FileAttachment
     )
-    ITEM_FIELDS_MAP = {f.name: f for f in ITEM_FIELDS}
+    FIELDS_MAP = {f.name: f for f in FIELDS}
 
     __slots__ = ('item_id', 'changekey', 'attachments')
 
     @classmethod
     def from_xml(cls, elem):
         item_id, changekey = cls.id_from_xml(elem)
-        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.ITEM_FIELDS if f.name not in ('item_id', 'changekey')}
+        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.FIELDS if f.name not in ('item_id', 'changekey')}
         elem.clear()
         return cls(item_id=item_id, changekey=changekey, **kwargs)
 
@@ -430,7 +432,7 @@ class CalendarItem(Item):
     https://msdn.microsoft.com/en-us/library/office/aa564765(v=exchg.150).aspx
     """
     ELEMENT_NAME = 'CalendarItem'
-    ITEM_FIELDS = Item.ITEM_FIELDS + (
+    FIELDS = Item.FIELDS + (
         SimpleField('start', field_uri='calendar:Start', value_cls=EWSDateTime, is_required=True),
         SimpleField('end', field_uri='calendar:End', value_cls=EWSDateTime, is_required=True),
         SimpleField('is_all_day', field_uri='calendar:IsAllDayEvent', value_cls=bool, is_required=True, default=False),
@@ -443,7 +445,7 @@ class CalendarItem(Item):
         SimpleField('optional_attendees', field_uri='calendar:OptionalAttendees', value_cls=Attendee, is_list=True),
         SimpleField('resources', field_uri='calendar:Resources', value_cls=Attendee, is_list=True),
     )
-    ITEM_FIELDS_MAP = {f.name: f for f in ITEM_FIELDS}
+    FIELDS_MAP = {f.name: f for f in FIELDS}
 
     def to_xml(self, version):
         # WARNING: The order of addition of XML elements is VERY important. Exchange expects XML elements in a
@@ -461,7 +463,7 @@ class Message(Item):
     ELEMENT_NAME = 'Message'
     # Supported attrs: see https://msdn.microsoft.com/en-us/library/office/aa494306(v=exchg.150).aspx
     # TODO: This list is incomplete
-    ITEM_FIELDS = Item.ITEM_FIELDS + (
+    FIELDS = Item.FIELDS + (
         SimpleField('to_recipients', field_uri='message:ToRecipients', value_cls=Mailbox, is_list=True,
                     is_read_only_after_send=True),
         SimpleField('cc_recipients', field_uri='message:CcRecipients', value_cls=Mailbox, is_list=True,
@@ -484,7 +486,7 @@ class Message(Item):
         SimpleField('message_id', field_uri='message:InternetMessageId', value_cls=string_type, is_read_only=True,
                     is_read_only_after_send=True),
     )
-    ITEM_FIELDS_MAP = {f.name: f for f in ITEM_FIELDS}
+    FIELDS_MAP = {f.name: f for f in FIELDS}
 
     def send(self, save_copy=True, copy_to_folder=None, conflict_resolution=AUTO_RESOLVE,
              send_meeting_invitations=SEND_TO_NONE):
@@ -539,7 +541,7 @@ class Task(Item):
     COMPLETED = 'Completed'
     # Supported attrs: see https://msdn.microsoft.com/en-us/library/office/aa563930(v=exchg.150).aspx
     # TODO: This list is incomplete
-    ITEM_FIELDS = Item.ITEM_FIELDS + (
+    FIELDS = Item.FIELDS + (
         SimpleField('actual_work', field_uri='task:ActualWork', value_cls=int),
         SimpleField('assigned_time', field_uri='task:AssignedTime', value_cls=EWSDateTime, is_read_only=True),
         SimpleField('billing_information', field_uri='task:BillingInformation', value_cls=string_type),
@@ -566,7 +568,7 @@ class Task(Item):
         SimpleField('status_description', field_uri='task:StatusDescription', value_cls=string_type, is_read_only=True),
         SimpleField('total_work', field_uri='task:TotalWork', value_cls=int),
     )
-    ITEM_FIELDS_MAP = {f.name: f for f in ITEM_FIELDS}
+    FIELDS_MAP = {f.name: f for f in FIELDS}
 
     def clean(self):
         super(Task, self).clean()
@@ -607,7 +609,7 @@ class Contact(Item):
     ELEMENT_NAME = 'Contact'
     # Supported attrs: see https://msdn.microsoft.com/en-us/library/office/aa581315(v=exchg.150).aspx
     # TODO: This list is incomplete
-    ITEM_FIELDS = Item.ITEM_FIELDS + (
+    FIELDS = Item.FIELDS + (
         SimpleField('file_as', field_uri='contacts:FileAs', value_cls=string_type),
         SimpleField('file_as_mapping', field_uri='contacts:FileAsMapping', value_cls=Choice, choices={
             'None', 'LastCommaFirst', 'FirstSpaceLast', 'Company', 'LastCommaFirstCompany', 'CompanyLastFirst',
@@ -642,7 +644,7 @@ class Contact(Item):
         # SimpleField('email_alias', field_uri='contacts:Alias', , value_cls=Email),
         # SimpleField('notes', field_uri='contacts:Notes', value_cls=string_type),  # Only available from Exchange 2010 SP2
     )
-    ITEM_FIELDS_MAP = {f.name: f for f in ITEM_FIELDS}
+    FIELDS_MAP = {f.name: f for f in FIELDS}
 
 
 class MeetingRequest(Item):
@@ -650,14 +652,14 @@ class MeetingRequest(Item):
     # TODO: Untested and unfinished. Only the bare minimum supported to allow reading a folder that contains meeting
     # requests.
     ELEMENT_NAME = 'MeetingRequest'
-    ITEM_FIELDS = (
+    FIELDS = (
         SimpleField('subject', field_uri='item:Subject', value_cls=Subject, is_required=True, is_read_only=True),
         SimpleField('author', field_uri='message:From', value_cls=Mailbox, is_read_only=True),
         SimpleField('is_read', field_uri='message:IsRead', value_cls=bool, is_read_only=True),
         SimpleField('start', field_uri='calendar:Start', value_cls=EWSDateTime, is_read_only=True),
         SimpleField('end', field_uri='calendar:End', value_cls=EWSDateTime, is_read_only=True),
     )
-    ITEM_FIELDS_MAP = {f.name: f for f in ITEM_FIELDS}
+    FIELDS_MAP = {f.name: f for f in FIELDS}
 
 
 class MeetingResponse(Item):
@@ -665,14 +667,14 @@ class MeetingResponse(Item):
     # TODO: Untested and unfinished. Only the bare minimum supported to allow reading a folder that contains meeting
     # responses.
     ELEMENT_NAME = 'MeetingResponse'
-    ITEM_FIELDS = (
+    FIELDS = (
         SimpleField('subject', field_uri='item:Subject', value_cls=Subject, is_required=True, is_read_only=True),
         SimpleField('author', field_uri='message:From', value_cls=Mailbox, is_read_only=True),
         SimpleField('is_read', field_uri='message:IsRead', value_cls=bool, is_read_only=True),
         SimpleField('start', field_uri='calendar:Start', value_cls=EWSDateTime, is_read_only=True),
         SimpleField('end', field_uri='calendar:End', value_cls=EWSDateTime, is_read_only=True),
     )
-    ITEM_FIELDS_MAP = {f.name: f for f in ITEM_FIELDS}
+    FIELDS_MAP = {f.name: f for f in FIELDS}
 
 
 class MeetingCancellation(Item):
@@ -680,14 +682,14 @@ class MeetingCancellation(Item):
     # TODO: Untested and unfinished. Only the bare minimum supported to allow reading a folder that contains meeting
     # cancellations.
     ELEMENT_NAME = 'MeetingCancellation'
-    ITEM_FIELDS = (
+    FIELDS = (
         SimpleField('subject', field_uri='item:Subject', value_cls=Subject, is_required=True, is_read_only=True),
         SimpleField('author', field_uri='message:From', value_cls=Mailbox, is_read_only=True),
         SimpleField('is_read', field_uri='message:IsRead', value_cls=bool, is_read_only=True),
         SimpleField('start', field_uri='calendar:Start', value_cls=EWSDateTime, is_read_only=True),
         SimpleField('end', field_uri='calendar:End', value_cls=EWSDateTime, is_read_only=True),
     )
-    ITEM_FIELDS_MAP = {f.name: f for f in ITEM_FIELDS}
+    FIELDS_MAP = {f.name: f for f in FIELDS}
 
 
 ITEM_CLASSES = (CalendarItem, Contact, Message, Task, MeetingRequest, MeetingResponse, MeetingCancellation)

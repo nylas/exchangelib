@@ -233,8 +233,8 @@ class IndexedField(SimpleField):
         if issubclass(self.value_cls, MultiFieldIndexedElement):
             if not subfield:
                 # Return elements for all sub-fields
-                return [self.field_uri_xml(label=label, subfield=f) for f in self.value_cls.SUB_FIELDS]
-            assert subfield in self.value_cls.SUB_FIELDS
+                return [self.field_uri_xml(label=label, subfield=f) for f in self.value_cls.FIELDS]
+            assert subfield in self.value_cls.FIELDS
             field_uri = '%s:%s' % (self.field_uri, subfield.field_uri)
         else:
             field_uri = self.field_uri

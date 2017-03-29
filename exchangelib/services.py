@@ -614,7 +614,7 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
         meeting_timezone_added = False
         for fieldname in fieldnames:
             try:
-                field = item_model.ITEM_FIELDS_MAP[fieldname]
+                field = item_model.FIELDS_MAP[fieldname]
             except KeyError:
                 raise ValueError("'%s' is not a valid field on '%s'" % (fieldname, item_model))
             if field.is_read_only:
@@ -630,7 +630,7 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
                 if isinstance(field, IndexedField):
                     for label in field.value_cls.LABELS:
                         if issubclass(field.value_cls, MultiFieldIndexedElement):
-                            for subfield in field.value_cls.SUB_FIELDS:
+                            for subfield in field.value_cls.FIELDS:
                                 yield self._get_delete_item_elem(field=field, label=label, subfield=subfield)
                         else:
                             yield self._get_delete_item_elem(field=field, label=label)
@@ -648,7 +648,7 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
                         # We have subfields. Generate SetItem XML for each subfield. SetItem only accepts items that
                         # have the one value set that we want to change. Create a new IndexedField object that has
                         # only that value set.
-                        for f in field.value_cls.SUB_FIELDS:
+                        for f in field.value_cls.FIELDS:
                             simple_item = field.value_cls(**{'label': v.label, f.name: getattr(v, f.name)})
                             yield self._get_set_item_elem(item_model=item_model, field=field, value=simple_item,
                                                           label=v.label, subfield=f)

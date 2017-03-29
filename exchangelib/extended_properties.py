@@ -18,6 +18,8 @@ class ExtendedProperty(EWSElement):
 
     Property_* values: https://msdn.microsoft.com/en-us/library/office/aa564843(v=exchg.150).aspx
     """
+    __metaclass__ = EWSElement
+
     ELEMENT_NAME = 'ExtendedProperty'
 
     DISTINGUISHED_SETS = {
