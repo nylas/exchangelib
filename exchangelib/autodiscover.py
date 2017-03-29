@@ -84,9 +84,6 @@ class AutodiscoverCache(object):
     def _storage_file(self):
         return AUTODISCOVER_PERSISTENT_STORAGE
 
-    def items(self):
-        return self._protocols.items()
-
     def clear(self):
         # Wipe the entire cache
         with shelve_open(self._storage_file) as db:
