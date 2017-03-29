@@ -5,8 +5,9 @@ import logging
 from six import text_type, string_types
 
 from .ewsdatetime import EWSDateTime
+from .fields import SimpleField, SubField
 from .services import MNS, TNS
-from .util import add_xml_child, get_xml_attr, set_xml_value, create_element
+from .util import  get_xml_attr, set_xml_value, create_element
 
 string_type = string_types[0]
 log = logging.getLogger(__name__)
@@ -85,18 +86,40 @@ class EWSElement(object):
 
     __slots__ = tuple()
 
-    @abc.abstractmethod
+    def __init__(self, **kwargs):
+        for f in self.FIELDS:
+            setattr(self, f.name, kwargs.pop(f.name, None))
+        if kwargs:
+            raise TypeError("%s are invalid arguments for this class" % ', '.join("'%s'" % k for k in kwargs.keys()))
+
     def clean(self):
-        # Perform any attribute validation here
-        return
+        # Validate attribute values using the field validator
+        for f in self.FIELDS:
+            val = getattr(self, f.name)
+            setattr(self, f.name, f.clean(val))
 
-    @abc.abstractmethod
-    def to_xml(self, version):
-        raise NotImplementedError()
-
-    @abc.abstractclassmethod
+    @classmethod
     def from_xml(cls, elem):
-        raise NotImplementedError()
+        if elem is None:
+            return
+        assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
+        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.FIELDS}
+        elem.clear()
+        return cls(**kwargs)
+
+    def to_xml(self, version):
+        self.clean()
+        # WARNING: The order of addition of XML elements is VERY important. Exchange expects XML elements in a
+        # specific, non-documented order and will fail with meaningless errors if the order is wrong.
+        i = create_element(self.request_tag())
+        for f in self.FIELDS:
+            if f.is_read_only:
+                continue
+            value = getattr(self, f.name)
+            if value is None or (f.is_list and not value):
+                continue
+            i.append(f.to_xml(value, version=version))
+        return i
 
     @classmethod
     def request_tag(cls):
@@ -148,11 +171,12 @@ class MessageHeader(EWSElement):
     ELEMENT_NAME = 'InternetMessageHeader'
     NAME_ATTR = 'HeaderName'
 
-    __slots__ = ('name', 'value')
+    FIELDS = (
+        SimpleField('name', field_uri='HeaderName', value_cls=string_type),
+        SubField('value', value_cls=string_type),
+    )
 
-    def __init__(self, name, value):
-        self.name = name
-        self.value = value
+    __slots__ = ('name', 'value')
 
     def to_xml(self, version):
         self.clean()
@@ -179,18 +203,24 @@ class ItemId(EWSElement):
 
     ID_ATTR = 'Id'
     CHANGEKEY_ATTR = 'ChangeKey'
+    FIELDS = (
+        SimpleField('id', field_uri=ID_ATTR, value_cls=string_type),
+        SimpleField('changekey', field_uri=CHANGEKEY_ATTR, value_cls=string_type),
+    )
 
     __slots__ = ('id', 'changekey')
 
-    def __init__(self, id, changekey):
-        self.id = id
-        self.changekey = changekey
-        self.clean()
+    def __init__(self, *args, **kwargs):
+        if not kwargs:
+            # Allow to set attributes without keyword
+            kwargs = dict(zip(self.__slots__, args))
+        super(ItemId, self).__init__(**kwargs)
 
     def clean(self):
-        if not isinstance(self.id, string_types) or not self.id:
-            raise ValueError("id '%s' must be a non-empty string" % id)
-        if not isinstance(self.changekey, string_types) or not self.changekey:
+        super(ItemId, self).clean()
+        if not self.id:
+            raise ValueError("id '%s' must be a non-empty string" % self.id)
+        if not self.changekey:
             raise ValueError("changekey '%s' must be a non-empty string" % self.changekey)
 
     def to_xml(self, version):
@@ -241,55 +271,22 @@ class Mailbox(EWSElement):
     ELEMENT_NAME = 'Mailbox'
     MAILBOX_TYPES = {'Mailbox', 'PublicDL', 'PrivateDL', 'Contact', 'PublicFolder', 'Unknown', 'OneOff'}
 
+    FIELDS = (
+        SimpleField('name', field_uri='Name', value_cls=string_type, is_required=False),
+        SimpleField('email_address', field_uri='EmailAddress', value_cls=string_type, is_required=False),
+        SimpleField('mailbox_type', field_uri='MailboxType', value_cls=Choice, choices=MAILBOX_TYPES,
+                    default='Mailbox', is_required=False),
+        SimpleField('item_id', value_cls=ItemId, is_required=False),
+        # There's also the 'RoutingType' element, but it's optional and must have value "SMTP"
+    )
+
     __slots__ = ('name', 'email_address', 'mailbox_type', 'item_id')
 
-    def __init__(self, name=None, email_address=None, mailbox_type=None, item_id=None):
-        # There's also the 'RoutingType' element, but it's optional and must have value "SMTP"
-        self.name = name
-        self.email_address = email_address
-        self.mailbox_type = mailbox_type
-        self.item_id = item_id
-        self.clean()
-
     def clean(self):
-        if self.name is not None:
-            assert isinstance(self.name, string_types)
-        if self.email_address is not None:
-            assert isinstance(self.email_address, string_types)
-        if self.mailbox_type is not None:
-            assert self.mailbox_type in self.MAILBOX_TYPES
-        if self.item_id is not None:
-            assert isinstance(self.item_id, ItemId)
+        super(Mailbox, self).clean()
         if not self.email_address and not self.item_id:
             # See "Remarks" section of https://msdn.microsoft.com/en-us/library/office/aa565036(v=exchg.150).aspx
-            raise AttributeError('Mailbox must have either email_address or item_id')
-
-    def to_xml(self, version):
-        self.clean()
-        mailbox = create_element(self.request_tag())
-        if self.name:
-            add_xml_child(mailbox, 't:Name', self.name)
-        if self.email_address:
-            add_xml_child(mailbox, 't:EmailAddress', self.email_address)
-        if self.mailbox_type:
-            add_xml_child(mailbox, 't:MailboxType', self.mailbox_type)
-        if self.item_id:
-            set_xml_value(mailbox, self.item_id, version)
-        return mailbox
-
-    @classmethod
-    def from_xml(cls, elem):
-        if elem is None:
-            return None
-        assert elem.tag == cls.response_tag(), (elem.tag, cls.response_tag())
-        res = cls(
-            name=get_xml_attr(elem, '{%s}Name' % TNS),
-            email_address=get_xml_attr(elem, '{%s}EmailAddress' % TNS),
-            mailbox_type=get_xml_attr(elem, '{%s}MailboxType' % TNS),
-            item_id=ItemId.from_xml(elem=elem.find(ItemId.response_tag())),
-        )
-        elem.clear()
-        return res
+            raise AttributeError("Mailbox must have either 'email_address' or 'item_id' set")
 
     def __hash__(self):
         # Exchange may add 'mailbox_type' and 'name' on insert. We're satisfied if the item_id or email address matches.
@@ -303,44 +300,14 @@ class Attendee(EWSElement):
     ELEMENT_NAME = 'Attendee'
     RESPONSE_TYPES = {'Unknown', 'Organizer', 'Tentative', 'Accept', 'Decline', 'NoResponseReceived'}
 
+    FIELDS = (
+        SimpleField('mailbox', value_cls=Mailbox),
+        SimpleField('response_type', field_uri='ResponseType', value_cls=Choice, choices=RESPONSE_TYPES,
+                    default='Unknown'),
+        SimpleField('last_response_time', field_uri='LastResponseTime', value_cls=EWSDateTime, is_required=False),
+    )
+
     __slots__ = ('mailbox', 'response_type', 'last_response_time')
-
-    def __init__(self, mailbox, response_type, last_response_time=None):
-        self.mailbox = mailbox
-        self.response_type = response_type
-        self.last_response_time = last_response_time
-        self.clean()
-
-    def clean(self):
-        if isinstance(self.mailbox, string_types):
-            self.mailbox = Mailbox(email_address=self.mailbox)
-        assert isinstance(self.mailbox, Mailbox)
-        assert self.response_type in self.RESPONSE_TYPES
-        if self.last_response_time is not None:
-            assert isinstance(self.last_response_time, EWSDateTime)
-
-    def to_xml(self, version):
-        self.clean()
-        attendee = create_element(self.request_tag())
-        set_xml_value(attendee, self.mailbox, version)
-        add_xml_child(attendee, 't:ResponseType', self.response_type)
-        if self.last_response_time:
-            add_xml_child(attendee, 't:LastResponseTime', self.last_response_time)
-        return attendee
-
-    @classmethod
-    def from_xml(cls, elem):
-        if elem is None:
-            return None
-        assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
-        last_response_time = get_xml_attr(elem, '{%s}LastResponseTime' % TNS)
-        res = cls(
-            mailbox=Mailbox.from_xml(elem=elem.find(Mailbox.response_tag())),
-            response_type=get_xml_attr(elem, '{%s}ResponseType' % TNS) or 'Unknown',
-            last_response_time=EWSDateTime.from_string(last_response_time) if last_response_time else None,
-        )
-        elem.clear()
-        return res
 
     def __hash__(self):
         # TODO: maybe take 'response_type' and 'last_response_time' into account?

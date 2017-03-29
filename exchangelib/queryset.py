@@ -227,11 +227,11 @@ class QuerySet(object):
                 yield val
             return
 
-        log.debug('Initializing cache')
         if self.q is None:
             self._cache = []
             return
 
+        log.debug('Initializing cache')
         _cache = []
         result_formatter = {
             self.VALUES: self.as_values,

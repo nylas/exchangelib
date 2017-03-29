@@ -277,7 +277,6 @@ class EWSService(object):
 
 
 class EWSAccountService(EWSService):
-    __metaclass__ = EWSService
 
     def __init__(self, account):
         self.account = account
@@ -285,7 +284,6 @@ class EWSAccountService(EWSService):
 
 
 class EWSFolderService(EWSAccountService):
-    __metaclass__ = EWSAccountService
 
     def __init__(self, folder):
         self.folder = folder

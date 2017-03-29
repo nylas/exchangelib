@@ -22,24 +22,13 @@ class AttachmentId(EWSElement):
     ID_ATTR = 'Id'
     ROOT_ID_ATTR = 'RootItemId'
     ROOT_CHANGEKEY_ATTR = 'RootItemChangeKey'
+    FIELDS = (
+        SimpleField('id', field_uri=ID_ATTR, value_cls=string_type),
+        SimpleField('root_id', field_uri=ROOT_ID_ATTR, value_cls=string_type, is_required=False),
+        SimpleField('root_changekey', field_uri=ROOT_CHANGEKEY_ATTR, value_cls=string_type, is_required=False),
+    )
 
     __slots__ = ('id', 'root_id', 'root_changekey')
-
-    def __init__(self, id, root_id=None, root_changekey=None):
-        self.id = id
-        self.root_id = root_id
-        self.root_changekey = root_changekey
-        self.clean()
-
-    def clean(self):
-        if not isinstance(self.id, string_types) or not id:
-            raise ValueError("id '%s' must be a non-empty string" % id)
-        if self.root_id is not None or self.root_changekey is not None:
-            if self.root_id is not None and (not isinstance(self.root_id, string_types) or not self.root_id):
-                raise ValueError("root_id '%s' must be a non-empty string" % self.root_id)
-            if self.root_changekey is not None and \
-                    (not isinstance(self.root_changekey, string_types) or not self.root_changekey):
-                raise ValueError("root_changekey '%s' must be a non-empty string" % self.root_changekey)
 
     def to_xml(self, version):
         self.clean()
@@ -71,14 +60,14 @@ class Attachment(EWSElement):
     Parent class for FileAttachment and ItemAttachment
     """
     FIELDS = (
-        SimpleField('attachment_id', field_uri='attachment:AttachmentId', value_cls=AttachmentId),
-        SimpleField('name', field_uri='attachment:Name', value_cls=string_type),
-        SimpleField('content_type', field_uri='attachment:ContentType', value_cls=string_type),
-        SimpleField('content_id', field_uri='attchment:ContentId', value_cls=string_type),
-        SimpleField('content_location', field_uri='attachment:ContentLocation', value_cls=AnyURI),
-        SimpleField('size', field_uri='attachment:Size', value_cls=int, is_read_only=True),  # Attachment size in bytes
-        SimpleField('last_modified_time', field_uri='attachment:LastModifiedTime', value_cls=EWSDateTime),
-        SimpleField('is_inline', field_uri='attachment:IsInline', value_cls=bool),
+        SimpleField('attachment_id', value_cls=AttachmentId),
+        SimpleField('name', field_uri='Name', value_cls=string_type),
+        SimpleField('content_type', field_uri='ContentType', value_cls=string_type),
+        SimpleField('content_id', field_uri='ContentId', value_cls=string_type),
+        SimpleField('content_location', field_uri='ContentLocation', value_cls=AnyURI),
+        SimpleField('size', field_uri='Size', value_cls=int, is_read_only=True),  # Attachment size in bytes
+        SimpleField('last_modified_time', field_uri='LastModifiedTime', value_cls=EWSDateTime),
+        SimpleField('is_inline', field_uri='IsInline', value_cls=bool),
     )
 
     __slots__ = ('parent_item', 'attachment_id', 'name', 'content_type', 'content_id', 'content_location', 'size',
@@ -86,34 +75,15 @@ class Attachment(EWSElement):
 
     def __init__(self, **kwargs):
         self.parent_item = kwargs.pop('parent_item', None)
-        for f in self.FIELDS:
-            setattr(self, f.name, kwargs.pop(f.name, None))
-        if kwargs:
-            raise TypeError("%s are invalid keyword arguments for this function" %
-                            ', '.join("'%s'" % k for k in kwargs.keys()))
-        self.clean()
+        super(Attachment, self).__init__(**kwargs)
 
     def clean(self):
         from .items import Item
         if self.parent_item is not None:
             assert isinstance(self.parent_item, Item)
-        for f in self.FIELDS:
-            val = getattr(self, f.name)
-            setattr(self, f.name, f.clean(val))
         if self.content_type is None and self.name is not None:
             self.content_type = mimetypes.guess_type(self.name)[0] or 'application/octet-stream'
-
-    def to_xml(self, version):
-        self.clean()
-        i = create_element(self.request_tag())
-        for f in self.FIELDS:
-            if f.is_read_only:
-                continue
-            value = getattr(self, f.name)
-            if value is None or (f.is_list and not value):
-                continue
-            i.append(f.to_xml(value, version=version))
-        return i
+        super(Attachment, self).clean()
 
     def attach(self):
         # Adds this attachment to an item and updates the item_id and updated changekey on the parent item
@@ -177,8 +147,8 @@ class FileAttachment(Attachment):
     # TODO: This class is most likely inefficient for large data. Investigate methods to reduce copying
     ELEMENT_NAME = 'FileAttachment'
     FIELDS = Attachment.FIELDS + (
-        SimpleField('is_contact_photo', field_uri='attachment:IsContactPhoto', value_cls=bool),
-        SimpleField('_content', field_uri='attachment:Content', value_cls=Content),
+        SimpleField('is_contact_photo', field_uri='IsContactPhoto', value_cls=bool),
+        SimpleField('_content', field_uri='Content', value_cls=Content),
     )
 
     __slots__ = ('parent_item', 'attachment_id', 'name', 'content_type', 'content_id', 'content_location', 'size',
@@ -235,7 +205,7 @@ class ItemAttachment(Attachment):
     """
     ELEMENT_NAME = 'ItemAttachment'
     FIELDS = Attachment.FIELDS + (
-        ItemField('_item', field_uri='attachment:Item'),
+        ItemField('_item', field_uri='Item'),
     )
 
     __slots__ = ('parent_item', 'attachment_id', 'name', 'content_type', 'content_id', 'content_location', 'size',

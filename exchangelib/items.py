@@ -56,8 +56,6 @@ DELETE_TYPE_CHOICES = (HARD_DELETE, SOFT_DELETE, MOVE_TO_DELETED_ITEMS)
 
 
 class Item(EWSElement):
-    __metaclass__ = EWSElement
-
     ELEMENT_NAME = 'Item'
 
     # FIELDS is an ordered list of attributes supported by this item class. Not all possible attributes are
@@ -110,12 +108,7 @@ class Item(EWSElement):
         self.folder = kwargs.pop('folder', None)
         if self.folder is not None:
             assert isinstance(self.folder, Folder)
-
-        for f in self.FIELDS:
-            setattr(self, f.name, kwargs.pop(f.name, None))
-        if kwargs:
-            raise TypeError("%s are invalid keyword arguments for this function" %
-                            ', '.join("'%s'" % k for k in kwargs.keys()))
+        super(Item, self).__init__(**kwargs)
         if self.attachments is None:
             self.attachments = []
         for a in self.attachments:
@@ -124,11 +117,6 @@ class Item(EWSElement):
             else:
                 a.parent_item = self
             self.attach(self.attachments)
-
-    def clean(self):
-        for f in self.FIELDS:
-            val = getattr(self, f.name)
-            setattr(self, f.name, f.clean(val))
 
     def save(self, update_fields=None, conflict_resolution=AUTO_RESOLVE, send_meeting_invitations=SEND_TO_NONE):
         if self.item_id:
@@ -331,20 +319,6 @@ class Item(EWSElement):
         kwargs = {f.name: f.from_xml(elem=elem) for f in cls.FIELDS if f.name not in ('item_id', 'changekey')}
         elem.clear()
         return cls(item_id=item_id, changekey=changekey, **kwargs)
-
-    def to_xml(self, version):
-        self.clean()
-        # WARNING: The order of addition of XML elements is VERY important. Exchange expects XML elements in a
-        # specific, non-documented order and will fail with meaningless errors if the order is wrong.
-        i = create_element(self.request_tag())
-        for f in self.FIELDS:
-            if f.is_read_only:
-                continue
-            value = getattr(self, f.name)
-            if value is None or (f.is_list and not value):
-                continue
-            i.append(f.to_xml(value, version=version))
-        return i
 
     @classmethod
     def register(cls, attr_name, attr_cls):
@@ -585,7 +559,6 @@ class Task(Item):
                             self.complete_date, self.start_date)
                 self.complete_date = self.start_date
         if self.percent_complete is not None:
-            assert isinstance(self.percent_complete, Decimal)
             assert Decimal(0) <= self.percent_complete <= Decimal(100), self.percent_complete
             if self.status == self.COMPLETED and self.percent_complete != Decimal(100):
                 # percent_complete must be 100% if task is complete

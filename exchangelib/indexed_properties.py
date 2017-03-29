@@ -11,8 +11,6 @@ log = logging.getLogger(__name__)
 
 
 class IndexedElement(EWSElement):
-    __metaclass__ = EWSElement
-
     LABELS = set()
     LABEL_FIELD = None
 
@@ -20,21 +18,14 @@ class IndexedElement(EWSElement):
 
     def __init__(self, **kwargs):
         self.label = kwargs.pop('label', None)
-        for f in self.FIELDS:
-            setattr(self, f.name, kwargs.pop(f.name, None))
-        if kwargs:
-            raise TypeError("%s are invalid keyword arguments for this function" %
-                            ', '.join("'%s'" % k for k in kwargs.keys()))
+        super(IndexedElement, self).__init__(**kwargs)
 
     def clean(self):
         self.LABEL_FIELD.clean(self.label)
-        for f in self.FIELDS:
-            value = getattr(self, f.name)
-            setattr(self, f.name, f.clean(value))
+        super(IndexedElement, self).clean()
 
 
 class SingleFieldIndexedElement(IndexedElement):
-    __metaclass__ = IndexedElement
     __slots__ = ('label',)
 
     @classmethod
@@ -84,7 +75,6 @@ class PhoneNumber(SingleFieldIndexedElement):
 
 
 class MultiFieldIndexedElement(IndexedElement):
-    __metaclass__ = IndexedElement
     __slots__ = ('label',)
 
     @classmethod

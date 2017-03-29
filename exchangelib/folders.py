@@ -34,46 +34,36 @@ class CalendarView(EWSElement):
     ELEMENT_NAME = 'CalendarView'
     NAMESPACE = MNS
 
+    FIELDS = (
+        SimpleField('start', field_uri='StartDate', value_cls=EWSDateTime),
+        SimpleField('end', field_uri='EndDate', value_cls=EWSDateTime),
+        SimpleField('max_items', field_uri='MaxEntriesReturned', value_cls=int, is_required=False),
+    )
+
     __slots__ = ('start', 'end', 'max_items')
 
-    def __init__(self, start, end, max_items=None):
-        self.start = start
-        self.end = end
-        self.max_items = max_items
-        self.clean()
-
     def clean(self):
-        if not isinstance(self.start, EWSDateTime):
-            raise ValueError("'start' must be an EWSDateTime")
-        if not isinstance(self.end, EWSDateTime):
-            raise ValueError("'end' must be an EWSDateTime")
-        if not getattr(self.start, 'tzinfo'):
-            raise ValueError("'start' must be timezone aware")
-        if not getattr(self.end, 'tzinfo'):
-            raise ValueError("'end' must be timezone aware")
+        super(CalendarView, self).clean()
         if self.end < self.start:
-            raise AttributeError("'start' must be before 'end'")
-        if self.max_items is not None:
-            if not isinstance(self.max_items, int):
-                raise ValueError("'max_items' must be an int")
-            if self.max_items < 1:
-                raise ValueError("'max_items' must be a positive integer")
+            raise ValueError("'start' must be before 'end'")
+        if self.max_items is not None and self.max_items < 1:
+            raise ValueError("'max_items' must be a positive integer")
 
     def to_xml(self, version):
         self.clean()
-        elem = create_element(self.request_tag())
-        # Use .set() to not fill up the create_element() cache with unique values
-        elem.set('StartDate', value_to_xml_text(self.start.astimezone(UTC)))
-        elem.set('EndDate', value_to_xml_text(self.end.astimezone(UTC)))
-        if self.max_items is not None:
-            elem.set('MaxEntriesReturned', value_to_xml_text(self.max_items))
-        return elem
+        i = create_element(self.request_tag())
+        for f in self.FIELDS:
+            value = getattr(self, f.name)
+            if value is None:
+                continue
+            if f.value_cls == EWSDateTime:
+                value = value.astimezone(UTC)
+            i.set(f.field_uri, value_to_xml_text(value))
+        return i
 
 
 @python_2_unicode_compatible
 class Folder(EWSElement):
-    __metaclass__ = EWSElement
-
     DISTINGUISHED_FOLDER_ID = None  # See https://msdn.microsoft.com/en-us/library/office/aa580808(v=exchg.150).aspx
     # Default item type for this folder. See http://msdn.microsoft.com/en-us/library/hh354773(v=exchg.80).aspx
     CONTAINER_CLASS = None
@@ -95,16 +85,13 @@ class Folder(EWSElement):
 
     def __init__(self, **kwargs):
         self.account = kwargs.pop('account', None)
-        for f in self.FIELDS:
-            setattr(self, f.name, kwargs.pop(f.name, None))
-        if kwargs:
-            raise TypeError("%s are invalid keyword arguments for this function" %
-                            ', '.join("'%s'" % k for k in kwargs.keys()))
+        super(Folder, self).__init__(**kwargs)
         if self.name is None:
             self.name = self.DISTINGUISHED_FOLDER_ID
         log.debug('%s created for %s', self, self.account)
 
     def clean(self):
+        super(Folder, self).clean()
         from .account import Account
         assert isinstance(self.account, Account)
         if not self.is_distinguished:
@@ -299,7 +286,7 @@ class Folder(EWSElement):
         return cls(folder_id=fld_id, changekey=changekey, **kwargs)
 
     def to_xml(self, version):
-        return FolderId(id=self.folder_id, changekey=self.changekey).to_xml(version=version)
+        return FolderId(self.folder_id, self.changekey).to_xml(version=version)
 
     def get_folders(self, shape=IdOnly, depth=DEEP):
         # 'depth' controls whether to return direct children or recurse into sub-folders

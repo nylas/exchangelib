@@ -1,10 +1,10 @@
+import abc
 import logging
 from decimal import Decimal
 
 from six import string_types
 
 from .ewsdatetime import EWSDateTime
-from .extended_properties import ExtendedProperty
 from .services import TNS
 from .util import create_element, get_xml_attrs, set_xml_value, value_to_xml_text, xml_text_to_value
 
@@ -16,6 +16,8 @@ class Field(object):
     """
     Holds information related to an item field
     """
+    __metaclass__ = abc.ABCMeta
+
     def __init__(self, name, value_cls, from_version=None, choices=None, default=None, is_list=False,
                  is_complex=False, is_required=False, is_required_after_save=False, is_read_only=False,
                  is_read_only_after_send=False):
@@ -49,10 +51,6 @@ class Field(object):
             if self.is_list and self.value_cls == Attachment:
                 return []
             return self.default
-        if self.value_cls == EWSDateTime and not getattr(value, 'tzinfo'):
-            raise ValueError("Field '%s' must be timezone aware" % self.name)
-        if self.value_cls == Choice and value not in self.choices:
-            raise ValueError("Field '%s' value '%s' is not a valid choice (%s)" % (self.name, value, self.choices))
 
         # For value_cls that are subclasses of string types, convert simple string values to their subclass equivalent
         # (e.g. str to Body and str to Subject) so we can call value.clean()
@@ -87,6 +85,11 @@ class Field(object):
                 raise ValueError("Field '%s' value '%s' must be of type %s" % (self.name, value, self.value_cls))
             if hasattr(value, 'clean'):
                 value.clean()
+
+        if self.value_cls == EWSDateTime and not getattr(value, 'tzinfo'):
+            raise ValueError("Field '%s' must be timezone aware" % self.name)
+        if self.value_cls == Choice and value not in self.choices:
+            raise ValueError("Field '%s' value '%s' is not a valid choice (%s)" % (self.name, value, self.choices))
         return value
 
     def from_xml(self, elem):
@@ -112,8 +115,8 @@ class Field(object):
             else:
                 assert False, 'Field %s type %s not supported' % (self.name, self.value_cls)
         else:
-            field_elem = elem.find(self.response_tag())
             if issubclass(self.value_cls, (bool, int, Decimal, bytes, string_type, EWSDateTime)):
+                field_elem = elem.find(self.response_tag())
                 val = None if field_elem is None else field_elem.text or None
                 if val is not None:
                     if issubclass(self.value_cls, EWSDateTime) and not val.endswith('Z'):
@@ -139,11 +142,15 @@ class Field(object):
                         return val.b64decode()
                     return val
             elif issubclass(self.value_cls, EWSElement):
-                sub_elem = elem.find(self.response_tag())
+                if self.field_uri is None:
+                    assert issubclass(self.value_cls, EWSElement)
+                    sub_elem = elem.find(self.value_cls.response_tag())
+                else:
+                    sub_elem = elem.find(self.response_tag())
                 if sub_elem is not None:
-                    if self.value_cls == Mailbox:
+                    if self.value_cls == Mailbox and self.field_uri is not None:
                         # We want the nested Mailbox, not the wrapper element
-                        return self.value_cls.from_xml(elem=sub_elem.find(Mailbox.response_tag()))
+                        return self.value_cls.from_xml(elem=sub_elem.find(self.value_cls.response_tag()))
                     else:
                         return self.value_cls.from_xml(elem=sub_elem)
             else:
@@ -174,18 +181,22 @@ class Field(object):
 
 class SimpleField(Field):
     def __init__(self, *args, **kwargs):
-        field_uri = kwargs.pop('field_uri')
+        self.field_uri = kwargs.pop('field_uri', None)
         super(SimpleField, self).__init__(*args, **kwargs)
         # See all valid FieldURI values at https://msdn.microsoft.com/en-us/library/office/aa494315(v=exchg.150).aspx
-        # field_uri_prefix is the prefix part of the FieldURI.
-        self.field_uri = field_uri
-        if ':' in field_uri:
-            self.field_uri_prefix, self.field_uri_postfix = field_uri.split(':')
+        # field_uri_prefix is the prefix part of the FieldURI, when the FieldURI points to an item field.
+        if self.field_uri is None:
+            self.field_uri_prefix, self.field_uri_postfix = None, None
+        elif ':' in self.field_uri:
+            self.field_uri_prefix, self.field_uri_postfix = self.field_uri.split(':')
         else:
-            self.field_uri_prefix, self.field_uri_postfix = None, field_uri
+            self.field_uri_prefix, self.field_uri_postfix = None, self.field_uri
 
     def to_xml(self, value, version):
-        from .properties import Body, HTMLBody, Content
+        from .properties import Body, HTMLBody, Content, EWSElement
+        if self.field_uri is None:
+            assert issubclass(self.value_cls, EWSElement)
+            return value.to_xml(version=version)
         field_elem = create_element(self.request_tag())
         if issubclass(self.value_cls, Body):
             body_type = {
@@ -198,12 +209,15 @@ class SimpleField(Field):
         return set_xml_value(field_elem, value, version=version)
 
     def field_uri_xml(self):
+        assert self.field_uri, self.name
         return create_element('t:FieldURI', FieldURI=self.field_uri)
 
     def request_tag(self):
+        assert self.field_uri_postfix, self.name
         return 't:%s' % self.field_uri_postfix
 
     def response_tag(self):
+        assert self.field_uri_postfix, self.name
         return '{%s}%s' % (TNS, self.field_uri_postfix)
 
     def __hash__(self):
@@ -267,6 +281,7 @@ class PhysicalAddressField(IndexedField):
 
 class ExtendedPropertyField(Field):
     def __init__(self, *args, **kwargs):
+        from .extended_properties import ExtendedProperty
         super(ExtendedPropertyField, self).__init__(*args, **kwargs)
         assert issubclass(self.value_cls, ExtendedProperty)
 
@@ -323,11 +338,7 @@ class LabelField(SimpleField):
         return elem.get(self.field_uri)
 
 
-class SubField(SimpleField):
-    def __init__(self, *args, **kwargs):
-        kwargs['field_uri'] = ''
-        super(SubField, self).__init__(*args, **kwargs)
-
+class SubField(Field):
     def from_xml(self, elem):
         return elem.text
 
