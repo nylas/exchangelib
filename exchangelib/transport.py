@@ -196,4 +196,7 @@ def _tokenize(val):
 def dummy_xml(version, name):
     # Generate a minimal, valid EWS request
     from .services import ResolveNames  # Avoid circular import
-    return wrap(content=ResolveNames(protocol=None)._get_payload(unresolved_entries=[name]), version=version)
+    return wrap(content=ResolveNames(protocol=None).get_payload(
+        unresolved_entries=[name],
+        return_full_contact_data=False
+    ), version=version)
