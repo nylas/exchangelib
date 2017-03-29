@@ -265,7 +265,7 @@ class QuerySet(object):
             if self._cache is not None:
                 return self._cache[idx]
             reverse_idx = -(idx+1)
-            return self.reverse()[reverse_idx]
+            return self.reverse()._getitem_idx(reverse_idx)
         else:
             if self._cache is None and idx < FindItem.CHUNKSIZE:
                 # Optimize a bit by setting self.page_size to only get as many items as strictly needed
