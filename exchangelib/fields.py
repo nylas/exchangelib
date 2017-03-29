@@ -301,11 +301,11 @@ class ExtendedPropertyField(Field):
         return elem
 
     def from_xml(self, elem):
-        extended_properties = elem.findall(self.response_tag())
+        extended_properties = elem.findall(self.value_cls.response_tag())
         return self.value_cls.from_xml(elems=extended_properties)
 
     def to_xml(self, value, version):
-        extended_property = create_element(self.request_tag())
+        extended_property = create_element(self.value_cls.request_tag())
         set_xml_value(extended_property, self.field_uri_xml(), version=version)
         if isinstance(value, self.value_cls):
             set_xml_value(extended_property, value, version=version)
@@ -313,13 +313,6 @@ class ExtendedPropertyField(Field):
             # Allow keeping ExtendedProperty field values as their simple Python type
             set_xml_value(extended_property, self.value_cls(value), version=version)
         return extended_property
-
-    def request_tag(self):
-        return 't:%s' % ExtendedProperty.ELEMENT_NAME
-
-    @classmethod
-    def response_tag(cls):
-        return '{%s}%s' % (TNS, ExtendedProperty.ELEMENT_NAME)
 
     def __hash__(self):
         return hash(self.name)

@@ -13,6 +13,7 @@ from .queryset import QuerySet
 from .restriction import Restriction
 from .services import IdOnly, FindFolder, GetFolder, FindItem, SHALLOW, DEEP, ITEM_TRAVERSAL_CHOICES, \
     FOLDER_TRAVERSAL_CHOICES, SHAPE_CHOICES
+from .transport import MNS
 from .util import create_element, value_to_xml_text
 
 string_type = string_types[0]
@@ -23,7 +24,7 @@ class FolderId(ItemId):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa579461(v=exchg.150).aspx
     ELEMENT_NAME = 'FolderId'
 
-    __slots__ = ('id', 'changekey')
+    __slots__ = ItemId.__slots__
 
 
 class CalendarView(EWSElement):
@@ -31,6 +32,7 @@ class CalendarView(EWSElement):
     MSDN: https://msdn.microsoft.com/en-US/library/office/aa564515%28v=exchg.150%29.aspx
     """
     ELEMENT_NAME = 'CalendarView'
+    NAMESPACE = MNS
 
     __slots__ = ('start', 'end', 'max_items')
 
@@ -56,10 +58,6 @@ class CalendarView(EWSElement):
                 raise ValueError("'max_items' must be an int")
             if self.max_items < 1:
                 raise ValueError("'max_items' must be a positive integer")
-
-    @classmethod
-    def request_tag(cls):
-        return 'm:%s' % cls.ELEMENT_NAME
 
     def to_xml(self, version):
         self.clean()

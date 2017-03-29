@@ -81,6 +81,7 @@ class EWSElement(object):
 
     ELEMENT_NAME = None
     FIELDS = tuple()
+    NAMESPACE = TNS  # Either TNS or MNS
 
     __slots__ = tuple()
 
@@ -99,11 +100,14 @@ class EWSElement(object):
 
     @classmethod
     def request_tag(cls):
-        return 't:%s' % cls.ELEMENT_NAME
+        return {
+            TNS: 't:%s' % cls.ELEMENT_NAME,
+            MNS: 'm:%s' % cls.ELEMENT_NAME,
+        }[cls.NAMESPACE]
 
     @classmethod
     def response_tag(cls):
-        return '{%s}%s' % (TNS, cls.ELEMENT_NAME)
+        return '{%s}%s' % (cls.NAMESPACE, cls.ELEMENT_NAME)
 
     @classmethod
     def get_field_by_fieldname(cls, fieldname):
@@ -216,29 +220,20 @@ class ItemId(EWSElement):
 class ParentItemId(ItemId):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa563720(v=exchg.150).aspx
     ELEMENT_NAME = 'ParentItemId'
+    NAMESPACE = MNS
 
-    __slots__ = ('id', 'changekey')
-
-    @classmethod
-    def request_tag(cls):
-        return 'm:%s' % cls.ELEMENT_NAME
+    __slots__ = ItemId.__slots__
 
 
 class RootItemId(ItemId):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/bb204277(v=exchg.150).aspx
     ELEMENT_NAME = 'RootItemId'
+    NAMESPACE = MNS
+
     ID_ATTR = 'RootItemId'
     CHANGEKEY_ATTR = 'RootItemChangeKey'
 
-    __slots__ = ('id', 'changekey')
-
-    @classmethod
-    def request_tag(cls):
-        return 'm:%s' % cls.ELEMENT_NAME
-
-    @classmethod
-    def response_tag(cls):
-        return '{%s}%s' % (MNS, cls.ELEMENT_NAME)
+    __slots__ = ItemId.__slots__
 
 
 class Mailbox(EWSElement):
@@ -355,17 +350,13 @@ class Attendee(EWSElement):
 class RoomList(Mailbox):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/dd899514(v=exchg.150).aspx
     ELEMENT_NAME = 'RoomList'
-    # In a GetRoomLists response, room lists are delivered as Address elements
-    # MSDN: https://msdn.microsoft.com/en-us/library/office/dd899404(v=exchg.150).aspx
-    RESPONSE_ELEMENT_NAME = 'Address'
-
-    @classmethod
-    def request_tag(cls):
-        return 'm:%s' % cls.ELEMENT_NAME
+    NAMESPACE = MNS
 
     @classmethod
     def response_tag(cls):
-        return '{%s}%s' % (TNS, cls.RESPONSE_ELEMENT_NAME)
+        # In a GetRoomLists response, room lists are delivered as Address elements
+        # MSDN: https://msdn.microsoft.com/en-us/library/office/dd899404(v=exchg.150).aspx
+        return '{%s}Address' % TNS
 
 
 class Room(Mailbox):
