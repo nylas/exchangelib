@@ -343,10 +343,14 @@ Allow redirects: %(allow_redirects)s
 Response time: %(response_time)s
 Status code: %(status_code)s
 Request headers: %(request_headers)s
-Response headers: %(response_headers)s'''
+Response headers: %(response_headers)s
+Request data: %(request_data)s'
+Response data: %(response_data)s'
+'''
     log_vals = dict(i=0, wait=0, timeout=timeout, session_id=session.session_id, thread_id=get_ident(),
                     auth=session.auth, url=url, response_time=None, status_code=None, request_headers=headers,
-                    response_headers=None, verify=verify, allow_redirects=allow_redirects)
+                    response_headers=None, verify=verify, allow_redirects=allow_redirects, request_data=data,
+                    response_data=None)
     try:
         while True:
             log.debug('Session %(session_id)s thread %(thread_id)s: retry %(i)s timeout %(timeout)s POST\'ing to '
@@ -367,9 +371,8 @@ Response headers: %(response_headers)s'''
             log_vals['status_code'] = r.status_code
             log_vals['request_headers'] = r.request.headers
             log_vals['response_headers'] = r.headers
+            log_vals['response_data'] = getattr(r, 'text')
             log.debug(log_msg, log_vals)
-            log.debug('Request data: %s', data)
-            log.debug('Response data: %s', getattr(r, 'text'))
             # The genericerrorpage.htm/internalerror.asp is ridiculous behaviour for random outages. Redirect to
             # '/internalsite/internalerror.asp' or '/internalsite/initparams.aspx' is caused by e.g. SSL certificate
             # f*ckups on the Exchange server.
@@ -425,13 +428,6 @@ Response headers: %(response_headers)s'''
         log_msg = '%(exc_cls)s: %(exc_msg)s\n' + log_msg
         log_vals['exc_cls'] = e.__class__.__name__
         log_vals['exc_msg'] = text_type(e)
-        log_msg += '\nRequest data: %(data)s'
-        log_vals['data'] = data
-        log_msg += '\nResponse data: %(text)s'
-        try:
-            log_vals['text'] = r.text
-        except (NameError, AttributeError):
-            log_vals['text'] = ''
         log.error(log_msg, log_vals)
         protocol.retire_session(session)
         raise
@@ -454,13 +450,6 @@ Response headers: %(response_headers)s'''
         if 'TimeoutException' in r.headers:
             raise r.headers['TimeoutException']
         # This could be anything. Let higher layers handle this
-        log_msg += '\nRequest data: %(data)s'
-        log_vals['data'] = data
-        log_msg += '\nResponse data: %(text)s'
-        try:
-            log_vals['text'] = r.text
-        except (NameError, AttributeError):
-            log_vals['text'] = ''
         raise TransportError('Unknown failure\n' + log_msg % log_vals)
     log.debug('Session %(session_id)s thread %(thread_id)s: Useful response from %(url)s', log_vals)
     return r, session
