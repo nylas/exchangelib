@@ -91,7 +91,6 @@ class Folder(EWSElement):
         SimpleField('unread_count', field_uri='folder:UnreadCount', value_cls=int),
         SimpleField('child_folder_count', field_uri='folder:ChildFolderCount', value_cls=int),
     )
-    FIELDS_MAP = {f.name: f for f in FIELDS}
 
     __slots__ = ('account', 'folder_id', 'changekey', 'name', 'folder_class', 'total_count', 'unread_count',
                  'child_folder_count')
@@ -164,7 +163,7 @@ class Folder(EWSElement):
     def get_item_field_by_fieldname(cls, fieldname):
         for item_model in cls.supported_item_models:
             try:
-                return item_model.FIELDS_MAP[fieldname]
+                return item_model.get_field_by_fieldname(fieldname)
             except KeyError:
                 pass
         raise ValueError("Unknown fieldname '%s' on class '%s'" % (fieldname, cls.__name__))

@@ -15,8 +15,6 @@ class IndexedElement(EWSElement):
 
     LABELS = set()
     LABEL_FIELD = None
-    FIELDS = tuple()
-    FIELDS_MAP = {f.name: f for f in FIELDS}
 
     __slots__ = ('label',)
 
@@ -65,7 +63,6 @@ class EmailAddress(SingleFieldIndexedElement):
     FIELDS = (
         EmailSubField('email', value_cls=string_type),
     )
-    FIELDS_MAP = {f.name: f for f in FIELDS}
 
     __slots__ = ('label', 'email')
 
@@ -82,7 +79,6 @@ class PhoneNumber(SingleFieldIndexedElement):
     FIELDS = (
         SubField('phone_number', value_cls=string_type),
     )
-    FIELDS_MAP = {f.name: f for f in FIELDS}
 
     __slots__ = ('label', 'phone_number')
 
@@ -123,7 +119,6 @@ class PhysicalAddress(MultiFieldIndexedElement):
         SimpleField('country', field_uri='CountryOrRegion', value_cls=string_type),
         SimpleField('zipcode', field_uri='PostalCode', value_cls=string_type),
     )
-    FIELDS_MAP = {f.name: f for f in FIELDS}
 
     __slots__ = ('label', 'street', 'city', 'state', 'country', 'zipcode')
 

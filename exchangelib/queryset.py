@@ -62,7 +62,7 @@ class OrderField(object):
                 if not subfield:
                     raise ValueError("IndexedField order_by() value '%s' must specify subfield, e.g. "
                                      "'physical_addresses__Business__zipcode'" % s)
-                subfield = field.value_cls.FIELDS_MAP[subfield]
+                subfield = field.value_cls.get_field_by_fieldname(subfield)
             if issubclass(field.value_cls, SingleFieldIndexedElement) and subfield:
                 raise ValueError("IndexedField order_by() value '%s' must not specify subfield, e.g. just "
                                  "'email_addresses__EmailAddress1'" % s)

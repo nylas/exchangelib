@@ -105,6 +105,30 @@ class EWSElement(object):
     def response_tag(cls):
         return '{%s}%s' % (TNS, cls.ELEMENT_NAME)
 
+    @classmethod
+    def get_field_by_fieldname(cls, fieldname):
+        if not hasattr(cls, '_fields_map'):
+            cls._fields_map = {f.name: f for f in cls.FIELDS}
+        return cls._fields_map[fieldname]
+
+    @classmethod
+    def add_field(cls, field, idx):
+        # Insert a new field at the preferred place in the tuple and invalidate the fieldname cache
+        cls.FIELDS = cls.FIELDS[0:idx] + (field,) + cls.FIELDS[idx:]
+        try:
+            delattr(cls, '_fields_map')
+        except AttributeError:
+            pass
+
+    @classmethod
+    def remove_field(cls, field):
+        # Remove the given field and invalidate the fieldname cache
+        cls.FIELDS = tuple(f for f in cls.FIELDS if f != field)
+        try:
+            delattr(cls, '_fields_map')
+        except AttributeError:
+            pass
+
     def __eq__(self, other):
         return hash(self) == hash(other)
 

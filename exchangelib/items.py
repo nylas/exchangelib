@@ -96,7 +96,6 @@ class Item(EWSElement):
         SimpleField('last_modified_name', field_uri='item:LastModifiedName', value_cls=string_type, is_read_only=True),
         SimpleField('last_modified_time', field_uri='item:LastModifiedTime', value_cls=EWSDateTime, is_read_only=True),
     )
-    FIELDS_MAP = {f.name: f for f in FIELDS}
 
     # We can't use __slots__ because we need to add extended properties dynamically
 
@@ -352,35 +351,34 @@ class Item(EWSElement):
         """
         Register a custom extended property in this item class so they can be accessed just like any other attribute
         """
-        if attr_name in cls.FIELDS_MAP:
+        try:
+            cls.get_field_by_fieldname(attr_name)
             raise AttributeError("%s' is already registered" % attr_name)
+        except KeyError:
+            pass
         if not issubclass(attr_cls, ExtendedProperty):
             raise ValueError("'%s' must be a subclass of ExtendedProperty" % attr_cls)
-        # Find the correct index for the extended property and insert the new field. See Item.FIELDS for comment
-        updated_item_fields = []
-        for f in cls.FIELDS:
-            updated_item_fields.append(f)
-            if f.name == 'reminder_is_set':
-                # This is a bit hacky and will need to change if we add new item fields after 'reminder_is_set'
-                updated_item_fields.append(ExtendedPropertyField(attr_name, value_cls=attr_cls))
-        cls.FIELDS = tuple(updated_item_fields)
-        # Rebuild map
-        cls.FIELDS_MAP = {f.name: f for f in cls.FIELDS}
+        # Find the correct index for the extended property and insert the new field. We insert after 'reminder_is_set'
+
+        # TODO: This is super hacky and will need to change if we add new item fields after 'reminder_is_set'
+        # ExtendedProperty actually goes in between <HasAttachments/><ExtendedProperty/><Culture/>
+        # See https://msdn.microsoft.com/en-us/library/office/aa580790(v=exchg.150).aspx
+        idx = tuple(f.name for f in cls.FIELDS).index('reminder_is_set') + 1
+        field = ExtendedPropertyField(attr_name, value_cls=attr_cls)
+        cls.add_field(field, idx=idx)
 
     @classmethod
     def deregister(cls, attr_name):
         """
         De-register an extended property that has been registered with register()
         """
-        # TODO: ExtendedProperty goes in between <HasAttachments/><ExtendedProperty/><Culture/>
-        # TODO: See https://msdn.microsoft.com/en-us/library/office/aa580790(v=exchg.150).aspx
-        if attr_name not in cls.FIELDS_MAP:
+        try:
+            field = cls.get_field_by_fieldname(attr_name)
+        except KeyError:
             raise AttributeError("%s' is not registered" % attr_name)
-        if not isinstance(cls.FIELDS_MAP[attr_name], ExtendedPropertyField):
+        if not isinstance(field, ExtendedPropertyField):
             raise AttributeError("'%s' is not registered as an ExtendedProperty" % attr_name)
-        cls.FIELDS = tuple(f for f in cls.FIELDS if f.name != attr_name)
-        # Rebuild map
-        cls.FIELDS_MAP = {f.name: f for f in cls.FIELDS}
+        cls.remove_field(field)
 
     def __eq__(self, other):
         if isinstance(other, tuple):
@@ -413,7 +411,6 @@ class BulkCreateResult(Item):
         SimpleField('attachments', field_uri='item:Attachments', value_cls=Attachment, default=(), is_list=True,
                     is_complex=True),  # ItemAttachment or FileAttachment
     )
-    FIELDS_MAP = {f.name: f for f in FIELDS}
 
     __slots__ = ('item_id', 'changekey', 'attachments')
 
@@ -445,7 +442,6 @@ class CalendarItem(Item):
         SimpleField('optional_attendees', field_uri='calendar:OptionalAttendees', value_cls=Attendee, is_list=True),
         SimpleField('resources', field_uri='calendar:Resources', value_cls=Attendee, is_list=True),
     )
-    FIELDS_MAP = {f.name: f for f in FIELDS}
 
     def to_xml(self, version):
         # WARNING: The order of addition of XML elements is VERY important. Exchange expects XML elements in a
@@ -486,7 +482,6 @@ class Message(Item):
         SimpleField('message_id', field_uri='message:InternetMessageId', value_cls=string_type, is_read_only=True,
                     is_read_only_after_send=True),
     )
-    FIELDS_MAP = {f.name: f for f in FIELDS}
 
     def send(self, save_copy=True, copy_to_folder=None, conflict_resolution=AUTO_RESOLVE,
              send_meeting_invitations=SEND_TO_NONE):
@@ -568,7 +563,6 @@ class Task(Item):
         SimpleField('status_description', field_uri='task:StatusDescription', value_cls=string_type, is_read_only=True),
         SimpleField('total_work', field_uri='task:TotalWork', value_cls=int),
     )
-    FIELDS_MAP = {f.name: f for f in FIELDS}
 
     def clean(self):
         super(Task, self).clean()
@@ -644,7 +638,6 @@ class Contact(Item):
         # SimpleField('email_alias', field_uri='contacts:Alias', , value_cls=Email),
         # SimpleField('notes', field_uri='contacts:Notes', value_cls=string_type),  # Only available from Exchange 2010 SP2
     )
-    FIELDS_MAP = {f.name: f for f in FIELDS}
 
 
 class MeetingRequest(Item):
@@ -659,7 +652,6 @@ class MeetingRequest(Item):
         SimpleField('start', field_uri='calendar:Start', value_cls=EWSDateTime, is_read_only=True),
         SimpleField('end', field_uri='calendar:End', value_cls=EWSDateTime, is_read_only=True),
     )
-    FIELDS_MAP = {f.name: f for f in FIELDS}
 
 
 class MeetingResponse(Item):
@@ -674,7 +666,6 @@ class MeetingResponse(Item):
         SimpleField('start', field_uri='calendar:Start', value_cls=EWSDateTime, is_read_only=True),
         SimpleField('end', field_uri='calendar:End', value_cls=EWSDateTime, is_read_only=True),
     )
-    FIELDS_MAP = {f.name: f for f in FIELDS}
 
 
 class MeetingCancellation(Item):
@@ -689,7 +680,6 @@ class MeetingCancellation(Item):
         SimpleField('start', field_uri='calendar:Start', value_cls=EWSDateTime, is_read_only=True),
         SimpleField('end', field_uri='calendar:End', value_cls=EWSDateTime, is_read_only=True),
     )
-    FIELDS_MAP = {f.name: f for f in FIELDS}
 
 
 ITEM_CLASSES = (CalendarItem, Contact, Message, Task, MeetingRequest, MeetingResponse, MeetingCancellation)

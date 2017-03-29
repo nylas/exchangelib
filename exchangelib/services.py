@@ -614,7 +614,7 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
         meeting_timezone_added = False
         for fieldname in fieldnames:
             try:
-                field = item_model.FIELDS_MAP[fieldname]
+                field = item_model.get_field_by_fieldname(fieldname)
             except KeyError:
                 raise ValueError("'%s' is not a valid field on '%s'" % (fieldname, item_model))
             if field.is_read_only:
