@@ -137,7 +137,7 @@ class Q(object):
             self.children.append(self.__class__(**{key: value}))
 
         if len(self.children) == 1 and self.fieldname is None and self.conn_type != self.NOT:
-            # We only have one child and no expression on ourselves, so we are a no-op. Take over the child values
+            # We only have one child and no expression on ourselves, so we are a no-op. Flatten by taking over the child
             q = self.children[0]
             self.conn_type = q.conn_type
             self.fieldname = q.fieldname
@@ -265,23 +265,17 @@ class Q(object):
             return None
         if self.is_leaf():
             expr = '%s %s %s' % (self.fieldname, self.op, repr(self.value))
-        elif len(self.children) == 1:
-            # Flatten the tree a bit
-            expr = self.children[0].expr()
         else:
             # Sort children by field name so we get stable output (for easier testing). Children should never be empty.
             expr = (' %s ' % (self.AND if self.conn_type == self.NOT else self.conn_type)).join(
                 (c.expr() if c.is_leaf() or c.conn_type == self.NOT else '(%s)' % c.expr())
                 for c in sorted(self.children, key=lambda i: i.fieldname or '')
             )
-        if not expr:
-            return None  # Should not be necessary, but play safe
         if self.conn_type == self.NOT:
             # Add the NOT operator. Put children in parens if there is more than one child.
-            if self.is_leaf() or (len(self.children) == 1 and self.children[0].is_leaf()):
-                expr = self.conn_type + ' %s' % expr
-            else:
-                expr = self.conn_type + ' (%s)' % expr
+            if self.is_leaf() or len(self.children) == 1:
+                return self.conn_type + ' %s' % expr
+            return self.conn_type + ' (%s)' % expr
         return expr
 
     @staticmethod
@@ -308,9 +302,8 @@ class Q(object):
         return ElementTree(restriction).getroot()
 
     def xml_elem(self, folder_class):
-        # Return an XML tree structure of this Q object. First, remove any empty children. If conn_type is AND or OR and
-        # there is exactly one child, ignore the AND/OR and treat this node as a leaf. If this is an empty leaf
-        # (equivalent of Q()), return None.
+        # Recursively build an XML tree structure of this Q object. If this is an empty leaf (the equivalent of Q()),
+        # return None.
         from .fields import IndexedField
         if self.is_empty():
             return None
@@ -333,9 +326,6 @@ class Q(object):
                     uriorconst = create_element('t:FieldURIOrConstant')
                     uriorconst.append(constant)
                     elem.append(uriorconst)
-        elif len(self.children) == 1:
-            # Flatten the tree a bit
-            elem = self.children[0].xml_elem(folder_class=folder_class)
         else:
             # We have multiple children. If conn_type is NOT, then group children with AND. We'll add the NOT later
             elem = self._conn_to_xml(self.AND if self.conn_type == self.NOT else self.conn_type)
