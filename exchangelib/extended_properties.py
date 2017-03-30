@@ -68,7 +68,10 @@ class ExtendedProperty(EWSElement):
 
     __slots__ = ('value',)
 
-    def __init__(self, **kwargs):
+    def __init__(self, *args, **kwargs):
+        if not kwargs:
+            # Allow to set attributes without keyword
+            kwargs = dict(zip(self.__slots__, args))
         self.value = kwargs.pop('value')
         super(ExtendedProperty, self).__init__(**kwargs)
 

@@ -2432,6 +2432,10 @@ class BaseItemTest(EWSTest):
 
         # Before register
         self.assertNotIn(attr_name, self.ITEM_CLASS.fieldnames())
+        with self.assertRaises(ValueError):
+            self.ITEM_CLASS.deregister(attr_name)  # Not registered yet
+        with self.assertRaises(ValueError):
+            self.ITEM_CLASS.deregister('subject')  # Not an extended property
 
         self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=TestProp)
 
@@ -2453,6 +2457,10 @@ class BaseItemTest(EWSTest):
         self.assertEqual(new_prop_val, item.dead_beef)
 
         # Test deregister
+        with self.assertRaises(ValueError):
+            self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=TestProp)  # Already registered
+        with self.assertRaises(ValueError):
+            self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=Mailbox)  # Not an extended property
         self.ITEM_CLASS.deregister(attr_name=attr_name)
         self.assertNotIn(attr_name, self.ITEM_CLASS.fieldnames())
 

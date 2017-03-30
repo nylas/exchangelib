@@ -328,7 +328,7 @@ class Item(EWSElement):
         """
         try:
             cls.get_field_by_fieldname(attr_name)
-            raise AttributeError("%s' is already registered" % attr_name)
+            raise ValueError("%s' is already registered" % attr_name)
         except KeyError:
             pass
         if not issubclass(attr_cls, ExtendedProperty):
@@ -350,9 +350,9 @@ class Item(EWSElement):
         try:
             field = cls.get_field_by_fieldname(attr_name)
         except KeyError:
-            raise AttributeError("%s' is not registered" % attr_name)
+            raise ValueError("%s' is not registered" % attr_name)
         if not isinstance(field, ExtendedPropertyField):
-            raise AttributeError("'%s' is not registered as an ExtendedProperty" % attr_name)
+            raise ValueError("'%s' is not registered as an ExtendedProperty" % attr_name)
         cls.remove_field(field)
 
     def __eq__(self, other):
