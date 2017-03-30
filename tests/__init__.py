@@ -474,6 +474,11 @@ class EWSTest(unittest.TestCase):
 
     def random_val(self, field):
         if isinstance(field, ExtendedPropertyField):
+            if field.value_cls.is_array_type():
+                if field.value_cls.python_type() == string_type:
+                    return [get_random_string(255) for _ in range(random.randint(1, 4))]
+                if field.value_cls.python_type() == int:
+                    return [get_random_int(0, 256) for _ in range(random.randint(1, 4))]
             if field.value_cls.python_type() == string_type:
                 return get_random_string(255)
             if field.value_cls.python_type() == int:
@@ -2463,6 +2468,31 @@ class BaseItemTest(EWSTest):
             self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=Mailbox)  # Not an extended property
         self.ITEM_CLASS.deregister(attr_name=attr_name)
         self.assertNotIn(attr_name, self.ITEM_CLASS.fieldnames())
+
+    def extended_property_arraytype(self):
+        # Tests array type extended properties
+        class TestArayProp(ExtendedProperty):
+            property_set_id = 'deadcafe-beef-beef-beef-deadcafebeef'
+            property_name = 'Test Array Property'
+            property_type = 'IntegerArray'
+
+        attr_name = 'dead_beef_array'
+        self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=TestArayProp)
+
+        # Test item creation, refresh, and update
+        item = self.get_test_item(folder=self.test_folder)
+        prop_val = item.dead_beef_array
+        self.assertTrue(isinstance(prop_val, list))
+        item.save()
+        item = list(self.account.fetch(ids=[(item.item_id, item.changekey)]))[0]
+        self.assertEqual(prop_val, item.dead_beef_array)
+        new_prop_val = self.random_val(self.ITEM_CLASS.get_field_by_fieldname(attr_name))
+        item.dead_beef_array = new_prop_val
+        item.save()
+        item = list(self.account.fetch(ids=[(item.item_id, item.changekey)]))[0]
+        self.assertEqual(new_prop_val, item.dead_beef_array)
+
+        self.ITEM_CLASS.deregister(attr_name=attr_name)
 
     def test_file_attachments(self):
         item = self.get_test_item(folder=self.test_folder)

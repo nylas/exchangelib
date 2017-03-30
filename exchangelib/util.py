@@ -342,8 +342,8 @@ Response time: %(response_time)s
 Status code: %(status_code)s
 Request headers: %(request_headers)s
 Response headers: %(response_headers)s
-Request data: %(request_data)s'
-Response data: %(response_data)s'
+Request data: %(request_data)s
+Response data: %(response_data)s
 '''
     log_vals = dict(i=0, wait=0, timeout=timeout, session_id=session.session_id, thread_id=get_ident(),
                     auth=session.auth, url=url, verify=verify, allow_redirects=allow_redirects, response_time=None,
