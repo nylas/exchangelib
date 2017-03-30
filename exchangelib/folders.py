@@ -35,9 +35,9 @@ class CalendarView(EWSElement):
     NAMESPACE = MNS
 
     FIELDS = (
-        SimpleField('start', field_uri='StartDate', value_cls=EWSDateTime),
-        SimpleField('end', field_uri='EndDate', value_cls=EWSDateTime),
-        SimpleField('max_items', field_uri='MaxEntriesReturned', value_cls=int, is_required=False),
+        SimpleField('start', field_uri='StartDate', value_cls=EWSDateTime, is_required=True),
+        SimpleField('end', field_uri='EndDate', value_cls=EWSDateTime, is_required=True),
+        SimpleField('max_items', field_uri='MaxEntriesReturned', value_cls=int),
     )
 
     __slots__ = ('start', 'end', 'max_items')

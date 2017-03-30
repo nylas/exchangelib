@@ -2772,7 +2772,7 @@ class MessagesTest(BaseItemTest):
         item.save()
         for res in self.account.bulk_send(ids=[item]):
             self.assertEqual(res, True)
-        time.sleep(5)  # Requests are supposed to be transactional, but apparently not...
+        time.sleep(10)  # Requests are supposed to be transactional, but apparently not...
         # By default, sent items are placed in the sent folder
         ids = self.account.sent.filter(categories__contains=item.categories).values_list('item_id', 'changekey')
         self.assertEqual(len(ids), 1)
