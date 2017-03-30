@@ -8,7 +8,7 @@ import logging
 import re
 import socket
 import time
-from xml.etree.ElementTree import Element
+from xml.etree.ElementTree import Element, fromstring, ParseError
 
 from future.moves.urllib.parse import urlparse
 from future.utils import PY2
@@ -206,27 +206,25 @@ def add_xml_child(tree, name, value):
 
 
 def to_xml(text, encoding):
-    from xml.etree.ElementTree import fromstring, ParseError
     processed = text.lstrip(BOM).encode(encoding or 'utf-8')
     try:
         return fromstring(processed)
     except ParseError:
-        from io import BytesIO
         from lxml.etree import XMLParser, parse, tostring
         # Exchange servers may spit out the weirdest XML. lxml is pretty good at recovering from errors
         log.warning('Fallback to lxml processing of faulty XML')
         magical_parser = XMLParser(encoding=encoding or 'utf-8', recover=True)
-        root = parse(BytesIO(processed), magical_parser)
+        root = parse(io.BytesIO(processed), magical_parser)
         try:
             return fromstring(tostring(root))
         except ParseError as e:
-            line_no, col_no = e.lineno, e.offset
             try:
-                offending_line = processed.splitlines()[line_no - 1]
+                offending_line = processed.splitlines()[e.lineno - 1]
             except IndexError:
-                offending_line = ''
-            offending_excerpt = offending_line[max(0, col_no - 20):col_no + 20].decode('ascii', 'ignore')
-            raise ParseError('%s\nOffending text: [...]%s[...]' % (text_type(e), offending_excerpt))
+                raise ParseError('%s' % text_type(e))
+            else:
+                offending_excerpt = offending_line[max(0, e.offset - 20):e.offset + 20].decode('ascii', 'ignore')
+                raise ParseError('%s\nOffending text: [...]%s[...]' % (text_type(e), offending_excerpt))
         except TypeError:
             raise ParseError('This is not XML: %s' % text)
 
