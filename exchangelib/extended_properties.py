@@ -68,8 +68,9 @@ class ExtendedProperty(EWSElement):
 
     __slots__ = ('value',)
 
-    def __init__(self, value):
-        self.value = value
+    def __init__(self, **kwargs):
+        self.value = kwargs.pop('value')
+        super(ExtendedProperty, self).__init__(**kwargs)
 
     def clean(self):
         if self.distinguished_property_set_id:
@@ -97,6 +98,7 @@ class ExtendedProperty(EWSElement):
 
         python_type = self.python_type()
         if self.is_array_type():
+            assert isinstance(self.value, (tuple, list, set))
             for v in self.value:
                 assert isinstance(v, python_type)
         else:
