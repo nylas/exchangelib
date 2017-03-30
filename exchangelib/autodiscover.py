@@ -255,9 +255,9 @@ def _try_autodiscover(hostname, credentials, email, verify):
                     return _try_autodiscover(hostname=hostname_from_dns, credentials=credentials, email=email,
                                              verify=verify)
                 except AutoDiscoverFailed:
-                    hostname_from_dns = _get_hostname_from_srv(hostname='_autodiscover._tcp.%s' % hostname)
                     # Start over with new hostname
                     try:
+                        hostname_from_dns = _get_hostname_from_srv(hostname='_autodiscover._tcp.%s' % hostname)
                         return _try_autodiscover(hostname=hostname_from_dns, credentials=credentials, email=email,
                                                  verify=verify)
                     except AutoDiscoverFailed:
