@@ -356,8 +356,7 @@ class Account(object):
             # We accept generators, so it's not always convenient for caller to know up-front if 'ids' is empty. Allow
             # empty 'ids' and return early.
             return []
-        return list(SendItem(account=self).call(items=ids, save_item_to_folder=save_copy,
-                                                saved_item_folder=copy_to_folder))
+        return list(SendItem(account=self).call(items=ids, saved_item_folder=copy_to_folder))
 
     def bulk_move(self, ids, to_folder):
         # Move items to another folder. Returns new IDs for the items that were moved

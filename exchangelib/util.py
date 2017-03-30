@@ -172,14 +172,14 @@ def set_xml_value(elem, value, version):
             elif isinstance(v, string_types):
                 add_xml_child(elem, 't:String', v)
             else:
-                raise AttributeError('Unsupported type %s for list element %s on elem %s' % (type(v), v, elem))
+                raise ValueError('Unsupported type %s for list element %s on elem %s' % (type(v), v, elem))
     elif isinstance(value, EWSElement):
         assert version
         elem.append(value.to_xml(version=version))
     elif isinstance(value, ElementType):
         elem.append(value)
     else:
-        raise AttributeError('Unsupported type %s for value %s on elem %s' % (type(value), value, elem))
+        raise ValueError('Unsupported type %s for value %s on elem %s' % (type(value), value, elem))
     return elem
 
 

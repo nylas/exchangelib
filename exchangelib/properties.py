@@ -286,7 +286,7 @@ class Mailbox(EWSElement):
         super(Mailbox, self).clean()
         if not self.email_address and not self.item_id:
             # See "Remarks" section of https://msdn.microsoft.com/en-us/library/office/aa565036(v=exchg.150).aspx
-            raise AttributeError("Mailbox must have either 'email_address' or 'item_id' set")
+            raise ValueError("Mailbox must have either 'email_address' or 'item_id' set")
 
     def __hash__(self):
         # Exchange may add 'mailbox_type' and 'name' on insert. We're satisfied if the item_id or email address matches.

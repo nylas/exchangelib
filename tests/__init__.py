@@ -792,7 +792,7 @@ class CommonTest(EWSTest):
     def test_configuration(self):
         with self.assertRaises(AttributeError):
             Configuration(credentials=Credentials(username='foo', password='bar'))
-        with self.assertRaises(AttributeError):
+        with self.assertRaises(ValueError):
             Configuration(credentials=Credentials(username='foo', password='bar'),
                           service_endpoint='http://example.com/svc',
                           auth_type='XXX')
