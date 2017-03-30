@@ -20,9 +20,11 @@ from .errors import TransportError, RateLimitError, RedirectError, RelativeRedir
 
 if PY2:
     from thread import get_ident
+    time_func = time.time
 
 else:
     from threading import get_ident
+    time_func = time.monotonic
 
 
 log = logging.getLogger(__name__)
@@ -351,7 +353,7 @@ Response data: %(response_data)s
         while True:
             log.debug('Session %(session_id)s thread %(thread_id)s: retry %(i)s timeout %(timeout)s POST\'ing to '
                       '%(url)s after %(wait)s s wait', log_vals)
-            d1 = time.monotonic()
+            d1 = time_func()
             try:
                 r = session.post(url=url, headers=headers, data=data, allow_redirects=False, timeout=timeout,
                                  verify=verify)
@@ -362,7 +364,7 @@ Response data: %(response_data)s
                 r = DummyResponse()
                 r.request.headers = headers
                 r.headers = {'TimeoutException': e}
-            d2 = time.monotonic()
+            d2 = time_func()
             log_vals['response_time'] = d2 - d1
             log_vals['status_code'] = r.status_code
             log_vals['request_headers'] = r.request.headers
