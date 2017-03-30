@@ -57,12 +57,10 @@ class Q(object):
     LOOKUP_ISTARTSWITH = 'istartswith'
     LOOKUP_EXISTS = 'exists'
 
+    __slots__ = 'conn_type', 'fieldname', 'op', 'value', 'children'
+
     def __init__(self, *args, **kwargs):
-        if 'conn_type' in kwargs:
-            self.conn_type = kwargs.pop('conn_type')
-        else:
-            self.conn_type = self.AND
-        assert self.conn_type in self.CONN_TYPES
+        self.conn_type = kwargs.pop('conn_type', self.AND)
 
         self.fieldname = None  # Name of the field we want to filter on
         self.op = None
@@ -70,94 +68,47 @@ class Q(object):
 
         # Build children of Q objects from *args and **kwargs
         self.children = []
+
         for q in args:
             if not isinstance(q, self.__class__):
-                if isinstance(q, Restriction):
-                    q = q.q
-                else:
-                    raise AttributeError("'%s' must be a Q or Restriction instance" % q)
+                raise ValueError("Non-keyword arg '%s' must be a Q object" % q)
             if not q.is_empty():
                 self.children.append(q)
 
         for key, value in kwargs.items():
-            if value is None:
-                raise ValueError('Value for Q kwarg "%s" cannot be None' % key)
             if '__' in key:
                 fieldname, lookup = key.rsplit('__')
+                if lookup == self.LOOKUP_EXISTS:
+                    if value:
+                        self.children.append(self.__class__(**{key: True}))
+                    else:
+                        self.children.append(~self.__class__(**{key: True}))
+                    continue
+
                 if lookup == self.LOOKUP_RANGE:
                     # EWS doesn't have a 'range' operator. Emulate 'foo__range=(1, 2)' as 'foo__gte=1 and foo__lte=2'
                     # (both values inclusive).
                     if len(value) != 2:
-                        raise ValueError("Value of kwarg '%s' must have exactly 2 elements" % key)
+                        raise ValueError("Value of lookup '%s' must have exactly 2 elements" % key)
                     self.children.append(self.__class__(**{'%s__gte' % fieldname: value[0]}))
                     self.children.append(self.__class__(**{'%s__lte' % fieldname: value[1]}))
                     continue
+
                 if lookup == self.LOOKUP_IN:
-                    # EWS doesn't have an 'in' operator. Emulate 'foo in (1, 2, ...)' as 'foo==1 or foo==2 or ...'
-                    or_args = []
-                    for val in value:
-                        or_args.append(self.__class__(**{fieldname: val}))
-                    self.children.append(Q(*or_args, conn_type=self.OR))
+                    # Allow '__in' lookups on list and non-list field types, specifying a list
+                    if not isinstance(value, (tuple, list, set)):
+                        raise ValueError("Value for lookup '%s' must be a list" % key)
+                    children = [self.__class__(**{fieldname: v}) for v in value]
+                    self.children.append(self.__class__(*children, conn_type=self.OR))
                     continue
-                else:
-                    op = self._lookup_to_op(lookup)
-            else:
-                fieldname, op = key, self.EQ
 
-            assert op in self.OP_TYPES
-            try:
-                value_to_xml_text(value)
-            except ValueError:
-                raise ValueError('Value "%s" for filter kwarg "%s" is unsupported' % (value, key))
-            if len(args) == 0 and len(kwargs) == 1:
-                self.fieldname = fieldname
-                self.op = op
-                if isinstance(value, EWSDateTime):
-                    # We want to convert all values to UTC
-                    if not getattr(value, 'tzinfo'):
-                        raise ValueError("'%s' must be timezone aware" % fieldname)
-                    self.value = value.astimezone(UTC)
-                else:
-                    self.value = value
-            else:
-                self.children.append(Q(**{key: value}))
-
-    @classmethod
-    def from_filter_args(cls, folder_class, *args, **kwargs):
-        # args and kwargs are Django-style q args and field lookups
-        q = None
-        if args:
-            q_args = []
-            for arg in args:
-                if not isinstance(arg, Q):
-                    raise ValueError("Non-keyword arg '%s' must be a Q object" % arg)
-                q_args.append(arg)
-            # AND all the given Q objects together
-            q = functools.reduce(lambda a, b: a & b, q_args)
-        if kwargs:
-            kwargs_q = q or Q()
-            for key, value in kwargs.items():
-                if value is None:
-                    raise ValueError('Value for filter kwarg "%s" cannot be None' % key)
-                if '__' in key:
-                    fieldname, lookup = key.rsplit('__')
-                else:
-                    fieldname, lookup = key, None
-                field = folder_class.get_item_field_by_fieldname(fieldname)
-                cls._validate_field(field, folder_class)
-                if lookup == Q.LOOKUP_EXISTS:
-                    if value:
-                        kwargs_q &= Q(**{key: True})
-                    else:
-                        kwargs_q &= ~Q(**{key: True})
-                    continue
-                # Filtering by category is a bit quirky. The only lookup type I have found to work is:
+                # Filtering on list types is a bit quirky. The only lookup type I have found to work is:
                 #
                 #     item:Categories == 'foo' AND item:Categories == 'bar' AND ...
                 #
                 #     item:Categories == 'foo' OR item:Categories == 'bar' OR ...
                 #
-                # The former returns items that have these categories, but maybe also others. The latter returns
+                # The former returns items that have all these categories, but maybe also others. The latter returns
                 # items that have at least one of these categories. This translates to the 'contains' and 'in' lookups.
                 # Both versions are case-insensitive.
                 #
@@ -167,32 +118,58 @@ class Q(object):
                 # Exact matching of categories (i.e. match ['a', 'b'] but not ['a', 'b', 'c']) could be implemented by
                 # post-processing items. Fetch 'item:Categories' with additional_fields and remove the items that don't
                 # have an exact match, after the call to FindItems.
-                if field.is_list:
-                    if lookup not in (Q.LOOKUP_CONTAINS, Q.LOOKUP_IN):
-                        raise ValueError(
-                            "Field '%(field)s' can only be filtered using '%(field)s__contains=['a', 'b', ...]' or "
-                            "'%(field)s__in=['a', 'b', ...]' or '%(field)s__exists=True|False'" % dict(field=fieldname))
-                    if isinstance(value, (list, tuple, set)):
-                        children = [Q(**{fieldname: v}) for v in value]
-                        if lookup == Q.LOOKUP_CONTAINS:
-                            kwargs_q &= Q(*children, conn_type=Q.AND)
-                        elif lookup == Q.LOOKUP_IN:
-                            kwargs_q &= Q(*children, conn_type=Q.OR)
-                        else:
-                            assert False
-                    else:
-                        kwargs_q &= Q(**{fieldname: value})
+                if lookup == self.LOOKUP_CONTAINS and isinstance(value, (tuple, list, set)):
+                    # '__contains' lookups on list field types
+                    children = [self.__class__(**{fieldname: v}) for v in value]
+                    self.children.append(self.__class__(*children, conn_type=self.AND))
                     continue
-                if lookup == Q.LOOKUP_IN and isinstance(value, (list, tuple, set)):
-                    # Allow '__in' lookup on non-list field types, specifying a list or a simple value
-                    children = [Q(**{fieldname: v}) for v in value]
-                    kwargs_q &= Q(*children, conn_type=Q.OR)
-                    continue
-                if isinstance(value, (list, tuple, set)) and lookup != Q.LOOKUP_RANGE:
-                    raise ValueError('Value for filter kwarg "%s" must be a single value' % key)
-                kwargs_q &= Q(**{key: value})
-            q = kwargs_q
-        return q
+                op = self._lookup_to_op(lookup)
+            else:
+                fieldname, op = key, self.EQ
+
+            if len(args) == 0 and len(kwargs) == 1:
+                # This is a single-kwarg Q object with a lookup that requires a single value. Make this a leaf
+                self.fieldname = fieldname
+                self.op = op
+                self.value = value
+                break
+
+            self.children.append(self.__class__(**{key: value}))
+
+        if len(self.children) == 1 and self.fieldname is None and self.conn_type != self.NOT:
+            # We only have one child and no expression on ourselves, so we are a no-op. Take over the child values
+            q = self.children[0]
+            self.conn_type = q.conn_type
+            self.fieldname = q.fieldname
+            self.op = q.op
+            self.value = q.value
+            self.children = q.children
+
+        self.clean()
+
+    def clean(self):
+        # Validate the value
+        if self.is_empty():
+            return
+        assert self.conn_type in self.CONN_TYPES
+        if not self.is_leaf():
+            return
+        assert self.fieldname
+        assert self.op in self.OP_TYPES
+        if self.value is None:
+            raise ValueError('Value for filter on field "%s" cannot be None' % self.fieldname)
+        if isinstance(self.value, (tuple, list, set)):
+            raise ValueError('Value for filter on field "%s" must be a single value' % self.fieldname)
+        try:
+            value_to_xml_text(self.value)
+        except ValueError:
+            raise ValueError('Value "%s" for filter in field "%s" is unsupported' % (self.value, self.fieldname))
+        if isinstance(self.value, EWSDateTime):
+            # We want to convert all values to UTC
+            if not getattr(self.value, 'tzinfo'):
+                self.value.astimezone()
+                raise ValueError("'%s' must be timezone aware" % self.fieldname)
+            self.value = self.value.astimezone(UTC)
 
     @classmethod
     def _lookup_to_op(cls, lookup):
@@ -287,7 +264,6 @@ class Q(object):
         if self.is_empty():
             return None
         if self.is_leaf():
-            assert self.fieldname and self.op and self.value is not None
             expr = '%s %s %s' % (self.fieldname, self.op, repr(self.value))
         elif len(self.children) == 1:
             # Flatten the tree a bit
@@ -339,7 +315,6 @@ class Q(object):
         if self.is_empty():
             return None
         if self.is_leaf():
-            assert self.fieldname and self.op and self.value is not None
             elem = self._op_to_xml(self.op)
             field = folder_class.get_item_field_by_fieldname(self.fieldname)
             self._validate_field(field=field, folder_class=folder_class)

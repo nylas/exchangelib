@@ -23,7 +23,7 @@ from exchangelib.credentials import DELEGATE, IMPERSONATION, Credentials, Servic
 from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalidOperation, AutoDiscoverRedirect, \
     AutoDiscoverCircularRedirect, AutoDiscoverFailed, ErrorNonExistentMailbox, UnknownTimeZone, \
     ErrorNameResolutionNoResults, TransportError, RedirectError, CASError, RateLimitError, UnauthorizedError, \
-    ErrorInvalidChangeKey, ErrorInvalidIdMalformed, SOAPError
+    ErrorInvalidChangeKey, ErrorInvalidIdMalformed, ErrorContainsFilterWrongType, SOAPError
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.extended_properties import ExtendedProperty
 from exchangelib.fields import ExtendedPropertyField
@@ -257,8 +257,8 @@ class RestrictionTest(unittest.TestCase):
         )
         # Test simulated IN expression
         in_q = Q(foo__in=[1, 2, 3])
-        self.assertEqual(in_q.children[0].conn_type, Q.OR)
-        self.assertEqual(len(in_q.children[0].children), 3)
+        self.assertEqual(in_q.conn_type, Q.OR)
+        self.assertEqual(len(in_q.children), 3)
 
     def test_q_inversion(self):
         self.assertEqual((~Q(foo=5)).op, Q.NE)
@@ -1667,10 +1667,8 @@ class BaseItemTest(EWSTest):
         item = self.get_test_item(categories=['TestA', 'TestB'])
         ids = self.test_folder.bulk_create(items=[item])
         common_qs = self.test_folder.filter(subject=item.subject)  # Guard against other sumultaneous runs
-        self.assertEqual(
-            len(common_qs.filter(categories__contains='ci6xahH1')),  # Plain string
-            0
-        )
+        with self.assertRaises(ErrorContainsFilterWrongType):
+            len(common_qs.filter(categories__contains='ci6xahH1'))  # Plain string is not supported
         self.assertEqual(
             len(common_qs.filter(categories__contains=['ci6xahH1'])),  # Same, but as list
             0
@@ -1695,10 +1693,8 @@ class BaseItemTest(EWSTest):
             len(common_qs.filter(categories__contains=item.categories)),  # Exact match
             1
         )
-        self.assertEqual(
-            len(common_qs.filter(categories__in='ci6xahH1')),  # Plain string
-            0
-        )
+        with self.assertRaises(ValueError):
+            len(common_qs.filter(categories__in='ci6xahH1'))  # Plain string is not supported
         self.assertEqual(
             len(common_qs.filter(categories__in=['ci6xahH1'])),  # Same, but as list
             0

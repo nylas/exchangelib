@@ -29,6 +29,8 @@ HEAD
   commonly used classes have a shortcut in __init__.py
 * Added support for the ``exists`` lookup in filters, e.g. ``my_folder.filter(categories__exists=True|False)`` to filter
   on the existence of that field on items in the folder.
+* When filtering, ``foo__in=value`` now requires the value to be a list, and ``foo__contains`` requires the value to be
+  a list if the field itself is a list, e.g. ``categories__contains=['a', 'b']``.
 
 
 1.8.1

@@ -371,14 +371,14 @@ class QuerySet(object):
     def filter(self, *args, **kwargs):
         """ Return everything that matches these search criteria """
         new_qs = self.copy()
-        q = Q.from_filter_args(self.folder.__class__, *args, **kwargs) or Q()
+        q = Q(*args, **kwargs) or Q()
         new_qs.q = q if new_qs.q is None else new_qs.q & q
         return new_qs
 
     def exclude(self, *args, **kwargs):
         """ Return everything that does NOT match these search criteria """
         new_qs = self.copy()
-        q = ~Q.from_filter_args(self.folder.__class__, *args, **kwargs) or Q()
+        q = ~Q(*args, **kwargs) or Q()
         new_qs.q = q if new_qs.q is None else new_qs.q & q
         return new_qs
 
