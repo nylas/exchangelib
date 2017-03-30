@@ -360,7 +360,7 @@ class QuerySetTest(unittest.TestCase):
 
 class UtilTest(unittest.TestCase):
     def test_chunkify(self):
-        # Test list, tuple, set, range, map and generator
+        # Test tuple, list, set, range, map and generator
         seq = [1, 2, 3, 4, 5]
         self.assertEqual(list(chunkify(seq, chunksize=2)), [[1, 2], [3, 4], [5]])
 

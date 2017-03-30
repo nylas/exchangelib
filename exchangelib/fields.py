@@ -73,7 +73,7 @@ class Field(object):
                 value = Attendee(mailbox=Mailbox(email_address=value), response_type='Accept')
 
         if self.is_list:
-            if not isinstance(value, (tuple, list)):
+            if not isinstance(value, (tuple, list, set)):
                 raise ValueError("Field '%s' value '%s' must be a list" % (self.name, value))
             for v in value:
                 if not isinstance(v, self.value_cls):

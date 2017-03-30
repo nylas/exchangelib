@@ -43,7 +43,7 @@ def chunkify(iterable, chunksize):
     """
     from .queryset import QuerySet
     if hasattr(iterable, '__getitem__') and not isinstance(iterable, QuerySet):
-        # list, tuple. QuerySet has __getitem__ but that evaluates the entire query greedily. We don't want that here.
+        # tuple, list. QuerySet has __getitem__ but that evaluates the entire query greedily. We don't want that here.
         for i in range(0, len(iterable), chunksize):
             yield iterable[i:i + chunksize]
     else:
@@ -67,7 +67,7 @@ def peek(iterable):
     # QuerySet has __len__ but that evaluates the entire query greedily. We don't want that here. Instead, peek() should
     # be called on QuerySet.iterator()
     if hasattr(iterable, '__len__'):
-        # list, tuple, set
+        # tuple, list, set
         return len(iterable) == 0, iterable
     else:
         # generator
@@ -163,7 +163,7 @@ def set_xml_value(elem, value, version):
     from .ewsdatetime import EWSDateTime
     if isinstance(value, string_types + (bool, int, bytes, Decimal, EWSDateTime)):
         elem.text = value_to_xml_text(value)
-    elif isinstance(value, (tuple, list)):
+    elif isinstance(value, (tuple, list, set)):
         for v in value:
             if isinstance(v, EWSElement):
                 assert version
