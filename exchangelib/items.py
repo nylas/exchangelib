@@ -109,14 +109,15 @@ class Item(EWSElement):
         if self.folder is not None:
             assert isinstance(self.folder, Folder)
         super(Item, self).__init__(**kwargs)
-        if self.attachments is None:
+        if self.attachments:
+            for a in self.attachments:
+                if a.parent_item:
+                    assert a.parent_item is self  # An attachment cannot refer to 'self' in __init__
+                else:
+                    a.parent_item = self
+                self.attach(self.attachments)
+        else:
             self.attachments = []
-        for a in self.attachments:
-            if a.parent_item:
-                assert a.parent_item is self  # An attachment cannot refer to 'self' in __init__
-            else:
-                a.parent_item = self
-            self.attach(self.attachments)
 
     def save(self, update_fields=None, conflict_resolution=AUTO_RESOLVE, send_meeting_invitations=SEND_TO_NONE):
         if self.item_id:

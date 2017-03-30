@@ -549,8 +549,8 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
     SERVICE_NAME = 'UpdateItem'
     element_container_name = '{%s}Items' % MNS
 
-    def call(self, items, conflict_resolution, message_disposition,
-                     send_meeting_invitations_or_cancellations, suppress_read_receipts):
+    def call(self, items, conflict_resolution, message_disposition, send_meeting_invitations_or_cancellations,
+             suppress_read_receipts):
         return self._pool_requests(payload_func=self.get_payload, **dict(
             items=items,
             conflict_resolution=conflict_resolution,
@@ -669,8 +669,8 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
                 else:
                     log.warning("Skipping timezone for field '%s'", field.name)
 
-    def get_payload(self, items, conflict_resolution, message_disposition,
-                     send_meeting_invitations_or_cancellations, suppress_read_receipts):
+    def get_payload(self, items, conflict_resolution, message_disposition, send_meeting_invitations_or_cancellations,
+                    suppress_read_receipts):
         # Takes a list of (Item, fieldnames) tuples where 'Item' is a instance of a subclass of Item and 'fieldnames'
         # are the attribute names that were updated. Returns the XML for an UpdateItem call.
         # an UpdateItem request.
@@ -723,8 +723,7 @@ class DeleteItem(EWSAccountService, EWSPooledMixIn):
     SERVICE_NAME = 'DeleteItem'
     element_container_name = None  # DeleteItem doesn't return a response object, just status in XML attrs
 
-    def call(self, items, delete_type, send_meeting_cancellations, affected_task_occurrences,
-                     suppress_read_receipts):
+    def call(self, items, delete_type, send_meeting_cancellations, affected_task_occurrences, suppress_read_receipts):
         return self._pool_requests(payload_func=self.get_payload, **dict(
             items=items,
             delete_type=delete_type,
@@ -734,7 +733,7 @@ class DeleteItem(EWSAccountService, EWSPooledMixIn):
         ))
 
     def get_payload(self, items, delete_type, send_meeting_cancellations, affected_task_occurrences,
-                     suppress_read_receipts):
+                    suppress_read_receipts):
         # Takes a list of (item_id, changekey) tuples or Item objects and returns the XML for a DeleteItem request.
         from .folders import ItemId
         if self.account.version.build >= EXCHANGE_2013:

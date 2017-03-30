@@ -109,7 +109,10 @@ class Folder(EWSElement):
     def folder_cls_from_container_class(container_class):
         """Returns a reasonable folder class given a container class, e.g. 'IPF.Note'
         """
-        return {cls.CONTAINER_CLASS: cls for cls in (Calendar, Contacts, Messages, Tasks)}.get(container_class, Folder)
+        try:
+            return {cls.CONTAINER_CLASS: cls for cls in (Calendar, Contacts, Messages, Tasks)}[container_class]
+        except KeyError:
+            return Folder
 
     @staticmethod
     def folder_cls_from_folder_name(folder_name, locale):

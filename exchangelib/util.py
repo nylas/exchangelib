@@ -1,19 +1,18 @@
 from __future__ import unicode_literals
 
+from copy import deepcopy
+from decimal import Decimal
 import io
 import itertools
 import logging
 import re
 import socket
 import time
-from copy import deepcopy
-from datetime import datetime
-from decimal import Decimal
 from xml.etree.ElementTree import Element
 
-import requests.exceptions
 from future.moves.urllib.parse import urlparse
 from future.utils import PY2
+import requests.exceptions
 from six import text_type, string_types
 
 from .errors import TransportError, RateLimitError, RedirectError, RelativeRedirect, CASError, UnauthorizedError, \
@@ -327,7 +326,6 @@ def post_ratelimited(protocol, session, url, headers, data, timeout=None, verify
     The contract on sessions here is to return the session that ends up being used, or retiring the session if we
     intend to raise an exception. We give up on max_wait timeout, not number of retries
     """
-    r = None
     wait = 10  # seconds
     redirects = 0
     log_msg = '''\
@@ -348,14 +346,14 @@ Request data: %(request_data)s'
 Response data: %(response_data)s'
 '''
     log_vals = dict(i=0, wait=0, timeout=timeout, session_id=session.session_id, thread_id=get_ident(),
-                    auth=session.auth, url=url, response_time=None, status_code=None, request_headers=headers,
-                    response_headers=None, verify=verify, allow_redirects=allow_redirects, request_data=data,
+                    auth=session.auth, url=url, verify=verify, allow_redirects=allow_redirects, response_time=None,
+                    status_code=None, request_headers=headers, response_headers=None, request_data=data,
                     response_data=None)
     try:
         while True:
             log.debug('Session %(session_id)s thread %(thread_id)s: retry %(i)s timeout %(timeout)s POST\'ing to '
                       '%(url)s after %(wait)s s wait', log_vals)
-            d1 = datetime.now()
+            d1 = time.monotonic()
             try:
                 r = session.post(url=url, headers=headers, data=data, allow_redirects=False, timeout=timeout,
                                  verify=verify)
@@ -366,12 +364,12 @@ Response data: %(response_data)s'
                 r = DummyResponse()
                 r.request.headers = headers
                 r.headers = {'TimeoutException': e}
-            d2 = datetime.now()
-            log_vals['response_time'] = text_type(d2 - d1)
+            d2 = time.monotonic()
+            log_vals['response_time'] = d2 - d1
             log_vals['status_code'] = r.status_code
             log_vals['request_headers'] = r.request.headers
             log_vals['response_headers'] = r.headers
-            log_vals['response_data'] = getattr(r, 'text')
+            log_vals['response_data'] = getattr(r, 'text', '')
             log.debug(log_msg, log_vals)
             # The genericerrorpage.htm/internalerror.asp is ridiculous behaviour for random outages. Redirect to
             # '/internalsite/internalerror.asp' or '/internalsite/initparams.aspx' is caused by e.g. SSL certificate

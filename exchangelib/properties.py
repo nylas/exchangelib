@@ -7,7 +7,7 @@ from six import text_type, string_types
 from .ewsdatetime import EWSDateTime
 from .fields import SimpleField, SubField
 from .services import MNS, TNS
-from .util import  get_xml_attr, set_xml_value, create_element
+from .util import get_xml_attr, set_xml_value, create_element
 
 string_type = string_types[0]
 log = logging.getLogger(__name__)
