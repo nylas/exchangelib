@@ -1652,6 +1652,19 @@ class BaseItemTest(EWSTest):
             [True, True, True, True]
         )
 
+    def test_queryset_failure(self):
+        qs = QuerySet(self.test_folder).filter(categories__contains=self.categories)
+        with self.assertRaises(ValueError):
+            qs.order_by('XXX')
+        with self.assertRaises(ValueError):
+            qs.values('XXX')
+        with self.assertRaises(ValueError):
+            qs.values_list('XXX')
+        with self.assertRaises(ValueError):
+            qs.only('XXX')
+        with self.assertRaises(ValueError):
+            qs.reverse()  # We can't reverse when we haven't defined an order yet
+
     def test_order_by_failure(self):
         # Test error handling on indexed properties with labels and subfields
         if self.ITEM_CLASS == Contact:
