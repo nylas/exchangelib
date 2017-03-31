@@ -48,10 +48,10 @@ class Account(object):
         if autodiscover:
             if not credentials:
                 raise AttributeError('autodiscover requires credentials')
-            self.primary_smtp_address, self.protocol = discover(email=self.primary_smtp_address,
-                                                                credentials=credentials, verify_ssl=verify_ssl)
             if config:
                 raise AttributeError('config is ignored when autodiscover is active')
+            self.primary_smtp_address, self.protocol = discover(email=self.primary_smtp_address,
+                                                                credentials=credentials, verify_ssl=verify_ssl)
         else:
             if not config:
                 raise AttributeError('non-autodiscover requires a config')

@@ -51,6 +51,9 @@ class Field(object):
             if self.is_list and self.value_cls == Attachment:
                 return []
             return self.default
+        if self.is_required and issubclass(self.value_cls, string_types) and not value:
+            # Required string types cannot be set to the empty string
+            raise ValueError("'%s' must be a non-empty string" % self.name)
 
         # For value_cls that are subclasses of string types, convert simple string values to their subclass equivalent
         # (e.g. str to Body and str to Subject) so we can call value.clean()

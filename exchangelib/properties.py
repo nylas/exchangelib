@@ -204,8 +204,8 @@ class ItemId(EWSElement):
     ID_ATTR = 'Id'
     CHANGEKEY_ATTR = 'ChangeKey'
     FIELDS = (
-        SimpleField('id', field_uri=ID_ATTR, value_cls=string_type),
-        SimpleField('changekey', field_uri=CHANGEKEY_ATTR, value_cls=string_type),
+        SimpleField('id', field_uri=ID_ATTR, value_cls=string_type, is_required=True),
+        SimpleField('changekey', field_uri=CHANGEKEY_ATTR, value_cls=string_type, is_required=True),
     )
 
     __slots__ = ('id', 'changekey')
@@ -215,13 +215,6 @@ class ItemId(EWSElement):
             # Allow to set attributes without keyword
             kwargs = dict(zip(self.__slots__, args))
         super(ItemId, self).__init__(**kwargs)
-
-    def clean(self):
-        super(ItemId, self).clean()
-        if not self.id:
-            raise ValueError("id '%s' must be a non-empty string" % self.id)
-        if not self.changekey:
-            raise ValueError("changekey '%s' must be a non-empty string" % self.changekey)
 
     def to_xml(self, version):
         self.clean()
@@ -272,11 +265,11 @@ class Mailbox(EWSElement):
     MAILBOX_TYPES = {'Mailbox', 'PublicDL', 'PrivateDL', 'Contact', 'PublicFolder', 'Unknown', 'OneOff'}
 
     FIELDS = (
-        SimpleField('name', field_uri='Name', value_cls=string_type, is_required=False),
-        SimpleField('email_address', field_uri='EmailAddress', value_cls=string_type, is_required=False),
+        SimpleField('name', field_uri='Name', value_cls=string_type),
+        SimpleField('email_address', field_uri='EmailAddress', value_cls=string_type),
         SimpleField('mailbox_type', field_uri='MailboxType', value_cls=Choice, choices=MAILBOX_TYPES,
-                    default='Mailbox', is_required=False),
-        SimpleField('item_id', value_cls=ItemId, is_required=False),
+                    default='Mailbox'),
+        SimpleField('item_id', value_cls=ItemId),
         # There's also the 'RoutingType' element, but it's optional and must have value "SMTP"
     )
 
@@ -301,10 +294,10 @@ class Attendee(EWSElement):
     RESPONSE_TYPES = {'Unknown', 'Organizer', 'Tentative', 'Accept', 'Decline', 'NoResponseReceived'}
 
     FIELDS = (
-        SimpleField('mailbox', value_cls=Mailbox),
+        SimpleField('mailbox', value_cls=Mailbox, is_required=True),
         SimpleField('response_type', field_uri='ResponseType', value_cls=Choice, choices=RESPONSE_TYPES,
                     default='Unknown'),
-        SimpleField('last_response_time', field_uri='LastResponseTime', value_cls=EWSDateTime, is_required=False),
+        SimpleField('last_response_time', field_uri='LastResponseTime', value_cls=EWSDateTime),
     )
 
     __slots__ = ('mailbox', 'response_type', 'last_response_time')

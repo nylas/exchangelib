@@ -23,9 +23,9 @@ class AttachmentId(EWSElement):
     ROOT_ID_ATTR = 'RootItemId'
     ROOT_CHANGEKEY_ATTR = 'RootItemChangeKey'
     FIELDS = (
-        SimpleField('id', field_uri=ID_ATTR, value_cls=string_type),
-        SimpleField('root_id', field_uri=ROOT_ID_ATTR, value_cls=string_type, is_required=False),
-        SimpleField('root_changekey', field_uri=ROOT_CHANGEKEY_ATTR, value_cls=string_type, is_required=False),
+        SimpleField('id', field_uri=ID_ATTR, value_cls=string_type, is_required=True),
+        SimpleField('root_id', field_uri=ROOT_ID_ATTR, value_cls=string_type),
+        SimpleField('root_changekey', field_uri=ROOT_CHANGEKEY_ATTR, value_cls=string_type),
     )
 
     __slots__ = ('id', 'root_id', 'root_changekey')
