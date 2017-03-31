@@ -52,20 +52,31 @@ class OrderField(object):
     def from_string(cls, s, folder):
         from .fields import IndexedField
         from .indexed_properties import SingleFieldIndexedElement, MultiFieldIndexedElement
-        field, label, subfield, reverse = split_fieldname(s)
-        field = folder.get_item_field_by_fieldname(field)
+        fieldname, label, subfield, reverse = split_fieldname(s)
+        field = folder.get_item_field_by_fieldname(fieldname)
         if isinstance(field, IndexedField):
             if not label:
                 raise ValueError(
-                    "IndexedField order_by() value '%s' must specify label, e.g. 'email_addresses__EmailAddress1'" % s)
+                    "IndexedField order_by() value '%s' must specify label, e.g. '%s__%s'" % (
+                        s, fieldname, field.value_cls.LABEL_FIELD.default))
+            valid_labels = field.value_cls.LABELS
+            if label not in valid_labels:
+                raise ValueError(
+                    "Label '%s' on IndexedField order_by() value '%s' must be one of %s" % (
+                        label, s, ', '.join(valid_labels)))
             if issubclass(field.value_cls, MultiFieldIndexedElement):
                 if not subfield:
-                    raise ValueError("IndexedField order_by() value '%s' must specify subfield, e.g. "
-                                     "'physical_addresses__Business__zipcode'" % s)
-                subfield = field.value_cls.get_field_by_fieldname(subfield)
+                    raise ValueError("IndexedField order_by() value '%s' must specify subfield, e.g. %s__%s__%s" % (
+                        s, fieldname, label, field.value_cls.FIELDS[0].name))
+                try:
+                    subfield = field.value_cls.get_field_by_fieldname(subfield)
+                except KeyError:
+                    raise ValueError(
+                        "Subfield '%s' on IndexedField order_by() value '%s' must be one of %s" % (
+                            subfield, s, ', '.join(field.value_cls.fieldnames())))
             if issubclass(field.value_cls, SingleFieldIndexedElement) and subfield:
-                raise ValueError("IndexedField order_by() value '%s' must not specify subfield, e.g. just "
-                                 "'email_addresses__EmailAddress1'" % s)
+                raise ValueError("IndexedField order_by() value '%s' must not specify subfield, e.g. just %s__%s"% (
+                    s, fieldname, label))
         return cls(field=field, label=label, subfield=subfield, reverse=reverse)
 
     def __repr__(self):

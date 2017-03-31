@@ -1614,6 +1614,21 @@ class BaseItemTest(EWSTest):
             [True, True, True, True]
         )
 
+    def test_order_by_failure(self):
+        # Test error handling on indexed properties with labels and subfields
+        if self.ITEM_CLASS == Contact:
+            qs = QuerySet(self.test_folder).filter(categories__contains=self.categories)
+            with self.assertRaises(ValueError):
+                qs.order_by('email_addresses')  # Must have label
+            with self.assertRaises(ValueError):
+                qs.order_by('email_addresses__FOO')  # Must have a valid label
+            with self.assertRaises(ValueError):
+                qs.order_by('email_addresses__EmailAddress1__FOO')  # Must not have a subfield
+            with self.assertRaises(ValueError):
+                qs.order_by('physical_addresses__Business')  # Must have a subfield
+            with self.assertRaises(ValueError):
+                qs.order_by('physical_addresses__Business__FOO')  # Must have a valid subfield
+
     def test_order_by(self):
         # Test order_by() on normal field
         test_items = []

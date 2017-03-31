@@ -302,11 +302,6 @@ class Item(EWSElement):
                 self.attachments.remove(a)
 
     @classmethod
-    def fieldnames(cls):
-        # Return non-ID field names
-        return set(f.name for f in cls.FIELDS if f.name not in ('item_id', 'changekey'))
-
-    @classmethod
     def id_from_xml(cls, elem):
         id_elem = elem.find(ItemId.response_tag())
         if id_elem is None:

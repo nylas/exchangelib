@@ -133,6 +133,11 @@ class EWSElement(object):
         return '{%s}%s' % (cls.NAMESPACE, cls.ELEMENT_NAME)
 
     @classmethod
+    def fieldnames(cls):
+        # Return non-ID field names
+        return set(f.name for f in cls.FIELDS if f.name not in ('item_id', 'changekey'))
+
+    @classmethod
     def get_field_by_fieldname(cls, fieldname):
         if not hasattr(cls, '_fields_map'):
             cls._fields_map = {f.name: f for f in cls.FIELDS}
