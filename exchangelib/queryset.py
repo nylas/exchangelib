@@ -363,9 +363,10 @@ class QuerySet(object):
         return new_qs
 
     def none(self):
-        """ Return a query that is quaranteed to be empty  """
+        """ Return a query that is guaranteed to be empty  """
         new_qs = self.copy()
         new_qs.q = None
+        new_qs._cache = []
         return new_qs
 
     def filter(self, *args, **kwargs):

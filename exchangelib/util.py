@@ -64,9 +64,11 @@ def peek(iterable):
     Checks if an iterable is empty and returns status and the rewinded iterable
     """
     from .queryset import QuerySet
+    if isinstance(iterable, QuerySet):
+        # QuerySet has __len__ but that evaluates the entire query greedily. We don't want that here. Instead, peek()
+        # should be called on QuerySet.iterator()
+        raise ValueError('Cannot peek on a QuerySet')
     assert not isinstance(iterable, QuerySet)
-    # QuerySet has __len__ but that evaluates the entire query greedily. We don't want that here. Instead, peek() should
-    # be called on QuerySet.iterator()
     if hasattr(iterable, '__len__'):
         # tuple, list, set
         return len(iterable) == 0, iterable

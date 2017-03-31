@@ -271,9 +271,10 @@ class Account(object):
         if message_disposition == SEND_ONLY:
             raise ValueError('Cannot send-only existing objects. Use SendItem service instead')
         # bulk_update() on a queryset does not make sense because there would be no opportunity to alter the items. In
-        # fact, it could be dangerous if the queryset is contains an '.only()'. This would wipe out certain fields
+        # fact, it could be dangerous if the queryset contains an '.only()'. This would wipe out certain fields
         # entirely.
-        assert not isinstance(items, QuerySet)
+        if isinstance(items, QuerySet):
+            raise ValueError('Cannot bulk update on a queryset')
         log.debug(
             'Updating items for %s (conflict_resolution %s, message_disposition: %s, send_meeting_invitations: %s)',
             self,
