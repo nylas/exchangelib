@@ -89,7 +89,7 @@ class Attachment(EWSElement):
         # Adds this attachment to an item and updates the item_id and updated changekey on the parent item
         if self.attachment_id:
             raise ValueError('This attachment has already been created')
-        if not self.parent_item.account:
+        if not self.parent_item or not self.parent_item.account:
             raise ValueError('Parent item %s must have an account' % self.parent_item)
         items = list(
             i if isinstance(i, Exception) else self.from_xml(elem=i)
@@ -112,8 +112,8 @@ class Attachment(EWSElement):
         # Deletes an attachment remotely and returns the item_id and updated changekey of the parent item
         if not self.attachment_id:
             raise ValueError('This attachment has not been created')
-        if not self.parent_item:
-            raise ValueError('This attachment is not attached to an item')
+        if not self.parent_item or not self.parent_item.account:
+            raise ValueError('Parent item %s must have an account' % self.parent_item)
         items = list(
             i if isinstance(i, Exception) else RootItemId.from_xml(elem=i)
             for i in DeleteAttachment(account=self.parent_item.account).call(items=[self.attachment_id])

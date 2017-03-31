@@ -2657,6 +2657,29 @@ class BaseItemTest(EWSTest):
 
         self.ITEM_CLASS.deregister(attr_name=attr_name)
 
+    def test_attachment_failure(self):
+        att1 = FileAttachment(name='my_file_1.txt', content=u'Hello from unicode æøå'.encode('utf-8'))
+        att1.attachment_id = 'XXX'
+        with self.assertRaises(ValueError):
+            att1.attach()  # Cannot have an attachment ID
+        att1.attachment_id = None
+        with self.assertRaises(ValueError):
+            att1.attach()  # Must have a parent item
+        att1.parent_item = Item()
+        with self.assertRaises(ValueError):
+            att1.attach()  # Parent item must have an account
+        att1.parent_item = None
+        with self.assertRaises(ValueError):
+            att1.detach()  # Must have an attachment ID
+        att1.attachment_id = 'XXX'
+        with self.assertRaises(ValueError):
+            att1.attach()  # Must have a parent item
+        att1.parent_item = Item()
+        with self.assertRaises(ValueError):
+            att1.attach()  # Parent item must have an account
+        att1.parent_item = None
+        att1.attachment_id = None
+
     def test_file_attachments(self):
         item = self.get_test_item(folder=self.test_folder)
 
