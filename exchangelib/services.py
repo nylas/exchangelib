@@ -948,9 +948,7 @@ class SendItem(EWSAccountService):
             raise ValueError('"items" must not be empty')
         senditem.append(item_ids)
         if saved_item_folder:
-            saveditemfolderid = create_element('m:SavedItemFolderId')
-            saveditemfolderid.append(self._folder_elem(saveditemfolderid))
-            senditem.append(saveditemfolderid)
+            senditem.append(self._folder_elem(saved_item_folder))
         return senditem
 
 
