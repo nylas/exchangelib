@@ -1525,8 +1525,8 @@ class BaseItemTest(EWSTest):
         for i in range(4):
             item = self.get_test_item()
             item.subject = 'Item %s' % i
+            item.save()
             test_items.append(item)
-        self.test_folder.bulk_create(items=test_items)
         qs = QuerySet(self.test_folder).filter(categories__contains=self.categories)
         test_cat = self.categories[0]
         self.assertEqual(
@@ -1565,13 +1565,49 @@ class BaseItemTest(EWSTest):
             [(i.subject, i.categories[0]) for i in qs.order_by('subject').reverse()],
             [('Item 3', test_cat), ('Item 2', test_cat), ('Item 1', test_cat), ('Item 0', test_cat)]
         )
+        with self.assertRaises(ValueError):
+            list(qs.values([]))
         self.assertEqual(
             [i for i in qs.order_by('subject').values('subject')],
             [{'subject': 'Item 0'}, {'subject': 'Item 1'}, {'subject': 'Item 2'}, {'subject': 'Item 3'}]
         )
         self.assertEqual(
+            list(qs.order_by('subject').values('item_id')),
+            [{'item_id': i.item_id} for i in test_items]
+        )
+        self.assertEqual(
+            list(qs.order_by('subject').values('changekey')),
+            [{'changekey': i.changekey} for i in test_items]
+        )
+        self.assertEqual(
+            list(qs.order_by('subject').values('item_id', 'changekey')),
+            [{k: getattr(i, k) for k in ('item_id', 'changekey')} for i in test_items]
+        )
+        self.assertEqual(
             set(i for i in qs.values_list('subject')),
             {('Item 0',), ('Item 1',), ('Item 2',), ('Item 3',)}
+        )
+        self.assertEqual(
+            list(qs.order_by('subject').values_list('item_id')),
+            [(i.item_id,) for i in test_items]
+        )
+        self.assertEqual(
+            list(qs.order_by('subject').values_list('changekey')),
+            [(i.changekey,) for i in test_items]
+        )
+        self.assertEqual(
+            list(qs.order_by('subject').values_list('item_id', 'changekey')),
+            [(i.item_id, i.changekey) for i in test_items]
+        )
+        with self.assertRaises(ValueError):
+            list(qs.values_list('item_id', 'changekey', flat=True))
+        self.assertEqual(
+            list(qs.order_by('subject').values_list('item_id', flat=True)),
+            [i.item_id for i in test_items]
+        )
+        self.assertEqual(
+            list(qs.order_by('subject').values_list('changekey', flat=True)),
+            [i.changekey for i in test_items]
         )
         self.assertEqual(
             set(i for i in qs.values_list('subject', flat=True)),
