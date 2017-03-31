@@ -634,6 +634,7 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
                 log.warning('%s is a read-only field. Skipping', field.name)
                 continue
             value = getattr(item, field.name)
+            field.clean(value)  # Make sure the value is OK
 
             if value is None or (field.is_list and not value):
                 # A value of None or [] means we want to remove this field from the item
@@ -711,7 +712,6 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
             is_empty = False
             if not fieldnames:
                 raise ValueError('"fieldnames" must not be empty')
-            item.clean()
             itemchange = create_element('t:ItemChange')
             log.debug('Updating item %s values %s', item.item_id, fieldnames)
             set_xml_value(itemchange, ItemId(item.item_id, item.changekey), self.account.version)
