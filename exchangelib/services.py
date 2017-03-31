@@ -282,6 +282,17 @@ class EWSAccountService(EWSService):
         self.account = account
         super(EWSAccountService, self).__init__(protocol=account.protocol)
 
+    def _folder_elem(self, folder):
+        from .account import DELEGATE
+        from .properties import Mailbox
+        folder_elem = folder.to_xml(version=self.account.version)
+        if not folder.folder_id:
+            # Folder is referenced by distinguished name
+            if self.account.access_type == DELEGATE:
+                mailbox = Mailbox(email_address=self.account.primary_smtp_address)
+                set_xml_value(folder_elem, mailbox, self.account.version)
+        return folder_elem
+
 
 class EWSFolderService(EWSAccountService):
 
@@ -533,13 +544,7 @@ class CreateItem(EWSAccountService, EWSPooledMixIn):
         )
         if folder:
             saveditemfolderid = create_element('m:SavedItemFolderId')
-            folder_elem = folder.to_xml(version=self.account.version)
-            if not folder.folder_id:
-                # Folder is referenced by distinguished name
-                if self.account.access_type == DELEGATE:
-                    mailbox = Mailbox(email_address=self.account.primary_smtp_address)
-                    set_xml_value(folder_elem, mailbox, self.account.version)
-            saveditemfolderid.append(folder_elem)
+            saveditemfolderid.append(self._folder_elem(folder))
             createitem.append(saveditemfolderid)
         item_elems = []
         for item in items:
@@ -835,13 +840,7 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
             field_order.append(field_uri)
             add_xml_child(finditem, 'm:SortOrder', field_order)
         parentfolderids = create_element('m:ParentFolderIds')
-        folder_elem = self.folder.to_xml(version=self.account.version)
-        if not self.folder.folder_id:
-            # Folder is referenced by distinguished name
-            if self.account.access_type == DELEGATE:
-                mailbox = Mailbox(email_address=self.account.primary_smtp_address)
-                set_xml_value(folder_elem, mailbox, self.account.version)
-        parentfolderids.append(folder_elem)
+        parentfolderids.append(self._folder_elem(self.folder))
         finditem.append(parentfolderids)
         return finditem
 
@@ -882,13 +881,7 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
         else:
             assert offset == 0, 'Offset is %s' % offset
         parentfolderids = create_element('m:ParentFolderIds')
-        folder_elem = self.folder.to_xml(version=self.account.version)
-        if not self.folder.folder_id:
-            # Folder is referenced by distinguished name
-            if self.account.access_type == DELEGATE:
-                mailbox = Mailbox(email_address=self.account.primary_smtp_address)
-                set_xml_value(folder_elem, mailbox, self.account.version)
-        parentfolderids.append(folder_elem)
+        parentfolderids.append(self._folder_elem(self.folder))
         findfolder.append(parentfolderids)
         return findfolder
 
@@ -921,13 +914,7 @@ class GetFolder(EWSAccountService):
             foldershape.append(additionalproperties)
         getfolder.append(foldershape)
         folderids = create_element('m:FolderIds')
-        folder_elem = folder.to_xml(version=self.account.version)
-        if not folder.folder_id:
-            # Folder is referenced by distinguished name
-            if self.account.access_type == DELEGATE:
-                mailbox = Mailbox(email_address=self.account.primary_smtp_address)
-                set_xml_value(folder_elem, mailbox, self.account.version)
-        folderids.append(folder_elem)
+        folderids.append(self._folder_elem(folder))
         getfolder.append(folderids)
         return getfolder
 
@@ -962,13 +949,7 @@ class SendItem(EWSAccountService):
         senditem.append(item_ids)
         if saved_item_folder:
             saveditemfolderid = create_element('m:SavedItemFolderId')
-            folder_elem = saved_item_folder.to_xml(version=self.account.version)
-            if not saved_item_folder.folder_id:
-                # Folder is referenced by distinguished name
-                if self.account.access_type == DELEGATE:
-                    mailbox = Mailbox(email_address=self.account.primary_smtp_address)
-                    set_xml_value(folder_elem, mailbox, self.account.version)
-            saveditemfolderid.append(folder_elem)
+            saveditemfolderid.append(self._folder_elem(saveditemfolderid))
             senditem.append(saveditemfolderid)
         return senditem
 
@@ -994,13 +975,7 @@ class MoveItem(EWSAccountService):
         moveeitem = create_element('m:%s' % self.SERVICE_NAME)
 
         tofolderid = create_element('m:ToFolderId')
-        folder_elem = to_folder.to_xml(version=self.account.version)
-        if not to_folder.folder_id:
-            # Folder is referenced by distinguished name
-            if self.account.access_type == DELEGATE:
-                mailbox = Mailbox(email_address=self.account.primary_smtp_address)
-                set_xml_value(folder_elem, mailbox, self.account.version)
-            tofolderid.append(folder_elem)
+        tofolderid.append(self._folder_elem(to_folder))
         moveeitem.append(tofolderid)
         item_ids = create_element('m:ItemIds')
         n = 0
