@@ -15,7 +15,7 @@ from six import PY2, text_type, string_types, python_2_unicode_compatible
 from yaml import load
 
 from exchangelib import close_connections
-from exchangelib.account import Account
+from exchangelib.account import Account, SAVE_ONLY, SEND_ONLY, SEND_AND_SAVE_COPY
 from exchangelib.attachments import Attachment, FileAttachment, ItemAttachment
 from exchangelib.autodiscover import AutodiscoverProtocol, discover
 from exchangelib.configuration import Configuration
@@ -790,7 +790,10 @@ class CommonTest(EWSTest):
                 self.account.junk,
                 self.account.contacts,
                 self.account.tasks,
-                self.account.calendar):
+                self.account.calendar,
+                self.account.recoverable_items_root,
+                self.account.recoverable_deleted_items,
+        ):
             # Just test that these at least don't throw errors
             repr(item)
             str(item)
@@ -988,6 +991,9 @@ class AccountTest(EWSTest):
         with self.assertRaises(AttributeError):
             # Autodiscover requires credentials
             Account(primary_smtp_address=self.account.primary_smtp_address, autodiscover=True)
+        with self.assertRaises(AttributeError):
+            # Autodiscover must not have config
+            Account(primary_smtp_address=self.account.primary_smtp_address, config='FOO', autodiscover=True)
         with self.assertRaises(AttributeError):
             # Non-autodiscover requires a config
             Account(primary_smtp_address=self.account.primary_smtp_address, autodiscover=False)
@@ -1461,14 +1467,54 @@ class BaseItemTest(EWSTest):
         # We allow empty sequences for these methods
         self.assertEqual(self.test_folder.bulk_create(items=[]), [])
         self.assertEqual(list(self.account.fetch(ids=[])), [])
+        self.assertEqual(self.account.bulk_create(folder=self.test_folder, items=[]), [])
         self.assertEqual(self.account.bulk_update(items=[]), [])
         self.assertEqual(self.account.bulk_delete(ids=[]), [])
+        self.assertEqual(self.account.bulk_send(ids=[]), [])
+        self.assertEqual(self.account.bulk_move(ids=[], to_folder=self.account.trash), [])
+        self.assertEqual(self.account.upload(data=[]), [])
+        self.assertEqual(self.account.export(items=[]), [])
+
+    def test_qs_args(self):
+        # We allow querysets for these methods
+        qs = self.test_folder.none()
+        self.assertEqual(list(self.account.fetch(ids=qs)), [])
+        self.assertEqual(self.account.bulk_update(items=qs), [])
+        self.assertEqual(self.account.bulk_delete(ids=qs), [])
+        self.assertEqual(self.account.bulk_send(ids=qs), [])
+        self.assertEqual(self.account.bulk_move(ids=qs, to_folder=self.account.trash), [])
+        self.assertEqual(self.account.upload(data=qs), [])
+        self.assertEqual(self.account.export(items=qs), [])
 
     def test_no_kwargs(self):
         self.assertEqual(self.test_folder.bulk_create([]), [])
         self.assertEqual(list(self.account.fetch([])), [])
+        self.assertEqual(self.account.bulk_create(self.test_folder, []), [])
         self.assertEqual(self.account.bulk_update([]), [])
         self.assertEqual(self.account.bulk_delete([]), [])
+        self.assertEqual(self.account.bulk_send([]), [])
+        self.assertEqual(self.account.bulk_move([], to_folder=self.account.trash), [])
+        self.assertEqual(self.account.upload([]), [])
+        self.assertEqual(self.account.export([]), [])
+
+    def test_invalid_bulk_args(self):
+        # Test bulk_create
+        with self.assertRaises(ValueError):
+            # Folder must belong to account
+            self.account.bulk_create(folder=Folder(account=None), items=[])
+        with self.assertRaises(AttributeError):
+            # Must have folder on save
+            self.account.bulk_create(folder=None, items=[], message_disposition=SAVE_ONLY)
+        # Test that we can send_and_save with a default folder
+        self.account.bulk_create(folder=None, items=[], message_disposition=SEND_AND_SAVE_COPY)
+        with self.assertRaises(AttributeError):
+            # Must not have folder on send-only
+            self.account.bulk_create(folder=self.test_folder, items=[], message_disposition=SEND_ONLY)
+
+        # Test bulk_update
+        with self.assertRaises(ValueError):
+            # Cannot update in send-only mode
+            self.account.bulk_update(items=[], message_disposition=SEND_ONLY)
 
     def test_querysets(self):
         test_items = []
@@ -2841,6 +2887,8 @@ class MessagesTest(BaseItemTest):
         self.assertEqual(len(self.account.sent.filter(categories__contains=item.categories)), 1)
 
     def test_bulk_send(self):
+        with self.assertRaises(AttributeError):
+            self.account.bulk_send(ids=[], save_copy=False, copy_to_folder=self.account.trash)
         item = self.get_test_item()
         item.save()
         for res in self.account.bulk_send(ids=[item]):
