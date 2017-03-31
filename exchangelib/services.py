@@ -634,7 +634,7 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
                 log.warning('%s is a read-only field. Skipping', field.name)
                 continue
             value = getattr(item, field.name)
-            field.clean(value)  # Make sure the value is OK
+            value = field.clean(value)  # Make sure the value is OK
 
             if value is None or (field.is_list and not value):
                 # A value of None or [] means we want to remove this field from the item
