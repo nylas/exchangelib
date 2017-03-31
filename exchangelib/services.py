@@ -524,13 +524,23 @@ class CreateItem(EWSAccountService, EWSPooledMixIn):
         # responses (see https://msdn.microsoft.com/en-us/library/office/aa566464(v=exchg.150).aspx) and sharing
         # invitation accepts (see https://msdn.microsoft.com/en-us/library/office/ee693280(v=exchg.150).aspx). The
         # last two are not supported yet.
+        from .account import DELEGATE
+        from .properties import Mailbox
         createitem = create_element(
             'm:%s' % self.SERVICE_NAME,
             MessageDisposition=message_disposition,
             SendMeetingInvitations=send_meeting_invitations,
         )
         if folder:
-            add_xml_child(createitem, 'm:SavedItemFolderId', folder.to_xml(version=self.account.version))
+            saveditemfolderid = create_element('m:SavedItemFolderId')
+            folder_elem = folder.to_xml(version=self.account.version)
+            if not folder.folder_id:
+                # Folder is referenced by distinguished name
+                if self.account.access_type == DELEGATE:
+                    mailbox = Mailbox(email_address=self.account.primary_smtp_address)
+                    set_xml_value(folder_elem, mailbox, self.account.version)
+            saveditemfolderid.append(folder_elem)
+            createitem.append(saveditemfolderid)
         item_elems = []
         for item in items:
             log.debug('Adding item %s', item)
@@ -788,6 +798,8 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
         ))
 
     def get_payload(self, additional_fields, restriction, order, shape, depth, calendar_view, page_size, offset=0):
+        from .credentials import DELEGATE
+        from .properties import Mailbox
         finditem = create_element('m:%s' % self.SERVICE_NAME, Traversal=depth)
         itemshape = create_element('m:ItemShape')
         add_xml_child(itemshape, 't:BaseShape', shape)
@@ -823,7 +835,13 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
             field_order.append(field_uri)
             add_xml_child(finditem, 'm:SortOrder', field_order)
         parentfolderids = create_element('m:ParentFolderIds')
-        parentfolderids.append(self.folder.to_xml(version=self.account.version))
+        folder_elem = self.folder.to_xml(version=self.account.version)
+        if not self.folder.folder_id:
+            # Folder is referenced by distinguished name
+            if self.account.access_type == DELEGATE:
+                mailbox = Mailbox(email_address=self.account.primary_smtp_address)
+                set_xml_value(folder_elem, mailbox, self.account.version)
+        parentfolderids.append(folder_elem)
         finditem.append(parentfolderids)
         return finditem
 
@@ -846,6 +864,8 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
         ))
 
     def get_payload(self, additional_fields, shape, depth, page_size, offset=0):
+        from .account import DELEGATE
+        from .properties import Mailbox
         findfolder = create_element('m:%s' % self.SERVICE_NAME, Traversal=depth)
         foldershape = create_element('m:FolderShape')
         add_xml_child(foldershape, 't:BaseShape', shape)
@@ -862,7 +882,13 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
         else:
             assert offset == 0, 'Offset is %s' % offset
         parentfolderids = create_element('m:ParentFolderIds')
-        parentfolderids.append(self.folder.to_xml(version=self.account.version))
+        folder_elem = self.folder.to_xml(version=self.account.version)
+        if not self.folder.folder_id:
+            # Folder is referenced by distinguished name
+            if self.account.access_type == DELEGATE:
+                mailbox = Mailbox(email_address=self.account.primary_smtp_address)
+                set_xml_value(folder_elem, mailbox, self.account.version)
+        parentfolderids.append(folder_elem)
         findfolder.append(parentfolderids)
         return findfolder
 
@@ -874,18 +900,17 @@ class GetFolder(EWSAccountService):
     SERVICE_NAME = 'GetFolder'
     element_container_name = '{%s}Folders' % MNS
 
-    def call(self, folder, distinguished_folder_id, additional_fields, shape):
+    def call(self, folder, additional_fields, shape):
         return self._get_elements(payload=self.get_payload(
             folder=folder,
-            distinguished_folder_id=distinguished_folder_id,
             additional_fields=additional_fields,
             shape=shape,
         ))
 
-    def get_payload(self, folder, distinguished_folder_id, additional_fields, shape):
+    def get_payload(self, folder, additional_fields, shape):
         from .credentials import DELEGATE
         from .properties import Mailbox
-        assert folder or distinguished_folder_id
+        assert folder
         getfolder = create_element('m:%s' % self.SERVICE_NAME)
         foldershape = create_element('m:FolderShape')
         add_xml_child(foldershape, 't:BaseShape', shape)
@@ -896,14 +921,13 @@ class GetFolder(EWSAccountService):
             foldershape.append(additionalproperties)
         getfolder.append(foldershape)
         folderids = create_element('m:FolderIds')
-        if folder:
-            folderids.append(folder.to_xml(version=self.account.version))
-        if distinguished_folder_id:
-            distinguishedfolderid = create_element('t:DistinguishedFolderId', Id=distinguished_folder_id)
+        folder_elem = folder.to_xml(version=self.account.version)
+        if not folder.folder_id:
+            # Folder is referenced by distinguished name
             if self.account.access_type == DELEGATE:
                 mailbox = Mailbox(email_address=self.account.primary_smtp_address)
-                set_xml_value(distinguishedfolderid, mailbox, self.account.version)
-            folderids.append(distinguishedfolderid)
+                set_xml_value(folder_elem, mailbox, self.account.version)
+        folderids.append(folder_elem)
         getfolder.append(folderids)
         return getfolder
 
@@ -919,7 +943,9 @@ class SendItem(EWSAccountService):
         return self._get_elements(payload=self.get_payload(items=items, saved_item_folder=saved_item_folder))
 
     def get_payload(self, items, saved_item_folder):
+        from .account import DELEGATE
         from .folders import ItemId
+        from .properties import Mailbox
         senditem = create_element(
             'm:%s' % self.SERVICE_NAME,
             SaveItemToFolder='true' if saved_item_folder else 'false',
@@ -935,7 +961,15 @@ class SendItem(EWSAccountService):
             raise ValueError('"items" must not be empty')
         senditem.append(item_ids)
         if saved_item_folder:
-            add_xml_child(senditem, 'm:SavedItemFolderId', saved_item_folder.to_xml(version=self.account.version))
+            saveditemfolderid = create_element('m:SavedItemFolderId')
+            folder_elem = saved_item_folder.to_xml(version=self.account.version)
+            if not saved_item_folder.folder_id:
+                # Folder is referenced by distinguished name
+                if self.account.access_type == DELEGATE:
+                    mailbox = Mailbox(email_address=self.account.primary_smtp_address)
+                    set_xml_value(folder_elem, mailbox, self.account.version)
+            saveditemfolderid.append(folder_elem)
+            senditem.append(saveditemfolderid)
         return senditem
 
 
@@ -954,9 +988,20 @@ class MoveItem(EWSAccountService):
 
     def get_payload(self, items, to_folder):
         # Takes a list of items and returns their new item IDs
+        from .account import DELEGATE
         from .folders import ItemId
+        from .properties import Mailbox
         moveeitem = create_element('m:%s' % self.SERVICE_NAME)
-        add_xml_child(moveeitem, 'm:ToFolderId', to_folder.to_xml(version=self.account.version))
+
+        tofolderid = create_element('m:ToFolderId')
+        folder_elem = to_folder.to_xml(version=self.account.version)
+        if not to_folder.folder_id:
+            # Folder is referenced by distinguished name
+            if self.account.access_type == DELEGATE:
+                mailbox = Mailbox(email_address=self.account.primary_smtp_address)
+                set_xml_value(folder_elem, mailbox, self.account.version)
+            tofolderid.append(folder_elem)
+        moveeitem.append(tofolderid)
         item_ids = create_element('m:ItemIds')
         n = 0
         for item in items:

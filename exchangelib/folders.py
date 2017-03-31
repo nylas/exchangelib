@@ -27,6 +27,27 @@ class FolderId(ItemId):
     __slots__ = ItemId.__slots__
 
 
+class DistinguishedFolderId(ItemId):
+    # MSDN: https://msdn.microsoft.com/en-us/library/office/aa580808(v=exchg.150).aspx
+    ELEMENT_NAME = 'DistinguishedFolderId'
+
+    FIELDS = (
+        SimpleField('id', field_uri=ItemId.ID_ATTR, value_cls=string_type, is_required=True),
+        SimpleField('changekey', field_uri=ItemId.CHANGEKEY_ATTR, value_cls=string_type, is_required=False),
+    )
+
+    __slots__ = 'id', 'changekey'
+
+    def to_xml(self, version):
+        self.clean()
+        elem = create_element(self.request_tag())
+        # Use .set() to not fill up the create_element() cache with unique values
+        elem.set(self.ID_ATTR, self.id)
+        if self.changekey:
+            elem.set(self.CHANGEKEY_ATTR, self.changekey)
+        return elem
+
+
 class CalendarView(EWSElement):
     """
     MSDN: https://msdn.microsoft.com/en-US/library/office/aa564515%28v=exchg.150%29.aspx
@@ -101,8 +122,6 @@ class Folder(EWSElement):
 
     @property
     def is_distinguished(self):
-        if not self.name or not self.DISTINGUISHED_FOLDER_ID:
-            return False
         return self.name.lower() == self.DISTINGUISHED_FOLDER_ID.lower()
 
     @staticmethod
@@ -289,7 +308,9 @@ class Folder(EWSElement):
         return cls(folder_id=fld_id, changekey=changekey, **kwargs)
 
     def to_xml(self, version):
-        return FolderId(self.folder_id, self.changekey).to_xml(version=version)
+        if self.folder_id:
+            return FolderId(self.folder_id, self.changekey).to_xml(version=version)
+        return DistinguishedFolderId(self.name).to_xml(version=version)
 
     def get_folders(self, shape=IdOnly, depth=DEEP):
         # 'depth' controls whether to return direct children or recurse into sub-folders
@@ -348,8 +369,7 @@ class Folder(EWSElement):
         assert shape in SHAPE_CHOICES
         folders = []
         for elem in GetFolder(account=account).call(
-                folder=None,
-                distinguished_folder_id=cls.DISTINGUISHED_FOLDER_ID,
+                folder=cls(account=account),
                 additional_fields=[f for f in cls.FIELDS if f.name not in ('folder_id', 'changekey')],
                 shape=shape
         ):
@@ -370,7 +390,6 @@ class Folder(EWSElement):
         folders = []
         for elem in GetFolder(account=self.account).call(
                 folder=self,
-                distinguished_folder_id=None,
                 additional_fields=[f for f in self.FIELDS if f.name not in ('folder_id', 'changekey')],
                 shape=IdOnly
         ):

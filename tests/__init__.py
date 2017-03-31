@@ -23,12 +23,13 @@ from exchangelib.credentials import DELEGATE, IMPERSONATION, Credentials, Servic
 from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalidOperation, AutoDiscoverRedirect, \
     AutoDiscoverCircularRedirect, AutoDiscoverFailed, ErrorNonExistentMailbox, UnknownTimeZone, \
     ErrorNameResolutionNoResults, TransportError, RedirectError, CASError, RateLimitError, UnauthorizedError, \
-    ErrorInvalidChangeKey, ErrorInvalidIdMalformed, ErrorContainsFilterWrongType, SOAPError
+    ErrorInvalidChangeKey, ErrorInvalidIdMalformed, ErrorContainsFilterWrongType, ErrorAccessDenied, \
+    ErrorFolderNotFound, SOAPError
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.extended_properties import ExtendedProperty
 from exchangelib.fields import ExtendedPropertyField
 from exchangelib.folders import Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Messages, Tasks, \
-    Contacts, CalendarView, Folder
+    Contacts, Folder
 from exchangelib.indexed_properties import IndexedElement, EmailAddress, PhysicalAddress, PhoneNumber
 from exchangelib.items import Item, CalendarItem, Message, Contact, Task, ALL_OCCURRENCIES
 from exchangelib.properties import Attendee, Mailbox, Choice, Email, RoomList, AnyURI, Body, HTMLBody, MimeContent, \
@@ -990,6 +991,44 @@ class AccountTest(EWSTest):
         with self.assertRaises(AttributeError):
             # Non-autodiscover requires a config
             Account(primary_smtp_address=self.account.primary_smtp_address, autodiscover=False)
+
+    def test_get_default_folder(self):
+        class MockCalendar(Calendar):
+            pass
+        # Test a normal folder lookup with GetFolder
+        folder = self.account._get_default_folder(MockCalendar)
+        self.assertIsInstance(folder, MockCalendar)
+        self.assertNotEqual(folder.folder_id, None)
+        self.assertEqual(folder.name, MockCalendar.LOCALIZED_NAMES[self.account.locale][0])
+
+        class MockCalendar(Calendar):
+            @classmethod
+            def get_distinguished(cls, account, shape=None):
+                raise ErrorAccessDenied('foo')
+
+        # Test an indirect folder lookup with FindItems
+        folder = self.account._get_default_folder(MockCalendar)
+        self.assertIsInstance(folder, MockCalendar)
+        self.assertEqual(folder.folder_id, None)
+        self.assertEqual(folder.name, MockCalendar.DISTINGUISHED_FOLDER_ID)
+
+        class MockCalendar(Calendar):
+            @classmethod
+            def get_distinguished(cls, account, shape=None):
+                raise ErrorFolderNotFound('foo')
+
+        # Test using the one folder of this folder type
+        with self.assertRaises(ErrorFolderNotFound):
+            # This fails because there are no folders of type MockCalendar
+            self.account._get_default_folder(MockCalendar)
+
+        _orig = Calendar.get_distinguished
+        Calendar.get_distinguished = MockCalendar.get_distinguished
+        folder = self.account._get_default_folder(Calendar)
+        self.assertIsInstance(folder, Calendar)
+        self.assertNotEqual(folder.folder_id, None)
+        self.assertEqual(folder.name, MockCalendar.LOCALIZED_NAMES[self.account.locale][0])
+        Calendar.get_distinguished = _orig
 
 
 class AutodiscoverTest(EWSTest):
