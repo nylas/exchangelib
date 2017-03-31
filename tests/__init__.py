@@ -1642,6 +1642,8 @@ class BaseItemTest(EWSTest):
         self.assertTrue(isinstance(qs[0], self.ITEM_CLASS))
         self.assertEqual(len(list(qs[1:3])), 2)
         self.assertEqual(len(qs), 4)
+        with self.assertRaises(IndexError):
+            foo = qs[99999]
         # Exists
         self.assertEqual(qs.exists(), True)
         self.assertEqual(qs.filter(subject='Test XXX').exists(), False)
@@ -1777,6 +1779,14 @@ class BaseItemTest(EWSTest):
              {'subject': 'Subj 1', 'extern_id': 'ID 0'},
              {'subject': 'Subj 0', 'extern_id': 'ID 1'},
              {'subject': 'Subj 0', 'extern_id': 'ID 0'}]
+        )
+        # Test sorting on a field that we don't need
+        self.assertEqual(
+            [(i.subject, i.extern_id) for i in qs.order_by('subject', 'extern_id').only('subject')],
+            [('Subj 0', None),
+             ('Subj 0', None),
+             ('Subj 1', None),
+             ('Subj 1', None)]
         )
         self.bulk_delete(qs)
 
