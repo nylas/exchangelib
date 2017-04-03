@@ -2263,8 +2263,9 @@ class BaseItemTest(EWSTest):
                 # Filter all others with =, __in and __contains. We could have more filters here, but these should
                 # always match.
                 filter_kwargs = [{f.name: val}, {'%s__in' % f.name: [val]}]
-                if isinstance(f, TextField) and not isinstance(f, (ChoiceField, BodyField)):
-                    # Choice fields cannot be filtered using __contains
+                if isinstance(f, TextField) and not isinstance(f, (ChoiceField, BodyField)) \
+                        and f.name != 'display_name':
+                    # Choice fields cannot be filtered using __contains. 'display_name' doesn't work either
                     filter_kwargs.append({'%s__contains' % f.name: val})
             for kw in filter_kwargs:
                 self.assertEqual(len(common_qs.filter(**kw)), 1, (f.name, val, kw))
