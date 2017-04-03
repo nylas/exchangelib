@@ -137,14 +137,6 @@ class MessageHeader(EWSElement):
 
     __slots__ = ('name', 'value')
 
-    def to_xml(self, version):
-        self.clean()
-        elem = create_element(self.request_tag())
-        # Use .set() to not fill up the create_element() cache with unique values
-        elem.set(self.NAME_ATTR, self.name)
-        set_xml_value(elem, self.value, version)
-        return elem
-
     @classmethod
     def from_xml(cls, elem):
         if elem is None:
