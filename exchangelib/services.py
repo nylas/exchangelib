@@ -69,13 +69,16 @@ class EWSService(object):
     def __init__(self, protocol):
         self.protocol = protocol
 
-    @abc.abstractmethod
-    def call(self, **kwargs):
-        raise NotImplementedError()
+    # The following two methods are the minimum required to be implemented by subclasses, but the name and number of
+    # kwargs differs between services. Therefore, we cannot make these methods abstract.
 
-    @abc.abstractmethod
-    def get_payload(self, **kwargs):
-        raise NotImplementedError()
+    # @abc.abstractmethod
+    # def call(self, **kwargs):
+    #     raise NotImplementedError()
+
+    # @abc.abstractmethod
+    # def get_payload(self, **kwargs):
+    #     raise NotImplementedError()
 
     def _get_elements(self, payload):
         assert isinstance(payload, ElementType)
