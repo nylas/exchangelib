@@ -535,8 +535,6 @@ class CreateItem(EWSAccountService, EWSPooledMixIn):
         # responses (see https://msdn.microsoft.com/en-us/library/office/aa566464(v=exchg.150).aspx) and sharing
         # invitation accepts (see https://msdn.microsoft.com/en-us/library/office/ee693280(v=exchg.150).aspx). The
         # last two are not supported yet.
-        from .account import DELEGATE
-        from .properties import Mailbox
         createitem = create_element(
             'm:%s' % self.SERVICE_NAME,
             MessageDisposition=message_disposition,
@@ -802,8 +800,6 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
         ))
 
     def get_payload(self, additional_fields, restriction, order, shape, depth, calendar_view, page_size, offset=0):
-        from .credentials import DELEGATE
-        from .properties import Mailbox
         finditem = create_element('m:%s' % self.SERVICE_NAME, Traversal=depth)
         itemshape = create_element('m:ItemShape')
         add_xml_child(itemshape, 't:BaseShape', shape)
@@ -862,8 +858,6 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
         ))
 
     def get_payload(self, additional_fields, shape, depth, page_size, offset=0):
-        from .account import DELEGATE
-        from .properties import Mailbox
         findfolder = create_element('m:%s' % self.SERVICE_NAME, Traversal=depth)
         foldershape = create_element('m:FolderShape')
         add_xml_child(foldershape, 't:BaseShape', shape)
@@ -900,8 +894,6 @@ class GetFolder(EWSAccountService):
         ))
 
     def get_payload(self, folder, additional_fields, shape):
-        from .credentials import DELEGATE
-        from .properties import Mailbox
         assert folder
         getfolder = create_element('m:%s' % self.SERVICE_NAME)
         foldershape = create_element('m:FolderShape')
@@ -929,9 +921,7 @@ class SendItem(EWSAccountService):
         return self._get_elements(payload=self.get_payload(items=items, saved_item_folder=saved_item_folder))
 
     def get_payload(self, items, saved_item_folder):
-        from .account import DELEGATE
         from .folders import ItemId
-        from .properties import Mailbox
         senditem = create_element(
             'm:%s' % self.SERVICE_NAME,
             SaveItemToFolder='true' if saved_item_folder else 'false',
@@ -966,9 +956,7 @@ class MoveItem(EWSAccountService):
 
     def get_payload(self, items, to_folder):
         # Takes a list of items and returns their new item IDs
-        from .account import DELEGATE
         from .folders import ItemId
-        from .properties import Mailbox
         moveeitem = create_element('m:%s' % self.SERVICE_NAME)
 
         tofolderid = create_element('m:ToFolderId')
