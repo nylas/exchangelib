@@ -314,9 +314,10 @@ class Item(EWSElement):
         """
         try:
             cls.get_field_by_fieldname(attr_name)
-            raise ValueError("%s' is already registered" % attr_name)
-        except KeyError:
+        except ValueError:
             pass
+        else:
+            raise ValueError("%s' is already registered" % attr_name)
         if not issubclass(attr_cls, ExtendedProperty):
             raise ValueError("'%s' must be a subclass of ExtendedProperty" % attr_cls)
         # Find the correct index for the extended property and insert the new field. We insert after 'reminder_is_set'
@@ -335,7 +336,7 @@ class Item(EWSElement):
         """
         try:
             field = cls.get_field_by_fieldname(attr_name)
-        except KeyError:
+        except ValueError:
             raise ValueError("%s' is not registered" % attr_name)
         if not isinstance(field, ExtendedPropertyField):
             raise ValueError("'%s' is not registered as an ExtendedProperty" % attr_name)

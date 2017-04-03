@@ -92,7 +92,10 @@ class EWSElement(object):
     def get_field_by_fieldname(cls, fieldname):
         if not hasattr(cls, '_fields_map'):
             cls._fields_map = {f.name: f for f in cls.FIELDS}
-        return cls._fields_map[fieldname]
+        try:
+            return cls._fields_map[fieldname]
+        except KeyError:
+            raise ValueError("'%s' is not a valid field on '%s'" % (fieldname, cls.__name__))
 
     @classmethod
     def add_field(cls, field, idx):

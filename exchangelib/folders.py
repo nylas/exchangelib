@@ -171,7 +171,7 @@ class Folder(EWSElement):
         for item_model in cls.supported_item_models:
             try:
                 return item_model.get_field_by_fieldname(fieldname)
-            except KeyError:
+            except ValueError:
                 pass
         raise ValueError("Unknown fieldname '%s' on class '%s'" % (fieldname, cls.__name__))
 

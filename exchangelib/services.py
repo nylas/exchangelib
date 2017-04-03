@@ -626,20 +626,15 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
         item_model = item.__class__
         meeting_timezone_added = False
         for fieldname in fieldnames:
-            try:
-                field = item_model.get_field_by_fieldname(fieldname)
-            except KeyError:
-                raise ValueError("'%s' is not a valid field on '%s'" % (fieldname, item_model))
+            field = item_model.get_field_by_fieldname(fieldname)
             if field.is_read_only:
-                log.warning('%s is a read-only field. Skipping', field.name)
-                continue
+                raise ValueError('%s is a read-only field', field.name)
             value = field.clean(getattr(item, field.name))  # Make sure the value is OK
 
             if value is None or (field.is_list and not value):
                 # A value of None or [] means we want to remove this field from the item
                 if field.is_required or field.is_required_after_save:
-                    log.warning('%s is a required field and may not be deleted. Skipping', field.name)
-                    continue
+                    raise ValueError('%s is a required field and may not be deleted', field.name)
                 if isinstance(field, IndexedField):
                     for label in field.value_cls.LABELS:
                         if issubclass(field.value_cls, MultiFieldIndexedElement):
