@@ -27,13 +27,14 @@ from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalid
     ErrorFolderNotFound, SOAPError
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.extended_properties import ExtendedProperty
-from exchangelib.fields import ExtendedPropertyField
+from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextField, EmailField, URIField, ChoiceField, \
+    BodyField, DateTimeField, Base64Field, EWSElementField, IndexedField, PhoneNumberField, EmailAddressField, \
+    PhysicalAddressField, ExtendedPropertyField, MailboxField, AttendeesField, AttachmentField
 from exchangelib.folders import Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Messages, Tasks, \
     Contacts, Folder
 from exchangelib.indexed_properties import IndexedElement, EmailAddress, PhysicalAddress, PhoneNumber
 from exchangelib.items import Item, CalendarItem, Message, Contact, Task, ALL_OCCURRENCIES
-from exchangelib.properties import Attendee, Mailbox, Choice, Email, RoomList, AnyURI, Body, HTMLBody, MimeContent, \
-    MessageHeader, Room, Subject, Location, EWSElement
+from exchangelib.properties import Attendee, Mailbox, Choice, RoomList, MessageHeader, Room, EWSElement
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.restriction import Restriction, Q
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, GetAttachment, ResolveNames, TNS
@@ -87,6 +88,7 @@ class VersionTest(unittest.TestCase):
         # Test that a version gets a reasonable api_version value if we don't set one explicitly
         version = Version(build=Build(15, 1, 2, 3))
         self.assertEqual(version.api_version, 'Exchange2016')
+
 
 class ConfigurationTest(unittest.TestCase):
     def test_hardcode_all(self):
@@ -485,85 +487,83 @@ class EWSTest(unittest.TestCase):
             if field.value_cls.python_type() == int:
                 return get_random_int(0, 256)
             assert False, (field.name, field, field.value_cls.python_type())
-        if field.is_list and field.value_cls == string_type:
-            return [get_random_string(16) for _ in range(random.randint(1, 4))]
-        if field.value_cls == string_type:
-            return get_random_string(255)
-        if field.value_cls == Subject:
-            return get_random_string(Subject.MAXLENGTH)
-        if field.value_cls == Location:
-            return get_random_string(Location.MAXLENGTH)
-        if field.value_cls == Body:
-            return get_random_string(255)
-        if field.value_cls == HTMLBody:
-            return get_random_string(255)
-        if field.value_cls == MimeContent:
-            return get_random_string(255)
-        if field.value_cls == AnyURI:
+        if isinstance(field, URIField):
             return get_random_url()
-        if field.value_cls == int:
-            return get_random_int(0, 256)
-        if field.value_cls == Decimal:
-            return get_random_decimal(1, 99)
-        if field.value_cls == bool:
-            return get_random_bool()
-        if field.value_cls == EWSDateTime:
-            return get_random_datetime()
-        if field.value_cls == Email:
+        if isinstance(field, EmailField):
             return get_random_email()
-        if field.value_cls == MessageHeader:
-            return [MessageHeader(name=get_random_string(10), value=get_random_string(255))
-                    for _ in range(random.randint(1, 4))]
-        if field.value_cls == Attachment:
-            return [FileAttachment(name='my_file.txt', content=b'test_content')]
-        if field.value_cls == Mailbox:
-            # email_address must be a real account on the server(?)
-            # TODO: Mailbox has multiple optional args, but they must match the server account, so we can't easily test.
-            if get_random_bool():
-                val = Mailbox(email_address=self.account.primary_smtp_address)
-            else:
-                val = self.account.primary_smtp_address
-            return [val] if field.is_list else val
-        if field.value_cls == Attendee:
-            # Attendee must refer to a real mailbox on the server(?). We're only sure to have one
-            if get_random_bool():
-                mbx = Mailbox(email_address=self.account.primary_smtp_address)
-            else:
-                mbx = self.account.primary_smtp_address
-            with_last_response_time = get_random_bool()
-            if with_last_response_time:
-                val = Attendee(mailbox=mbx, response_type='Accept', last_response_time=get_random_datetime())
-            else:
+        if isinstance(field, ChoiceField):
+            return get_random_choice(field.choices)
+        if isinstance(field, BodyField):
+            return get_random_string(255)
+        if isinstance(field, TextField):
+            if field.is_list:
+                return [get_random_string(16) for _ in range(random.randint(1, 4))]
+            return get_random_string(field.max_length or 255)
+        if isinstance(field, Base64Field):
+            return get_random_string(255)
+        if isinstance(field, BooleanField):
+            return get_random_bool()
+        if isinstance(field, IntegerField):
+            return get_random_int(0, 256)
+        if isinstance(field, DecimalField):
+            return get_random_decimal(1, 99)
+        if isinstance(field, DateTimeField):
+            return get_random_datetime()
+        if isinstance(field, EWSElementField):
+            if field.value_cls == MessageHeader:
+                return [MessageHeader(name=get_random_string(10), value=get_random_string(255))
+                        for _ in range(random.randint(1, 4))]
+            if isinstance(field, AttachmentField):
+                return [FileAttachment(name='my_file.txt', content=b'test_content')]
+            if isinstance(field, MailboxField):
+                # email_address must be a real account on the server(?)
+                # TODO: Mailbox has multiple optional args, but they must match the server account, so we can't easily test.
                 if get_random_bool():
-                    val = Attendee(mailbox=mbx, response_type='Accept')
+                    val = Mailbox(email_address=self.account.primary_smtp_address)
                 else:
                     val = self.account.primary_smtp_address
-            return [val] if field.is_list else val
-        if field.value_cls == EmailAddress:
-            if field.is_list:
+                return [val] if field.is_list else val
+            if isinstance(field, AttendeesField):
+                # Attendee must refer to a real mailbox on the server(?). We're only sure to have one
+                if get_random_bool():
+                    mbx = Mailbox(email_address=self.account.primary_smtp_address)
+                else:
+                    mbx = self.account.primary_smtp_address
+                with_last_response_time = get_random_bool()
+                if with_last_response_time:
+                    val = Attendee(mailbox=mbx, response_type='Accept', last_response_time=get_random_datetime())
+                else:
+                    if get_random_bool():
+                        val = Attendee(mailbox=mbx, response_type='Accept')
+                    else:
+                        val = self.account.primary_smtp_address
+                return [val] if field.is_list else val
+        if isinstance(field, IndexedField):
+            if isinstance(field, EmailAddressField):
+                if field.is_list:
+                    addrs = []
+                    for label in EmailAddress.LABELS:
+                        addr = EmailAddress(email=get_random_email())
+                        addr.label = label
+                        addrs.append(addr)
+                    return addrs
+                return EmailAddress(email=get_random_email())
+            if isinstance(field, PhysicalAddressField):
                 addrs = []
-                for label in EmailAddress.LABELS:
-                    addr = EmailAddress(email=get_random_email())
+                for label in PhysicalAddress.LABELS:
+                    addr = PhysicalAddress(street=get_random_string(32), city=get_random_string(32),
+                                           state=get_random_string(32), country=get_random_string(32),
+                                           zipcode=get_random_string(8))
                     addr.label = label
                     addrs.append(addr)
                 return addrs
-            return EmailAddress(email=get_random_email())
-        if field.value_cls == PhysicalAddress:
-            addrs = []
-            for label in PhysicalAddress.LABELS:
-                addr = PhysicalAddress(street=get_random_string(32), city=get_random_string(32),
-                                       state=get_random_string(32), country=get_random_string(32),
-                                       zipcode=get_random_string(8))
-                addr.label = label
-                addrs.append(addr)
-            return addrs
-        if field.value_cls == PhoneNumber:
-            pns = []
-            for label in PhoneNumber.LABELS:
-                pn = PhoneNumber(phone_number=get_random_string(16))
-                pn.label = label
-                pns.append(pn)
-            return pns
+            if isinstance(field, PhoneNumberField):
+                pns = []
+                for label in PhoneNumber.LABELS:
+                    pn = PhoneNumber(phone_number=get_random_string(16))
+                    pn.label = label
+                    pns.append(pn)
+                return pns
         assert False, 'Unknown field %s' % field
 
 
@@ -1368,9 +1368,6 @@ class BaseItemTest(EWSTest):
                 continue
             if f.name == 'percent_complete':
                 continue
-            if f.value_cls == Choice:
-                insert_kwargs[f.name] = get_random_choice(f.choices)
-                continue
             insert_kwargs[f.name] = self.random_val(f)
         return insert_kwargs
 
@@ -1419,7 +1416,7 @@ class BaseItemTest(EWSTest):
                 update_kwargs[f.name] = not insert_kwargs[f.name]
                 continue
             if f.value_cls == Choice:
-                update_kwargs[f.name] = get_random_choice(f.choices)
+                update_kwargs[f.name] = get_random_choice([v for v in f.choices if v!= insert_kwargs[f.name]])
                 continue
             if f.value_cls in (Mailbox, Attendee):
                 if insert_kwargs[f.name] is None:
@@ -2131,7 +2128,8 @@ class BaseItemTest(EWSTest):
                 # Filter all others with =, __in and __contains. We could have more filters here, but these should
                 # always match.
                 filter_kwargs = [{f.name: val}, {'%s__in' % f.name: [val]}]
-                if f.value_cls in string_types and f.name not in ('display_name',):
+                if f.value_cls in string_types and not isinstance(f, ChoiceField) and f.name not in ('display_name'):
+                    # Choice fields cannot be filtered using __contains
                     # For some reason, 'display_name__contains' does not match. Error in EWS?
                     filter_kwargs.append({'%s__contains' % f.name: val})
             for kw in filter_kwargs:

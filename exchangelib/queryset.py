@@ -75,7 +75,7 @@ class OrderField(object):
                         "Subfield '%s' on IndexedField order_by() value '%s' must be one of %s" % (
                             subfield, s, ', '.join(field.value_cls.fieldnames())))
             if issubclass(field.value_cls, SingleFieldIndexedElement) and subfield:
-                raise ValueError("IndexedField order_by() value '%s' must not specify subfield, e.g. just %s__%s"% (
+                raise ValueError("IndexedField order_by() value '%s' must not specify subfield, e.g. just %s__%s" % (
                     s, fieldname, label))
         return cls(field=field, label=label, subfield=subfield, reverse=reverse)
 

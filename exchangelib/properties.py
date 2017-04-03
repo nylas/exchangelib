@@ -1,11 +1,9 @@
 import abc
-import base64
 import logging
 
 from six import text_type, string_types
 
-from .ewsdatetime import EWSDateTime
-from .fields import SimpleField, SubField
+from .fields import SubField, TextField, EmailField, ChoiceField, DateTimeField, EWSElementField, MailboxField
 from .services import MNS, TNS
 from .util import get_xml_attr, set_xml_value, create_element
 
@@ -15,17 +13,6 @@ log = logging.getLogger(__name__)
 
 class Choice(text_type):
     # A helper class used for string enums
-    pass
-
-
-class Email(text_type):
-    # A helper class used for email address string
-    pass
-
-
-class AnyURI(text_type):
-    # Helper to mark strings that must conform to xsd:anyURI
-    # If we want an URI validator, see http://stackoverflow.com/questions/14466585/is-this-regex-correct-for-xsdanyuri
     pass
 
 
@@ -41,47 +28,11 @@ class HTMLBody(Body):
     body_type = 'HTML'
 
 
-class Subject(text_type):
-    # A helper class used for subject string
-    MAXLENGTH = 255
-
-    def clean(self):
-        if len(self) > self.MAXLENGTH:
-            raise ValueError("'%s' value '%s' exceeds length %s" % (self.__class__.__name__, self, self.MAXLENGTH))
-
-
-class Location(text_type):
-    # A helper class used for location string
-    MAXLENGTH = 255
-
-    def clean(self):
-        if len(self) > self.MAXLENGTH:
-            raise ValueError("'%s' value '%s' exceeds length %s" % (self.__class__.__name__, self, self.MAXLENGTH))
-
-
-class Content(bytes):
-    # Helper to work with the base64 encoded binary Attachment content field
-    def b64encode(self):
-        return base64.b64encode(self).decode('ascii')
-
-    def b64decode(self):
-        return base64.b64decode(self)
-
-
-class MimeContent(text_type):
-    # Helper to work with the base64 encoded MimeContent Message field
-    def b64encode(self):
-        return base64.b64encode(self).decode('ascii')
-
-    def b64decode(self):
-        return base64.b64decode(self)
-
-
 class EWSElement(object):
     __metaclass__ = abc.ABCMeta
 
     ELEMENT_NAME = None
-    FIELDS = tuple()
+    FIELDS = []
     NAMESPACE = TNS  # Either TNS or MNS
 
     __slots__ = tuple()
@@ -146,7 +97,7 @@ class EWSElement(object):
     @classmethod
     def add_field(cls, field, idx):
         # Insert a new field at the preferred place in the tuple and invalidate the fieldname cache
-        cls.FIELDS = cls.FIELDS[0:idx] + (field,) + cls.FIELDS[idx:]
+        cls.FIELDS.insert(idx, field)
         try:
             delattr(cls, '_fields_map')
         except AttributeError:
@@ -155,7 +106,7 @@ class EWSElement(object):
     @classmethod
     def remove_field(cls, field):
         # Remove the given field and invalidate the fieldname cache
-        cls.FIELDS = tuple(f for f in cls.FIELDS if f != field)
+        cls.FIELDS.remove(field)
         try:
             delattr(cls, '_fields_map')
         except AttributeError:
@@ -176,10 +127,10 @@ class MessageHeader(EWSElement):
     ELEMENT_NAME = 'InternetMessageHeader'
     NAME_ATTR = 'HeaderName'
 
-    FIELDS = (
-        SimpleField('name', field_uri='HeaderName', value_cls=string_type),
-        SubField('value', value_cls=string_type),
-    )
+    FIELDS = [
+        TextField('name', field_uri='HeaderName'),
+        SubField('value'),
+    ]
 
     __slots__ = ('name', 'value')
 
@@ -208,10 +159,10 @@ class ItemId(EWSElement):
 
     ID_ATTR = 'Id'
     CHANGEKEY_ATTR = 'ChangeKey'
-    FIELDS = (
-        SimpleField('id', field_uri=ID_ATTR, value_cls=string_type, is_required=True),
-        SimpleField('changekey', field_uri=CHANGEKEY_ATTR, value_cls=string_type, is_required=True),
-    )
+    FIELDS = [
+        TextField('id', field_uri=ID_ATTR, is_required=True),
+        TextField('changekey', field_uri=CHANGEKEY_ATTR, is_required=True),
+    ]
 
     __slots__ = ('id', 'changekey')
 
@@ -269,14 +220,13 @@ class Mailbox(EWSElement):
     ELEMENT_NAME = 'Mailbox'
     MAILBOX_TYPES = {'Mailbox', 'PublicDL', 'PrivateDL', 'Contact', 'PublicFolder', 'Unknown', 'OneOff'}
 
-    FIELDS = (
-        SimpleField('name', field_uri='Name', value_cls=string_type),
-        SimpleField('email_address', field_uri='EmailAddress', value_cls=string_type),
-        SimpleField('mailbox_type', field_uri='MailboxType', value_cls=Choice, choices=MAILBOX_TYPES,
-                    default='Mailbox'),
-        SimpleField('item_id', value_cls=ItemId),
+    FIELDS = [
+        TextField('name', field_uri='Name'),
+        EmailField('email_address', field_uri='EmailAddress'),
+        ChoiceField('mailbox_type', field_uri='MailboxType', choices=MAILBOX_TYPES, default='Mailbox'),
+        EWSElementField('item_id', value_cls=ItemId),
         # There's also the 'RoutingType' element, but it's optional and must have value "SMTP"
-    )
+    ]
 
     __slots__ = ('name', 'email_address', 'mailbox_type', 'item_id')
 
@@ -298,12 +248,11 @@ class Attendee(EWSElement):
     ELEMENT_NAME = 'Attendee'
     RESPONSE_TYPES = {'Unknown', 'Organizer', 'Tentative', 'Accept', 'Decline', 'NoResponseReceived'}
 
-    FIELDS = (
-        SimpleField('mailbox', value_cls=Mailbox, is_required=True),
-        SimpleField('response_type', field_uri='ResponseType', value_cls=Choice, choices=RESPONSE_TYPES,
-                    default='Unknown'),
-        SimpleField('last_response_time', field_uri='LastResponseTime', value_cls=EWSDateTime),
-    )
+    FIELDS = [
+        MailboxField('mailbox', is_required=True),
+        ChoiceField('response_type', field_uri='ResponseType', choices=RESPONSE_TYPES, default='Unknown'),
+        DateTimeField('last_response_time', field_uri='LastResponseTime'),
+    ]
 
     __slots__ = ('mailbox', 'response_type', 'last_response_time')
 

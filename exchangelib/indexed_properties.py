@@ -2,8 +2,8 @@ import logging
 
 from six import string_types
 
-from .fields import SimpleField, EmailSubField, LabelField, SubField
-from .properties import Choice, EWSElement
+from .fields import EmailSubField, LabelField, SubField, TextField
+from .properties import EWSElement
 from .util import create_element, set_xml_value, add_xml_child
 
 string_type = string_types[0]
@@ -50,10 +50,10 @@ class EmailAddress(SingleFieldIndexedElement):
     # MSDN:  https://msdn.microsoft.com/en-us/library/office/aa564757(v=exchg.150).aspx
     ELEMENT_NAME = 'Entry'
     LABELS = {'EmailAddress1', 'EmailAddress2', 'EmailAddress3'}
-    LABEL_FIELD = LabelField('label', field_uri='Key', value_cls=Choice, choices=LABELS, default='EmailAddress1')
-    FIELDS = (
-        EmailSubField('email', value_cls=string_type),
-    )
+    LABEL_FIELD = LabelField('label', field_uri='Key', choices=LABELS, default='EmailAddress1')
+    FIELDS = [
+        EmailSubField('email'),
+    ]
 
     __slots__ = ('label', 'email')
 
@@ -66,10 +66,10 @@ class PhoneNumber(SingleFieldIndexedElement):
         'HomeFax', 'HomePhone', 'HomePhone2', 'Isdn', 'MobilePhone', 'OtherFax', 'OtherTelephone', 'Pager',
         'PrimaryPhone', 'RadioPhone', 'Telex', 'TtyTddPhone',
     }
-    LABEL_FIELD = LabelField('label', field_uri='Key', value_cls=Choice, choices=LABELS, default='PrimaryPhone')
-    FIELDS = (
-        SubField('phone_number', value_cls=string_type),
-    )
+    LABEL_FIELD = LabelField('label', field_uri='Key', choices=LABELS, default='PrimaryPhone')
+    FIELDS = [
+        SubField('phone_number'),
+    ]
 
     __slots__ = ('label', 'phone_number')
 
@@ -101,14 +101,14 @@ class PhysicalAddress(MultiFieldIndexedElement):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa564323(v=exchg.150).aspx
     ELEMENT_NAME = 'Entry'
     LABELS = {'Business', 'Home', 'Other'}
-    LABEL_FIELD = LabelField('label', field_uri='Key', value_cls=Choice, choices=LABELS, default='Business')
-    FIELDS = (
-        SimpleField('street', field_uri='Street', value_cls=string_type),  # Street, house number, etc.
-        SimpleField('city', field_uri='City', value_cls=string_type),
-        SimpleField('state', field_uri='State', value_cls=string_type),
-        SimpleField('country', field_uri='CountryOrRegion', value_cls=string_type),
-        SimpleField('zipcode', field_uri='PostalCode', value_cls=string_type),
-    )
+    LABEL_FIELD = LabelField('label', field_uri='Key', choices=LABELS, default='Business')
+    FIELDS = [
+        TextField('street', field_uri='Street'),  # Street, house number, etc.
+        TextField('city', field_uri='City'),
+        TextField('state', field_uri='State'),
+        TextField('country', field_uri='CountryOrRegion'),
+        TextField('zipcode', field_uri='PostalCode'),
+    ]
 
     __slots__ = ('label', 'street', 'city', 'state', 'country', 'zipcode')
 

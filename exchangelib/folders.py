@@ -5,7 +5,7 @@ from future.utils import python_2_unicode_compatible
 from six import string_types
 
 from .ewsdatetime import EWSDateTime, UTC
-from .fields import SimpleField
+from .fields import IntegerField, TextField, DateTimeField
 from .items import Item, CalendarItem, Contact, Message, Task, MeetingRequest, MeetingResponse, MeetingCancellation, \
     ITEM_CLASSES
 from .properties import ItemId, EWSElement
@@ -31,10 +31,10 @@ class DistinguishedFolderId(ItemId):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa580808(v=exchg.150).aspx
     ELEMENT_NAME = 'DistinguishedFolderId'
 
-    FIELDS = (
-        SimpleField('id', field_uri=ItemId.ID_ATTR, value_cls=string_type, is_required=True),
-        SimpleField('changekey', field_uri=ItemId.CHANGEKEY_ATTR, value_cls=string_type, is_required=False),
-    )
+    FIELDS = [
+        TextField('id', field_uri=ItemId.ID_ATTR, is_required=True),
+        TextField('changekey', field_uri=ItemId.CHANGEKEY_ATTR, is_required=False),
+    ]
 
     __slots__ = 'id', 'changekey'
 
@@ -55,11 +55,11 @@ class CalendarView(EWSElement):
     ELEMENT_NAME = 'CalendarView'
     NAMESPACE = MNS
 
-    FIELDS = (
-        SimpleField('start', field_uri='StartDate', value_cls=EWSDateTime, is_required=True),
-        SimpleField('end', field_uri='EndDate', value_cls=EWSDateTime, is_required=True),
-        SimpleField('max_items', field_uri='MaxEntriesReturned', value_cls=int),
-    )
+    FIELDS = [
+        DateTimeField('start', field_uri='StartDate', is_required=True),
+        DateTimeField('end', field_uri='EndDate', is_required=True),
+        IntegerField('max_items', field_uri='MaxEntriesReturned'),
+    ]
 
     __slots__ = ('start', 'end', 'max_items')
 
@@ -91,15 +91,15 @@ class Folder(EWSElement):
     supported_item_models = ITEM_CLASSES  # The Item types that this folder can contain. Default is all
     LOCALIZED_NAMES = dict()  # A map of (str)locale: (tuple)localized_folder_names
     ITEM_MODEL_MAP = {cls.response_tag(): cls for cls in ITEM_CLASSES}
-    FIELDS = (
-        SimpleField('folder_id', field_uri='folder:FolderId', value_cls=string_type),
-        SimpleField('changekey', field_uri='folder:Changekey', value_cls=string_type),
-        SimpleField('name', field_uri='folder:DisplayName', value_cls=string_type),
-        SimpleField('folder_class', field_uri='folder:FolderClass', value_cls=string_type),
-        SimpleField('total_count', field_uri='folder:TotalCount', value_cls=int),
-        SimpleField('unread_count', field_uri='folder:UnreadCount', value_cls=int),
-        SimpleField('child_folder_count', field_uri='folder:ChildFolderCount', value_cls=int),
-    )
+    FIELDS = [
+        TextField('folder_id', field_uri='folder:FolderId'),
+        TextField('changekey', field_uri='folder:Changekey'),
+        TextField('name', field_uri='folder:DisplayName'),
+        TextField('folder_class', field_uri='folder:FolderClass'),
+        IntegerField('total_count', field_uri='folder:TotalCount'),
+        IntegerField('unread_count', field_uri='folder:UnreadCount'),
+        IntegerField('child_folder_count', field_uri='folder:ChildFolderCount'),
+    ]
 
     __slots__ = ('account', 'folder_id', 'changekey', 'name', 'folder_class', 'total_count', 'unread_count',
                  'child_folder_count')

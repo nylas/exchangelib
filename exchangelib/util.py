@@ -114,15 +114,13 @@ def get_xml_attrs(tree, name):
 def value_to_xml_text(value):
     from .ewsdatetime import EWSDateTime
     from .indexed_properties import PhoneNumber, EmailAddress
-    from .properties import Content, Mailbox, Attendee
+    from .properties import Mailbox, Attendee
     if isinstance(value, string_types):
         return safe_xml_value(value)
     if isinstance(value, bool):
         return '1' if value else '0'
     if isinstance(value, (int, Decimal)):
         return text_type(value)
-    if isinstance(value, Content):
-        return value.b64encode()
     if isinstance(value, EWSDateTime):
         return value.ewsformat()
     if isinstance(value, PhoneNumber):

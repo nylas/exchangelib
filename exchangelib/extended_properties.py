@@ -152,7 +152,7 @@ class ExtendedProperty(EWSElement):
             return value
 
     @classmethod
-    def _props_map(cls):
+    def properties_map(cls):
         return {
             'DistinguishedPropertySetId': cls.distinguished_property_set_id,
             'PropertySetId': cls.property_set_id,
@@ -163,32 +163,22 @@ class ExtendedProperty(EWSElement):
         }
 
     @classmethod
-    def from_xml(cls, elems):
+    def from_xml(cls, elem):
         # Gets value of this specific ExtendedProperty from a list of 'ExtendedProperty' XML elements
         python_type = cls.python_type()
-        for extended_property in elems:
-            extended_field_uri = extended_property.find('{%s}ExtendedFieldURI' % TNS)
-            match = True
-            for k, v in cls._props_map().items():
-                if extended_field_uri.get(k) != v:
-                    match = False
-                    break
-            if match:
-                if cls.is_array_type():
-                    values = extended_property.find('{%s}Values' % TNS)
-                    return [
-                        xml_text_to_value(value=val, value_type=python_type)
-                        for val in get_xml_attrs(values, '{%s}Value' % TNS)
-                    ]
-                extended_field_value = xml_text_to_value(
-                    value=get_xml_attr(extended_property, '{%s}Value' % TNS), value_type=python_type)
-                if python_type == string_type and not extended_field_value:
-                    # For string types, we want to return the empty string instead of None if the element was
-                    # actually found, but there was no XML value. For other types, it would be more problematic
-                    # to make that distinction, e.g. return False for bool, 0 for int, etc.
-                    extended_field_value = ''
-                return extended_field_value
-        return None
+        if cls.is_array_type():
+            values = elem.find('{%s}Values' % TNS)
+            return [
+                xml_text_to_value(value=val, value_type=python_type)
+                for val in get_xml_attrs(values, '{%s}Value' % TNS)
+            ]
+        extended_field_value = xml_text_to_value(value=get_xml_attr(elem, '{%s}Value' % TNS), value_type=python_type)
+        if python_type == string_type and not extended_field_value:
+            # For string types, we want to return the empty string instead of None if the element was
+            # actually found, but there was no XML value. For other types, it would be more problematic
+            # to make that distinction, e.g. return False for bool, 0 for int, etc.
+            extended_field_value = ''
+        return extended_field_value
 
 
 class ExternId(ExtendedProperty):

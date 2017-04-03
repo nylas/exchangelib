@@ -4,9 +4,9 @@ import mimetypes
 
 from six import string_types
 
-from .ewsdatetime import EWSDateTime
-from .fields import SimpleField, ItemField
-from .properties import AnyURI, Content, RootItemId, EWSElement
+from .fields import BooleanField, TextField, IntegerField, URIField, DateTimeField, EWSElementField, Base64Field, \
+    ItemField
+from .properties import RootItemId, EWSElement
 from .services import TNS, GetAttachment, CreateAttachment, DeleteAttachment
 from .util import create_element
 
@@ -22,11 +22,11 @@ class AttachmentId(EWSElement):
     ID_ATTR = 'Id'
     ROOT_ID_ATTR = 'RootItemId'
     ROOT_CHANGEKEY_ATTR = 'RootItemChangeKey'
-    FIELDS = (
-        SimpleField('id', field_uri=ID_ATTR, value_cls=string_type, is_required=True),
-        SimpleField('root_id', field_uri=ROOT_ID_ATTR, value_cls=string_type),
-        SimpleField('root_changekey', field_uri=ROOT_CHANGEKEY_ATTR, value_cls=string_type),
-    )
+    FIELDS = [
+        TextField('id', field_uri=ID_ATTR, is_required=True),
+        TextField('root_id', field_uri=ROOT_ID_ATTR),
+        TextField('root_changekey', field_uri=ROOT_CHANGEKEY_ATTR),
+    ]
 
     __slots__ = ('id', 'root_id', 'root_changekey')
 
@@ -59,16 +59,16 @@ class Attachment(EWSElement):
     """
     Parent class for FileAttachment and ItemAttachment
     """
-    FIELDS = (
-        SimpleField('attachment_id', value_cls=AttachmentId),
-        SimpleField('name', field_uri='Name', value_cls=string_type),
-        SimpleField('content_type', field_uri='ContentType', value_cls=string_type),
-        SimpleField('content_id', field_uri='ContentId', value_cls=string_type),
-        SimpleField('content_location', field_uri='ContentLocation', value_cls=AnyURI),
-        SimpleField('size', field_uri='Size', value_cls=int, is_read_only=True),  # Attachment size in bytes
-        SimpleField('last_modified_time', field_uri='LastModifiedTime', value_cls=EWSDateTime),
-        SimpleField('is_inline', field_uri='IsInline', value_cls=bool),
-    )
+    FIELDS = [
+        EWSElementField('attachment_id', value_cls=AttachmentId),
+        TextField('name', field_uri='Name'),
+        TextField('content_type', field_uri='ContentType'),
+        TextField('content_id', field_uri='ContentId'),
+        URIField('content_location', field_uri='ContentLocation'),
+        IntegerField('size', field_uri='Size', is_read_only=True),  # Attachment size in bytes
+        DateTimeField('last_modified_time', field_uri='LastModifiedTime'),
+        BooleanField('is_inline', field_uri='IsInline'),
+    ]
 
     __slots__ = ('parent_item', 'attachment_id', 'name', 'content_type', 'content_id', 'content_location', 'size',
                  'last_modified_time', 'is_inline')
@@ -146,10 +146,10 @@ class FileAttachment(Attachment):
     """
     # TODO: This class is most likely inefficient for large data. Investigate methods to reduce copying
     ELEMENT_NAME = 'FileAttachment'
-    FIELDS = Attachment.FIELDS + (
-        SimpleField('is_contact_photo', field_uri='IsContactPhoto', value_cls=bool),
-        SimpleField('_content', field_uri='Content', value_cls=Content),
-    )
+    FIELDS = Attachment.FIELDS + [
+        BooleanField('is_contact_photo', field_uri='IsContactPhoto'),
+        Base64Field('_content', field_uri='Content'),
+    ]
 
     __slots__ = ('parent_item', 'attachment_id', 'name', 'content_type', 'content_id', 'content_location', 'size',
                  'last_modified_time', 'is_inline', 'is_contact_photo', '_content')
@@ -204,9 +204,10 @@ class ItemAttachment(Attachment):
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa562997(v=exchg.150).aspx
     """
     ELEMENT_NAME = 'ItemAttachment'
-    FIELDS = Attachment.FIELDS + (
+    # noinspection PyTypeChecker
+    FIELDS = Attachment.FIELDS + [
         ItemField('_item', field_uri='Item'),
-    )
+    ]
 
     __slots__ = ('parent_item', 'attachment_id', 'name', 'content_type', 'content_id', 'content_location', 'size',
                  'last_modified_time', 'is_inline', '_item')

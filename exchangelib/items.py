@@ -4,13 +4,12 @@ from decimal import Decimal
 from future.utils import python_2_unicode_compatible
 from six import string_types
 
-from .attachments import Attachment
-from .ewsdatetime import EWSDateTime, UTC_NOW
+from .ewsdatetime import UTC_NOW
 from .extended_properties import ExtendedProperty
-from .fields import SimpleField, PhoneNumberField, EmailAddressField, PhysicalAddressField, ExtendedPropertyField
-from .indexed_properties import PhoneNumber, EmailAddress, PhysicalAddress
-from .properties import EWSElement, Body, Subject, Location, AnyURI, MimeContent, MessageHeader, ItemId, Choice, \
-    Mailbox, Attendee
+from .fields import BooleanField, IntegerField, DecimalField, Base64Field, TextField, ChoiceField, \
+    URIField, BodyField, DateTimeField, EWSElementField, PhoneNumberField, EmailAddressField, PhysicalAddressField, \
+    ExtendedPropertyField, AttachmentField, MailboxField, AttendeesField
+from .properties import MessageHeader, EWSElement, ItemId
 from .util import create_element
 from .version import EXCHANGE_2010
 
@@ -64,36 +63,37 @@ class Item(EWSElement):
 
     # 'extern_id' is not a native EWS Item field. We use it for identification when item originates in an external
     # system. The field is implemented as an extended property on the Item.
-    FIELDS = (
-        SimpleField('item_id', field_uri='item:ItemId', value_cls=string_type, is_read_only=True),
-        SimpleField('changekey', field_uri='item:ChangeKey', value_cls=string_type, is_read_only=True),
+    FIELDS = [
+        TextField('item_id', field_uri='item:ItemId', is_read_only=True),
+        TextField('changekey', field_uri='item:ChangeKey', is_read_only=True),
         # TODO: MimeContent actually supports writing, but is still untested
-        SimpleField('mime_content', field_uri='item:MimeContent', value_cls=MimeContent, is_read_only=True),
-        SimpleField('subject', field_uri='item:Subject', value_cls=Subject),
-        SimpleField('sensitivity', field_uri='item:Sensitivity', value_cls=Choice,
-                    choices={'Normal', 'Personal', 'Private', 'Confidential'}, is_required=True, default='Normal'),
-        SimpleField('body', field_uri='item:Body', value_cls=Body, is_complex=True),  # Body or HTMLBody
-        SimpleField('attachments', field_uri='item:Attachments', value_cls=Attachment, default=None, is_list=True,
-                    is_complex=True),  # ItemAttachment or FileAttachment
-        SimpleField('datetime_received', field_uri='item:DateTimeReceived', value_cls=EWSDateTime, is_read_only=True),
-        SimpleField('categories', field_uri='item:Categories', value_cls=string_type, is_list=True),
-        SimpleField('importance', field_uri='item:Importance', value_cls=Choice,
-                    choices={'Low', 'Normal', 'High'}, is_required=True, default='Normal'),
-        SimpleField('is_draft', field_uri='item:IsDraft', value_cls=bool, is_read_only=True),
-        SimpleField('headers', field_uri='item:InternetMessageHeaders', value_cls=MessageHeader, is_list=True,
-                    is_read_only=True),
-        SimpleField('datetime_sent', field_uri='item:DateTimeSent', value_cls=EWSDateTime, is_read_only=True),
-        SimpleField('datetime_created', field_uri='item:DateTimeCreated', value_cls=EWSDateTime, is_read_only=True),
+        Base64Field('mime_content', field_uri='item:MimeContent', is_read_only=True),
+        TextField('subject', field_uri='item:Subject', max_length=255),
+        ChoiceField('sensitivity', field_uri='item:Sensitivity', choices={
+            'Normal', 'Personal', 'Private', 'Confidential'
+        }, is_required=True, default='Normal'),
+        BodyField('body', field_uri='item:Body', is_complex=True),  # Body or HTMLBody
+        AttachmentField('attachments', field_uri='item:Attachments'),  # ItemAttachment or FileAttachment
+        DateTimeField('datetime_received', field_uri='item:DateTimeReceived', is_read_only=True),
+        TextField('categories', field_uri='item:Categories', is_list=True),
+        ChoiceField('importance', field_uri='item:Importance', choices={
+            'Low', 'Normal', 'High'
+        }, is_required=True, default='Normal'),
+        BooleanField('is_draft', field_uri='item:IsDraft', is_read_only=True),
+        EWSElementField('headers', field_uri='item:InternetMessageHeaders', value_cls=MessageHeader, is_list=True,
+                        is_read_only=True),
+        DateTimeField('datetime_sent', field_uri='item:DateTimeSent', is_read_only=True),
+        DateTimeField('datetime_created', field_uri='item:DateTimeCreated', is_read_only=True),
         # Reminder related fields
-        SimpleField('reminder_is_set', field_uri='item:ReminderIsSet', value_cls=bool, is_required=True, default=False),
-        SimpleField('reminder_due_by', field_uri='item:ReminderDueBy', value_cls=EWSDateTime, is_required=False,
-                    is_required_after_save=True),
-        SimpleField('reminder_minutes_before_start', field_uri='item:ReminderMinutesBeforeStart', value_cls=int,
-                    is_required_after_save=True, default=0),
+        BooleanField('reminder_is_set', field_uri='item:ReminderIsSet', is_required=True, default=False),
+        DateTimeField('reminder_due_by', field_uri='item:ReminderDueBy', is_required=False,
+                      is_required_after_save=True),
+        IntegerField('reminder_minutes_before_start', field_uri='item:ReminderMinutesBeforeStart',
+                     is_required_after_save=True, default=0),
         # ExtendedProperty fields go here
-        SimpleField('last_modified_name', field_uri='item:LastModifiedName', value_cls=string_type, is_read_only=True),
-        SimpleField('last_modified_time', field_uri='item:LastModifiedTime', value_cls=EWSDateTime, is_read_only=True),
-    )
+        TextField('last_modified_name', field_uri='item:LastModifiedName', is_read_only=True),
+        DateTimeField('last_modified_time', field_uri='item:LastModifiedTime', is_read_only=True),
+    ]
 
     # We can't use __slots__ because we need to add extended properties dynamically
 
@@ -271,10 +271,9 @@ class Item(EWSElement):
 
         Adding attachments to an existing item will update the changekey of the item.
         """
-        if isinstance(attachments, Attachment):
+        if not isinstance(attachments, (tuple, list, set)):
             attachments = [attachments]
         for a in attachments:
-            assert isinstance(a, Attachment)
             if not a.parent_item:
                 a.parent_item = self
             if self.item_id and not a.attachment_id:
@@ -290,10 +289,9 @@ class Item(EWSElement):
 
         Removing attachments from an existing item will update the changekey of the item.
         """
-        if isinstance(attachments, Attachment):
+        if not isinstance(attachments, (tuple, list, set)):
             attachments = [attachments]
         for a in attachments:
-            assert isinstance(a, Attachment)
             assert a.parent_item is self
             if self.item_id:
                 # Item is already created. Detach  the attachment server-side now
@@ -375,12 +373,11 @@ class Item(EWSElement):
 
 @python_2_unicode_compatible
 class BulkCreateResult(Item):
-    FIELDS = (
-        SimpleField('item_id', field_uri='item:ItemId', value_cls=string_type, is_read_only=True, is_required=True),
-        SimpleField('changekey', field_uri='item:ChangeKey', value_cls=string_type, is_read_only=True, is_required=True),
-        SimpleField('attachments', field_uri='item:Attachments', value_cls=Attachment, default=(), is_list=True,
-                    is_complex=True),  # ItemAttachment or FileAttachment
-    )
+    FIELDS = [
+        TextField('item_id', field_uri='item:ItemId', is_read_only=True, is_required=True),
+        TextField('changekey', field_uri='item:ChangeKey', is_read_only=True, is_required=True),
+        AttachmentField('attachments', field_uri='item:Attachments'),  # ItemAttachment or FileAttachment
+    ]
 
     __slots__ = ('item_id', 'changekey', 'attachments')
 
@@ -399,19 +396,19 @@ class CalendarItem(Item):
     https://msdn.microsoft.com/en-us/library/office/aa564765(v=exchg.150).aspx
     """
     ELEMENT_NAME = 'CalendarItem'
-    FIELDS = Item.FIELDS + (
-        SimpleField('start', field_uri='calendar:Start', value_cls=EWSDateTime, is_required=True),
-        SimpleField('end', field_uri='calendar:End', value_cls=EWSDateTime, is_required=True),
-        SimpleField('is_all_day', field_uri='calendar:IsAllDayEvent', value_cls=bool, is_required=True, default=False),
+    FIELDS = Item.FIELDS + [
+        DateTimeField('start', field_uri='calendar:Start', is_required=True),
+        DateTimeField('end', field_uri='calendar:End', is_required=True),
+        BooleanField('is_all_day', field_uri='calendar:IsAllDayEvent', is_required=True, default=False),
         # TODO: The 'WorkingElsewhere' status was added in Exchange2015 but we don't support versioned choices yet
-        SimpleField('legacy_free_busy_status', field_uri='calendar:LegacyFreeBusyStatus', value_cls=Choice,
+        ChoiceField('legacy_free_busy_status', field_uri='calendar:LegacyFreeBusyStatus',
                     choices={'Free', 'Tentative', 'Busy', 'OOF', 'NoData'}, is_required=True, default='Busy'),
-        SimpleField('location', field_uri='calendar:Location', value_cls=Location),
-        SimpleField('organizer', field_uri='calendar:Organizer', value_cls=Mailbox, is_read_only=True),
-        SimpleField('required_attendees', field_uri='calendar:RequiredAttendees', value_cls=Attendee, is_list=True),
-        SimpleField('optional_attendees', field_uri='calendar:OptionalAttendees', value_cls=Attendee, is_list=True),
-        SimpleField('resources', field_uri='calendar:Resources', value_cls=Attendee, is_list=True),
-    )
+        TextField('location', field_uri='calendar:Location', max_length=255),
+        MailboxField('organizer', field_uri='calendar:Organizer', is_read_only=True),
+        AttendeesField('required_attendees', field_uri='calendar:RequiredAttendees'),
+        AttendeesField('optional_attendees', field_uri='calendar:OptionalAttendees'),
+        AttendeesField('resources', field_uri='calendar:Resources'),
+    ]
 
     def to_xml(self, version):
         # WARNING: The order of addition of XML elements is VERY important. Exchange expects XML elements in a
@@ -429,29 +426,22 @@ class Message(Item):
     ELEMENT_NAME = 'Message'
     # Supported attrs: see https://msdn.microsoft.com/en-us/library/office/aa494306(v=exchg.150).aspx
     # TODO: This list is incomplete
-    FIELDS = Item.FIELDS + (
-        SimpleField('to_recipients', field_uri='message:ToRecipients', value_cls=Mailbox, is_list=True,
-                    is_read_only_after_send=True),
-        SimpleField('cc_recipients', field_uri='message:CcRecipients', value_cls=Mailbox, is_list=True,
-                    is_read_only_after_send=True),
-        SimpleField('bcc_recipients', field_uri='message:BccRecipients', value_cls=Mailbox, is_list=True,
-                    is_read_only_after_send=True),
-        SimpleField('is_read_receipt_requested', field_uri='message:IsReadReceiptRequested', value_cls=bool,
-                    is_required=True, default=False, is_read_only_after_send=True),
-        SimpleField('is_delivery_receipt_requested', field_uri='message:IsDeliveryReceiptRequested', value_cls=bool,
-                    is_required=True, default=False, is_read_only_after_send=True),
-        SimpleField('sender', field_uri='message:Sender', value_cls=Mailbox, is_read_only=True,
-                    is_read_only_after_send=True),
+    FIELDS = Item.FIELDS + [
+        MailboxField('to_recipients', field_uri='message:ToRecipients', is_list=True, is_read_only_after_send=True),
+        MailboxField('cc_recipients', field_uri='message:CcRecipients', is_list=True, is_read_only_after_send=True),
+        MailboxField('bcc_recipients', field_uri='message:BccRecipients', is_list=True, is_read_only_after_send=True),
+        BooleanField('is_read_receipt_requested', field_uri='message:IsReadReceiptRequested',
+                     is_required=True, default=False, is_read_only_after_send=True),
+        BooleanField('is_delivery_receipt_requested', field_uri='message:IsDeliveryReceiptRequested',
+                     is_required=True, default=False, is_read_only_after_send=True),
+        MailboxField('sender', field_uri='message:Sender', is_read_only=True, is_read_only_after_send=True),
         # We can't use fieldname 'from' since it's a Python keyword
-        SimpleField('author', field_uri='message:From', value_cls=Mailbox, is_read_only_after_send=True),
-        SimpleField('is_read', field_uri='message:IsRead', value_cls=bool, is_required=True, default=False),
-        SimpleField('is_response_requested', field_uri='message:IsResponseRequested', value_cls=bool, default=False,
-                    is_required=True),
-        SimpleField('reply_to', field_uri='message:ReplyTo', value_cls=Mailbox, is_list=True,
-                    is_read_only_after_send=True),
-        SimpleField('message_id', field_uri='message:InternetMessageId', value_cls=string_type, is_read_only=True,
-                    is_read_only_after_send=True),
-    )
+        MailboxField('author', field_uri='message:From', is_read_only_after_send=True),
+        BooleanField('is_read', field_uri='message:IsRead', is_required=True, default=False),
+        BooleanField('is_response_requested', field_uri='message:IsResponseRequested', default=False, is_required=True),
+        MailboxField('reply_to', field_uri='message:ReplyTo', is_list=True, is_read_only_after_send=True),
+        TextField('message_id', field_uri='message:InternetMessageId', is_read_only=True, is_read_only_after_send=True),
+    ]
 
     def send(self, save_copy=True, copy_to_folder=None, conflict_resolution=AUTO_RESOLVE,
              send_meeting_invitations=SEND_TO_NONE):
@@ -506,33 +496,33 @@ class Task(Item):
     COMPLETED = 'Completed'
     # Supported attrs: see https://msdn.microsoft.com/en-us/library/office/aa563930(v=exchg.150).aspx
     # TODO: This list is incomplete
-    FIELDS = Item.FIELDS + (
-        SimpleField('actual_work', field_uri='task:ActualWork', value_cls=int),
-        SimpleField('assigned_time', field_uri='task:AssignedTime', value_cls=EWSDateTime, is_read_only=True),
-        SimpleField('billing_information', field_uri='task:BillingInformation', value_cls=string_type),
-        SimpleField('change_count', field_uri='task:ChangeCount', value_cls=int, is_read_only=True),
-        SimpleField('companies', field_uri='task:Companies', value_cls=string_type, is_list=True),
-        SimpleField('contacts', field_uri='task:Contacts', value_cls=string_type, is_list=True),
-        SimpleField('delegation_state', field_uri='task:DelegationState', value_cls=Choice,
-                    choices={'NoMatch', 'OwnNew', 'Owned', 'Accepted', 'Declined', 'Max'}, is_read_only=True),
-        SimpleField('delegator', field_uri='task:Delegator', value_cls=string_type, is_read_only=True),
+    FIELDS = Item.FIELDS + [
+        IntegerField('actual_work', field_uri='task:ActualWork'),
+        DateTimeField('assigned_time', field_uri='task:AssignedTime', is_read_only=True),
+        TextField('billing_information', field_uri='task:BillingInformation'),
+        IntegerField('change_count', field_uri='task:ChangeCount', is_read_only=True),
+        TextField('companies', field_uri='task:Companies', is_list=True),
+        TextField('contacts', field_uri='task:Contacts', is_list=True),
+        ChoiceField('delegation_state', field_uri='task:DelegationState', choices={
+            'NoMatch', 'OwnNew', 'Owned', 'Accepted', 'Declined', 'Max'
+        }, is_read_only=True),
+        TextField('delegator', field_uri='task:Delegator', is_read_only=True),
         # 'complete_date' can be set, but is ignored by the server, which sets it to now()
-        SimpleField('complete_date', field_uri='task:CompleteDate', value_cls=EWSDateTime, is_read_only=True),
-        SimpleField('due_date', field_uri='task:DueDate', value_cls=EWSDateTime),
-        SimpleField('is_complete', field_uri='task:IsComplete', value_cls=bool, is_read_only=True),
-        SimpleField('is_recurring', field_uri='task:IsRecurring', value_cls=bool, is_read_only=True),
-        SimpleField('is_team_task', field_uri='task:IsTeamTask', value_cls=bool, is_read_only=True),
-        SimpleField('mileage', field_uri='task:Mileage', value_cls=string_type),
-        SimpleField('owner', field_uri='task:Owner', value_cls=string_type, is_read_only=True),
-        SimpleField('percent_complete', field_uri='task:PercentComplete', value_cls=Decimal, is_required=True,
-                    default=Decimal(0.0)),
-        SimpleField('start_date', field_uri='task:StartDate', value_cls=EWSDateTime),
-        SimpleField('status', field_uri='task:Status', value_cls=Choice, choices={
+        DateTimeField('complete_date', field_uri='task:CompleteDate', is_read_only=True),
+        DateTimeField('due_date', field_uri='task:DueDate'),
+        BooleanField('is_complete', field_uri='task:IsComplete', is_read_only=True),
+        BooleanField('is_recurring', field_uri='task:IsRecurring', is_read_only=True),
+        BooleanField('is_team_task', field_uri='task:IsTeamTask', is_read_only=True),
+        TextField('mileage', field_uri='task:Mileage'),
+        TextField('owner', field_uri='task:Owner', is_read_only=True),
+        DecimalField('percent_complete', field_uri='task:PercentComplete', is_required=True, default=Decimal(0.0)),
+        DateTimeField('start_date', field_uri='task:StartDate'),
+        ChoiceField('status', field_uri='task:Status', choices={
             NOT_STARTED, 'InProgress', COMPLETED, 'WaitingOnOthers', 'Deferred'
         }, is_required=True, default=NOT_STARTED),
-        SimpleField('status_description', field_uri='task:StatusDescription', value_cls=string_type, is_read_only=True),
-        SimpleField('total_work', field_uri='task:TotalWork', value_cls=int),
-    )
+        TextField('status_description', field_uri='task:StatusDescription', is_read_only=True),
+        IntegerField('total_work', field_uri='task:TotalWork'),
+    ]
 
     def clean(self):
         super(Task, self).clean()
@@ -572,40 +562,39 @@ class Contact(Item):
     ELEMENT_NAME = 'Contact'
     # Supported attrs: see https://msdn.microsoft.com/en-us/library/office/aa581315(v=exchg.150).aspx
     # TODO: This list is incomplete
-    FIELDS = Item.FIELDS + (
-        SimpleField('file_as', field_uri='contacts:FileAs', value_cls=string_type),
-        SimpleField('file_as_mapping', field_uri='contacts:FileAsMapping', value_cls=Choice, choices={
+    FIELDS = Item.FIELDS + [
+        TextField('file_as', field_uri='contacts:FileAs'),
+        ChoiceField('file_as_mapping', field_uri='contacts:FileAsMapping', choices={
             'None', 'LastCommaFirst', 'FirstSpaceLast', 'Company', 'LastCommaFirstCompany', 'CompanyLastFirst',
             'LastFirst', 'LastFirstCompany', 'CompanyLastCommaFirst', 'LastFirstSuffix', 'LastSpaceFirstCompany',
             'CompanyLastSpaceFirst', 'LastSpaceFirst', 'DisplayName', 'FirstName', 'LastFirstMiddleSuffix', 'LastName',
             'Empty',
         }),
-        SimpleField('display_name', field_uri='contacts:DisplayName', value_cls=string_type, is_required=True),
-        SimpleField('given_name', field_uri='contacts:GivenName', value_cls=string_type),
-        SimpleField('initials', field_uri='contacts:Initials', value_cls=string_type),
-        SimpleField('middle_name', field_uri='contacts:MiddleName', value_cls=string_type),
-        SimpleField('nickname', field_uri='contacts:Nickname', value_cls=string_type),
-        SimpleField('company_name', field_uri='contacts:CompanyName', value_cls=string_type),
-        EmailAddressField('email_addresses', field_uri='contacts:EmailAddress', value_cls=EmailAddress, is_list=True),
-        PhysicalAddressField('physical_addresses', field_uri='contacts:PhysicalAddress', value_cls=PhysicalAddress,
-                             is_list=True),
-        PhoneNumberField('phone_numbers', field_uri='contacts:PhoneNumber', value_cls=PhoneNumber, is_list=True),
-        SimpleField('assistant_name', field_uri='contacts:AssistantName', value_cls=string_type),
-        SimpleField('birthday', field_uri='contacts:Birthday', value_cls=EWSDateTime),
-        SimpleField('business_homepage', field_uri='contacts:BusinessHomePage', value_cls=AnyURI),
-        SimpleField('companies', field_uri='contacts:Companies', value_cls=string_type, is_list=True),
-        SimpleField('department', field_uri='contacts:Department', value_cls=string_type),
-        SimpleField('generation', field_uri='contacts:Generation', value_cls=string_type),
-        # SimpleField('im_addresses', field_uri='contacts:ImAddresses', value_cls=ImAddress, is_list=True),
-        SimpleField('job_title', field_uri='contacts:JobTitle', value_cls=string_type),
-        SimpleField('manager', field_uri='contacts:Manager', value_cls=string_type),
-        SimpleField('mileage', field_uri='contacts:Mileage', value_cls=string_type),
-        SimpleField('office', field_uri='contacts:OfficeLocation', value_cls=string_type),
-        SimpleField('profession', field_uri='contacts:Profession', value_cls=string_type),
-        SimpleField('surname', field_uri='contacts:Surname', value_cls=string_type),
-        # SimpleField('email_alias', field_uri='contacts:Alias', , value_cls=Email),
-        # SimpleField('notes', field_uri='contacts:Notes', value_cls=string_type),  # Only available from Exchange 2010 SP2
-    )
+        TextField('display_name', field_uri='contacts:DisplayName', is_required=True),
+        TextField('given_name', field_uri='contacts:GivenName'),
+        TextField('initials', field_uri='contacts:Initials'),
+        TextField('middle_name', field_uri='contacts:MiddleName'),
+        TextField('nickname', field_uri='contacts:Nickname'),
+        TextField('company_name', field_uri='contacts:CompanyName'),
+        EmailAddressField('email_addresses', field_uri='contacts:EmailAddress'),
+        PhysicalAddressField('physical_addresses', field_uri='contacts:PhysicalAddress'),
+        PhoneNumberField('phone_numbers', field_uri='contacts:PhoneNumber'),
+        TextField('assistant_name', field_uri='contacts:AssistantName'),
+        DateTimeField('birthday', field_uri='contacts:Birthday'),
+        URIField('business_homepage', field_uri='contacts:BusinessHomePage'),
+        TextField('companies', field_uri='contacts:Companies', is_list=True),
+        TextField('department', field_uri='contacts:Department'),
+        TextField('generation', field_uri='contacts:Generation'),
+        # IMAddressField('im_addresses', field_uri='contacts:ImAddresses', is_list=True),
+        TextField('job_title', field_uri='contacts:JobTitle'),
+        TextField('manager', field_uri='contacts:Manager'),
+        TextField('mileage', field_uri='contacts:Mileage'),
+        TextField('office', field_uri='contacts:OfficeLocation'),
+        TextField('profession', field_uri='contacts:Profession'),
+        TextField('surname', field_uri='contacts:Surname'),
+        # EmailField('email_alias', field_uri='contacts:Alias'),
+        # TextField('notes', field_uri='contacts:Notes'),  # Only available from Exchange 2010 SP2
+    ]
 
 
 class MeetingRequest(Item):
@@ -613,13 +602,13 @@ class MeetingRequest(Item):
     # TODO: Untested and unfinished. Only the bare minimum supported to allow reading a folder that contains meeting
     # requests.
     ELEMENT_NAME = 'MeetingRequest'
-    FIELDS = (
-        SimpleField('subject', field_uri='item:Subject', value_cls=Subject, is_required=True, is_read_only=True),
-        SimpleField('author', field_uri='message:From', value_cls=Mailbox, is_read_only=True),
-        SimpleField('is_read', field_uri='message:IsRead', value_cls=bool, is_read_only=True),
-        SimpleField('start', field_uri='calendar:Start', value_cls=EWSDateTime, is_read_only=True),
-        SimpleField('end', field_uri='calendar:End', value_cls=EWSDateTime, is_read_only=True),
-    )
+    FIELDS = [
+        TextField('subject', field_uri='item:Subject', max_length=255, is_required=True, is_read_only=True),
+        MailboxField('author', field_uri='message:From', is_read_only=True),
+        BooleanField('is_read', field_uri='message:IsRead', is_read_only=True),
+        DateTimeField('start', field_uri='calendar:Start', is_read_only=True),
+        DateTimeField('end', field_uri='calendar:End', is_read_only=True),
+    ]
 
 
 class MeetingResponse(Item):
@@ -627,13 +616,13 @@ class MeetingResponse(Item):
     # TODO: Untested and unfinished. Only the bare minimum supported to allow reading a folder that contains meeting
     # responses.
     ELEMENT_NAME = 'MeetingResponse'
-    FIELDS = (
-        SimpleField('subject', field_uri='item:Subject', value_cls=Subject, is_required=True, is_read_only=True),
-        SimpleField('author', field_uri='message:From', value_cls=Mailbox, is_read_only=True),
-        SimpleField('is_read', field_uri='message:IsRead', value_cls=bool, is_read_only=True),
-        SimpleField('start', field_uri='calendar:Start', value_cls=EWSDateTime, is_read_only=True),
-        SimpleField('end', field_uri='calendar:End', value_cls=EWSDateTime, is_read_only=True),
-    )
+    FIELDS = [
+        TextField('subject', field_uri='item:Subject', max_length=255, is_required=True, is_read_only=True),
+        MailboxField('author', field_uri='message:From', is_read_only=True),
+        BooleanField('is_read', field_uri='message:IsRead', is_read_only=True),
+        DateTimeField('start', field_uri='calendar:Start', is_read_only=True),
+        DateTimeField('end', field_uri='calendar:End', is_read_only=True),
+    ]
 
 
 class MeetingCancellation(Item):
@@ -641,13 +630,13 @@ class MeetingCancellation(Item):
     # TODO: Untested and unfinished. Only the bare minimum supported to allow reading a folder that contains meeting
     # cancellations.
     ELEMENT_NAME = 'MeetingCancellation'
-    FIELDS = (
-        SimpleField('subject', field_uri='item:Subject', value_cls=Subject, is_required=True, is_read_only=True),
-        SimpleField('author', field_uri='message:From', value_cls=Mailbox, is_read_only=True),
-        SimpleField('is_read', field_uri='message:IsRead', value_cls=bool, is_read_only=True),
-        SimpleField('start', field_uri='calendar:Start', value_cls=EWSDateTime, is_read_only=True),
-        SimpleField('end', field_uri='calendar:End', value_cls=EWSDateTime, is_read_only=True),
-    )
+    FIELDS = [
+        TextField('subject', field_uri='item:Subject', max_length=255, is_required=True, is_read_only=True),
+        MailboxField('author', field_uri='message:From', is_read_only=True),
+        BooleanField('is_read', field_uri='message:IsRead', is_read_only=True),
+        DateTimeField('start', field_uri='calendar:Start', is_read_only=True),
+        DateTimeField('end', field_uri='calendar:End', is_read_only=True),
+    ]
 
 
 ITEM_CLASSES = (CalendarItem, Contact, Message, Task, MeetingRequest, MeetingResponse, MeetingCancellation)
