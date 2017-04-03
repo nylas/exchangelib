@@ -1517,6 +1517,80 @@ class BaseItemTest(EWSTest):
             # Cannot update in send-only mode
             self.account.bulk_update(items=[], message_disposition=SEND_ONLY)
 
+    def test_invalid_direct_args(self):
+        with self.assertRaises(ValueError):
+            item = self.get_test_item()
+            item.account = None
+            item.save()  # Must have account on save
+        with self.assertRaises(ValueError):
+            item = self.get_test_item()
+            item.item_id = 'XXX'  # Fake a saved item
+            item.account = None
+            item.save()  # Must have account on update
+        with self.assertRaises(ValueError):
+            item = self.get_test_item()
+            item.save(update_fields=['foo', 'bar'])  # update_fields is only valid on update
+
+        with self.assertRaises(ValueError):
+            item = self.get_test_item()
+            item.account = None
+            item.send()  # Must have account on send
+        with self.assertRaises(ErrorItemNotFound):
+            item = self.get_test_item()
+            item.save()
+            item_id, changekey = item.item_id, item.changekey
+            item.delete()
+            item.item_id, item.changekey = item_id, changekey
+            item.send()  # Item disappeared
+        with self.assertRaises(AttributeError):
+            item = self.get_test_item()
+            item.send(copy_to_folder=self.account.trash, save_copy=False)  # Inconsistent args
+
+        with self.assertRaises(ValueError):
+            item = self.get_test_item()
+            item.account = None
+            item.refresh()  # Must have account on refresh
+        with self.assertRaises(ValueError):
+            item = self.get_test_item()
+            item.refresh()  # Refresh an item that has not been saved
+        with self.assertRaises(ErrorItemNotFound):
+            item = self.get_test_item()
+            item.save()
+            item_id, changekey = item.item_id, item.changekey
+            item.delete()
+            item.item_id, item.changekey = item_id, changekey
+            item.refresh()  # Refresh an item that doesn't exist
+
+        with self.assertRaises(ValueError):
+            item = self.get_test_item()
+            item.account = None
+            item.move(to_folder=self.test_folder)  # Must have an account on move
+        with self.assertRaises(ValueError):
+            item = self.get_test_item()
+            item.move(to_folder=self.test_folder)  # Must be an existing item
+        with self.assertRaises(ErrorItemNotFound):
+            item = self.get_test_item()
+            item.save()
+            item_id, changekey = item.item_id, item.changekey
+            item.delete()
+            item.item_id, item.changekey = item_id, changekey
+            item.move(to_folder=self.test_folder)  # Item disappeared
+
+        with self.assertRaises(ValueError):
+            item = self.get_test_item()
+            item.account = None
+            item.delete()  # Must have an account
+        with self.assertRaises(ValueError):
+            item = self.get_test_item()
+            item.delete()  # Must be an existing item
+        with self.assertRaises(ErrorItemNotFound):
+            item = self.get_test_item()
+            item.save()
+            item_id, changekey = item.item_id, item.changekey
+            item.delete()
+            item.item_id, item.changekey = item_id, changekey
+            item.delete()  # Item disappeared
+
     def test_querysets(self):
         test_items = []
         for i in range(4):
@@ -2626,7 +2700,7 @@ class BaseItemTest(EWSTest):
         with self.assertRaises(ValueError):
             self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=TestProp)  # Already registered
         with self.assertRaises(ValueError):
-            self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=Mailbox)  # Not an extended property
+            self.ITEM_CLASS.register(attr_name='XXX', attr_cls=Mailbox)  # Not an extended property
         self.ITEM_CLASS.deregister(attr_name=attr_name)
         self.assertNotIn(attr_name, self.ITEM_CLASS.fieldnames())
 
@@ -2964,6 +3038,13 @@ class MessagesTest(BaseItemTest):
         item.send_and_save()
         self.assertIsNone(item.item_id)
         self.assertIsNone(item.changekey)
+        time.sleep(5)  # Requests are supposed to be transactional, but apparently not...
+        self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 1)
+
+        # Test update, although it makes little sense
+        item = self.get_test_item()
+        item.save()
+        item.send_and_save()
         time.sleep(5)  # Requests are supposed to be transactional, but apparently not...
         self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 1)
 

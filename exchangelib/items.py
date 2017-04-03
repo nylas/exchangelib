@@ -4,6 +4,7 @@ from decimal import Decimal
 from future.utils import python_2_unicode_compatible
 from six import string_types
 
+from .errors import ErrorItemNotFound
 from .ewsdatetime import UTC_NOW
 from .extended_properties import ExtendedProperty
 from .fields import BooleanField, IntegerField, DecimalField, Base64Field, TextField, ChoiceField, \
@@ -188,8 +189,6 @@ class Item(EWSElement):
             assert len(res) == 0
             return None
         else:
-            if not res:
-                raise ValueError('Item disappeared')
             assert len(res) == 1, res
             if isinstance(res[0], Exception):
                 raise res[0]
@@ -202,8 +201,6 @@ class Item(EWSElement):
         if not self.item_id:
             raise ValueError('Item must have an ID')
         res = list(self.account.fetch(ids=[self]))
-        if not res:
-            raise ValueError('Item disappeared')
         assert len(res) == 1, res
         if isinstance(res[0], Exception):
             raise res[0]
@@ -219,8 +216,6 @@ class Item(EWSElement):
         if not self.item_id:
             raise ValueError('Item must have an ID')
         res = self.account.bulk_move(ids=[self], to_folder=to_folder)
-        if not res:
-            raise ValueError('Item disappeared')
         assert len(res) == 1, res
         if isinstance(res[0], Exception):
             raise res[0]
@@ -258,8 +253,6 @@ class Item(EWSElement):
         res = self.account.bulk_delete(
             ids=[self], delete_type=delete_type, send_meeting_cancellations=send_meeting_cancellations,
             affected_task_occurrences=affected_task_occurrences, suppress_read_receipts=suppress_read_receipts)
-        if not res:
-            raise ValueError('Item disappeared')
         assert len(res) == 1, res
         if isinstance(res[0], Exception):
             raise res[0]
@@ -451,8 +444,6 @@ class Message(Item):
             raise ValueError('Item must have an account')
         if self.item_id:
             res = self.account.bulk_send(ids=[self], save_copy=save_copy, copy_to_folder=copy_to_folder)
-            if not res:
-                raise ValueError('Item disappeared')
             assert len(res) == 1, res
             if isinstance(res[0], Exception):
                 raise res[0]
