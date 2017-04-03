@@ -203,6 +203,37 @@ class EWSDateTimeTest(unittest.TestCase):
         self.assertEqual(EWSDate(2000, 1, 1).ewsformat(), '2000-01-01')
 
 
+class PropertiesTest(unittest.TestCase):
+    def test_internet_message_headers(self):
+        # Message headers are read-only, and an integration test is difficult because we can't reliably AND quickly
+        # generate emails that pass through some relay server that adds headers. Create a unit test instead.
+        payload = '''\
+<?xml version="1.0" encoding="utf-8"?>
+<s:Envelope xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages" xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
+    <t:InternetMessageHeaders>
+        <t:InternetMessageHeader HeaderName="Received">from foo by bar</t:InternetMessageHeader>
+        <t:InternetMessageHeader HeaderName="DKIM-Signature">Hello from DKIM</t:InternetMessageHeader>
+        <t:InternetMessageHeader HeaderName="MIME-Version">1.0</t:InternetMessageHeader>
+        <t:InternetMessageHeader HeaderName="X-Mailer">Contoso Mail</t:InternetMessageHeader>
+        <t:InternetMessageHeader HeaderName="Return-Path">foo@example.com</t:InternetMessageHeader>
+    </t:InternetMessageHeaders>
+</s:Envelope'''
+        headers_elem = to_xml(payload, encoding='ascii').find('{%s}InternetMessageHeaders' % TNS)
+        headers = {}
+        for elem in headers_elem.findall('{%s}InternetMessageHeader' % TNS):
+            header = MessageHeader.from_xml(elem)
+            headers[header.name] = header.value
+        self.assertDictEqual(
+            headers,
+            {
+                'Received': 'from foo by bar',
+                'DKIM-Signature': 'Hello from DKIM',
+                'MIME-Version': '1.0',
+                'X-Mailer': 'Contoso Mail',
+                'Return-Path': 'foo@example.com',
+            }
+        )
+
 class RestrictionTest(unittest.TestCase):
     def setUp(self):
         self.maxDiff = None
@@ -517,9 +548,6 @@ class EWSTest(unittest.TestCase):
         if isinstance(field, DateTimeField):
             return get_random_datetime()
         if isinstance(field, EWSElementField):
-            if field.value_cls == MessageHeader:
-                return [MessageHeader(name=get_random_string(10), value=get_random_string(255))
-                        for _ in range(random.randint(1, 4))]
             if isinstance(field, AttachmentField):
                 return [FileAttachment(name='my_file.txt', content=b'test_content')]
             if isinstance(field, MailboxField):
