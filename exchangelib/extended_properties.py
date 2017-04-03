@@ -136,7 +136,7 @@ class ExtendedProperty(EWSElement):
 
     @classmethod
     def is_array_type(cls):
-        return cls.property_type.endswith('Array')
+        return cls.property_type and cls.property_type.endswith('Array')
 
     @classmethod
     def property_tag_as_int(cls):
