@@ -1,5 +1,6 @@
 # coding=utf-8
 import datetime
+import io
 import os
 import random
 import string
@@ -11,7 +12,7 @@ from keyword import kwlist
 from xml.etree.ElementTree import ParseError
 
 import requests
-from six import PY2, text_type, string_types, python_2_unicode_compatible
+from six import PY2, string_types
 from yaml import load
 
 from exchangelib import close_connections
@@ -209,7 +210,7 @@ class PropertiesTest(unittest.TestCase):
         # generate emails that pass through some relay server that adds headers. Create a unit test instead.
         payload = '''\
 <?xml version="1.0" encoding="utf-8"?>
-<s:Envelope xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages" xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
+<Envelope xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
     <t:InternetMessageHeaders>
         <t:InternetMessageHeader HeaderName="Received">from foo by bar</t:InternetMessageHeader>
         <t:InternetMessageHeader HeaderName="DKIM-Signature">Hello from DKIM</t:InternetMessageHeader>
@@ -217,7 +218,7 @@ class PropertiesTest(unittest.TestCase):
         <t:InternetMessageHeader HeaderName="X-Mailer">Contoso Mail</t:InternetMessageHeader>
         <t:InternetMessageHeader HeaderName="Return-Path">foo@example.com</t:InternetMessageHeader>
     </t:InternetMessageHeaders>
-</s:Envelope'''
+</Envelope'''
         headers_elem = to_xml(payload, encoding='ascii').find('{%s}InternetMessageHeaders' % TNS)
         headers = {}
         for elem in headers_elem.findall('{%s}InternetMessageHeader' % TNS):
@@ -233,6 +234,7 @@ class PropertiesTest(unittest.TestCase):
                 'Return-Path': 'foo@example.com',
             }
         )
+
 
 class RestrictionTest(unittest.TestCase):
     def setUp(self):
@@ -316,23 +318,15 @@ class RestrictionTest(unittest.TestCase):
 
 
 class QuerySetTest(unittest.TestCase):
-    @python_2_unicode_compatible
-    class MockAccount(Account):
-        def __init__(self):
-            pass
-
-        def __str__(self):
-            return ''
-
     def test_from_folder(self):
-        folder = Inbox(account=self.MockAccount())
+        folder = Inbox(account='XXX')
         self.assertIsInstance(folder.all(), QuerySet)
         self.assertIsInstance(folder.none(), QuerySet)
         self.assertIsInstance(folder.filter(subject='foo'), QuerySet)
         self.assertIsInstance(folder.exclude(subject='foo'), QuerySet)
 
     def test_queryset_copy(self):
-        qs = QuerySet(folder=Inbox(account=self.MockAccount()))
+        qs = QuerySet(folder=Inbox(account='XXX'))
         qs.q = Q()
         qs.only_fields = ('a', 'b')
         qs.order_fields = ('c', 'd')
@@ -501,7 +495,8 @@ class EWSTest(unittest.TestCase):
         self.config = Configuration(server=settings['server'],
                                     credentials=Credentials(settings['username'], settings['password']),
                                     verify_ssl=settings['verify_ssl'])
-        self.account = Account(primary_smtp_address=settings['account'], access_type=DELEGATE, config=self.config, locale='da_DK')
+        self.account = Account(primary_smtp_address=settings['account'], access_type=DELEGATE, config=self.config,
+                               locale='da_DK')
         self.maxDiff = None
 
     def bulk_delete(self, ids):
@@ -552,7 +547,7 @@ class EWSTest(unittest.TestCase):
                 return [FileAttachment(name='my_file.txt', content=b'test_content')]
             if isinstance(field, MailboxField):
                 # email_address must be a real account on the server(?)
-                # TODO: Mailbox has multiple optional args, but they must match the server account, so we can't easily test.
+                # TODO: Mailbox has multiple optional args but vals must match server account, so we can't easily test
                 if get_random_bool():
                     val = Mailbox(email_address=self.account.primary_smtp_address)
                 else:
@@ -603,6 +598,16 @@ class EWSTest(unittest.TestCase):
 
 
 class CommonTest(EWSTest):
+    @staticmethod
+    def pprint(xml_str):
+        from lxml.etree import parse, tostring
+        return tostring(parse(
+            io.BytesIO(xml_str)),
+            xml_declaration=True,
+            encoding='utf-8',
+            pretty_print=True
+        ).replace(b'\t', b'    ').replace(b' xmlns:', b'\n    xmlns:')
+
     def test_wrap(self):
         # Test payload wrapper with both delegation, impersonation and timezones
         MockAccount = namedtuple('Account', ['access_type', 'primary_smtp_address'])
@@ -613,59 +618,66 @@ class CommonTest(EWSTest):
         tz = MockTZ('XXX')
         wrapped = wrap(content=content, version=version, account=account)
         self.assertEqual(
-            wrapped,
-            b''.join(l.strip() for l in b'''\
-<?xml version="1.0" encoding="utf-8"?>
-<s:Envelope xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages" xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
-    <s:Header>
-        <t:RequestServerVersion Version="BBB" />
-    </s:Header>
-    <s:Body>
-        <AAA />
-    </s:Body>
-</s:Envelope>'''.split(b'\n')))
-
+            self.pprint(wrapped),
+            b'''<?xml version='1.0' encoding='utf-8'?>
+<s:Envelope
+    xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"
+    xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"
+    xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
+  <s:Header>
+    <t:RequestServerVersion Version="BBB"/>
+  </s:Header>
+  <s:Body>
+    <AAA/>
+  </s:Body>
+</s:Envelope>
+''')
         account = MockAccount(IMPERSONATION, 'foo@example.com')
         wrapped = wrap(content=content, version=version, account=account, encoding='utf-8')
         self.assertEqual(
-            wrapped,
-            b''.join(l.strip() for l in b'''\
-<?xml version="1.0" encoding="utf-8"?>
-<s:Envelope xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages" xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
-    <s:Header>
-        <t:RequestServerVersion Version="BBB" />
-        <t:ExchangeImpersonation>
-            <t:ConnectingSID>
-                <t:PrimarySmtpAddress>foo@example.com</t:PrimarySmtpAddress>
-            </t:ConnectingSID>
-        </t:ExchangeImpersonation>
-    </s:Header>
-    <s:Body>
-        <AAA />
-    </s:Body>
-</s:Envelope>'''.split(b'\n')))
-
+            self.pprint(wrapped),
+            b'''<?xml version='1.0' encoding='utf-8'?>
+<s:Envelope
+    xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"
+    xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"
+    xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
+  <s:Header>
+    <t:RequestServerVersion Version="BBB"/>
+    <t:ExchangeImpersonation>
+      <t:ConnectingSID>
+        <t:PrimarySmtpAddress>foo@example.com</t:PrimarySmtpAddress>
+      </t:ConnectingSID>
+    </t:ExchangeImpersonation>
+  </s:Header>
+  <s:Body>
+    <AAA/>
+  </s:Body>
+</s:Envelope>
+''')
         wrapped = wrap(content=content, version=version, account=account, ewstimezone=tz, encoding='latin1')
         self.assertEqual(
-            wrapped,
-            b''.join(l.strip() for l in b'''\
-<?xml version="1.0" encoding="latin1"?>
-<s:Envelope xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages" xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
-    <s:Header>
-        <t:RequestServerVersion Version="BBB" />
-        <t:ExchangeImpersonation>
-            <t:ConnectingSID>
-                <t:PrimarySmtpAddress>foo@example.com</t:PrimarySmtpAddress>
-            </t:ConnectingSID>
-        </t:ExchangeImpersonation>
-        <t:TimeZoneContext>
-            <t:TimeZoneDefinition Id="XXX" />
-        </t:TimeZoneContext>
-    </s:Header>
-    <s:Body>
-        <AAA />
-    </s:Body>
-</s:Envelope>'''.split(b'\n')))
+            self.pprint(wrapped),
+            b'''<?xml version='1.0' encoding='utf-8'?>
+<s:Envelope
+    xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"
+    xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"
+    xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
+  <s:Header>
+    <t:RequestServerVersion Version="BBB"/>
+    <t:ExchangeImpersonation>
+      <t:ConnectingSID>
+        <t:PrimarySmtpAddress>foo@example.com</t:PrimarySmtpAddress>
+      </t:ConnectingSID>
+    </t:ExchangeImpersonation>
+    <t:TimeZoneContext>
+      <t:TimeZoneDefinition Id="XXX"/>
+    </t:TimeZoneContext>
+  </s:Header>
+  <s:Body>
+    <AAA/>
+  </s:Body>
+</s:Envelope>
+''')
 
     def test_poolsize(self):
         self.assertEqual(self.config.protocol.SESSION_POOLSIZE, 4)
@@ -858,7 +870,7 @@ class CommonTest(EWSTest):
     def test_post_ratelimited(self):
         url = 'https://example.com'
 
-        def mock_session_post(status_code, headers, text):
+        def mock_post(status_code, headers, text):
             req = namedtuple('request', ['headers'])(headers={})
             return lambda **kwargs: namedtuple(
                 'response', ['status_code', 'headers', 'text', 'request', 'history', 'url']
@@ -877,78 +889,78 @@ class CommonTest(EWSTest):
         session = protocol.get_session()
 
         # Test the straight, HTTP 200 path
-        session.post = mock_session_post(200, {}, 'foo')
+        session.post = mock_post(200, {}, 'foo')
         r, session = post_ratelimited(protocol=protocol, session=session, url='', headers=None, data='')
         self.assertEqual(r.text, 'foo')
 
         # Test exceptions raises by the POST request
-        for exc_cls in CONNECTION_ERRORS:
-            session.post = mock_session_exception(exc_cls)
-            with self.assertRaises(exc_cls):
+        for err_cls in CONNECTION_ERRORS:
+            session.post = mock_session_exception(err_cls)
+            with self.assertRaises(err_cls):
                 r, session = post_ratelimited(protocol=protocol, session=session, url='', headers=None, data='')
 
         # Test bad exit codes and headers
-        session.post = mock_session_post(401, {}, '')
+        session.post = mock_post(401, {}, '')
         with self.assertRaises(UnauthorizedError):
             r, session = post_ratelimited(protocol=protocol, session=session, url='', headers=None, data='')
-        session.post = mock_session_post(999, {'connection': 'close'}, '')
+        session.post = mock_post(999, {'connection': 'close'}, '')
         with self.assertRaises(TransportError):
             r, session = post_ratelimited(protocol=protocol, session=session, url='', headers=None, data='')
-        session.post = mock_session_post(302, {'location': '/ews/genericerrorpage.htm?aspxerrorpath=/ews/exchange.asmx'}, '')
+        session.post = mock_post(302, {'location': '/ews/genericerrorpage.htm?aspxerrorpath=/ews/exchange.asmx'}, '')
         with self.assertRaises(TransportError):
             r, session = post_ratelimited(protocol=protocol, session=session, url='', headers=None, data='')
-        session.post = mock_session_post(503, {}, '')
+        session.post = mock_post(503, {}, '')
         with self.assertRaises(TransportError):
             r, session = post_ratelimited(protocol=protocol, session=session, url='', headers=None, data='')
 
         # No redirect header
-        session.post = mock_session_post(302, {}, '')
+        session.post = mock_post(302, {}, '')
         with self.assertRaises(TransportError):
             r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
         # Redirect header to same location
-        session.post = mock_session_post(302, {'location': url}, '')
+        session.post = mock_post(302, {'location': url}, '')
         with self.assertRaises(TransportError):
             r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
         # Redirect header to relative location
-        session.post = mock_session_post(302, {'location': url + '/foo'}, '')
+        session.post = mock_post(302, {'location': url + '/foo'}, '')
         with self.assertRaises(RedirectError):
             r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
         # Redirect header to other location and allow_redirects=False
-        session.post = mock_session_post(302, {'location': 'https://contoso.com'}, '')
+        session.post = mock_post(302, {'location': 'https://contoso.com'}, '')
         with self.assertRaises(TransportError):
             r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
         # Redirect header to other location and allow_redirects=True
         import exchangelib.util
         exchangelib.util.MAX_REDIRECTS = 0
-        session.post = mock_session_post(302, {'location': 'https://contoso.com'}, '')
+        session.post = mock_post(302, {'location': 'https://contoso.com'}, '')
         with self.assertRaises(TransportError):
             r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='',
                                           allow_redirects=True)
 
         # CAS error
-        session.post = mock_session_post(999, {'X-CasErrorCode': 'AAARGH!'}, '')
+        session.post = mock_post(999, {'X-CasErrorCode': 'AAARGH!'}, '')
         with self.assertRaises(CASError):
             r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
 
         # Allow XML data in a non-HTTP 200 response
-        session.post = mock_session_post(500, {}, '<?xml version="1.0" ?><foo></foo>')
+        session.post = mock_post(500, {}, '<?xml version="1.0" ?><foo></foo>')
         r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
         self.assertEqual(r.text, '<?xml version="1.0" ?><foo></foo>')
 
         # Bad status_code and bad text
-        session.post = mock_session_post(999, {}, '')
+        session.post = mock_post(999, {}, '')
         with self.assertRaises(TransportError):
             r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
 
         # Rate limit exceeded
         protocol.credentials = ServiceAccount(username=credentials.username, password=credentials.password, max_wait=1)
-        session.post = mock_session_post(503, {'connection': 'close'}, '')
+        session.post = mock_post(503, {'connection': 'close'}, '')
         protocol.renew_session = lambda s: s  # Return the same session so it's still mocked
         with self.assertRaises(RateLimitError):
             r, session = post_ratelimited(protocol=protocol, session=session, url='', headers=None, data='')
         # Test something larger than the default wait, so we retry at least once
         protocol.credentials.max_wait = 15
-        session.post = mock_session_post(503, {'connection': 'close'}, '')
+        session.post = mock_post(503, {'connection': 'close'}, '')
         with self.assertRaises(RateLimitError):
             r, session = post_ratelimited(protocol=protocol, session=session, url='', headers=None, data='')
 
@@ -999,7 +1011,7 @@ class CommonTest(EWSTest):
         # Test for all EWSElement classes that they handle None as input to from_xml()
         import exchangelib
         for mod in (exchangelib.attachments, exchangelib.extended_properties, exchangelib.indexed_properties,
-                       exchangelib.folders, exchangelib.items, exchangelib.properties):
+                    exchangelib.folders, exchangelib.items, exchangelib.properties):
             for k, v in vars(mod).items():
                 if type(v) != type:
                     continue
@@ -1112,6 +1124,8 @@ class AutodiscoverTest(EWSTest):
 
     def test_autodiscover_cache(self):
         from exchangelib.autodiscover import _autodiscover_cache
+        import exchangelib.autodiscover
+
         # Empty the cache
         _autodiscover_cache.clear()
         cache_key = (self.account.domain, self.config.credentials, self.config.protocol.verify_ssl)
@@ -1135,9 +1149,10 @@ class AutodiscoverTest(EWSTest):
         )
         discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
         self.assertIn(cache_key, _autodiscover_cache)
+
         # Make sure that the cache is actually used on the second call to discover()
-        import exchangelib.autodiscover
         _orig = exchangelib.autodiscover._try_autodiscover
+
         def _mock(*args, **kwargs):
             raise NotImplementedError()
         exchangelib.autodiscover._try_autodiscover = _mock
@@ -1175,24 +1190,27 @@ class AutodiscoverTest(EWSTest):
         del _autodiscover_cache
 
     def test_autodiscover_redirect(self):
+        import exchangelib.autodiscover
         # Prime the cache
         email, p = discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
-        # Test that we can get another address back than the address we're looking up
-        import exchangelib.autodiscover
         _orig = exchangelib.autodiscover._autodiscover_quick
+
+        # Test that we can get another address back than the address we're looking up
         def _mock1(credentials, email, protocol):
             return 'john@example.com', p
         exchangelib.autodiscover._autodiscover_quick = _mock1
         test_email, p = discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
         self.assertEqual(test_email, 'john@example.com')
+
         # Test that we can survive being asked to lookup with another address
         def _mock2(credentials, email, protocol):
-            if email == 'xxxxxx@'+self.account.domain:
+            if email == 'xxxxxx@%s' % self.account.domain:
                 raise ErrorNonExistentMailbox(email)
             raise AutoDiscoverRedirect(redirect_email='xxxxxx@'+self.account.domain)
         exchangelib.autodiscover._autodiscover_quick = _mock2
         with self.assertRaises(ErrorNonExistentMailbox):
             discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
+
         # Test that we catch circular redirects
         def _mock3(credentials, email, protocol):
             raise AutoDiscoverRedirect(redirect_email=self.account.primary_smtp_address)
@@ -1399,7 +1417,10 @@ class BaseItemTest(EWSTest):
                 # Start with an incomplete task
                 status = get_random_choice(f.choices - {Task.COMPLETED})
                 insert_kwargs[f.name] = status
-                insert_kwargs['percent_complete'] = Decimal(0) if status == Task.NOT_STARTED else get_random_decimal(1, 99)
+                if status == Task.NOT_STARTED:
+                    insert_kwargs['percent_complete'] = Decimal(0)
+                else:
+                    insert_kwargs['percent_complete'] = get_random_decimal(1, 99)
                 continue
             if f.name == 'percent_complete':
                 continue
@@ -1451,7 +1472,7 @@ class BaseItemTest(EWSTest):
                 update_kwargs[f.name] = not insert_kwargs[f.name]
                 continue
             if f.value_cls == Choice:
-                update_kwargs[f.name] = get_random_choice([v for v in f.choices if v!= insert_kwargs[f.name]])
+                update_kwargs[f.name] = get_random_choice([v for v in f.choices if v != insert_kwargs[f.name]])
                 continue
             if f.value_cls in (Mailbox, Attendee):
                 if insert_kwargs[f.name] is None:
@@ -1750,7 +1771,7 @@ class BaseItemTest(EWSTest):
         self.assertEqual(len(list(qs[1:3])), 2)
         self.assertEqual(len(qs), 4)
         with self.assertRaises(IndexError):
-            foo = qs[99999]
+            print(qs[99999])
         # Exists
         self.assertEqual(qs.exists(), True)
         self.assertEqual(qs.filter(subject='Test XXX').exists(), False)
@@ -1835,11 +1856,13 @@ class BaseItemTest(EWSTest):
             self.test_folder.bulk_create(items=test_items)
             qs = QuerySet(self.test_folder).filter(categories__contains=self.categories)
             self.assertEqual(
-                [i[0].email for i in qs.order_by('email_addresses__%s' % label).values_list('email_addresses', flat=True)],
+                [i[0].email for i in qs.order_by('email_addresses__%s' % label)
+                    .values_list('email_addresses', flat=True)],
                 ['0@foo.com', '1@foo.com', '2@foo.com', '3@foo.com']
             )
             self.assertEqual(
-                [i[0].email for i in qs.order_by('-email_addresses__%s' % label).values_list('email_addresses', flat=True)],
+                [i[0].email for i in qs.order_by('-email_addresses__%s' % label)
+                    .values_list('email_addresses', flat=True)],
                 ['3@foo.com', '2@foo.com', '1@foo.com', '0@foo.com']
             )
             self.bulk_delete(qs)
@@ -1853,11 +1876,13 @@ class BaseItemTest(EWSTest):
             self.test_folder.bulk_create(items=test_items)
             qs = QuerySet(self.test_folder).filter(categories__contains=self.categories)
             self.assertEqual(
-                [i[0].street for i in qs.order_by('physical_addresses__%s__street' % label).values_list('physical_addresses', flat=True)],
+                [i[0].street for i in qs.order_by('physical_addresses__%s__street' % label)
+                    .values_list('physical_addresses', flat=True)],
                 ['Elm St 0', 'Elm St 1', 'Elm St 2', 'Elm St 3']
             )
             self.assertEqual(
-                [i[0].street for i in qs.order_by('-physical_addresses__%s__street' % label).values_list('physical_addresses', flat=True)],
+                [i[0].street for i in qs.order_by('-physical_addresses__%s__street' % label)
+                    .values_list('physical_addresses', flat=True)],
                 ['Elm St 3', 'Elm St 2', 'Elm St 1', 'Elm St 0']
             )
             self.bulk_delete(qs)
@@ -2238,12 +2263,11 @@ class BaseItemTest(EWSTest):
                 # Filter all others with =, __in and __contains. We could have more filters here, but these should
                 # always match.
                 filter_kwargs = [{f.name: val}, {'%s__in' % f.name: [val]}]
-                if f.value_cls in string_types and not isinstance(f, ChoiceField) and f.name not in ('display_name'):
+                if isinstance(f, TextField) and not isinstance(f, (ChoiceField, BodyField)):
                     # Choice fields cannot be filtered using __contains
-                    # For some reason, 'display_name__contains' does not match. Error in EWS?
                     filter_kwargs.append({'%s__contains' % f.name: val})
             for kw in filter_kwargs:
-                self.assertEqual(len(common_qs.filter(**kw)), 1)
+                self.assertEqual(len(common_qs.filter(**kw)), 1, (f.name, val, kw))
         self.bulk_delete(ids)
 
     def test_paging(self):
@@ -2563,7 +2587,7 @@ class BaseItemTest(EWSTest):
         self.assertEqual(len(update_ids), 1)
         self.assertEqual(len(update_ids[0]), 2, update_ids)
         self.assertEqual(insert_ids[0].item_id, update_ids[0][0])  # ID should be the same
-        self.assertNotEqual(insert_ids[0].changekey, update_ids[0][1])  # Changekey should not be the same when item is updated
+        self.assertNotEqual(insert_ids[0].changekey, update_ids[0][1])  # Changekey should change when item is updated
         item = list(self.account.fetch(update_ids))[0]
         for f in self.ITEM_CLASS.FIELDS:
             if f.is_read_only:
@@ -2622,7 +2646,7 @@ class BaseItemTest(EWSTest):
         self.assertEqual(len(wipe2_ids), 1)
         self.assertEqual(len(wipe2_ids[0]), 2, wipe2_ids)
         self.assertEqual(insert_ids[0].item_id, wipe2_ids[0][0])  # ID should be the same
-        self.assertNotEqual(insert_ids[0].changekey, wipe2_ids[0][1])  # Changekey should not be the same when item is updated
+        self.assertNotEqual(insert_ids[0].changekey, wipe2_ids[0][1])  # Changekey should change when item is updated
         item = list(self.account.fetch(wipe2_ids))[0]
         self.assertEqual(item.extern_id, extern_id)
 
@@ -3079,16 +3103,34 @@ class CalendarTest(BaseItemTest):
             return set(i.categories) == set(self.categories)
 
         # Test dates
-        self.assertEqual(len([i for i in self.test_folder.view(start=item1.start, end=item1.end) if match_cat(i)]), 1)
-        self.assertEqual(len([i for i in self.test_folder.view(start=item1.start, end=item2.end) if match_cat(i)]), 2)
+        self.assertEqual(
+            len([i for i in self.test_folder.view(start=item1.start, end=item1.end) if match_cat(i)]),
+            1
+        )
+        self.assertEqual(
+            len([i for i in self.test_folder.view(start=item1.start, end=item2.end) if match_cat(i)]),
+            2
+        )
         # Edge cases. Get view from end of item1 to start of item2. Should logically return 0 items, but Exchange wants
         # it differently and returns item1 even though there is no overlap.
-        self.assertEqual(len([i for i in self.test_folder.view(start=item1.end, end=item2.start) if match_cat(i)]), 1)
-        self.assertEqual(len([i for i in self.test_folder.view(start=item1.start, end=item2.start) if match_cat(i)]), 1)
+        self.assertEqual(
+            len([i for i in self.test_folder.view(start=item1.end, end=item2.start) if match_cat(i)]),
+            1
+        )
+        self.assertEqual(
+            len([i for i in self.test_folder.view(start=item1.start, end=item2.start) if match_cat(i)]),
+            1
+        )
 
         # Test max_items
-        self.assertEqual(len([i for i in self.test_folder.view(start=item1.start, end=item2.end, max_items=9999) if match_cat(i)]), 2)
-        self.assertEqual(len(self.test_folder.view(start=item1.start, end=item2.end, max_items=1)), 1)
+        self.assertEqual(
+            len([i for i in self.test_folder.view(start=item1.start, end=item2.end, max_items=9999) if match_cat(i)]),
+            2
+        )
+        self.assertEqual(
+            len(self.test_folder.view(start=item1.start, end=item2.end, max_items=1)),
+            1
+        )
 
         # Test chaining
         qs = self.test_folder.view(start=item1.start, end=item2.end)
@@ -3183,13 +3225,13 @@ def get_random_bool():
     return bool(random.randint(0, 1))
 
 
-def get_random_int(min=0, max=2147483647):
-    return random.randint(min, max)
+def get_random_int(min_val=0, max_val=2147483647):
+    return random.randint(min_val, max_val)
 
 
-def get_random_decimal(min=0, max=100):
+def get_random_decimal(min_val=0, max_val=100):
     precision = 2
-    val = get_random_int(min, max * 10**precision) / 10.0**precision
+    val = get_random_int(min_val, max_val * 10**precision) / 10.0**precision
     return Decimal('{:.2f}'.format(val))
 
 
@@ -3239,7 +3281,7 @@ def get_random_datetime(start_date=datetime.date(1900, 1, 1), end_date=datetime.
     # Create a random datetime with minute precision
     random_date = get_random_date(start_date=start_date, end_date=end_date)
     random_datetime = datetime.datetime.combine(random_date, datetime.time.min) \
-                      + datetime.timedelta(minutes=random.randint(0, 60 * 24))
+        + datetime.timedelta(minutes=random.randint(0, 60 * 24))
     return UTC.localize(EWSDateTime.from_datetime(random_datetime))
 
 
