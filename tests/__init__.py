@@ -1558,7 +1558,7 @@ class BaseItemTest(EWSTest):
             item = self.get_test_item()
             item.save()
             item_id, changekey = item.item_id, item.changekey
-            item.delete()
+            item.delete(affected_task_occurrences=ALL_OCCURRENCIES)
             item.item_id, item.changekey = item_id, changekey
             item.refresh()  # Refresh an item that doesn't exist
 
@@ -1573,7 +1573,7 @@ class BaseItemTest(EWSTest):
             item = self.get_test_item()
             item.save()
             item_id, changekey = item.item_id, item.changekey
-            item.delete()
+            item.delete(affected_task_occurrences=ALL_OCCURRENCIES)
             item.item_id, item.changekey = item_id, changekey
             item.move(to_folder=self.test_folder)  # Item disappeared
 
@@ -1583,14 +1583,14 @@ class BaseItemTest(EWSTest):
             item.delete()  # Must have an account
         with self.assertRaises(ValueError):
             item = self.get_test_item()
-            item.delete()  # Must be an existing item
+            item.delete(affected_task_occurrences=ALL_OCCURRENCIES)  # Must be an existing item
         with self.assertRaises(ErrorItemNotFound):
             item = self.get_test_item()
             item.save()
             item_id, changekey = item.item_id, item.changekey
-            item.delete()
+            item.delete(affected_task_occurrences=ALL_OCCURRENCIES)
             item.item_id, item.changekey = item_id, changekey
-            item.delete()  # Item disappeared
+            item.delete(affected_task_occurrences=ALL_OCCURRENCIES)  # Item disappeared
 
     def test_querysets(self):
         test_items = []
