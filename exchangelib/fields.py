@@ -575,6 +575,9 @@ class SubField(Field):
     def to_xml(self, value, version):
         return value
 
+    def __hash__(self):
+        return hash(self.name)
+
 
 class EmailSubField(SubField):
     value_cls = string_type
