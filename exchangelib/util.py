@@ -1,5 +1,6 @@
 from __future__ import unicode_literals
 
+import base64
 from copy import deepcopy
 from decimal import Decimal
 import io
@@ -115,6 +116,8 @@ def value_to_xml_text(value):
     from .ewsdatetime import EWSDateTime
     from .indexed_properties import PhoneNumber, EmailAddress
     from .properties import Mailbox, Attendee
+    if isinstance(value, bytes):
+        return base64.b64encode(value).decode('ascii')
     if isinstance(value, string_types):
         return safe_xml_value(value)
     if isinstance(value, bool):
@@ -142,9 +145,8 @@ def xml_text_to_value(value, value_type):
         # Return builtin str unprocessed
         return value
     if value_type == bytes:
-        # Return builtin bytes unprocessed. The XML returns binary data as plain strings, so we'll leave it to the
-        # caller to decide how to decode.
-        return value
+        # EWS sends binary data base64-encoded. Decode before returning to user
+        return base64.b64decode(value)
     if issubclass(value_type, string_type):
         # Cast string-like values to their intended class
         return value_type(value)
@@ -162,7 +164,7 @@ def xml_text_to_value(value, value_type):
 def set_xml_value(elem, value, version):
     from .folders import EWSElement
     from .ewsdatetime import EWSDateTime
-    if isinstance(value, string_types + (bool, int, bytes, Decimal, EWSDateTime)):
+    if isinstance(value, string_types + (bool, bytes, int, Decimal, EWSDateTime)):
         elem.text = value_to_xml_text(value)
     elif isinstance(value, (tuple, list, set)):
         for v in value:

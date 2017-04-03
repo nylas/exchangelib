@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from six import string_types
 
+from .ewsdatetime import EWSDateTime
 from .properties import EWSElement
 from .services import TNS
 from .util import create_element, add_xml_child, get_xml_attrs, get_xml_attr, set_xml_value, value_to_xml_text, \
@@ -108,6 +109,32 @@ class ExtendedProperty(EWSElement):
             assert isinstance(self.value, python_type)
 
     @classmethod
+    def from_xml(cls, elem):
+        # Gets value of this specific ExtendedProperty from a list of 'ExtendedProperty' XML elements
+        python_type = cls.python_type()
+        if cls.is_array_type():
+            values = elem.find('{%s}Values' % TNS)
+            return [
+                xml_text_to_value(value=val, value_type=python_type)
+                for val in get_xml_attrs(values, '{%s}Value' % TNS)
+            ]
+        extended_field_value = xml_text_to_value(value=get_xml_attr(elem, '{%s}Value' % TNS), value_type=python_type)
+        if python_type == string_type and not extended_field_value:
+            # For string types, we want to return the empty string instead of None if the element was
+            # actually found, but there was no XML value. For other types, it would be more problematic
+            # to make that distinction, e.g. return False for bool, 0 for int, etc.
+            extended_field_value = ''
+        return extended_field_value
+
+    def to_xml(self, version):
+        if self.is_array_type():
+            values = create_element('t:Values')
+            for v in self.value:
+                add_xml_child(values, 't:Value', v)
+            return values
+        return set_xml_value(create_element('t:Value'), self.value, version=version)
+
+    @classmethod
     def is_array_type(cls):
         return cls.property_type.endswith('Array')
 
@@ -136,20 +163,9 @@ class ExtendedProperty(EWSElement):
             'Integer': int,
             'Long': int,
             'Short': int,
-            # 'SystemTime': int,
+            'SystemTime': EWSDateTime,
             'String': string_type,
         }[base_type]
-
-    def to_xml(self, version):
-        if self.is_array_type():
-            values = create_element('t:Values')
-            for v in self.value:
-                add_xml_child(values, 't:Value', v)
-            return values
-        else:
-            value = create_element('t:Value')
-            set_xml_value(value, self.value, version=version)
-            return value
 
     @classmethod
     def properties_map(cls):
@@ -161,24 +177,6 @@ class ExtendedProperty(EWSElement):
             'PropertyId': value_to_xml_text(cls.property_id) if cls.property_id else None,
             'PropertyType': cls.property_type,
         }
-
-    @classmethod
-    def from_xml(cls, elem):
-        # Gets value of this specific ExtendedProperty from a list of 'ExtendedProperty' XML elements
-        python_type = cls.python_type()
-        if cls.is_array_type():
-            values = elem.find('{%s}Values' % TNS)
-            return [
-                xml_text_to_value(value=val, value_type=python_type)
-                for val in get_xml_attrs(values, '{%s}Value' % TNS)
-            ]
-        extended_field_value = xml_text_to_value(value=get_xml_attr(elem, '{%s}Value' % TNS), value_type=python_type)
-        if python_type == string_type and not extended_field_value:
-            # For string types, we want to return the empty string instead of None if the element was
-            # actually found, but there was no XML value. For other types, it would be more problematic
-            # to make that distinction, e.g. return False for bool, 0 for int, etc.
-            extended_field_value = ''
-        return extended_field_value
 
 
 class ExternId(ExtendedProperty):
