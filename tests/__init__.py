@@ -1531,20 +1531,21 @@ class BaseItemTest(EWSTest):
             item = self.get_test_item()
             item.save(update_fields=['foo', 'bar'])  # update_fields is only valid on update
 
-        with self.assertRaises(ValueError):
-            item = self.get_test_item()
-            item.account = None
-            item.send()  # Must have account on send
-        with self.assertRaises(ErrorItemNotFound):
-            item = self.get_test_item()
-            item.save()
-            item_id, changekey = item.item_id, item.changekey
-            item.delete()
-            item.item_id, item.changekey = item_id, changekey
-            item.send()  # Item disappeared
-        with self.assertRaises(AttributeError):
-            item = self.get_test_item()
-            item.send(copy_to_folder=self.account.trash, save_copy=False)  # Inconsistent args
+        if self.ITEM_CLASS == Message:
+            with self.assertRaises(ValueError):
+                item = self.get_test_item()
+                item.account = None
+                item.send()  # Must have account on send
+            with self.assertRaises(ErrorItemNotFound):
+                item = self.get_test_item()
+                item.save()
+                item_id, changekey = item.item_id, item.changekey
+                item.delete()
+                item.item_id, item.changekey = item_id, changekey
+                item.send()  # Item disappeared
+            with self.assertRaises(AttributeError):
+                item = self.get_test_item()
+                item.send(copy_to_folder=self.account.trash, save_copy=False)  # Inconsistent args
 
         with self.assertRaises(ValueError):
             item = self.get_test_item()
