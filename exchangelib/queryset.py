@@ -70,7 +70,7 @@ class OrderField(object):
                         s, fieldname, label, field.value_cls.FIELDS[0].name))
                 try:
                     subfield = field.value_cls.get_field_by_fieldname(subfield)
-                except KeyError:
+                except ValueError:
                     raise ValueError(
                         "Subfield '%s' on IndexedField order_by() value '%s' must be one of %s" % (
                             subfield, s, ', '.join(field.value_cls.fieldnames())))
