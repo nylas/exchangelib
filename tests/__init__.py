@@ -974,7 +974,7 @@ class CommonTest(EWSTest):
                     continue
                 if not issubclass(v, EWSElement):
                     continue
-                if issubclass(v, (Item, Folder)):
+                if issubclass(v, (Item, Folder, ExtendedProperty)):
                     # These do not support None input
                     with self.assertRaises(Exception):
                         v.from_xml(None)
