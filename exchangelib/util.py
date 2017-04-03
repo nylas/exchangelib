@@ -222,6 +222,10 @@ def to_xml(text, encoding):
         try:
             return fromstring(tostring(root))
         except ParseError as e:
+            if hasattr(e, 'position'):
+                e.lineno, e.offset = e.position
+            if not e.lineno:
+                raise ParseError('%s' % text_type(e))
             try:
                 offending_line = processed.splitlines()[e.lineno - 1]
             except IndexError:

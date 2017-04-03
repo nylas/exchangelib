@@ -441,6 +441,9 @@ class UtilTest(unittest.TestCase):
         to_xml(BOM+'<?xml version="1.0" encoding="UTF-8"?><foo>&broken</foo>', encoding='ascii')
         with self.assertRaises(ParseError):
             to_xml('foo', encoding='ascii')
+        with self.assertRaises(ParseError) as e:
+            to_xml('<t:Foo><t:Bar>Baz</t:Bar></t:Foo>', encoding='ascii')
+        self.assertIn('Offending text: [...]<t:Foo><t:Bar>Baz</t[...]', e.exception.args[0])
 
     def test_get_domain(self):
         self.assertEqual(get_domain('foo@example.com'), 'example.com')
