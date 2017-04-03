@@ -2686,6 +2686,7 @@ class BaseItemTest(EWSTest):
         # Test __init__(attachments=...) and attach() on new item
         binary_file_content = u'Hello from unicode æøå'.encode('utf-8')
         att1 = FileAttachment(name='my_file_1.txt', content=binary_file_content)
+        att1.content = binary_file_content  # Test property setter
         self.assertEqual(len(item.attachments), 0)
         item.attach(att1)
         self.assertEqual(len(item.attachments), 1)
@@ -2737,6 +2738,7 @@ class BaseItemTest(EWSTest):
             attached_item1.is_all_day = False
         attached_item1.save()
         attachment1 = ItemAttachment(name='attachment1', item=attached_item1)
+        attachment1.item = attached_item1  # Test property setter
         item.attach(attachment1)
 
         self.assertEqual(len(item.attachments), 1)
