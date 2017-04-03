@@ -963,14 +963,14 @@ class CommonTest(EWSTest):
     def test_from_xml(self):
         # Test for all EWSElement classes that they handle None as input to from_xml()
         import exchangelib
-        for module in (exchangelib.attachments, exchangelib.extended_properties, exchangelib.indexed_properties,
+        for mod in (exchangelib.attachments, exchangelib.extended_properties, exchangelib.indexed_properties,
                        exchangelib.folders, exchangelib.items, exchangelib.properties):
-            for k, v in vars(module).items():
+            for k, v in vars(mod).items():
                 if type(v) != type:
                     continue
                 if not issubclass(v, EWSElement):
                     continue
-                if issubclass(v, (Item, Folder, ExtendedProperty)):
+                if issubclass(v, (Item, Folder)):
                     # These do not support None input
                     with self.assertRaises(Exception):
                         v.from_xml(None)
@@ -1454,9 +1454,9 @@ class BaseItemTest(EWSTest):
         item.clean()
         for f in self.ITEM_CLASS.FIELDS:
             # Test field maxlength
-            if issubclass(f.value_cls, text_type) and hasattr(f.value_cls, 'MAXLENGTH'):
+            if isinstance(f, TextField) and f.max_length:
                 with self.assertRaises(ValueError):
-                    setattr(item, f.name, 'a' * (f.value_cls.MAXLENGTH + 1))
+                    setattr(item, f.name, 'a' * (f.max_length + 1))
                     item.clean()
                     setattr(item, f.name, 'a')
 
@@ -2630,7 +2630,7 @@ class BaseItemTest(EWSTest):
         self.ITEM_CLASS.deregister(attr_name=attr_name)
         self.assertNotIn(attr_name, self.ITEM_CLASS.fieldnames())
 
-    def extended_property_arraytype(self):
+    def test_extended_property_arraytype(self):
         # Tests array type extended properties
         class TestArayProp(ExtendedProperty):
             property_set_id = 'deadcafe-beef-beef-beef-deadcafebeef'

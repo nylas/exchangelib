@@ -52,7 +52,7 @@ class EWSElement(object):
     @classmethod
     def from_xml(cls, elem):
         if elem is None:
-            return
+            return None
         assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
         kwargs = {f.name: f.from_xml(elem=elem) for f in cls.FIELDS}
         elem.clear()

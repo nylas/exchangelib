@@ -72,7 +72,7 @@ class Item(EWSElement):
         ChoiceField('sensitivity', field_uri='item:Sensitivity', choices={
             'Normal', 'Personal', 'Private', 'Confidential'
         }, is_required=True, default='Normal'),
-        BodyField('body', field_uri='item:Body', is_complex=True),  # Body or HTMLBody
+        BodyField('body', field_uri='item:Body'),  # Body or HTMLBody
         AttachmentField('attachments', field_uri='item:Attachments'),  # ItemAttachment or FileAttachment
         DateTimeField('datetime_received', field_uri='item:DateTimeReceived', is_read_only=True),
         TextField('categories', field_uri='item:Categories', is_list=True),

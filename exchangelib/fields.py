@@ -269,6 +269,7 @@ class BodyField(TextField):
     def __init__(self, *args, **kwargs):
         from .properties import Body
         self.value_cls = Body
+        kwargs['is_complex'] = True
         super(BodyField, self).__init__(*args, **kwargs)
 
     def clean(self, value):
@@ -341,7 +342,7 @@ class MailboxField(EWSElementField):
                 value = [self.value_cls(email_address=s) if isinstance(s, string_types) else s for s in value]
             elif isinstance(value, string_types):
                 value = self.value_cls(email_address=value)
-        return super(EWSElementField, self).clean(value)
+        return super(MailboxField, self).clean(value)
 
     def from_xml(self, elem):
         if self.is_list:
@@ -374,7 +375,7 @@ class AttendeesField(EWSElementField):
         if value is not None:
             value = [self.value_cls(mailbox=Mailbox(email_address=s), response_type='Accept')
                      if isinstance(s, string_types) else s for s in value]
-        return super(EWSElementField, self).clean(value)
+        return super(AttendeesField, self).clean(value)
 
     def from_xml(self, elem):
         iter_elem = elem.find(self.response_tag())
