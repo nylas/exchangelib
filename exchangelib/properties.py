@@ -5,7 +5,7 @@ from six import text_type, string_types
 
 from .fields import SubField, TextField, EmailField, ChoiceField, DateTimeField, EWSElementField, MailboxField
 from .services import MNS, TNS
-from .util import get_xml_attr, set_xml_value, create_element
+from .util import get_xml_attr, create_element
 
 string_type = string_types[0]
 log = logging.getLogger(__name__)
