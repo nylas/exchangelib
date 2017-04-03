@@ -79,7 +79,7 @@ class EWSDateTime(datetime.datetime):
     def from_string(cls, date_string):
         # Assume UTC and return timezone-aware EWSDateTime objects
         local_dt = super(EWSDateTime, cls).strptime(date_string, '%Y-%m-%dT%H:%M:%SZ')
-        return EWSTimeZone.from_pytz(pytz.utc).localize(cls.from_datetime(local_dt))
+        return UTC.localize(cls.from_datetime(local_dt))
 
     @classmethod
     def now(cls, tz=None):
