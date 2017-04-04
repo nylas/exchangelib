@@ -1085,6 +1085,14 @@ class CommonTest(EWSTest):
         protocol.release_session(session)
         protocol.credentials = credentials
 
+    def test_version_renegotiate(self):
+        # Test that we can recover from a wrong API version. This is needed in version guessing and when the
+        # autodiscover response returns a wrong server version for the account
+        old_version = self.account.version.api_version
+        self.account.version.api_version = 'XXX'
+        list(self.account.inbox.filter(subject=get_random_string(16)))
+        self.assertEquals(old_version, self.account.version.api_version)
+
     def test_soap_error(self):
         soap_xml = """\
 <?xml version="1.0" encoding="utf-8" ?>
