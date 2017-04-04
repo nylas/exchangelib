@@ -438,6 +438,8 @@ class QuerySet(object):
         flat = kwargs.pop('flat', False)
         if kwargs:
             raise AttributeError('Unknown kwargs: %s' % kwargs)
+        if flat and len(args) != 1:
+            raise ValueError('flat=True requires exactly one field name')
         try:
             only_fields = self._check_fields(args)
         except ValueError as e:

@@ -1787,7 +1787,7 @@ class BaseItemTest(EWSTest):
         )
         with self.assertRaises(ValueError):
             list(qs.values_list('item_id', 'changekey', flat=True))
-        with self.assertRaises(ValueError):
+        with self.assertRaises(AttributeError):
             list(qs.values_list('item_id', xxx=True))
         self.assertEqual(
             list(qs.order_by('subject').values_list('item_id', flat=True)),
