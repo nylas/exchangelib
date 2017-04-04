@@ -389,9 +389,10 @@ class Q(object):
     def __repr__(self):
         if self.is_leaf():
             return self.__class__.__name__ + '(%s %s %s)' % (self.fieldname, self.op, repr(self.value))
+        sorted_children = tuple(sorted(self.children, key=lambda i: i.fieldname or ''))
         if self.conn_type == self.NOT or len(self.children) > 1:
-            return self.__class__.__name__ + repr((self.conn_type,) + tuple(self.children))
-        return self.__class__.__name__ + repr(tuple(self.children))
+            return self.__class__.__name__ + repr((self.conn_type,) + sorted_children)
+        return self.__class__.__name__ + repr(sorted_children)
 
 
 @python_2_unicode_compatible

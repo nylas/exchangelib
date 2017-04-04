@@ -396,11 +396,6 @@ class RestrictionTest(unittest.TestCase):
         self.assertEqual(q.to_xml(folder_class=Calendar), None)
         with self.assertRaises(ValueError):
             Restriction(q, folder_class=Calendar)
-        # Test not not Q on a non-leaf
-        #self.assertEqual(Q(foo__contains=('bar', 'baz')).conn_type, Q.AND)
-        #self.assertEqual((~Q(foo__contains=('bar', 'baz'))).conn_type, Q.NOT)
-        self.assertEqual((~~Q(foo__contains=('bar', 'baz'))).conn_type, Q.AND)
-        self.assertEqual(Q(foo__contains=('bar', 'baz')), ~~Q(foo__contains=('bar', 'baz')))
         # Test validation
         with self.assertRaises(ValueError):
             Q(datetime_created__range=(1,))  # Must have exactly 2 args
@@ -420,9 +415,14 @@ class RestrictionTest(unittest.TestCase):
         self.assertEqual((~Q(x=5)).expr(), 'x != 5')
         q = (Q(b__contains='a', x__contains=5) | Q(~Q(a__contains='c'), f__gt=3, c=6)) & ~Q(y=9, z__contains='b')
         self.assertEqual(
-            q.expr(),
+            str(q),  # str() calls expr()
             "((b contains 'a' AND x contains 5) OR (NOT a contains 'c' AND c == 6 AND f > 3)) "
             "AND NOT (y == 9 AND z contains 'b')"
+        )
+        self.assertEqual(
+            repr(q),
+            "Q('AND', Q('OR', Q('AND', Q(b contains 'a'), Q(x contains 5)), Q('AND', Q('NOT', Q(a contains 'c')), "
+            "Q(c == 6), Q(f > 3))), Q('NOT', Q('AND', Q(y == 9), Q(z contains 'b'))))"
         )
         # Test simulated IN expression
         in_q = Q(foo__in=[1, 2, 3])
@@ -436,6 +436,11 @@ class RestrictionTest(unittest.TestCase):
         self.assertEqual((~Q(foo__lte=5)).op, Q.GT)
         self.assertEqual((~Q(foo__gt=5)).op, Q.LTE)
         self.assertEqual((~Q(foo__gte=5)).op, Q.LT)
+        # Test not not Q on a non-leaf
+        self.assertEqual(Q(foo__contains=('bar', 'baz')).conn_type, Q.AND)
+        self.assertEqual((~Q(foo__contains=('bar', 'baz'))).conn_type, Q.NOT)
+        self.assertEqual((~~Q(foo__contains=('bar', 'baz'))).conn_type, Q.AND)
+        self.assertEqual(Q(foo__contains=('bar', 'baz')), ~~Q(foo__contains=('bar', 'baz')))
 
     def test_q_boolean_ops(self):
         self.assertEqual((Q(foo=5) & Q(foo=6)).conn_type, Q.AND)
