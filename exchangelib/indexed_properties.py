@@ -1,6 +1,6 @@
 import logging
 
-from six import string_types
+from six import string_types, text_type
 
 from .fields import EmailSubField, LabelField, SubField, TextField
 from .properties import EWSElement
@@ -115,5 +115,5 @@ class PhysicalAddress(MultiFieldIndexedElement):
     def clean(self):
         # pylint: disable=access-member-before-definition
         if isinstance(self.zipcode, int):
-            self.zipcode = string_type(self.zipcode)
+            self.zipcode = text_type(self.zipcode)
         super(PhysicalAddress, self).clean()

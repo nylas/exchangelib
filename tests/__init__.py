@@ -3354,7 +3354,7 @@ class CalendarTest(BaseItemTest):
         # Test bad args
         with self.assertRaises(ValueError):
             list(self.test_folder.view(start=item1.end, end=item1.start))
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             list(self.test_folder.view(start='xxx', end=item1.end))
         with self.assertRaises(ValueError):
             list(self.test_folder.view(start=item1.start, end=item1.end, max_items=0))
