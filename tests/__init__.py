@@ -270,7 +270,7 @@ class PropertiesTest(unittest.TestCase):
         self.assertFalse(hasattr(Item, '_fields_map'))
 
     def test_itemid_equality(self):
-        self.assertEquals(ItemId('X', 'Y'), ItemId('X', 'Y'))
+        self.assertEqual(ItemId('X', 'Y'), ItemId('X', 'Y'))
         self.assertNotEquals(ItemId('X', 'Y'), ItemId('X', 'Z'))
         self.assertNotEquals(ItemId('Z', 'Y'), ItemId('X', 'Y'))
         self.assertNotEquals(ItemId('X', 'Y'), ItemId('Z', 'Z'))
@@ -280,9 +280,9 @@ class PropertiesTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             mbx.clean()  # Must have either item_id or email_address set
         mbx = Mailbox(email_address='XXX')
-        self.assertEquals(hash(mbx), hash('xxx'))
+        self.assertEqual(hash(mbx), hash('xxx'))
         mbx.item_id = 'YYY'
-        self.assertEquals(hash(mbx), hash('YYY'))  # If we have an item_id, use that for uniqueness
+        self.assertEqual(hash(mbx), hash('YYY'))  # If we have an item_id, use that for uniqueness
 
 
 class FieldTest(unittest.TestCase):
@@ -328,30 +328,30 @@ class ItemTest(unittest.TestCase):
         task = Task(due_date=tz.localize(EWSDateTime(2017, 1, 1)), start_date=tz.localize(EWSDateTime(2017, 2, 1)))
         task.clean()
         # We reset due date if it's before start date
-        self.assertEquals(task.due_date, tz.localize(EWSDateTime(2017, 2, 1)))
-        self.assertEquals(task.due_date, task.start_date)
+        self.assertEqual(task.due_date, tz.localize(EWSDateTime(2017, 2, 1)))
+        self.assertEqual(task.due_date, task.start_date)
 
         task = Task(complete_date=tz.localize(EWSDateTime(2099, 1, 1)), status=Task.NOT_STARTED)
         task.clean()
         # We reset status if complete_date is set
-        self.assertEquals(task.status, Task.COMPLETED)
+        self.assertEqual(task.status, Task.COMPLETED)
         # We also reset complete date to now() if it's in the future
-        self.assertEquals(task.complete_date.date(), EWSDate.today())
+        self.assertEqual(task.complete_date.date(), EWSDate.today())
 
         task = Task(complete_date=tz.localize(EWSDateTime(2017, 1, 1)), start_date=tz.localize(EWSDateTime(2017, 2, 1)))
         task.clean()
         # We also reset complete date to start_date if it's before start_date
-        self.assertEquals(task.complete_date, task.start_date)
+        self.assertEqual(task.complete_date, task.start_date)
 
         task = Task(percent_complete=Decimal('50.0'), status=Task.COMPLETED)
         task.clean()
         # We reset percent_complete to 100.0 if state is completed
-        self.assertEquals(task.percent_complete, Decimal(100))
+        self.assertEqual(task.percent_complete, Decimal(100))
 
         task = Task(percent_complete=Decimal('50.0'), status=Task.NOT_STARTED)
         task.clean()
         # We reset percent_complete to 0.0 if state is not_started
-        self.assertEquals(task.percent_complete, Decimal(0))
+        self.assertEqual(task.percent_complete, Decimal(0))
 
 class RestrictionTest(unittest.TestCase):
     def setUp(self):
@@ -398,7 +398,7 @@ class RestrictionTest(unittest.TestCase):
             Restriction(q, folder_class=Calendar)
         # Test not not Q
         q = Q(foo='bar')
-        self.assertEquals(q, ~~q)
+        self.assertEqual(q, ~~q)
         with self.assertRaises(ValueError):
             Q(datetime_created__range=(1,))  # Must have exactly 2 args
         with self.assertRaises(ValueError):
@@ -1104,7 +1104,7 @@ class CommonTest(EWSTest):
         old_version = self.account.version.api_version
         self.account.version.api_version = 'XXX'
         list(self.account.inbox.filter(subject=get_random_string(16)))
-        self.assertEquals(old_version, self.account.version.api_version)
+        self.assertEqual(old_version, self.account.version.api_version)
 
     def test_soap_error(self):
         soap_xml = """\
@@ -3162,9 +3162,9 @@ class BaseItemTest(EWSTest):
         att1 = FileAttachment(name='my_file_1.txt', content=binary_file_content)
         self.assertIn("name='my_file_1.txt'", str(att1))
         att1.content = binary_file_content  # Test property setter
-        self.assertEquals(att1.content, binary_file_content)  # Test property getter
+        self.assertEqual(att1.content, binary_file_content)  # Test property getter
         att1.attachment_id = 'xxx'
-        self.assertEquals(att1.content, binary_file_content)  # Test property getter when attachment_id is set
+        self.assertEqual(att1.content, binary_file_content)  # Test property getter when attachment_id is set
         att1._content = None
         with self.assertRaises(ValueError):
             print(att1.content)  # Test property getter when we need to fetch the content
@@ -3173,10 +3173,10 @@ class BaseItemTest(EWSTest):
         att2 = ItemAttachment(name='attachment1', item=attached_item1)
         self.assertIn("name='attachment1'", str(att2))
         att2.item = attached_item1  # Test property setter
-        self.assertEquals(att2.item, attached_item1)  # Test property getter
-        self.assertEquals(att2.item, attached_item1)  # Test property getter
+        self.assertEqual(att2.item, attached_item1)  # Test property getter
+        self.assertEqual(att2.item, attached_item1)  # Test property getter
         att2.attachment_id = 'xxx'
-        self.assertEquals(att2.item, attached_item1)  # Test property getter when attachment_id is set
+        self.assertEqual(att2.item, attached_item1)  # Test property getter when attachment_id is set
         att2._item = None
         with self.assertRaises(ValueError):
             print(att2.item)  # Test property getter when we need to fetch the item
