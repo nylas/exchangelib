@@ -530,6 +530,7 @@ class Task(Item):
                 self.status = self.COMPLETED
             now = UTC_NOW()
             if (self.complete_date - now).total_seconds() > 120:
+                # Reset complete_date values that are in the future
                 # 'complete_date' can be set automatically by the server. Allow some grace between local and server time
                 log.warning("'complete_date' must be in the past (%s vs %s). Resetting", self.complete_date, now)
                 self.complete_date = now

@@ -312,6 +312,37 @@ class FieldTest(unittest.TestCase):
         self.assertEqual(field.clean(ExternId('XXX')), ExternId('XXX'))  # We can clean an ExternId instance as well
 
 
+class ItemTest(unittest.TestCase):
+    def test_task_validation(self):
+        tz = EWSTimeZone.timezone('Europe/Copenhagen')
+        task = Task(due_date=tz.localize(EWSDateTime(2017, 1, 1)), start_date=tz.localize(EWSDateTime(2017, 2, 1)))
+        task.clean()
+        # We reset due date if it's before start date
+        self.assertEquals(task.due_date, tz.localize(EWSDateTime(2017, 2, 1)))
+        self.assertEquals(task.due_date, task.start_date)
+
+        task = Task(complete_date=tz.localize(EWSDateTime(2099, 1, 1)), status=Task.NOT_STARTED)
+        task.clean()
+        # We reset status if complete_date is set
+        self.assertEquals(task.status, Task.COMPLETED)
+        # We also reset complete date to now() if it's in the future
+        self.assertEquals(task.complete_date.date(), EWSDate.today())
+
+        task = Task(complete_date=tz.localize(EWSDateTime(2017, 1, 1)), start_date=tz.localize(EWSDateTime(2017, 2, 1)))
+        task.clean()
+        # We also reset complete date to start_date if it's before start_date
+        self.assertEquals(task.complete_date, task.start_date)
+
+        task = Task(percent_complete=Decimal('50.0'), status=Task.COMPLETED)
+        task.clean()
+        # We reset percent_complete to 100.0 if state is completed
+        self.assertEquals(task.percent_complete, Decimal(100))
+
+        task = Task(percent_complete=Decimal('50.0'), status=Task.NOT_STARTED)
+        task.clean()
+        # We reset percent_complete to 0.0 if state is not_started
+        self.assertEquals(task.percent_complete, Decimal(0))
+
 class RestrictionTest(unittest.TestCase):
     def setUp(self):
         self.maxDiff = None
