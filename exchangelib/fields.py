@@ -190,7 +190,7 @@ class DateTimeField(FieldURIField):
 
     def clean(self, value):
         assert not self.is_list
-        if value is not None and isinstance(value, EWSDateTime) and not getattr(value, 'tzinfo'):
+        if value is not None and isinstance(value, EWSDateTime) and not value.tzinfo:
             raise ValueError("Field '%s' must be timezone aware" % self.name)
         return super(DateTimeField, self).clean(value)
 

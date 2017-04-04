@@ -165,9 +165,6 @@ class Q(object):
             raise ValueError('Value "%s" for filter in field "%s" is unsupported' % (self.value, self.fieldname))
         if isinstance(self.value, EWSDateTime):
             # We want to convert all values to UTC
-            if not getattr(self.value, 'tzinfo'):
-                self.value.astimezone()
-                raise ValueError("'%s' must be timezone aware" % self.fieldname)
             self.value = self.value.astimezone(UTC)
 
     @classmethod
@@ -192,66 +189,67 @@ class Q(object):
 
     @classmethod
     def _conn_to_xml(cls, conn_type):
-        if conn_type == cls.AND:
-            return create_element('t:And')
-        if conn_type == cls.OR:
-            return create_element('t:Or')
-        if conn_type == cls.NOT:
-            return create_element('t:Not')
-        raise ValueError("Unknown conn_type: '%s'" % conn_type)
+        xml_tag_map = {
+            cls.AND: 't:And',
+            cls.OR: 't:Or',
+            cls.NOT: 't:Not',
+        }
+        try:
+            return create_element(xml_tag_map[conn_type])
+        except KeyError:
+            raise ValueError("Unknown conn_type: '%s'" % conn_type)
 
     @classmethod
     def _op_to_xml(cls, op):
-        if op == cls.EQ:
-            return create_element('t:IsEqualTo')
-        if op == cls.NE:
-            return create_element('t:IsNotEqualTo')
-        if op == cls.GTE:
-            return create_element('t:IsGreaterThanOrEqualTo')
-        if op == cls.LTE:
-            return create_element('t:IsLessThanOrEqualTo')
-        if op == cls.LT:
-            return create_element('t:IsLessThan')
-        if op == cls.GT:
-            return create_element('t:IsGreaterThan')
-        if op == cls.EXISTS:
-            return create_element('t:Exists')
-        if op in (cls.EXACT, cls.IEXACT, cls.CONTAINS, cls.ICONTAINS, cls.STARTSWITH, cls.ISTARTSWITH):
-            # For description of Contains attribute values, see
-            #     https://msdn.microsoft.com/en-us/library/office/aa580702(v=exchg.150).aspx
-            #
-            # Possible ContainmentMode values:
-            #     FullString, Prefixed, Substring, PrefixOnWords, ExactPhrase
-            # Django lookups have no equivalent of PrefixOnWords and ExactPhrase (and I'm unsure how they actually
-            # work).
-            #
-            # EWS has no equivalent of '__endswith' or '__iendswith'. That could be emulated using '__contains' and
-            # '__icontains' and filtering results afterwards in Python. But it could be inefficient because we might be
-            # fetching and discarding a lot of non-matching items, plus we would need to always fetch the field we're
-            # matching on, to be able to do the filtering. I think it's better to leave this to the consumer, i.e.:
-            #
-            # items = [i for i in fld.filter(subject__contains=suffix) if i.subject.endswith(suffix)]
-            # items = [i for i in fld.filter(subject__icontains=suffix) if i.subject.lower().endswith(suffix.lower())]
-            #
-            # Possible ContainmentComparison values (there are more, but the rest are "To be removed"):
-            #     Exact, IgnoreCase, IgnoreNonSpacingCharacters, IgnoreCaseAndNonSpacingCharacters
-            # I'm unsure about non-spacing characters, but as I read
-            #    https://en.wikipedia.org/wiki/Graphic_character#Spacing_and_non-spacing_characters
-            # we shouldn't ignore them ('a' would match both 'a' and 'å', the latter having a non-spacing character).
-            if op in {cls.EXACT, cls.IEXACT}:
-                match_mode = 'FullString'
-            elif op in (cls.CONTAINS, cls.ICONTAINS):
-                match_mode = 'Substring'
-            elif op in (cls.STARTSWITH, cls.ISTARTSWITH):
-                match_mode = 'Prefixed'
-            else:
-                assert False
-            if op in (cls.IEXACT, cls.ICONTAINS, cls.ISTARTSWITH):
-                compare_mode = 'IgnoreCase'
-            else:
-                compare_mode = 'Exact'
-            return create_element('t:Contains', ContainmentMode=match_mode, ContainmentComparison=compare_mode)
-        raise ValueError("Unknown op: '%s'" % op)
+        xml_tag_map = {
+            cls.EQ: 't:IsEqualTo',
+            cls.NE: 't:IsNotEqualTo',
+            cls.GTE: 't:IsGreaterThanOrEqualTo',
+            cls.LTE: 't:IsLessThanOrEqualTo',
+            cls.LT: 't:IsLessThan',
+            cls.GT: 't:IsGreaterThan',
+            cls.EXISTS: 't:Exists',
+        }
+        if op in xml_tag_map:
+            return create_element(xml_tag_map[op])
+
+        if op not in (cls.EXACT, cls.IEXACT, cls.CONTAINS, cls.ICONTAINS, cls.STARTSWITH, cls.ISTARTSWITH):
+            raise ValueError("Unknown op: '%s'" % op)
+
+        # For description of Contains attribute values, see
+        #     https://msdn.microsoft.com/en-us/library/office/aa580702(v=exchg.150).aspx
+        #
+        # Possible ContainmentMode values:
+        #     FullString, Prefixed, Substring, PrefixOnWords, ExactPhrase
+        # Django lookups have no equivalent of PrefixOnWords and ExactPhrase (and I'm unsure how they actually
+        # work).
+        #
+        # EWS has no equivalent of '__endswith' or '__iendswith'. That could be emulated using '__contains' and
+        # '__icontains' and filtering results afterwards in Python. But it could be inefficient because we might be
+        # fetching and discarding a lot of non-matching items, plus we would need to always fetch the field we're
+        # matching on, to be able to do the filtering. I think it's better to leave this to the consumer, i.e.:
+        #
+        # items = [i for i in fld.filter(subject__contains=suffix) if i.subject.endswith(suffix)]
+        # items = [i for i in fld.filter(subject__icontains=suffix) if i.subject.lower().endswith(suffix.lower())]
+        #
+        # Possible ContainmentComparison values (there are more, but the rest are "To be removed"):
+        #     Exact, IgnoreCase, IgnoreNonSpacingCharacters, IgnoreCaseAndNonSpacingCharacters
+        # I'm unsure about non-spacing characters, but as I read
+        #    https://en.wikipedia.org/wiki/Graphic_character#Spacing_and_non-spacing_characters
+        # we shouldn't ignore them ('a' would match both 'a' and 'å', the latter having a non-spacing character).
+        if op in {cls.EXACT, cls.IEXACT}:
+            match_mode = 'FullString'
+        elif op in (cls.CONTAINS, cls.ICONTAINS):
+            match_mode = 'Substring'
+        elif op in (cls.STARTSWITH, cls.ISTARTSWITH):
+            match_mode = 'Prefixed'
+        else:
+            assert False
+        if op in (cls.IEXACT, cls.ICONTAINS, cls.ISTARTSWITH):
+            compare_mode = 'IgnoreCase'
+        else:
+            compare_mode = 'Exact'
+        return create_element('t:Contains', ContainmentMode=match_mode, ContainmentComparison=compare_mode)
 
     def is_leaf(self):
         return not self.children

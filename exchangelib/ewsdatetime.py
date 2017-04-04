@@ -47,7 +47,8 @@ class EWSDateTime(datetime.datetime):
         """
         ISO 8601 format to satisfy xs:datetime as interpreted by EWS. Example: 2009-01-15T13:45:56Z
         """
-        assert self.tzinfo  # EWS datetimes must always be timezone-aware
+        if not self.tzinfo:
+            raise ValueError('EWSDateTime must be timezone-aware')
         if self.tzinfo.zone == 'UTC':
             return self.strftime('%Y-%m-%dT%H:%M:%SZ')
         return self.strftime('%Y-%m-%dT%H:%M:%S')
