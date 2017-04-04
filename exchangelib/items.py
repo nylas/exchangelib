@@ -109,6 +109,7 @@ class Item(EWSElement):
         if self.folder is not None:
             assert isinstance(self.folder, Folder)
         super(Item, self).__init__(**kwargs)
+        # pylint: disable=access-member-before-definition
         if self.attachments:
             for a in self.attachments:
                 if a.parent_item:
@@ -516,6 +517,7 @@ class Task(Item):
     ]
 
     def clean(self):
+        # pylint: disable=access-member-before-definition
         super(Task, self).clean()
         if self.due_date and self.start_date and self.due_date < self.start_date:
             log.warning("'due_date' must be greater than 'start_date' (%s vs %s). Resetting 'due_date'",
