@@ -235,6 +235,13 @@ class PropertiesTest(unittest.TestCase):
             }
         )
 
+    def test_physical_address(self):
+        # Test that we can enter an integer zipcode and that it's converted to a string by clean()
+        zipcode = 98765
+        addr = PhysicalAddress(zipcode=zipcode)
+        addr.clean()
+        self.assertEqual(addr.zipcode, str(zipcode))
+
 
 class RestrictionTest(unittest.TestCase):
     def setUp(self):
@@ -1089,13 +1096,13 @@ class AccountTest(EWSTest):
             Account(primary_smtp_address='blah')
         with self.assertRaises(AttributeError):
             # Autodiscover requires credentials
-            Account(primary_smtp_address=self.account.primary_smtp_address, autodiscover=True)
+            Account(primary_smtp_address='blah@example.com', autodiscover=True)
         with self.assertRaises(AttributeError):
-            # Autodiscover must not have config
-            Account(primary_smtp_address=self.account.primary_smtp_address, config='FOO', autodiscover=True)
+            # Autodiscover must have credentials but must not have config
+            Account(primary_smtp_address='blah@example.com', credentials='FOO', config='FOO', autodiscover=True)
         with self.assertRaises(AttributeError):
             # Non-autodiscover requires a config
-            Account(primary_smtp_address=self.account.primary_smtp_address, autodiscover=False)
+            Account(primary_smtp_address='blah@example.com', autodiscover=False)
 
     def test_get_default_folder(self):
         class MockCalendar(Calendar):
@@ -1781,6 +1788,8 @@ class BaseItemTest(EWSTest):
         )
         with self.assertRaises(ValueError):
             list(qs.values_list('item_id', 'changekey', flat=True))
+        with self.assertRaises(ValueError):
+            list(qs.values_list('item_id', xxx=True))
         self.assertEqual(
             list(qs.order_by('subject').values_list('item_id', flat=True)),
             [i.item_id for i in test_items]
@@ -1831,6 +1840,26 @@ class BaseItemTest(EWSTest):
             qs.filter(subject__startswith='Item').delete(),
             [True, True, True, True]
         )
+
+    def test_cached_queryset_corner_cases(self):
+        test_items = []
+        for i in range(4):
+            item = self.get_test_item()
+            item.subject = 'Item %s' % i
+            item.save()
+            test_items.append(item)
+        qs = QuerySet(self.test_folder).filter(categories__contains=self.categories).order_by('subject')
+        for _ in qs:
+            # Build up the cache
+            pass
+        self.assertEqual(len(qs._cache), 4)
+        with self.assertRaises(MultipleObjectsReturned):
+            qs.get()  # Get with a full cache
+        self.assertEqual(qs[2].subject, 'Item 2')  # Index with a full cache
+        self.assertEqual(qs[-2].subject, 'Item 2')  # Negative index with a full cache
+        qs.delete()  # Delete with a full cache
+        self.assertEqual(qs.count(), 0)  # QuerySet is empty after delete
+        self.assertEqual(list(qs.none()), [])
 
     def test_queryset_failure(self):
         qs = QuerySet(self.test_folder).filter(categories__contains=self.categories)
@@ -1977,12 +2006,33 @@ class BaseItemTest(EWSTest):
              {'subject': 'Subj 0', 'extern_id': 'ID 1'},
              {'subject': 'Subj 0', 'extern_id': 'ID 0'}]
         )
-        # Test sorting on a field that we don't need
+
+    def test_order_by_with_clientside_sort(self):
+        # Test sorting on a field that we didn't request
+        test_items = []
+        for i in range(2):
+            for j in range(2):
+                item = self.get_test_item()
+                item.subject = 'Subj %s' % i
+                item.extern_id = 'ID %s' % j
+                test_items.append(item)
+        self.test_folder.bulk_create(items=test_items)
+        # Test with no 'extra_order_fields' cleanup
+        qs = QuerySet(self.test_folder).filter(categories__contains=self.categories)
         self.assertEqual(
             [(i.subject, i.extern_id) for i in qs.order_by('subject', 'extern_id').only('subject')],
             [('Subj 0', None),
              ('Subj 0', None),
              ('Subj 1', None),
+             ('Subj 1', None)]
+        )
+        # Test with 'extra_order_fields' cleanup
+        qs = QuerySet(self.test_folder).filter(categories__contains=self.categories)
+        self.assertEqual(
+            [(i.subject, i.extern_id) for i in qs.order_by('extern_id', 'subject').only('subject')],
+            [('Subj 0', None),
+             ('Subj 1', None),
+             ('Subj 0', None),
              ('Subj 1', None)]
         )
         self.bulk_delete(qs)

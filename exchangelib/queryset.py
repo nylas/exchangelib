@@ -79,9 +79,6 @@ class OrderField(object):
                     s, fieldname, label))
         return cls(field=field, label=label, subfield=subfield, reverse=reverse)
 
-    def __repr__(self):
-        return self.__class__.__name__ + repr((self.field, self.label, self.subfield, self.reverse))
-
 
 @python_2_unicode_compatible
 class QuerySet(object):
@@ -245,9 +242,9 @@ class QuerySet(object):
         log.debug('Initializing cache')
         _cache = []
         result_formatter = {
-            self.VALUES: self.as_values,
-            self.VALUES_LIST: self.as_values_list,
-            self.FLAT: self.as_flat_values_list,
+            self.VALUES: self._as_values,
+            self.VALUES_LIST: self._as_values_list,
+            self.FLAT: self._as_flat_values_list,
             self.NONE: lambda res_iter: res_iter,
         }[self.return_format]
         for val in result_formatter(self._query()):
@@ -271,10 +268,10 @@ class QuerySet(object):
     def _getitem_idx(self, idx):
         from .services import FindItem
         assert isinstance(idx, int)
+        if self._cache is not None:
+            return self._cache[idx]
         if idx < 0:
             # Support negative indexes by reversing the queryset and negating the index value
-            if self._cache is not None:
-                return self._cache[idx]
             reverse_idx = -(idx+1)
             return self.reverse()._getitem_idx(reverse_idx)
         else:
@@ -300,9 +297,8 @@ class QuerySet(object):
             self.page_size = s.stop
         return islice(self.__iter__(), s.start, s.stop, s.step)
 
-    def as_values(self, iterable):
-        if not self.only_fields:
-            raise ValueError('values() requires at least one field name')
+    def _as_values(self, iterable):
+        assert self.only_fields, 'values() requires at least one field name'
         only_field_names = {f.name for f in self.only_fields}
         has_additional_fields = bool(only_field_names - {'item_id', 'changekey'})
         if not has_additional_fields:
@@ -320,9 +316,8 @@ class QuerySet(object):
         for i in iterable:
             yield {k: getattr(i, k) for k in only_field_names}
 
-    def as_values_list(self, iterable):
-        if not self.only_fields:
-            raise ValueError('values_list() requires at least one field name')
+    def _as_values_list(self, iterable):
+        assert self.only_fields, 'values_list() requires at least one field name'
         only_field_names = {f.name for f in self.only_fields}
         has_additional_fields = bool(only_field_names - {'item_id', 'changekey'})
         if not has_additional_fields:
@@ -340,9 +335,8 @@ class QuerySet(object):
         for i in iterable:
             yield tuple(getattr(i, f) for f in only_field_names)
 
-    def as_flat_values_list(self, iterable):
-        if not self.only_fields or len(self.only_fields) != 1:
-            raise ValueError('flat=True requires exactly one field name')
+    def _as_flat_values_list(self, iterable):
+        assert self.only_fields and len(self.only_fields) == 1, 'flat=True requires exactly one field name'
         flat_field_name = self.only_fields[0].name
         if flat_field_name == 'item_id':
             # _query() will return an iterator of (item_id, changekey) tuples
@@ -377,7 +371,7 @@ class QuerySet(object):
         """ Return a query that is guaranteed to be empty  """
         new_qs = self.copy()
         new_qs.q = None
-        new_qs._cache = []
+        new_qs._cache = None
         return new_qs
 
     def filter(self, *args, **kwargs):
@@ -461,6 +455,8 @@ class QuerySet(object):
     def iterator(self, page_size=None):
         """ Return the query result as an iterator, without caching the result. 'page_size' is the number of items to
         fetch from the server per request. """
+        if self.q is None:
+            return []
         if self._cache is not None:
             return self._cache
         # Return an iterator that doesn't bother with caching
@@ -499,7 +495,9 @@ class QuerySet(object):
         """ Delete the items matching the query, with as little effort as possible """
         from .items import ALL_OCCURRENCIES
         if self._cache is not None:
-            return self.folder.account.bulk_delete(ids=self._cache, affected_task_occurrences=ALL_OCCURRENCIES)
+            res = self.folder.account.bulk_delete(ids=self._cache, affected_task_occurrences=ALL_OCCURRENCIES)
+            self._cache = None  # Invalidate the cache after delete, regardless of the results
+            return res
         new_qs = self.copy()
         new_qs.only_fields = tuple()
         new_qs.order_fields = None
