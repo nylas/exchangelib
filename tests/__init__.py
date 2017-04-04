@@ -27,7 +27,7 @@ from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalid
     ErrorInvalidChangeKey, ErrorInvalidIdMalformed, ErrorContainsFilterWrongType, ErrorAccessDenied, \
     ErrorFolderNotFound, SOAPError
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
-from exchangelib.extended_properties import ExtendedProperty
+from exchangelib.extended_properties import ExtendedProperty, ExternId
 from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextField, EmailField, URIField, ChoiceField, \
     BodyField, DateTimeField, Base64Field, EWSElementField, IndexedField, PhoneNumberField, EmailAddressField, \
     PhysicalAddressField, ExtendedPropertyField, MailboxField, AttendeesField, AttachmentField
@@ -271,6 +271,13 @@ class FieldTest(unittest.TestCase):
         field = ChoiceField('foo', field_uri='bar', choices={'foo', 'bar'})
         with self.assertRaises(ValueError):
             field.clean('XXX')  # Value must be a valid choice
+
+        # A few tests on extended properties that override base methods
+        field = ExtendedPropertyField('foo', value_cls=ExternId, is_required=True)
+        with self.assertRaises(ValueError):
+            field.clean(None)  # Value is required
+        self.assertEqual(field.clean('XXX'), 'XXX')  # We can clean a simple value and keep it as a simple value
+        self.assertEqual(field.clean(ExternId('XXX')), ExternId('XXX'))  # We can clean an ExternId instance as well
 
 
 class RestrictionTest(unittest.TestCase):
