@@ -184,9 +184,10 @@ class ExtendedProperty(EWSElement):
 
     @classmethod
     def properties_map(cls):
+        # EWS returns PropertySetId values in lowercase in XML
         return {
             'DistinguishedPropertySetId': cls.distinguished_property_set_id,
-            'PropertySetId': cls.property_set_id,
+            'PropertySetId': cls.property_set_id.lower() if cls.property_set_id else None,
             'PropertyTag': cls.property_tag_as_hex(),
             'PropertyName': cls.property_name,
             'PropertyId': value_to_xml_text(cls.property_id) if cls.property_id else None,

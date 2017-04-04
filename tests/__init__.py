@@ -515,18 +515,17 @@ class EWSTest(unittest.TestCase):
 
     def random_val(self, field):
         if isinstance(field, ExtendedPropertyField):
-            if field.value_cls.is_array_type():
-                if field.value_cls.python_type() == string_type:
-                    return [get_random_string(255) for _ in range(random.randint(1, 4))]
-                if field.value_cls.python_type() == int:
-                    return [get_random_int(0, 256) for _ in range(random.randint(1, 4))]
-                if field.value_cls.python_type() == bytes:
-                    return [get_random_string(255).encode() for _ in range(random.randint(1, 4))]
-            if field.value_cls.python_type() == string_type:
+            if field.value_cls.property_type == 'StringArray':
+                return [get_random_string(255) for _ in range(random.randint(1, 4))]
+            if field.value_cls.property_type == 'IntegerArray':
+                return [get_random_int(0, 256) for _ in range(random.randint(1, 4))]
+            if field.value_cls.property_type == 'BinaryArray':
+                return [get_random_string(255).encode() for _ in range(random.randint(1, 4))]
+            if field.value_cls.property_type == 'String':
                 return get_random_string(255)
-            if field.value_cls.python_type() == int:
+            if field.value_cls.property_type == 'Integer':
                 return get_random_int(0, 256)
-            if field.value_cls.python_type() == bytes:
+            if field.value_cls.property_type == 'Binary':
                 return get_random_string(255).encode()
             assert False, (field.name, field, field.value_cls.python_type())
         if isinstance(field, URIField):
@@ -2918,6 +2917,37 @@ class BaseItemTest(EWSTest):
 
         self.ITEM_CLASS.deregister(attr_name=attr_name)
 
+    def test_extended_property_with_invalid_tag(self):
+        class InvalidProp(ExtendedProperty):
+            property_tag = '0x8000'
+            property_type = 'Integer'
+
+        with self.assertRaises(ValueError):
+            InvalidProp('Foo').clean()  # property_tag is in protected range
+
+    def test_extended_property_with_string_tag(self):
+        class Flag(ExtendedProperty):
+            property_tag = '0x1090'
+            property_type = 'Integer'
+
+        attr_name = 'my_flag'
+        self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=Flag)
+
+        # Test item creation, refresh, and update
+        item = self.get_test_item(folder=self.test_folder)
+        prop_val = item.my_flag
+        self.assertTrue(isinstance(prop_val, int))
+        item.save()
+        item = list(self.account.fetch(ids=[(item.item_id, item.changekey)]))[0]
+        self.assertEqual(prop_val, item.my_flag)
+        new_prop_val = self.random_val(self.ITEM_CLASS.get_field_by_fieldname(attr_name))
+        item.my_flag = new_prop_val
+        item.save()
+        item = list(self.account.fetch(ids=[(item.item_id, item.changekey)]))[0]
+        self.assertEqual(new_prop_val, item.my_flag)
+
+        self.ITEM_CLASS.deregister(attr_name=attr_name)
+
     def test_extended_distinguished_property(self):
         class MyMeeting(ExtendedProperty):
             distinguished_property_set_id = 'Meeting'
@@ -2939,6 +2969,30 @@ class BaseItemTest(EWSTest):
         item.save()
         item = list(self.account.fetch(ids=[(item.item_id, item.changekey)]))[0]
         self.assertEqual(new_prop_val, item.my_meeting)
+
+        self.ITEM_CLASS.deregister(attr_name=attr_name)
+
+    def test_extended_property_binary_array(self):
+        class MyMeetingArray(ExtendedProperty):
+            property_set_id = '00062004-0000-0000-C000-000000000046'
+            property_type = 'BinaryArray'
+            property_id = 32852
+
+        attr_name = 'my_meeting_array'
+        self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=MyMeetingArray)
+
+        # Test item creation, refresh, and update
+        item = self.get_test_item(folder=self.test_folder)
+        prop_val = item.my_meeting_array
+        self.assertTrue(isinstance(prop_val, list))
+        item.save()
+        item = list(self.account.fetch(ids=[(item.item_id, item.changekey)]))[0]
+        self.assertEqual(prop_val, item.my_meeting_array)
+        new_prop_val = self.random_val(self.ITEM_CLASS.get_field_by_fieldname(attr_name))
+        item.my_meeting_array = new_prop_val
+        item.save()
+        item = list(self.account.fetch(ids=[(item.item_id, item.changekey)]))[0]
+        self.assertEqual(new_prop_val, item.my_meeting_array)
 
         self.ITEM_CLASS.deregister(attr_name=attr_name)
 
