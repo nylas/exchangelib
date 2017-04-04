@@ -138,17 +138,9 @@ def value_to_xml_text(value):
 def xml_text_to_value(value, value_type):
     # We can't handle bytes in this function because str == bytes on Python2
     from .ewsdatetime import EWSDateTime
-    if value is None:
-        return None
     if value_type == string_type:
         # Return builtin str unprocessed
         return value
-    if issubclass(value_type, string_type):
-        # Cast string-like values to their intended class
-        return value_type(value)
-    if issubclass(value_type, bytes):
-        # Cast bytes-like values to their intended class
-        return value_type(value)
     return {
         bool: lambda v: True if v == 'true' else False if v == 'false' else None,
         int: int,
