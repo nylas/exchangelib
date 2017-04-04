@@ -3129,12 +3129,36 @@ class BaseItemTest(EWSTest):
             att1.detach()  # Must have an attachment ID
         att1.attachment_id = 'XXX'
         with self.assertRaises(ValueError):
-            att1.attach()  # Must have a parent item
+            att1.detach()  # Must have a parent item
         att1.parent_item = Item()
         with self.assertRaises(ValueError):
-            att1.attach()  # Parent item must have an account
+            att1.detach()  # Parent item must have an account
         att1.parent_item = None
         att1.attachment_id = None
+
+    def test_attachment_properties(self):
+        binary_file_content = u'Hello from unicode æøå'.encode('utf-8')
+        att1 = FileAttachment(name='my_file_1.txt', content=binary_file_content)
+        self.assertIn("name='my_file_1.txt'", str(att1))
+        att1.content = binary_file_content  # Test property setter
+        self.assertEquals(att1.content, binary_file_content)  # Test property getter
+        att1.attachment_id = 'xxx'
+        self.assertEquals(att1.content, binary_file_content)  # Test property getter when attachment_id is set
+        att1._content = None
+        with self.assertRaises(ValueError):
+            print(att1.content)  # Test property getter when we need to fetch the content
+
+        attached_item1 = self.get_test_item(folder=self.test_folder)
+        att2 = ItemAttachment(name='attachment1', item=attached_item1)
+        self.assertIn("name='attachment1'", str(att2))
+        att2.item = attached_item1  # Test property setter
+        self.assertEquals(att2.item, attached_item1)  # Test property getter
+        self.assertEquals(att2.item, attached_item1)  # Test property getter
+        att2.attachment_id = 'xxx'
+        self.assertEquals(att2.item, attached_item1)  # Test property getter when attachment_id is set
+        att2._item = None
+        with self.assertRaises(ValueError):
+            print(att2.item)  # Test property getter when we need to fetch the item
 
     def test_file_attachments(self):
         item = self.get_test_item(folder=self.test_folder)
@@ -3142,7 +3166,6 @@ class BaseItemTest(EWSTest):
         # Test __init__(attachments=...) and attach() on new item
         binary_file_content = u'Hello from unicode æøå'.encode('utf-8')
         att1 = FileAttachment(name='my_file_1.txt', content=binary_file_content)
-        att1.content = binary_file_content  # Test property setter
         self.assertEqual(len(item.attachments), 0)
         item.attach(att1)
         self.assertEqual(len(item.attachments), 1)
@@ -3194,7 +3217,6 @@ class BaseItemTest(EWSTest):
             attached_item1.is_all_day = False
         attached_item1.save()
         attachment1 = ItemAttachment(name='attachment1', item=attached_item1)
-        attachment1.item = attached_item1  # Test property setter
         item.attach(attachment1)
 
         self.assertEqual(len(item.attachments), 1)

@@ -166,7 +166,7 @@ class FileAttachment(Attachment):
         if self._content is not None:
             return self._content
         # We have an ID to the data but still haven't called GetAttachment to get the actual data. Do that now.
-        if not self.parent_item.account:
+        if not self.parent_item or not self.parent_item.account:
             raise ValueError('%s must have an account' % self.__class__.__name__)
         elems = list(GetAttachment(account=self.parent_item.account).call(
             items=[self.attachment_id], include_mime_content=False))
@@ -224,7 +224,7 @@ class ItemAttachment(Attachment):
         if self._item is not None:
             return self._item
         # We have an ID to the data but still haven't called GetAttachment to get the actual data. Do that now.
-        if not self.parent_item.account:
+        if not self.parent_item or not self.parent_item.account:
             raise ValueError('%s must have an account' % self.__class__.__name__)
         items = list(
             i if isinstance(i, Exception) else self.__class__.from_xml(elem=i)
