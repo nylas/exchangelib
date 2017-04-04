@@ -113,6 +113,7 @@ class PhysicalAddress(MultiFieldIndexedElement):
     __slots__ = ('label', 'street', 'city', 'state', 'country', 'zipcode')
 
     def clean(self):
+        # pylint: disable=access-member-before-definition
         if isinstance(self.zipcode, int):
             self.zipcode = string_type(self.zipcode)
         super(PhysicalAddress, self).clean()

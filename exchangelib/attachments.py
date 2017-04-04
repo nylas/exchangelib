@@ -81,6 +81,7 @@ class Attachment(EWSElement):
         from .items import Item
         if self.parent_item is not None:
             assert isinstance(self.parent_item, Item)
+        # pylint: disable=access-member-before-definition
         if self.content_type is None and self.name is not None:
             self.content_type = mimetypes.guess_type(self.name)[0] or 'application/octet-stream'
         super(Attachment, self).clean()

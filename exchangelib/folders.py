@@ -107,6 +107,7 @@ class Folder(EWSElement):
     def __init__(self, **kwargs):
         self.account = kwargs.pop('account', None)
         super(Folder, self).__init__(**kwargs)
+        # pylint: disable=access-member-before-definition
         if self.name is None:
             self.name = self.DISTINGUISHED_FOLDER_ID
         log.debug('%s created for %s', self, self.account)
