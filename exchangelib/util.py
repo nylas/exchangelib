@@ -1,6 +1,5 @@
 from __future__ import unicode_literals
 
-import base64
 from copy import deepcopy
 from decimal import Decimal
 import io
@@ -113,11 +112,10 @@ def get_xml_attrs(tree, name):
 
 
 def value_to_xml_text(value):
+    # We can't handle bytes in this function because str == bytes on Python2
     from .ewsdatetime import EWSDateTime
     from .indexed_properties import PhoneNumber, EmailAddress
     from .properties import Mailbox, Attendee
-    if isinstance(value, bytes):
-        return base64.b64encode(value).decode('ascii')
     if isinstance(value, string_types):
         return safe_xml_value(value)
     if isinstance(value, bool):
@@ -138,15 +136,13 @@ def value_to_xml_text(value):
 
 
 def xml_text_to_value(value, value_type):
+    # We can't handle bytes in this function because str == bytes on Python2
     from .ewsdatetime import EWSDateTime
     if value is None:
         return None
     if value_type == string_type:
         # Return builtin str unprocessed
         return value
-    if value_type == bytes:
-        # EWS sends binary data base64-encoded. Decode before returning to user
-        return base64.b64decode(value)
     if issubclass(value_type, string_type):
         # Cast string-like values to their intended class
         return value_type(value)

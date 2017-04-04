@@ -1,3 +1,4 @@
+import base64
 import logging
 from decimal import Decimal
 
@@ -114,29 +115,43 @@ class ExtendedProperty(EWSElement):
         python_type = cls.python_type()
         if cls.is_array_type():
             values = elem.find('{%s}Values' % TNS)
-            return [
-                xml_text_to_value(value=val, value_type=python_type)
-                for val in get_xml_attrs(values, '{%s}Value' % TNS)
-            ]
+            if cls.is_binary_type():
+                return [base64.b64decode(val) for val in get_xml_attrs(values, '{%s}Value' % TNS)]
+            else:
+                return [
+                    xml_text_to_value(value=val, value_type=python_type)
+                    for val in get_xml_attrs(values, '{%s}Value' % TNS)
+                ]
+        if cls.is_binary_type():
+            return base64.b64decode(get_xml_attr(elem, '{%s}Value' % TNS))
         extended_field_value = xml_text_to_value(value=get_xml_attr(elem, '{%s}Value' % TNS), value_type=python_type)
         if python_type == string_type and not extended_field_value:
             # For string types, we want to return the empty string instead of None if the element was
             # actually found, but there was no XML value. For other types, it would be more problematic
             # to make that distinction, e.g. return False for bool, 0 for int, etc.
-            extended_field_value = ''
+            return ''
         return extended_field_value
 
     def to_xml(self, version):
         if self.is_array_type():
             values = create_element('t:Values')
             for v in self.value:
-                add_xml_child(values, 't:Value', v)
+                if self.is_binary_type():
+                    add_xml_child(values, 't:Value', base64.b64encode(v).decode('ascii'))
+                else:
+                    add_xml_child(values, 't:Value', v)
             return values
-        return set_xml_value(create_element('t:Value'), self.value, version=version)
+        val = base64.b64encode(self.value).decode('ascii') if self.is_binary_type() else self.value
+        return set_xml_value(create_element('t:Value'), val, version=version)
 
     @classmethod
     def is_array_type(cls):
         return cls.property_type and cls.property_type.endswith('Array')
+
+    @classmethod
+    def is_binary_type(cls):
+        # We can't just test python_type() == bytes, because str == bytes in Python2
+        return cls.property_type and 'Binary' in cls.property_type
 
     @classmethod
     def property_tag_as_int(cls):

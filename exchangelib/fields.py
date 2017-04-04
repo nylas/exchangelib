@@ -1,4 +1,5 @@
 import abc
+import base64
 from decimal import Decimal
 import logging
 
@@ -178,16 +179,12 @@ class Base64Field(FieldURIField):
         field_elem = elem.find(self.response_tag())
         val = None if field_elem is None else field_elem.text or None
         if val is not None:
-            try:
-                val = xml_text_to_value(value=val, value_type=self.value_cls)
-            except ValueError:
-                pass
-            return val
+            return base64.b64decode(val)
         return self.default
 
     def to_xml(self, value, version):
         field_elem = create_element(self.request_tag())
-        return set_xml_value(field_elem, value, version=version)
+        return set_xml_value(field_elem, base64.b64encode(value).decode('ascii'), version=version)
 
 
 class DateTimeField(FieldURIField):
