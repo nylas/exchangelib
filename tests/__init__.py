@@ -396,9 +396,12 @@ class RestrictionTest(unittest.TestCase):
         self.assertEqual(q.to_xml(folder_class=Calendar), None)
         with self.assertRaises(ValueError):
             Restriction(q, folder_class=Calendar)
-        # Test not not Q
-        q = Q(foo='bar')
-        self.assertEqual(q, ~~q)
+        # Test not not Q on a non-leaf
+        #self.assertEqual(Q(foo__contains=('bar', 'baz')).conn_type, Q.AND)
+        #self.assertEqual((~Q(foo__contains=('bar', 'baz'))).conn_type, Q.NOT)
+        self.assertEqual((~~Q(foo__contains=('bar', 'baz'))).conn_type, Q.AND)
+        self.assertEqual(Q(foo__contains=('bar', 'baz')), ~~Q(foo__contains=('bar', 'baz')))
+        # Test validation
         with self.assertRaises(ValueError):
             Q(datetime_created__range=(1,))  # Must have exactly 2 args
         with self.assertRaises(ValueError):

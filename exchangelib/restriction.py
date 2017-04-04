@@ -137,14 +137,19 @@ class Q(object):
 
         if len(self.children) == 1 and self.fieldname is None and self.conn_type != self.NOT:
             # We only have one child and no expression on ourselves, so we are a no-op. Flatten by taking over the child
-            q = self.children[0]
-            self.conn_type = q.conn_type
-            self.fieldname = q.fieldname
-            self.op = q.op
-            self.value = q.value
-            self.children = q.children
+            self._promote()
 
         self.clean()
+
+    def _promote(self):
+        # Flatten by taking over the only child
+        assert len(self.children) == 1 and self.fieldname is None
+        q = self.children[0]
+        self.conn_type = q.conn_type
+        self.fieldname = q.fieldname
+        self.op = q.op
+        self.value = q.value
+        self.children = q.children
 
     def clean(self):
         # Validate the value
@@ -347,10 +352,13 @@ class Q(object):
         return self.__class__(self, other, conn_type=self.OR)
 
     def __invert__(self):
-        # ~ operator. If this is a leaf and op has an inverse, change op. Else return a new Q with conn_type NOT
+        # ~ operator. If op has an inverse, change op. Else return a new Q with conn_type NOT
         if self.conn_type == self.NOT:
             # This is NOT NOT. Change to AND
             self.conn_type = self.AND
+            if len(self.children) == 1 and self.fieldname is None:
+                self._promote()
+            return self
         if self.is_leaf():
             if self.op == self.EQ:
                 self.op = self.NE
