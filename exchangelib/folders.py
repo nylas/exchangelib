@@ -114,8 +114,9 @@ class Folder(EWSElement):
 
     def clean(self):
         super(Folder, self).clean()
-        from .account import Account
-        assert isinstance(self.account, Account)
+        if self.account is not None:
+            from .account import Account
+            assert isinstance(self.account, Account)
         if not self.is_distinguished:
             assert self.folder_id
         if self.folder_id:
@@ -123,7 +124,7 @@ class Folder(EWSElement):
 
     @property
     def is_distinguished(self):
-        return self.name.lower() == self.DISTINGUISHED_FOLDER_ID.lower()
+        return self.name and self.DISTINGUISHED_FOLDER_ID and self.name.lower() == self.DISTINGUISHED_FOLDER_ID.lower()
 
     @staticmethod
     def folder_cls_from_container_class(container_class):
@@ -309,6 +310,7 @@ class Folder(EWSElement):
         return cls(folder_id=fld_id, changekey=changekey, **kwargs)
 
     def to_xml(self, version):
+        self.clean()
         if self.folder_id:
             return FolderId(self.folder_id, self.changekey).to_xml(version=version)
         return DistinguishedFolderId(self.name).to_xml(version=version)

@@ -1512,15 +1512,22 @@ class FolderTest(EWSTest):
         for folder_cls, cls_folders in folders.items():
             for f in cls_folders:
                 old_values = {}
-                for k in folder_cls.__slots__:
-                    old_values[k] = getattr(f, k)
-                    if k in ('account', 'folder_id', 'changekey'):
+                for field in folder_cls.FIELDS:
+                    old_values[field.name] = getattr(f, field.name)
+                    if field.name in ('account', 'folder_id', 'changekey'):
                         # These are needed for a successful refresh()
                         continue
-                    setattr(f, k, get_random_string(16))
+                    setattr(f, field.name, self.random_val(field))
                 f.refresh()
-                for k in folder_cls.__slots__:
-                    self.assertEqual(getattr(f, k), old_values[k])
+                for field in folder_cls.FIELDS:
+                    self.assertEqual(getattr(f, field.name), old_values[field.name])
+
+        folder = Folder()
+        with self.assertRaises(ValueError):
+            folder.refresh()  # Must have an account
+        folder.account = 'XXX'
+        with self.assertRaises(ValueError):
+            folder.refresh()  # Must have an item_id
 
 
 class BaseItemTest(EWSTest):
