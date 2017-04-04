@@ -41,7 +41,7 @@ class EWSElement(object):
         for f in self.FIELDS:
             setattr(self, f.name, kwargs.pop(f.name, None))
         if kwargs:
-            raise TypeError("%s are invalid arguments for this class" % ', '.join("'%s'" % k for k in kwargs.keys()))
+            raise AttributeError("%s are invalid kwargs for this class" % ', '.join("'%s'" % k for k in kwargs.keys()))
 
     def clean(self):
         # Validate attribute values using the field validator

@@ -35,7 +35,7 @@ from exchangelib.folders import Calendar, DeletedItems, Drafts, Inbox, Outbox, S
     Contacts, Folder
 from exchangelib.indexed_properties import IndexedElement, EmailAddress, PhysicalAddress, PhoneNumber
 from exchangelib.items import Item, CalendarItem, Message, Contact, Task, ALL_OCCURRENCIES
-from exchangelib.properties import Attendee, Mailbox, Choice, RoomList, MessageHeader, Room, EWSElement
+from exchangelib.properties import Attendee, Mailbox, Choice, RoomList, MessageHeader, Room, ItemId, EWSElement
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.restriction import Restriction, Q
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, GetAttachment, ResolveNames, TNS
@@ -241,6 +241,38 @@ class PropertiesTest(unittest.TestCase):
         addr = PhysicalAddress(zipcode=zipcode)
         addr.clean()
         self.assertEqual(addr.zipcode, str(zipcode))
+
+    def test_invalid_kwargs(self):
+        with self.assertRaises(AttributeError):
+            Mailbox(foo='XXX')
+
+    def test_add_field_with_no_field_cache(self):
+        try:
+            delattr(Item, '_fields_map')
+        except AttributeError:
+            pass
+        field = TextField('foo', field_uri='bar')
+        Item.add_field(field, 1)
+        self.assertFalse(hasattr(Item, '_fields_map'))
+        self.assertEqual(Item.get_field_by_fieldname('foo'), field)
+        self.assertTrue(hasattr(Item, '_fields_map'))
+        Item.remove_field(field)
+        self.assertFalse(hasattr(Item, '_fields_map'))
+
+    def test_itemid_equality(self):
+        self.assertEquals(ItemId('X', 'Y'), ItemId('X', 'Y'))
+        self.assertNotEquals(ItemId('X', 'Y'), ItemId('X', 'Z'))
+        self.assertNotEquals(ItemId('Z', 'Y'), ItemId('X', 'Y'))
+        self.assertNotEquals(ItemId('X', 'Y'), ItemId('Z', 'Z'))
+
+    def test_mailbox(self):
+        mbx = Mailbox(name='XXX')
+        with self.assertRaises(ValueError):
+            mbx.clean()  # Must have either item_id or email_address set
+        mbx = Mailbox(email_address='XXX')
+        self.assertEquals(hash(mbx), hash('xxx'))
+        mbx.item_id = 'YYY'
+        self.assertEquals(hash(mbx), hash('YYY'))  # If we have an item_id, use that for uniqueness
 
 
 class FieldTest(unittest.TestCase):
