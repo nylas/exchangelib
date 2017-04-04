@@ -243,6 +243,36 @@ class PropertiesTest(unittest.TestCase):
         self.assertEqual(addr.zipcode, str(zipcode))
 
 
+class FieldTest(unittest.TestCase):
+    def test_value_validation(self):
+        field = TextField('foo', field_uri='bar', is_required=True, default=None)
+        with self.assertRaises(ValueError):
+            field.clean(None)  # Must have a default value on None input
+
+        field = TextField('foo', field_uri='bar', is_required=True, default='XXX')
+        self.assertEqual(field.clean(None), 'XXX')
+
+        field = TextField('foo', field_uri='bar', is_list=True)
+        with self.assertRaises(ValueError):
+            field.clean('XXX')  # Must be a list type
+
+        field = TextField('foo', field_uri='bar', is_list=True)
+        with self.assertRaises(TypeError):
+            field.clean([1, 2, 3])  # List items must be correct type
+
+        field = TextField('foo', field_uri='bar')
+        with self.assertRaises(TypeError):
+            field.clean(1)  # Value must be correct type
+
+        field = DateTimeField('foo', field_uri='bar')
+        with self.assertRaises(ValueError):
+            field.clean(EWSDateTime(2017, 1, 1))  # Datetime values must be timezone aware
+
+        field = ChoiceField('foo', field_uri='bar', choices={'foo', 'bar'})
+        with self.assertRaises(ValueError):
+            field.clean('XXX')  # Value must be a valid choice
+
+
 class RestrictionTest(unittest.TestCase):
     def setUp(self):
         self.maxDiff = None

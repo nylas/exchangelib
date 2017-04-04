@@ -56,7 +56,7 @@ class Field(object):
                     v.clean()
         else:
             if not isinstance(value, self.value_cls):
-                raise ValueError("Field '%s' value '%s' must be of type %s" % (self.name, value, self.value_cls))
+                raise TypeError("Field '%s' value '%s' must be of type %s" % (self.name, value, self.value_cls))
             if hasattr(value, 'clean'):
                 value.clean()
         return value
@@ -72,11 +72,9 @@ class Field(object):
     def __eq__(self, other):
         return hash(self) == hash(other)
 
+    @abc.abstractmethod
     def __hash__(self):
         raise NotImplementedError()
-
-    def __repr__(self):
-        return self.__class__.__name__ + repr((self.name, self.value_cls))
 
 
 class FieldURIField(Field):
