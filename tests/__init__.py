@@ -1009,6 +1009,58 @@ class CommonTest(EWSTest):
             ), encoding='utf-8'))
         self.assertIn('YYY', e.exception.args[0])
 
+        # Test bad XML (no body)
+        soap_xml = """\
+<?xml version="1.0" encoding="utf-8" ?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Header>
+    <t:ServerVersionInfo MajorVersion="8" MinorVersion="0" MajorBuildNumber="685" MinorBuildNumber="8"
+                         xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types" />
+  </soap:Header>
+  </soap:Body>
+</soap:Envelope>"""
+        with self.assertRaises(TransportError):
+            ResolveNames._get_soap_payload(to_xml(soap_xml, encoding='utf-8'))
+
+        # Test bad XML (no fault)
+        soap_xml = """\
+<?xml version="1.0" encoding="utf-8" ?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Header>
+    <t:ServerVersionInfo MajorVersion="8" MinorVersion="0" MajorBuildNumber="685" MinorBuildNumber="8"
+                         xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types" />
+  </soap:Header>
+  <soap:Body>
+    <soap:Fault>
+    </soap:Fault>
+  </soap:Body>
+</soap:Envelope>"""
+        with self.assertRaises(TransportError):
+            ResolveNames._get_soap_payload(to_xml(soap_xml, encoding='utf-8'))
+
+    def test_element_container(self):
+        svc = ResolveNames(self.account.protocol)
+        soap_xml = """\
+        <?xml version="1.0" encoding="utf-8" ?>
+        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+          <soap:Body>
+            <ResolveNamesResponse xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"
+                                  xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types"
+                                  xmlns="http://schemas.microsoft.com/exchange/services/2006/messages">
+              <m:ResponseMessages>
+                <m:ResolveNamesResponseMessage ResponseClass="Success">
+                  <m:ResponseCode>NoError</m:ResponseCode>
+                </m:ResolveNamesResponseMessage>
+              </m:ResponseMessages>
+            </ResolveNamesResponse>
+          </soap:Body>
+        </soap:Envelope>"""
+        resp = svc._get_soap_payload(to_xml(soap_xml, encoding='utf-8'))
+        with self.assertRaises(TransportError) as e:
+            # Missing ResolutionSet elements
+            list(svc._get_elements_in_response(response=resp))
+        self.assertIn('ResolutionSet elements in ResponseMessage', e.exception.args[0])
+
     def test_from_xml(self):
         # Test for all EWSElement classes that they handle None as input to from_xml()
         import exchangelib
