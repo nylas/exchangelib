@@ -36,6 +36,7 @@ from exchangelib.folders import Calendar, DeletedItems, Drafts, Inbox, Outbox, S
 from exchangelib.indexed_properties import IndexedElement, EmailAddress, PhysicalAddress, PhoneNumber
 from exchangelib.items import Item, CalendarItem, Message, Contact, Task, ALL_OCCURRENCIES
 from exchangelib.properties import Attendee, Mailbox, Choice, RoomList, MessageHeader, Room, ItemId, EWSElement
+from exchangelib.protocol import Protocol
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.restriction import Restriction, Q
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, GetAttachment, ResolveNames, TNS
@@ -103,6 +104,15 @@ class ConfigurationTest(unittest.TestCase):
             verify_ssl=True,
             version=Version(build=Build(15, 1, 2, 3), api_version='foo'),
         )
+
+
+class ProtocolTest(unittest.TestCase):
+    def test_session(self):
+        protocol = Protocol(service_endpoint='https://example.com/Foo.asmx', credentials=Credentials('A', 'B'),
+                            auth_type=NTLM, verify_ssl=True, version=Version(Build(15, 1)))
+        session = protocol.create_session()
+        new_session = protocol.renew_session(session)
+        self.assertNotEquals(id(session), id(new_session))
 
 
 class CredentialsTest(unittest.TestCase):

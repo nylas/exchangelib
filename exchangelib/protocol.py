@@ -254,14 +254,3 @@ class EWSSession(requests.sessions.Session):
                 log.debug('Closing socket %s', text_type(conn.sock.getsockname()))
                 conn.sock.shutdown(socket.SHUT_RDWR)
                 conn.sock.close()
-
-    def __enter__(self):
-        return super(EWSSession, self).__enter__()
-
-    def __exit__(self, *args):
-        if any(args):
-            # We arrived here due to an exception
-            self.protocol.retire_session(self)
-        else:
-            self.protocol.release_session(self)
-        # Don't call super().__exit__()  because it always closes the socket
