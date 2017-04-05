@@ -60,6 +60,7 @@ class BuildTest(unittest.TestCase):
 
     def test_compare(self):
         self.assertEqual(Build(15, 0, 1, 2), Build(15, 0, 1, 2))
+        self.assertNotEqual(Build(15, 0, 1, 2), Build(15, 0, 1, 3))
         self.assertLess(Build(15, 0, 1, 2), Build(15, 0, 1, 3))
         self.assertLess(Build(15, 0, 1, 2), Build(15, 0, 2, 2))
         self.assertLess(Build(15, 0, 1, 2), Build(15, 1, 1, 2))
@@ -268,12 +269,15 @@ class PropertiesTest(unittest.TestCase):
         self.assertTrue(hasattr(Item, '_fields_map'))
         Item.remove_field(field)
         self.assertFalse(hasattr(Item, '_fields_map'))
+        Item.add_field(field, 1)
+        Item.remove_field(field)  # When _fields_map does not exist
 
     def test_itemid_equality(self):
         self.assertEqual(ItemId('X', 'Y'), ItemId('X', 'Y'))
         self.assertNotEquals(ItemId('X', 'Y'), ItemId('X', 'Z'))
         self.assertNotEquals(ItemId('Z', 'Y'), ItemId('X', 'Y'))
         self.assertNotEquals(ItemId('X', 'Y'), ItemId('Z', 'Z'))
+        self.assertNotEquals(ItemId('X', 'Y'), None)
 
     def test_mailbox(self):
         mbx = Mailbox(name='XXX')
@@ -1487,6 +1491,8 @@ class FolderTest(EWSTest):
     def test_getfolders(self):
         folders = self.account.root.get_folders()
         self.assertGreater(len(folders), 60, sorted(f.name for f in folders))
+        with self.assertRaises(ValueError):
+            self.account.inbox.get_folder_by_name(get_random_string(16))
 
     def test_folder_grouping(self):
         folders = self.account.folders
