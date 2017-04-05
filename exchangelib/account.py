@@ -19,10 +19,10 @@ from .items import Item, BulkCreateResult, HARD_DELETE, \
     DELETE_TYPE_CHOICES, MESSAGE_DISPOSITION_CHOICES, CONFLICT_RESOLUTION_CHOICES, AFFECTED_TASK_OCCURRENCES_CHOICES, \
     SEND_MEETING_INVITATIONS_CHOICES, SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES, \
     SEND_MEETING_CANCELLATIONS_CHOICES
+from .folders import SHALLOW, DEEP
 from .protocol import Protocol
 from .queryset import QuerySet
-from .services import ExportItems, UploadItems, GetItem, CreateItem, UpdateItem, DeleteItem, MoveItem, SendItem, \
-    SHALLOW, DEEP
+from .services import ExportItems, UploadItems, GetItem, CreateItem, UpdateItem, DeleteItem, MoveItem, SendItem
 from .util import get_domain, peek
 
 log = getLogger(__name__)

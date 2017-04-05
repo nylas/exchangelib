@@ -55,6 +55,19 @@ SOFT_DELETE = 'SoftDelete'
 MOVE_TO_DELETED_ITEMS = 'MoveToDeletedItems'
 DELETE_TYPE_CHOICES = (HARD_DELETE, SOFT_DELETE, MOVE_TO_DELETED_ITEMS)
 
+# Traversal enums
+SHALLOW = 'Shallow'
+SOFT_DELETED = 'SoftDeleted'
+ASSOCIATED = 'Associated'
+ITEM_TRAVERSAL_CHOICES = (SHALLOW, SOFT_DELETED, ASSOCIATED)
+
+# Shape enums
+IdOnly = 'IdOnly'
+# AllProperties doesn't actually get all properties in FindItem, just the "first-class" ones. See
+#    http://msdn.microsoft.com/en-us/library/office/dn600367(v=exchg.150).aspx
+AllProperties = 'AllProperties'
+SHAPE_CHOICES = (IdOnly, AllProperties)
+
 
 class Item(EWSElement):
     ELEMENT_NAME = 'Item'

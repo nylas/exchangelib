@@ -36,21 +36,6 @@ from .version import EXCHANGE_2010, EXCHANGE_2013
 
 log = logging.getLogger(__name__)
 
-# Shape enums
-IdOnly = 'IdOnly'
-# AllProperties doesn't actually get all properties in FindItem, just the "first-class" ones. See
-#    http://msdn.microsoft.com/en-us/library/office/dn600367(v=exchg.150).aspx
-AllProperties = 'AllProperties'
-SHAPE_CHOICES = (IdOnly, AllProperties)
-
-# Traversal enums
-SHALLOW = 'Shallow'
-SOFT_DELETED = 'SoftDeleted'
-DEEP = 'Deep'
-ASSOCIATED = 'Associated'
-ITEM_TRAVERSAL_CHOICES = (SHALLOW, SOFT_DELETED, ASSOCIATED)
-FOLDER_TRAVERSAL_CHOICES = (SHALLOW, DEEP, SOFT_DELETED)
-
 
 class EWSService(object):
     __metaclass__ = abc.ABCMeta
@@ -483,6 +468,7 @@ class GetItem(EWSAccountService, EWSPooledMixIn):
         #
         # We start with an IdOnly request. 'additional_properties' defines the additional fields we want. Supported
         # fields are available in self.folder.allowed_fields().
+        from .items import IdOnly
         from .folders import ItemId
         getitem = create_element('m:%s' % self.SERVICE_NAME)
         itemshape = create_element('m:ItemShape')

@@ -1,19 +1,35 @@
 # Add noqa on top-level convenience imports
 from __future__ import unicode_literals
 
-from .account import Account  # noqa
-from .attachments import FileAttachment, ItemAttachment  # noqa
-from .autodiscover import discover  # noqa
-from .configuration import Configuration  # noqa
-from .credentials import DELEGATE, IMPERSONATION, Credentials, ServiceAccount  # noqa
-from .ewsdatetime import EWSDateTime, EWSTimeZone, UTC, UTC_NOW  # noqa
-from .extended_properties import ExtendedProperty, ExternId  # noqa
-from .items import CalendarItem, Contact, Message, Task  # noqa
-from .properties import ItemId, Mailbox, Attendee, Room, RoomList, Body, HTMLBody  # noqa
-from .restriction import Q  # noqa
-from .services import SHALLOW, DEEP  # noqa
-from .transport import NTLM, DIGEST, BASIC  # noqa
-from .version import Build, Version  # noqa
+from .account import Account
+from .attachments import FileAttachment, ItemAttachment
+from .autodiscover import discover
+from .configuration import Configuration
+from .credentials import DELEGATE, IMPERSONATION, Credentials, ServiceAccount
+from .ewsdatetime import EWSDateTime, EWSTimeZone, UTC, UTC_NOW
+from .extended_properties import ExtendedProperty, ExternId
+from .folders import SHALLOW, DEEP
+from .items import CalendarItem, Contact, Message, Task
+from .properties import Body, HTMLBody, ItemId, Mailbox, Attendee, Room, RoomList
+from .restriction import Q
+from .transport import BASIC, DIGEST, NTLM
+from .version import Build, Version
+
+__all__ = [
+    'Account',
+    'FileAttachment', 'ItemAttachment',
+    'discover',
+    'Configuration',
+    'DELEGATE', 'IMPERSONATION', 'Credentials', 'ServiceAccount',
+    'EWSDateTime', 'EWSTimeZone', 'UTC', 'UTC_NOW',
+    'ExtendedProperty',
+    'CalendarItem', 'Contact', 'Message', 'Task',
+    'ItemId', 'Mailbox', 'Attendee', 'Room', 'RoomList', 'Body', 'HTMLBody',
+    'Q',
+    'SHALLOW', 'DEEP',
+    'BASIC', 'DIGEST', 'NTLM'
+    'Build', 'Version',
+]
 
 
 def close_connections():
@@ -21,6 +37,7 @@ def close_connections():
     from .protocol import close_connections as close_protocol_connections
     close_autodiscover_connections()
     close_protocol_connections()
+
 
 # Pre-register these extended properties
 CalendarItem.register('extern_id', ExternId)

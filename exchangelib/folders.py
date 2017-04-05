@@ -9,17 +9,22 @@ from six import string_types
 from .ewsdatetime import EWSDateTime, UTC
 from .fields import IntegerField, TextField, DateTimeField
 from .items import Item, CalendarItem, Contact, Message, Task, MeetingRequest, MeetingResponse, MeetingCancellation, \
-    ITEM_CLASSES
+    ITEM_CLASSES, ITEM_TRAVERSAL_CHOICES, SHAPE_CHOICES, IdOnly
 from .properties import ItemId, EWSElement
 from .queryset import QuerySet
 from .restriction import Restriction
-from .services import IdOnly, FindFolder, GetFolder, FindItem, SHALLOW, DEEP, ITEM_TRAVERSAL_CHOICES, \
-    FOLDER_TRAVERSAL_CHOICES, SHAPE_CHOICES
+from .services import FindFolder, GetFolder, FindItem
 from .transport import MNS
 from .util import create_element, value_to_xml_text
 
 string_type = string_types[0]
 log = logging.getLogger(__name__)
+
+# Traversal enums
+SHALLOW = 'Shallow'
+SOFT_DELETED = 'SoftDeleted'
+DEEP = 'Deep'
+FOLDER_TRAVERSAL_CHOICES = (SHALLOW, DEEP, SOFT_DELETED)
 
 
 class FolderId(ItemId):

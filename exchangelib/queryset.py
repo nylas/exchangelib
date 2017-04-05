@@ -10,7 +10,6 @@ from future.utils import python_2_unicode_compatible
 from six import string_types
 
 from .restriction import Q
-from .services import IdOnly
 
 log = logging.getLogger(__name__)
 
@@ -177,7 +176,6 @@ class QuerySet(object):
 
         find_item_kwargs = dict(
             additional_fields=None,
-            shape=IdOnly,
             order=order_field,
             calendar_view=self.calendar_view,
             page_size=self.page_size,
