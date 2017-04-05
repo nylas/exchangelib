@@ -224,7 +224,9 @@ def is_xml(text):
     """
     Helper function. Lightweight test if response is an XML doc
     """
-    return text.lstrip(BOM)[0:5] == '<?xml'
+    if text.startswith(BOM):
+        return text[BOM_LEN:BOM_LEN + 5] == '<?xml'
+    return text[:5] == '<?xml'
 
 
 class DummyRequest(object):
