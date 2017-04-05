@@ -94,7 +94,6 @@ class Build(object):
             if v is None:
                 raise ValueError()
             kwargs[k] = int(v)  # Also raises ValueError
-        elem.clear()
         return cls(**kwargs)
 
     def api_version(self):
@@ -145,6 +144,7 @@ class Build(object):
 EXCHANGE_2007 = Build(8, 0)
 EXCHANGE_2010 = Build(14, 0)
 EXCHANGE_2013 = Build(15, 0)
+EXCHANGE_2016 = Build(15, 1)
 
 
 @python_2_unicode_compatible
@@ -229,19 +229,19 @@ class Version(object):
     @classmethod
     def from_response(cls, requested_api_version, response):
         try:
-            header = to_xml(response.text).find('{%s}Header' % SOAPNS)
+            header = to_xml(response).find('{%s}Header' % SOAPNS)
             if header is None:
                 raise ParseError()
         except ParseError:
-            raise EWSWarning('Unknown XML response from %s (response: %s)' % (response, response.text))
+            raise TransportError('Unknown XML response (%s)' % response)
 
         info = header.find('{%s}ServerVersionInfo' % TNS)
         if info is None:
-            raise TransportError('No ServerVersionInfo in response: %s' % response.text)
+            raise TransportError('No ServerVersionInfo in response: %s' % response)
         try:
             build = Build.from_xml(elem=info)
         except ValueError:
-            raise TransportError('Bad ServerVersionInfo in response: %s' % response.text)
+            raise TransportError('Bad ServerVersionInfo in response: %s' % response)
         # Not all Exchange servers send the Version element
         api_version_from_server = info.get('Version') or build.api_version()
         if api_version_from_server != requested_api_version:
