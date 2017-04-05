@@ -10,7 +10,6 @@ Exchange EWS references:
     - 2010: http://msdn.microsoft.com/en-us/library/bb409286(v=exchg.140).aspx
     - 2013: http://msdn.microsoft.com/en-us/library/bb409286(v=exchg.150).aspx
 """
-
 from __future__ import unicode_literals
 
 import abc

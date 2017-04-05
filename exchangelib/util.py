@@ -11,6 +11,7 @@ import time
 from xml.etree.ElementTree import Element, fromstring, ParseError
 
 from future.moves.urllib.parse import urlparse
+from future.moves._thread import get_ident
 from future.utils import PY2
 import requests.exceptions
 from six import text_type, string_types
@@ -18,13 +19,7 @@ from six import text_type, string_types
 from .errors import TransportError, RateLimitError, RedirectError, RelativeRedirect, CASError, UnauthorizedError, \
     ErrorInvalidSchemaVersionForMailboxVersion
 
-if PY2:
-    from thread import get_ident
-    time_func = time.time
-
-else:
-    from threading import get_ident
-    time_func = time.monotonic
+time_func = time.time if PY2 else time.monotonic
 
 
 log = logging.getLogger(__name__)

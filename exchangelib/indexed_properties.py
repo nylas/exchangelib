@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 import logging
 
 from six import string_types, text_type

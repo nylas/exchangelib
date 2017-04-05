@@ -1,4 +1,6 @@
 # Add noqa on top-level convenience imports
+from __future__ import unicode_literals
+
 from .account import Account  # noqa
 from .attachments import FileAttachment, ItemAttachment  # noqa
 from .autodiscover import discover  # noqa

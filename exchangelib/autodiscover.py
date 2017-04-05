@@ -18,6 +18,7 @@ import tempfile
 from threading import Lock
 
 import dns.resolver
+from future.moves.queue import LifoQueue
 import requests.exceptions
 from future.utils import raise_from, PY2, python_2_unicode_compatible
 from six import text_type
@@ -30,10 +31,6 @@ from .protocol import BaseProtocol, Protocol
 from .util import create_element, get_xml_attr, add_xml_child, to_xml, is_xml, post_ratelimited, xml_to_str, \
     get_domain, CONNECTION_ERRORS
 
-if PY2:
-    import Queue as queue
-else:
-    import queue
 
 log = logging.getLogger(__name__)
 
@@ -476,7 +473,7 @@ class AutodiscoverProtocol(BaseProtocol):
 
     def __init__(self, *args, **kwargs):
         super(AutodiscoverProtocol, self).__init__(*args, **kwargs)
-        self._session_pool = queue.LifoQueue(maxsize=self.SESSION_POOLSIZE)
+        self._session_pool = LifoQueue(maxsize=self.SESSION_POOLSIZE)
         for _ in range(self.SESSION_POOLSIZE):
             self._session_pool.put(self.create_session(), block=False)
 

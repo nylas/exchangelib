@@ -16,7 +16,8 @@ from threading import Lock
 import requests.adapters
 import requests.sessions
 from future.utils import with_metaclass, python_2_unicode_compatible
-from six import text_type, PY2
+from future.moves.queue import LifoQueue, Empty, Full
+from six import text_type
 
 from .credentials import Credentials
 from .errors import TransportError
@@ -24,11 +25,6 @@ from .services import GetServerTimeZones, GetRoomLists, GetRooms
 from .transport import get_auth_instance, get_service_authtype, get_docs_authtype, AUTH_TYPE_MAP, UNKNOWN
 from .util import split_url
 from .version import Version, API_VERSIONS
-
-if PY2:
-    import Queue as queue
-else:
-    import queue
 
 log = logging.getLogger(__name__)
 
@@ -75,7 +71,7 @@ class BaseProtocol(object):
         while True:
             try:
                 self._session_pool.get(block=False).close_socket(self.service_endpoint)
-            except (queue.Empty, ReferenceError, AttributeError):
+            except (Empty, ReferenceError, AttributeError):
                 break
 
     def get_session(self):
@@ -86,7 +82,7 @@ class BaseProtocol(object):
                 session = self._session_pool.get(timeout=_timeout)
                 log.debug('Server %s: Got session %s', self.server, session.session_id)
                 return session
-            except queue.Empty:
+            except Empty:
                 # This is normal when we have many worker threads starving for available sessions
                 log.debug('Server %s: No sessions available for %s seconds', self.server, _timeout)
 
@@ -95,7 +91,7 @@ class BaseProtocol(object):
         log.debug('Server %s: Releasing session %s', self.server, session.session_id)
         try:
             self._session_pool.put(session, block=False)
-        except queue.Full:
+        except Full:
             log.debug('Server %s: Session pool was already full %s', self.server, session.session_id)
 
     def retire_session(self, session):
@@ -194,7 +190,7 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
 
         # Try to behave nicely with the Exchange server. We want to keep the connection open between requests.
         # We also want to re-use sessions, to avoid the NTLM auth handshake on every request.
-        self._session_pool = queue.LifoQueue(maxsize=self.SESSION_POOLSIZE)
+        self._session_pool = LifoQueue(maxsize=self.SESSION_POOLSIZE)
         for _ in range(self.SESSION_POOLSIZE):
             self._session_pool.put(self.create_session(), block=False)
 

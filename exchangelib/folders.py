@@ -1,4 +1,6 @@
 # coding=utf-8
+from __future__ import unicode_literals
+
 import logging
 
 from future.utils import python_2_unicode_compatible
