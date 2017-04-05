@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 from copy import deepcopy
 from decimal import Decimal
 import io
@@ -193,6 +195,9 @@ def add_xml_child(tree, name, value):
 
 def to_xml(text):
     try:
+        if PY2:
+            # On python2, fromstring expects an encoded string
+            return fromstring((text[BOM_LEN:] if text.startswith(BOM) else text).encode('utf-8'))
         return fromstring(text[BOM_LEN:] if text.startswith(BOM) else text)
     except ParseError:
         from lxml.etree import XMLParser, parse, tostring

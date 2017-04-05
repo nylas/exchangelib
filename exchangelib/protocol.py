@@ -22,7 +22,8 @@ from six import text_type
 from .credentials import Credentials
 from .errors import TransportError
 from .services import GetServerTimeZones, GetRoomLists, GetRooms
-from .transport import get_auth_instance, get_service_authtype, get_docs_authtype, AUTH_TYPE_MAP, UNKNOWN
+from .transport import get_auth_instance, get_service_authtype, get_docs_authtype, AUTH_TYPE_MAP, UNKNOWN, \
+    DEFAULT_HEADERS
 from .util import split_url
 from .version import Version, API_VERSIONS
 
@@ -112,8 +113,7 @@ class BaseProtocol(object):
         session = EWSSession(self)
         session.auth = get_auth_instance(credentials=self.credentials, auth_type=self.auth_type)
         # Leave this inside the loop because headers are mutable
-        headers = {'Content-Type': 'text/xml; charset=utf-8', 'Accept-Encoding': 'compress, gzip'}
-        session.headers.update(headers)
+        session.headers.update(DEFAULT_HEADERS.copy())
         scheme = 'https' if self.has_ssl else 'http'
         # We want just one connection per session. No retries, since we wrap all requests in our own retry handler
         session.mount('%s://' % scheme, requests.adapters.HTTPAdapter(

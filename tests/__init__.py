@@ -813,7 +813,7 @@ class CommonTest(EWSTest):
 </s:Envelope>
 ''')
         account = MockAccount(IMPERSONATION, 'foo@example.com')
-        wrapped = wrap(content=content, version=version, account=account, encoding='utf-8')
+        wrapped = wrap(content=content, version=version, account=account)
         self.assertEqual(
             self.pprint(wrapped),
             b'''<?xml version='1.0' encoding='utf-8'?>
@@ -834,7 +834,7 @@ class CommonTest(EWSTest):
   </s:Body>
 </s:Envelope>
 ''')
-        wrapped = wrap(content=content, version=version, account=account, ewstimezone=tz, encoding='latin1')
+        wrapped = wrap(content=content, version=version, account=account, ewstimezone=tz)
         self.assertEqual(
             self.pprint(wrapped),
             b'''<?xml version='1.0' encoding='utf-8'?>
@@ -865,9 +865,9 @@ class CommonTest(EWSTest):
     def test_get_timezones(self):
         ws = GetServerTimeZones(self.config.protocol)
         data = ws.call()
-        self.assertAlmostEqual(len(data), 130, delta=30, msg=data)
+        self.assertAlmostEqual(len(list(data)), 130, delta=30, msg=data)
         # Test shortcut
-        self.assertAlmostEqual(len(self.config.protocol.get_timezones()), 130, delta=30, msg=data)
+        self.assertAlmostEqual(len(list(self.config.protocol.get_timezones())), 130, delta=30, msg=data)
 
     def test_get_roomlists(self):
         # The test server is not guaranteed to have any room lists which makes this test less useful

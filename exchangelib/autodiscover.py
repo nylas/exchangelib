@@ -28,6 +28,7 @@ from .credentials import Credentials
 from .errors import AutoDiscoverFailed, AutoDiscoverRedirect, AutoDiscoverCircularRedirect, TransportError, \
     RedirectError, ErrorNonExistentMailbox, UnauthorizedError
 from .protocol import BaseProtocol, Protocol
+from .transport import DEFAULT_ENCODING, DEFAULT_HEADERS
 from .util import create_element, get_xml_attr, add_xml_child, to_xml, is_xml, post_ratelimited, xml_to_str, \
     get_domain, CONNECTION_ERRORS
 
@@ -326,9 +327,9 @@ def _autodiscover_quick(credentials, email, protocol):
                                           verify_ssl=protocol.verify_ssl)
 
 
-def _get_autodiscover_auth_type(url, email, verify, encoding='utf-8'):
+def _get_autodiscover_auth_type(url, email, verify):
     try:
-        data = _get_autodiscover_payload(email=email, encoding=encoding)
+        data = _get_autodiscover_payload(email=email)
         return transport.get_autodiscover_authtype(service_endpoint=url, data=data, timeout=TIMEOUT,
                                                    verify=verify)
     except TransportError as e:
@@ -341,27 +342,26 @@ def _get_autodiscover_auth_type(url, email, verify, encoding='utf-8'):
         raise_from(AutoDiscoverFailed('Error guessing auth type: %s' % e), e)
 
 
-def _get_autodiscover_payload(email, encoding='utf-8'):
+def _get_autodiscover_payload(email):
     # Builds a full Autodiscover XML request
     payload = create_element('Autodiscover', xmlns=REQUEST_NS)
     request = create_element('Request')
     add_xml_child(request, 'EMailAddress', email)
     add_xml_child(request, 'AcceptableResponseSchema', RESPONSE_NS)
     payload.append(request)
-    return xml_to_str(payload, encoding=encoding, xml_declaration=True)
+    return xml_to_str(payload, encoding=DEFAULT_ENCODING, xml_declaration=True)
 
 
-def _get_autodiscover_response(protocol, email, encoding='utf-8'):
-    data = _get_autodiscover_payload(email=email, encoding=encoding)
-    headers = {'Content-Type': 'text/xml; charset=%s' % encoding}
+def _get_autodiscover_response(protocol, email):
+    data = _get_autodiscover_payload(email=email)
     try:
         # Rate-limiting is an issue with autodiscover if the same setup is hosting EWS and autodiscover and we just
         # hammered the server with requests. We allow redirects since some autodiscover servers will issue different
         # redirects depending on the POST data content.
         session = protocol.get_session()
         r, session = post_ratelimited(protocol=protocol, session=session, url=protocol.service_endpoint,
-                                      headers=headers, data=data, timeout=protocol.TIMEOUT, verify=protocol.verify_ssl,
-                                      allow_redirects=True)
+                                      headers=DEFAULT_HEADERS.copy(), data=data, timeout=protocol.TIMEOUT,
+                                      verify=protocol.verify_ssl, allow_redirects=True)
         protocol.release_session(session)
         log.debug('Response headers: %s', r.headers)
     except RedirectError:

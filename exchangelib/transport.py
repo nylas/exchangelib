@@ -33,8 +33,11 @@ AUTH_TYPE_MAP = {
     NOAUTH: None,
 }
 
+DEFAULT_ENCODING = 'utf-8'
+DEFAULT_HEADERS = {'Content-Type': 'text/xml; charset=%s' % DEFAULT_ENCODING, 'Accept-Encoding': 'compress, gzip'}
 
-def wrap(content, version, account=None, ewstimezone=None, encoding='utf-8'):
+
+def wrap(content, version, account=None, ewstimezone=None):
     """
     Generate the necessary boilerplate XML for a raw SOAP request. The XML is specific to the server version.
     ExchangeImpersonation allows to act as the user we want to impersonate.
@@ -62,7 +65,7 @@ def wrap(content, version, account=None, ewstimezone=None, encoding='utf-8'):
     body = create_element('s:Body')
     body.append(content)
     envelope.append(body)
-    return xml_to_str(envelope, encoding=encoding, xml_declaration=True)
+    return xml_to_str(envelope, encoding=DEFAULT_ENCODING, xml_declaration=True)
 
 
 def get_auth_instance(credentials, auth_type):
@@ -86,9 +89,9 @@ def get_autodiscover_authtype(service_endpoint, data, timeout, verify):
     # First issue a HEAD request to look for a location header. This is the autodiscover HTTP redirect method. If there
     # was no redirect, continue trying a POST request with a valid payload.
     log.debug('Getting autodiscover auth type for %s %s', service_endpoint, timeout)
-    headers = {'Content-Type': 'text/xml; charset=utf-8'}
     with requests.sessions.Session() as s:
-        r = s.head(url=service_endpoint, headers=headers, timeout=timeout, allow_redirects=False, verify=verify)
+        r = s.head(url=service_endpoint, headers=DEFAULT_HEADERS.copy(), timeout=timeout, allow_redirects=False,
+                   verify=verify)
         if r.status_code == 302:
             try:
                 redirect_url = get_redirect_url(r, require_relative=True)
@@ -99,17 +102,16 @@ def get_autodiscover_authtype(service_endpoint, data, timeout, verify):
                 raise RedirectError(url=e.value)
             # Some MS servers are masters of messing up HTTP, issuing 302 to an error page with zero content.
             # Give this URL a chance with a POST request.
-        r = s.post(url=service_endpoint, headers=headers, data=data, timeout=timeout, allow_redirects=False,
-                   verify=verify)
+        r = s.post(url=service_endpoint, headers=DEFAULT_HEADERS.copy(),
+                   data=data, timeout=timeout, allow_redirects=False, verify=verify)
     return _get_auth_method_from_response(response=r)
 
 
 def get_docs_authtype(docs_url, verify):
     # Get auth type by tasting headers from the server. Don't do HEAD requests. It's too error prone.
     log.debug('Getting docs auth type for %s', docs_url)
-    headers = {'Content-Type': 'text/xml; charset=utf-8'}
     with requests.sessions.Session() as s:
-        r = s.get(url=docs_url, headers=headers, allow_redirects=True, verify=verify)
+        r = s.get(url=docs_url, headers=DEFAULT_HEADERS.copy(), allow_redirects=True, verify=verify)
     return _get_auth_method_from_response(response=r)
 
 
@@ -117,14 +119,14 @@ def get_service_authtype(service_endpoint, versions, verify, name):
     # Get auth type by tasting headers from the server. Only do POST requests. HEAD is too error prone, and some servers
     # are set up to redirect to OWA on all requests except POST to /EWS/Exchange.asmx
     log.debug('Getting service auth type for %s', service_endpoint)
-    headers = {'Content-Type': 'text/xml; charset=utf-8'}
     # We don't know the API version yet, but we need it to create a valid request because some Exchange servers only
     # respond when given a valid request. Try all known versions. Gross.
     with requests.sessions.Session() as s:
         for version in versions:
             data = dummy_xml(version=version, name=name)
             log.debug('Requesting %s from %s', data, service_endpoint)
-            r = s.post(url=service_endpoint, headers=headers, data=data, allow_redirects=True, verify=verify)
+            r = s.post(url=service_endpoint, headers=DEFAULT_HEADERS.copy(), data=data, allow_redirects=True,
+                       verify=verify)
             try:
                 auth_type = _get_auth_method_from_response(response=r)
                 log.debug('Auth type is %s', auth_type)
