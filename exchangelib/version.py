@@ -211,7 +211,7 @@ class Version(object):
                 types_url,
                 '\n\n%s[...]' % r.text[:200] if len(r.text) > 200 else '\n\n%s' % r.text if r.text else '',
             ))
-        return to_xml(r.text, encoding=r.encoding).get('version')
+        return to_xml(r.text).get('version')
 
     @classmethod
     def _guess_version_from_service(cls, protocol, hint=None):
@@ -229,7 +229,7 @@ class Version(object):
     @classmethod
     def from_response(cls, requested_api_version, response):
         try:
-            header = to_xml(response.text, encoding=response.encoding).find('{%s}Header' % SOAPNS)
+            header = to_xml(response.text).find('{%s}Header' % SOAPNS)
             if header is None:
                 raise ParseError()
         except ParseError:

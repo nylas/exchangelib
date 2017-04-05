@@ -1,5 +1,3 @@
-from __future__ import unicode_literals
-
 from copy import deepcopy
 from decimal import Decimal
 import io
@@ -31,6 +29,7 @@ string_type = string_types[0]
 _illegal_xml_chars_RE = re.compile('[\x00-\x08\x0b\x0c\x0e-\x1F\uD800-\uDFFF\uFFFE\uFFFF]')
 # UTF-8 byte order mark which may precede the XML from an Exchange server
 BOM = '\xef\xbb\xbf'
+BOM_LEN = len(BOM)
 
 
 def chunkify(iterable, chunksize):
@@ -192,16 +191,16 @@ def add_xml_child(tree, name, value):
     tree.append(set_xml_value(elem=create_element(name), value=value, version=None))
 
 
-def to_xml(text, encoding):
-    processed = text.lstrip(BOM).encode(encoding or 'utf-8')
+def to_xml(text):
     try:
-        return fromstring(processed)
+        return fromstring(text[BOM_LEN:] if text.startswith(BOM) else text)
     except ParseError:
         from lxml.etree import XMLParser, parse, tostring
         # Exchange servers may spit out the weirdest XML. lxml is pretty good at recovering from errors
         log.warning('Fallback to lxml processing of faulty XML')
-        magical_parser = XMLParser(encoding=encoding or 'utf-8', recover=True)
-        root = parse(io.BytesIO(processed), magical_parser)
+        magical_parser = XMLParser(recover=True)
+        no_bom_text = text[BOM_LEN:] if text.startswith(BOM) else text
+        root = parse(io.BytesIO(no_bom_text.encode('utf-8')), magical_parser)
         try:
             return fromstring(tostring(root))
         except ParseError as e:
@@ -210,11 +209,11 @@ def to_xml(text, encoding):
             if not e.lineno:
                 raise ParseError('%s' % text_type(e))
             try:
-                offending_line = processed.splitlines()[e.lineno - 1]
+                offending_line = no_bom_text.splitlines()[e.lineno - 1]
             except IndexError:
                 raise ParseError('%s' % text_type(e))
             else:
-                offending_excerpt = offending_line[max(0, e.offset - 20):e.offset + 20].decode('ascii', 'ignore')
+                offending_excerpt = offending_line[max(0, e.offset - 20):e.offset + 20]
                 raise ParseError('%s\nOffending text: [...]%s[...]' % (text_type(e), offending_excerpt))
         except TypeError:
             raise ParseError('This is not XML: %s' % text)

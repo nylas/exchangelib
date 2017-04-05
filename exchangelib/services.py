@@ -138,7 +138,7 @@ class EWSService(object):
             self.protocol.release_session(session)
             log.debug('Trying API version %s for account %s', api_version, account)
             try:
-                soap_response_payload = to_xml(r.text, encoding=r.encoding or 'utf-8')
+                soap_response_payload = to_xml(r.text)
             except ParseError as e:
                 raise SOAPError('Bad SOAP response: %s' % e)
             try:

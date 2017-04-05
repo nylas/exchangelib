@@ -387,9 +387,9 @@ def _raise_response_errors(elem):
     raise AutoDiscoverFailed('Unknown error %s: %s' % (errorcode, message))
 
 
-def _parse_response(response, encoding='utf-8'):
+def _parse_response(response):
     # We could return lots more interesting things here
-    autodiscover = to_xml(response, encoding=encoding)
+    autodiscover = to_xml(response)
     resp = autodiscover.find('{%s}Response' % RESPONSE_NS)
     if resp is None:
         _raise_response_errors(autodiscover)

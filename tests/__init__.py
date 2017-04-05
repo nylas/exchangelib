@@ -246,7 +246,7 @@ class PropertiesTest(unittest.TestCase):
         <t:InternetMessageHeader HeaderName="Return-Path">foo@example.com</t:InternetMessageHeader>
     </t:InternetMessageHeaders>
 </Envelope'''
-        headers_elem = to_xml(payload, encoding='ascii').find('{%s}InternetMessageHeaders' % TNS)
+        headers_elem = to_xml(payload).find('{%s}InternetMessageHeaders' % TNS)
         headers = {}
         for elem in headers_elem.findall('{%s}InternetMessageHeader' % TNS):
             header = MessageHeader.from_xml(elem)
@@ -640,13 +640,13 @@ class UtilTest(unittest.TestCase):
             get_redirect_url(r, allow_relative=False)
 
     def test_to_xml(self):
-        to_xml('<?xml version="1.0" encoding="UTF-8"?><foo></foo>', encoding='ascii')
-        to_xml(BOM+'<?xml version="1.0" encoding="UTF-8"?><foo></foo>', encoding='ascii')
-        to_xml(BOM+'<?xml version="1.0" encoding="UTF-8"?><foo>&broken</foo>', encoding='ascii')
+        to_xml('<?xml version="1.0" encoding="UTF-8"?><foo></foo>')
+        to_xml(BOM+'<?xml version="1.0" encoding="UTF-8"?><foo></foo>')
+        to_xml(BOM+'<?xml version="1.0" encoding="UTF-8"?><foo>&broken</foo>')
         with self.assertRaises(ParseError):
-            to_xml('foo', encoding='ascii')
+            to_xml('foo')
         try:
-            to_xml('<t:Foo><t:Bar>Baz</t:Bar></t:Foo>', encoding='ascii')
+            to_xml('<t:Foo><t:Bar>Baz</t:Bar></t:Foo>')
         except ParseError as e:
             # Not all lxml versions throw an error here, so we can't use assertRaises
             self.assertIn('Offending text: [...]<t:Foo><t:Bar>Baz</t[...]', e.args[0])
@@ -914,7 +914,7 @@ class CommonTest(EWSTest):
         </m:GetRoomListsResponse>
     </s:Body>
 </s:Envelope>'''
-        res = ws._get_elements_in_response(response=ws._get_soap_payload(soap_response=to_xml(xml, 'utf-8')))
+        res = ws._get_elements_in_response(response=ws._get_soap_payload(soap_response=to_xml(xml)))
         self.assertSetEqual(
             {RoomList.from_xml(elem).email_address for elem in res},
             {'roomlist1@example.com', 'roomlist2@example.com'}
@@ -971,7 +971,7 @@ class CommonTest(EWSTest):
         </m:GetRoomsResponse>
     </s:Body>
 </s:Envelope>'''
-        res = ws._get_elements_in_response(response=ws._get_soap_payload(soap_response=to_xml(xml, 'utf-8')))
+        res = ws._get_elements_in_response(response=ws._get_soap_payload(soap_response=to_xml(xml)))
         self.assertSetEqual(
             {Room.from_xml(elem).email_address for elem in res},
             {'room1@example.com', 'room2@example.com'}
@@ -1169,19 +1169,19 @@ class CommonTest(EWSTest):
         with self.assertRaises(SOAPError) as e:
             ResolveNames._get_soap_payload(to_xml(soap_xml.format(
                 faultcode='YYY', faultstring='AAA', responsecode='XXX', message='ZZZ'
-            ), encoding='utf-8'))
+            )))
         self.assertIn('AAA', e.exception.args[0])
         self.assertIn('YYY', e.exception.args[0])
         self.assertIn('ZZZ', e.exception.args[0])
         with self.assertRaises(ErrorNonExistentMailbox) as e:
             ResolveNames._get_soap_payload(to_xml(soap_xml.format(
                 faultcode='ErrorNonExistentMailbox', faultstring='AAA', responsecode='XXX', message='ZZZ'
-            ), encoding='utf-8'))
+            )))
         self.assertIn('AAA', e.exception.args[0])
         with self.assertRaises(ErrorNonExistentMailbox) as e:
             ResolveNames._get_soap_payload(to_xml(soap_xml.format(
                 faultcode='XXX', faultstring='AAA', responsecode='ErrorNonExistentMailbox', message='YYY'
-            ), encoding='utf-8'))
+            )))
         self.assertIn('YYY', e.exception.args[0])
 
         # Test bad XML (no body)
@@ -1195,7 +1195,7 @@ class CommonTest(EWSTest):
   </soap:Body>
 </soap:Envelope>"""
         with self.assertRaises(TransportError):
-            ResolveNames._get_soap_payload(to_xml(soap_xml, encoding='utf-8'))
+            ResolveNames._get_soap_payload(to_xml(soap_xml))
 
         # Test bad XML (no fault)
         soap_xml = """\
@@ -1211,7 +1211,7 @@ class CommonTest(EWSTest):
   </soap:Body>
 </soap:Envelope>"""
         with self.assertRaises(TransportError):
-            ResolveNames._get_soap_payload(to_xml(soap_xml, encoding='utf-8'))
+            ResolveNames._get_soap_payload(to_xml(soap_xml))
 
     def test_element_container(self):
         svc = ResolveNames(self.account.protocol)
@@ -1228,7 +1228,7 @@ class CommonTest(EWSTest):
     </m:ResolveNamesResponse>
   </soap:Body>
 </soap:Envelope>"""
-        resp = svc._get_soap_payload(to_xml(soap_xml, encoding='utf-8'))
+        resp = svc._get_soap_payload(to_xml(soap_xml))
         with self.assertRaises(TransportError) as e:
             # Missing ResolutionSet elements
             list(svc._get_elements_in_response(response=resp))
