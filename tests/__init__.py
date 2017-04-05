@@ -40,17 +40,32 @@ from exchangelib.properties import Attendee, Mailbox, Choice, RoomList, MessageH
 from exchangelib.protocol import Protocol
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.restriction import Restriction, Q
-from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, GetAttachment, ResolveNames, TNS
+from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, GetAttachment, CreateAttachment, \
+    DeleteAttachment, ResolveNames, TNS
 from exchangelib.transport import NTLM, wrap
 from exchangelib.util import chunkify, peek, get_redirect_url, to_xml, BOM, get_domain, \
     post_ratelimited, create_element, CONNECTION_ERRORS
-from exchangelib.version import Build, Version
+from exchangelib.version import Build, Version, EXCHANGE_2007
 from exchangelib.winzone import generate_map, PYTZ_TO_MS_TIMEZONE_MAP
 
 if PY2:
     FileNotFoundError = OSError
 
 string_type = string_types[0]
+
+
+def mock_post(url, status_code, headers, text):
+    req = namedtuple('request', ['headers'])(headers={})
+    return lambda **kwargs: namedtuple(
+        'response', ['status_code', 'headers', 'text', 'request', 'history', 'url']
+    )(status_code=status_code, headers=headers, text=text, request=req, history=None, url=url)
+
+
+def mock_session_exception(exc_cls):
+    def raise_exc(**kwargs):
+        raise exc_cls()
+
+    return raise_exc
 
 
 class BuildTest(unittest.TestCase):
@@ -527,6 +542,27 @@ class QuerySetTest(unittest.TestCase):
         self.assertNotEqual(qs.order_fields, new_qs.order_fields)
         self.assertNotEqual(id(qs.return_format), id(new_qs.return_format))
         self.assertNotEqual(qs.return_format, new_qs.return_format)
+
+
+class ServicesTest(unittest.TestCase):
+    def test_invalid_server_version(self):
+        # Test that we get a client-side error if we call a service that was only implemented in a later version
+        mock_account = namedtuple('mock_account', ('protocol'))
+        mock_protocol = namedtuple('mock_protocol', ('version'))
+        mock_version = namedtuple('mock_version', ('build'))
+        account = mock_account(protocol=mock_protocol(version=mock_version(build=EXCHANGE_2007)))
+        with self.assertRaises(NotImplementedError):
+            GetServerTimeZones(protocol=account.protocol).call()
+        with self.assertRaises(NotImplementedError):
+            GetRoomLists(protocol=account.protocol).call()
+        with self.assertRaises(NotImplementedError):
+            GetRooms(protocol=account.protocol).call('XXX')
+        with self.assertRaises(NotImplementedError):
+            GetAttachment(account=account).call('XXX', 'YYY')
+        with self.assertRaises(NotImplementedError):
+            CreateAttachment(account=account).call('XXX', 'YYY')
+        with self.assertRaises(NotImplementedError):
+            DeleteAttachment(account=account).call('XXX')
 
 
 class UtilTest(unittest.TestCase):
@@ -1014,17 +1050,6 @@ class CommonTest(EWSTest):
     def test_post_ratelimited(self):
         url = 'https://example.com'
 
-        def mock_post(status_code, headers, text):
-            req = namedtuple('request', ['headers'])(headers={})
-            return lambda **kwargs: namedtuple(
-                'response', ['status_code', 'headers', 'text', 'request', 'history', 'url']
-            )(status_code=status_code, headers=headers, text=text, request=req, history=None, url=url)
-
-        def mock_session_exception(exc_cls):
-            def raise_exc(**kwargs):
-                raise exc_cls()
-            return raise_exc
-
         protocol = self.config.protocol
         credentials = protocol.credentials
         # Make sure we fail fast in error cases
@@ -1033,7 +1058,7 @@ class CommonTest(EWSTest):
         session = protocol.get_session()
 
         # Test the straight, HTTP 200 path
-        session.post = mock_post(200, {}, 'foo')
+        session.post = mock_post(url, 200, {}, 'foo')
         r, session = post_ratelimited(protocol=protocol, session=session, url='', headers=None, data='')
         self.assertEqual(r.text, 'foo')
 
@@ -1044,67 +1069,67 @@ class CommonTest(EWSTest):
                 r, session = post_ratelimited(protocol=protocol, session=session, url='', headers=None, data='')
 
         # Test bad exit codes and headers
-        session.post = mock_post(401, {}, '')
+        session.post = mock_post(url, 401, {}, '')
         with self.assertRaises(UnauthorizedError):
             r, session = post_ratelimited(protocol=protocol, session=session, url='', headers=None, data='')
-        session.post = mock_post(999, {'connection': 'close'}, '')
+        session.post = mock_post(url, 999, {'connection': 'close'}, '')
         with self.assertRaises(TransportError):
             r, session = post_ratelimited(protocol=protocol, session=session, url='', headers=None, data='')
-        session.post = mock_post(302, {'location': '/ews/genericerrorpage.htm?aspxerrorpath=/ews/exchange.asmx'}, '')
+        session.post = mock_post(url, 302, {'location': '/ews/genericerrorpage.htm?aspxerrorpath=/ews/exchange.asmx'}, '')
         with self.assertRaises(TransportError):
             r, session = post_ratelimited(protocol=protocol, session=session, url='', headers=None, data='')
-        session.post = mock_post(503, {}, '')
+        session.post = mock_post(url, 503, {}, '')
         with self.assertRaises(TransportError):
             r, session = post_ratelimited(protocol=protocol, session=session, url='', headers=None, data='')
 
         # No redirect header
-        session.post = mock_post(302, {}, '')
+        session.post = mock_post(url, 302, {}, '')
         with self.assertRaises(TransportError):
             r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
         # Redirect header to same location
-        session.post = mock_post(302, {'location': url}, '')
+        session.post = mock_post(url, 302, {'location': url}, '')
         with self.assertRaises(TransportError):
             r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
         # Redirect header to relative location
-        session.post = mock_post(302, {'location': url + '/foo'}, '')
+        session.post = mock_post(url, 302, {'location': url + '/foo'}, '')
         with self.assertRaises(RedirectError):
             r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
         # Redirect header to other location and allow_redirects=False
-        session.post = mock_post(302, {'location': 'https://contoso.com'}, '')
+        session.post = mock_post(url, 302, {'location': 'https://contoso.com'}, '')
         with self.assertRaises(TransportError):
             r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
         # Redirect header to other location and allow_redirects=True
         import exchangelib.util
         exchangelib.util.MAX_REDIRECTS = 0
-        session.post = mock_post(302, {'location': 'https://contoso.com'}, '')
+        session.post = mock_post(url, 302, {'location': 'https://contoso.com'}, '')
         with self.assertRaises(TransportError):
             r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='',
                                           allow_redirects=True)
 
         # CAS error
-        session.post = mock_post(999, {'X-CasErrorCode': 'AAARGH!'}, '')
+        session.post = mock_post(url, 999, {'X-CasErrorCode': 'AAARGH!'}, '')
         with self.assertRaises(CASError):
             r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
 
         # Allow XML data in a non-HTTP 200 response
-        session.post = mock_post(500, {}, '<?xml version="1.0" ?><foo></foo>')
+        session.post = mock_post(url, 500, {}, '<?xml version="1.0" ?><foo></foo>')
         r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
         self.assertEqual(r.text, '<?xml version="1.0" ?><foo></foo>')
 
         # Bad status_code and bad text
-        session.post = mock_post(999, {}, '')
+        session.post = mock_post(url, 999, {}, '')
         with self.assertRaises(TransportError):
             r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
 
         # Rate limit exceeded
         protocol.credentials = ServiceAccount(username=credentials.username, password=credentials.password, max_wait=1)
-        session.post = mock_post(503, {'connection': 'close'}, '')
+        session.post = mock_post(url, 503, {'connection': 'close'}, '')
         protocol.renew_session = lambda s: s  # Return the same session so it's still mocked
         with self.assertRaises(RateLimitError):
             r, session = post_ratelimited(protocol=protocol, session=session, url='', headers=None, data='')
         # Test something larger than the default wait, so we retry at least once
         protocol.credentials.max_wait = 15
-        session.post = mock_post(503, {'connection': 'close'}, '')
+        session.post = mock_post(url, 503, {'connection': 'close'}, '')
         with self.assertRaises(RateLimitError):
             r, session = post_ratelimited(protocol=protocol, session=session, url='', headers=None, data='')
 
