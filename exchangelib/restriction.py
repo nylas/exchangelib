@@ -78,11 +78,10 @@ class Q(object):
             if '__' in key:
                 fieldname, lookup = key.rsplit('__')
                 if lookup == self.LOOKUP_EXISTS:
-                    if value:
-                        self.children.append(self.__class__(**{key: True}))
-                    else:
+                    # value=True will fall through to further processing
+                    if not value:
                         self.children.append(~self.__class__(**{key: True}))
-                    continue
+                        continue
 
                 if lookup == self.LOOKUP_RANGE:
                     # EWS doesn't have a 'range' operator. Emulate 'foo__range=(1, 2)' as 'foo__gte=1 and foo__lte=2'
@@ -160,6 +159,8 @@ class Q(object):
             return
         assert self.fieldname
         assert self.op in self.OP_TYPES
+        if self.op == self.EXISTS:
+            assert self.value == True
         if self.value is None:
             raise ValueError('Value for filter on field "%s" cannot be None' % self.fieldname)
         if isinstance(self.value, (tuple, list, set)):

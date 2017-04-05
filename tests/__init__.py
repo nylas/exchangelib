@@ -2263,6 +2263,18 @@ class BaseItemTest(EWSTest):
         common_qs = self.test_folder.filter(categories__contains=self.categories)
         one_hour = datetime.timedelta(hours=1)
         two_hours = datetime.timedelta(hours=2)
+        # Test 'exists'
+        ids = self.test_folder.bulk_create(items=[self.get_test_item()])
+        self.assertEqual(
+            len(common_qs.filter(datetime_created__exists=True)),
+            1
+        )
+        self.assertEqual(
+            len(common_qs.filter(datetime_created__exists=False)),
+            0
+        )
+        self.bulk_delete(ids)
+
         # Test 'range'
         ids = self.test_folder.bulk_create(items=[self.get_test_item()])
         self.assertEqual(
