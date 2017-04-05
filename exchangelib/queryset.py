@@ -477,14 +477,16 @@ class QuerySet(object):
             raise MultipleObjectsReturned()
         return items[0]
 
-    def count(self):
-        """ Get the query count, with as little effort as possible """
+    def count(self, page_size=1000):
+        """ Get the query count, with as little effort as possible 'page_size' is the number of items to
+        fetch from the server per request. We're only fetching the IDs, so keep it high"""
         if self._cache is not None:
             return len(self._cache)
         new_qs = self.copy()
         new_qs.only_fields = tuple()
         new_qs.order_fields = None
         new_qs.return_format = self.NONE
+        new_qs.page_size = page_size
         return len(list(new_qs.__iter__()))
 
     def exists(self):
