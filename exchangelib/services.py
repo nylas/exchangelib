@@ -15,7 +15,7 @@ from __future__ import unicode_literals
 import abc
 import logging
 import traceback
-from xml.parsers.expat import ExpatError
+from xml.etree.ElementTree import ParseError
 
 from six import text_type
 
@@ -67,7 +67,9 @@ class EWSService(object):
     def _get_elements(self, payload):
         assert isinstance(payload, ElementType)
         try:
+            # Send the request, get the response and do basic sanity checking on the SOAP XML
             response = self._get_response_xml(payload=payload)
+            # Read the XML and throw any SOAP or general EWS error messages. Return a generator over the result elements
             return self._get_elements_in_response(response=response)
         except (
                 ErrorAccessDenied,
@@ -137,8 +139,8 @@ class EWSService(object):
             log.debug('Trying API version %s for account %s', api_version, account)
             try:
                 soap_response_payload = to_xml(r.text, encoding=r.encoding or 'utf-8')
-            except ExpatError as e:
-                raise SOAPError('SOAP response is not XML: %s' % e)
+            except ParseError as e:
+                raise SOAPError('Bad SOAP response: %s' % e)
             try:
                 res = self._get_soap_payload(soap_response=soap_response_payload)
             except (ErrorInvalidSchemaVersionForMailboxVersion, ErrorInvalidServerVersion):
@@ -170,7 +172,7 @@ class EWSService(object):
             fault = body.find('{%s}Fault' % SOAPNS)
             if fault is None:
                 raise SOAPError('Unknown SOAP response: %s' % xml_to_str(body))
-            cls._raise_soap_errors(fault=fault)  # Will throw SOAPError
+            cls._raise_soap_errors(fault=fault)  # Will throw SOAPError or custom EWS error
         response_messages = response.find('{%s}ResponseMessages' % MNS)
         if response_messages is None:
             # Result isn't delivered in a list of FooResponseMessages, but directly in the FooResponse. Consumers expect
@@ -351,7 +353,7 @@ class GetServerTimeZones(EWSService):
     def call(self, returnfulltimezonedata=False):
         if self.protocol.version.build < EXCHANGE_2010:
             raise NotImplementedError('%s is only supported for Exchange 2010 servers and later' % self.SERVICE_NAME)
-        return list(self._get_elements(payload=self.get_payload(returnfulltimezonedata=returnfulltimezonedata)))
+        return self._get_elements(payload=self.get_payload(returnfulltimezonedata=returnfulltimezonedata))
 
     def get_payload(self, returnfulltimezonedata):
         return create_element(

@@ -12,6 +12,7 @@ from keyword import kwlist
 from xml.etree.ElementTree import ParseError
 
 import requests
+import requests_mock
 from six import PY2, string_types
 from yaml import load
 
@@ -25,7 +26,7 @@ from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalid
     AutoDiscoverCircularRedirect, AutoDiscoverFailed, ErrorNonExistentMailbox, UnknownTimeZone, \
     ErrorNameResolutionNoResults, TransportError, RedirectError, CASError, RateLimitError, UnauthorizedError, \
     ErrorInvalidChangeKey, ErrorInvalidIdMalformed, ErrorContainsFilterWrongType, ErrorAccessDenied, \
-    ErrorFolderNotFound, SOAPError
+    ErrorFolderNotFound, ErrorInvalidRequest, SOAPError
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.extended_properties import ExtendedProperty, ExternId
 from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextField, EmailField, URIField, ChoiceField, \
@@ -1207,6 +1208,18 @@ class CommonTest(EWSTest):
             # Missing ResolutionSet elements
             list(svc._get_elements_in_response(response=resp))
         self.assertIn('ResolutionSet elements in ResponseMessage', e.exception.args[0])
+
+    def test_get_elements(self):
+        # Test that we can handle SOAP-level error messages
+        svc = ResolveNames(self.account.protocol)
+        with self.assertRaises(ErrorInvalidRequest):
+            svc._get_elements(create_element('XXX'))
+
+    @requests_mock.mock()
+    def test_invalid_soap_response(self, m):
+        m.post(self.config.protocol.service_endpoint, text='XXX')
+        with self.assertRaises(SOAPError):
+            self.account.inbox.all().count()
 
     def test_from_xml(self):
         # Test for all EWSElement classes that they handle None as input to from_xml()
