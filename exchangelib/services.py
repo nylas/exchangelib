@@ -486,14 +486,13 @@ class GetItem(EWSAccountService, EWSPooledMixIn):
             add_xml_child(itemshape, 't:AdditionalProperties', additional_property_elems)
         getitem.append(itemshape)
         item_ids = create_element('m:ItemIds')
-        n = 0
+        is_empty = True
         for item in items:
-            n += 1
+            is_empty = False
             item_id = ItemId(*(item if isinstance(item, tuple) else (item.item_id, item.changekey)))
             log.debug('Getting item %s', item)
             set_xml_value(item_ids, item_id, self.account.version)
-        if not n:
-            raise ValueError('"items" must not be empty')
+        assert not is_empty, '"items" must not be empty'
         getitem.append(item_ids)
         return getitem
 
@@ -536,13 +535,14 @@ class CreateItem(EWSAccountService, EWSPooledMixIn):
             saveditemfolderid = create_element('m:SavedItemFolderId')
             saveditemfolderid.append(self._folder_elem(folder))
             createitem.append(saveditemfolderid)
-        item_elems = []
+        item_elems = create_element('m:Items')
+        is_empty = True
         for item in items:
+            is_empty = False
             log.debug('Adding item %s', item)
-            item_elems.append(item.to_xml(version=self.account.version))
-        if not item_elems:
-            raise ValueError('"items" must not be empty')
-        add_xml_child(createitem, 'm:Items', item_elems)
+            set_xml_value(item_elems, item, self.account.version)
+        assert not is_empty, '"items" must not be empty'
+        createitem.append(item_elems)
         return createitem
 
 
@@ -704,8 +704,7 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
                 updates.append(elem)
             itemchange.append(updates)
             itemchanges.append(itemchange)
-        if is_empty:
-            raise ValueError('"items" must not be empty')
+        assert not is_empty, '"items" must not be empty'
         updateitem.append(itemchanges)
         return updateitem
 
@@ -752,14 +751,13 @@ class DeleteItem(EWSAccountService, EWSPooledMixIn):
             )
 
         item_ids = create_element('m:ItemIds')
-        n = 0
+        is_empty = True
         for item in items:
-            n += 1
+            is_empty = False
             item_id = ItemId(*(item if isinstance(item, tuple) else (item.item_id, item.changekey)))
             log.debug('Deleting item %s', item)
             set_xml_value(item_ids, item_id, self.account.version)
-        if not n:
-            raise ValueError('"items" must not be empty')
+        assert not is_empty, '"items" must not be empty'
         deleteitem.append(item_ids)
         return deleteitem
 
@@ -914,14 +912,13 @@ class SendItem(EWSAccountService):
             SaveItemToFolder='true' if saved_item_folder else 'false',
         )
         item_ids = create_element('m:ItemIds')
-        n = 0
+        is_empty = True
         for item in items:
-            n += 1
+            is_empty = False
             item_id = ItemId(*(item if isinstance(item, tuple) else (item.item_id, item.changekey)))
             log.debug('Sending item %s', item)
             set_xml_value(item_ids, item_id, self.account.version)
-        if not n:
-            raise ValueError('"items" must not be empty')
+        assert not is_empty, '"items" must not be empty'
         senditem.append(item_ids)
         if saved_item_folder:
             senditem.append(self._folder_elem(saved_item_folder))
@@ -950,14 +947,13 @@ class MoveItem(EWSAccountService):
         tofolderid.append(self._folder_elem(to_folder))
         moveeitem.append(tofolderid)
         item_ids = create_element('m:ItemIds')
-        n = 0
+        is_empty = True
         for item in items:
-            n += 1
+            is_empty = False
             item_id = ItemId(*(item if isinstance(item, tuple) else (item.item_id, item.changekey)))
             log.debug('Moving item %s to %s', item, to_folder)
             set_xml_value(item_ids, item_id, self.account.version)
-        if not n:
-            raise ValueError('"items" must not be empty')
+        assert not is_empty, '"items" must not be empty'
         moveeitem.append(item_ids)
         return moveeitem
 
@@ -980,12 +976,11 @@ class ResolveNames(EWSService):
             'm:%s' % self.SERVICE_NAME,
             ReturnFullContactData='true' if return_full_contact_data else 'false',
         )
-        n = 0
+        is_empty = True
         for entry in unresolved_entries:
-            n += 1
+            is_empty = False
             add_xml_child(payload, 'm:UnresolvedEntry', entry)
-        if not n:
-            raise ValueError('"unresolvedentries" must not be empty')
+        assert not is_empty, '"unresolvedentries" must not be empty'
         return payload
 
 
@@ -1014,13 +1009,12 @@ class GetAttachment(EWSAccountService):
             add_xml_child(attachment_shape, 't:IncludeMimeContent', 'true')
             payload.append(attachment_shape)
         attachment_ids = create_element('m:AttachmentIds')
-        n = 0
+        is_empty = True
         for item in items:
-            n += 1
+            is_empty = False
             attachment_id = item if isinstance(item, AttachmentId) else AttachmentId(id=item)
             set_xml_value(attachment_ids, attachment_id, self.account.version)
-        if not n:
-            raise ValueError('"items" must not be empty')
+        assert not is_empty, '"items" must not be empty'
         payload.append(attachment_ids)
         return payload
 
@@ -1047,12 +1041,11 @@ class CreateAttachment(EWSAccountService):
                                    else (parent_item.item_id, parent_item.changekey)))
         payload.append(parent_id.to_xml(version=self.account.version))
         attachments = create_element('m:Attachments')
-        n = 0
+        is_empty = True
         for item in items:
-            n += 1
+            is_empty = False
             set_xml_value(attachments, item, self.account.version)
-        if not n:
-            raise ValueError('"items" must not be empty')
+        assert not is_empty, '"items" must not be empty'
         payload.append(attachments)
         return payload
 
@@ -1086,13 +1079,12 @@ class DeleteAttachment(EWSAccountService):
         from .attachments import AttachmentId
         payload = create_element('m:%s' % self.SERVICE_NAME)
         attachment_ids = create_element('m:AttachmentIds')
-        n = 0
+        is_empty = True
         for item in items:
-            n += 1
+            is_empty = False
             attachment_id = item if isinstance(item, AttachmentId) else AttachmentId(id=item)
             set_xml_value(attachment_ids, attachment_id, self.account.version)
-        if not n:
-            raise ValueError('"items" must not be empty')
+        assert not is_empty, '"items" must not be empty'
         payload.append(attachment_ids)
         return payload
 
