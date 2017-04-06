@@ -3555,6 +3555,19 @@ class CalendarTest(BaseItemTest):
     TEST_FOLDER = 'calendar'
     ITEM_CLASS = CalendarItem
 
+    def test_update_to_non_utc_datetime(self):
+        # Test updating with non-UTC datetime values. This is a separate code path in UpdateItem code
+        item = self.get_test_item()
+        item.reminder_is_set = True
+        item.is_all_day = False
+        item.save()
+        dt_start, dt_end = [dt.astimezone(self.tz) for dt in get_random_datetime_range()]
+        item.start, item.end = dt_start, dt_end
+        item.save()
+        item.refresh()
+        self.assertEqual(item.start, dt_start)
+        self.assertEqual(item.end, dt_end)
+
     def test_view(self):
         item1 = self.ITEM_CLASS(
             account=self.account,
