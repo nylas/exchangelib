@@ -3759,20 +3759,23 @@ def get_random_email():
     ))
 
 
-def get_random_date(start_date=datetime.date(1900, 1, 1), end_date=datetime.date(2100, 1, 1)):
+def get_random_date(start_date=datetime.date(1990, 1, 1), end_date=datetime.date(2030, 1, 1)):
+    # Keep with a reasonable date range. A wider date range is unstable WRT timezones
     return EWSDate.fromordinal(random.randint(start_date.toordinal(), end_date.toordinal()))
 
 
-def get_random_datetime(start_date=datetime.date(1900, 1, 1), end_date=datetime.date(2100, 1, 1)):
+def get_random_datetime(start_date=datetime.date(1990, 1, 1), end_date=datetime.date(2030, 1, 1)):
     # Create a random datetime with minute precision
+    # Keep with a reasonable date range. A wider date range is unstable WRT timezones
     random_date = get_random_date(start_date=start_date, end_date=end_date)
     random_datetime = datetime.datetime.combine(random_date, datetime.time.min) \
         + datetime.timedelta(minutes=random.randint(0, 60 * 24))
     return UTC.localize(EWSDateTime.from_datetime(random_datetime))
 
 
-def get_random_datetime_range(start_date=datetime.date(1900, 1, 1), end_date=datetime.date(2100, 1, 1)):
+def get_random_datetime_range(start_date=datetime.date(1990, 1, 1), end_date=datetime.date(2030, 1, 1)):
     # Create two random datetimes. Calendar items raise ErrorCalendarDurationIsTooLong if duration is > 5 years.
+    # Keep with a reasonable date range. A wider date range is unstable WRT timezones
     dt1 = get_random_datetime(start_date=start_date, end_date=end_date)
     dt2 = dt1 + datetime.timedelta(minutes=random.randint(0, 60 * 24 * 365 * 5))
     return dt1, dt2
