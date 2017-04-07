@@ -146,7 +146,7 @@ def _get_auth_method_from_response(response):
         try:
             redirect_url = get_redirect_url(response, allow_relative=False)
         except RelativeRedirect:
-            raise TransportError('Circular redirect')
+            raise TransportError('Redirect to same host when trying to get auth method')
         raise RedirectError(url=redirect_url)
     if response.status_code != 401:
         raise TransportError('Unexpected response: %s %s' % (response.status_code, response.reason))
@@ -154,6 +154,7 @@ def _get_auth_method_from_response(response):
     # Get auth type from headers
     for key, val in response.headers.items():
         if key.lower() == 'www-authenticate':
+            # Requests will combine multiple HTTP headers into one in 'request.headers'
             vals = _tokenize(val.lower())
             for v in vals:
                 if v.startswith('realm'):
