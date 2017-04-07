@@ -372,22 +372,28 @@ def _get_autodiscover_response(protocol, email):
 
 def _raise_response_errors(elem):
     # Find an error message in the response and raise the relevant exception
-    resp = elem.find('{%s}Response' % ERROR_NS)
-    error = resp.find('{%s}Error' % ERROR_NS)
-    errorcode = get_xml_attr(error, '{%s}ErrorCode' % ERROR_NS)
-    message = get_xml_attr(error, '{%s}Message' % ERROR_NS)
-    if message in ('The e-mail address cannot be found.', "The email address can't be found."):
-        raise ErrorNonExistentMailbox('The SMTP address has no mailbox associated with it')
-    raise AutoDiscoverFailed('Unknown error %s: %s' % (errorcode, message))
+    try:
+        resp = elem.find('{%s}Response' % ERROR_NS)
+        error = resp.find('{%s}Error' % ERROR_NS)
+        errorcode = get_xml_attr(error, '{%s}ErrorCode' % ERROR_NS)
+        message = get_xml_attr(error, '{%s}Message' % ERROR_NS)
+        if message in ('The e-mail address cannot be found.', "The email address can't be found."):
+            raise ErrorNonExistentMailbox('The SMTP address has no mailbox associated with it')
+        raise AutoDiscoverFailed('Unknown error %s: %s' % (errorcode, message))
+    except AttributeError:
+        raise AutoDiscoverFailed('Unknown autodiscover response: %s' % xml_to_str(elem))
 
 
 def _parse_response(response):
     # We could return lots more interesting things here
+    if not is_xml(response):
+        raise AutoDiscoverFailed('Unknown autodiscover response: %s' % response)
     autodiscover = to_xml(response)
     resp = autodiscover.find('{%s}Response' % RESPONSE_NS)
     if resp is None:
         _raise_response_errors(autodiscover)
     account = resp.find('{%s}Account' % RESPONSE_NS)
+    assert get_xml_attr(account, '{%s}AccountType' % RESPONSE_NS) == 'email'
     action = get_xml_attr(account, '{%s}Action' % RESPONSE_NS)
     redirect_email = get_xml_attr(account, '{%s}RedirectAddr' % RESPONSE_NS)
     if action == 'redirectAddr' and redirect_email:
@@ -397,7 +403,6 @@ def _parse_response(response):
     # case, the original email address IS the primary address
     user = resp.find('{%s}User' % RESPONSE_NS)
     primary_smtp_address = get_xml_attr(user, '{%s}AutoDiscoverSMTPAddress' % RESPONSE_NS)
-    assert get_xml_attr(account, '{%s}AccountType' % RESPONSE_NS) == 'email'
     protocols = {get_xml_attr(p, '{%s}Type' % RESPONSE_NS): p for p in account.findall('{%s}Protocol' % RESPONSE_NS)}
     # There are three possible protocol types: EXCH, EXPR and WEB.
     # EXPR is meant for EWS. See http://blogs.technet.com/b/exchange/archive/2008/09/26/3406344.aspx
