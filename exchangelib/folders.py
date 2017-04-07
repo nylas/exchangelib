@@ -384,8 +384,7 @@ class Folder(EWSElement):
                 shape=shape
         ):
             if isinstance(elem, Exception):
-                folders.append(elem)
-                continue
+                raise elem
             folder = cls.from_xml(elem=elem)
             folder.account = account
             folders.append(folder)
@@ -404,8 +403,7 @@ class Folder(EWSElement):
                 shape=IdOnly
         ):
             if isinstance(elem, Exception):
-                folders.append(elem)
-                continue
+                raise elem
             folder = self.from_xml(elem=elem)
             folder.account = self.account
             folders.append(folder)
