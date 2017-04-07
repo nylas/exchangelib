@@ -119,7 +119,10 @@ class Q(object):
                     children = [self.__class__(**{fieldname: v}) for v in value]
                     self.children.append(self.__class__(*children, conn_type=self.AND))
                     continue
-                op = self._lookup_to_op(lookup)
+                try:
+                    op = self._lookup_to_op(lookup)
+                except KeyError:
+                    raise ValueError("Lookup '%s' is not supported (called as '%s=%r')" % (lookup, key, value))
             else:
                 fieldname, op = key, self.EQ
 
