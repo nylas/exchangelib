@@ -394,8 +394,7 @@ class Restriction(object):
     """
 
     def __init__(self, q, folder_class):
-        if not isinstance(q, Q):
-            raise ValueError("'q' must be a Q object (%s)", type(q))
+        assert isinstance(q, Q)
         if q.is_empty():
             raise ValueError("Q object must not be empty")
         from .folders import Folder
