@@ -187,13 +187,7 @@ def discover(email, credentials, verify_ssl=True):
             if email.lower() == e.redirect_email.lower():
                 raise_from(AutoDiscoverCircularRedirect('Redirect to same email address: %s' % email), e)
             # Start over with the new email address
-            try:
-                return discover(email=e.redirect_email, credentials=credentials, verify_ssl=verify_ssl)
-            except AutoDiscoverFailed:
-                # Autodiscover no longer works with this domain. Clear cache and try again
-                del _autodiscover_cache[autodiscover_key]
-                return discover(email=e.redirect_email, credentials=credentials, verify_ssl=verify_ssl)
-        # This is unreachable
+            return discover(email=e.redirect_email, credentials=credentials, verify_ssl=verify_ssl)
 
     log.debug('Waiting for _autodiscover_cache_lock')
     with _autodiscover_cache_lock:
