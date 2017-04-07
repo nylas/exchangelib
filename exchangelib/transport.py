@@ -24,7 +24,6 @@ NOAUTH = 'no authentication'
 NTLM = 'NTLM'
 BASIC = 'basic'
 DIGEST = 'digest'
-UNKNOWN = 'unknown'
 
 AUTH_TYPE_MAP = {
     NTLM: requests_ntlm.HttpNtlmAuth,
