@@ -1516,7 +1516,14 @@ class AutodiscoverTest(EWSTest):
         self.assertEqual(protocol.version.build, self.config.protocol.version.build)
 
     def test_autodiscover_failure(self):
+        from exchangelib.autodiscover import _autodiscover_cache
+        # Empty the cache
+        _autodiscover_cache.clear()
         with self.assertRaises(ErrorNonExistentMailbox):
+            # Test that error is raised with an empty cache
+            discover(email='XXX.' + self.account.primary_smtp_address, credentials=self.config.credentials)
+        with self.assertRaises(ErrorNonExistentMailbox):
+            # Test that error is raised with a full cache
             discover(email='XXX.' + self.account.primary_smtp_address, credentials=self.config.credentials)
 
     def test_close_autodiscover_connections(self):
@@ -1674,6 +1681,99 @@ class AutodiscoverTest(EWSTest):
             _get_hostname_from_srv('example.com.')
         dns.resolver.Resolver = _orig
 
+    def test_parse_response(self):
+        from exchangelib.autodiscover import _parse_response
+
+        with self.assertRaises(AutoDiscoverFailed):
+            _parse_response('XXX')  # Invalid response
+
+        xml = '''<?xml version="1.0" encoding="utf-8"?><foo>bar</foo>'''
+        with self.assertRaises(AutoDiscoverFailed):
+            _parse_response(xml)  # Invalid XML response
+
+        # Redirection
+        xml = '''\
+<?xml version="1.0" encoding="utf-8"?>
+<Autodiscover xmlns="http://schemas.microsoft.com/exchange/autodiscover/responseschema/2006">
+    <Response xmlns="http://schemas.microsoft.com/exchange/autodiscover/outlook/responseschema/2006a">
+        <User>
+            <AutoDiscoverSMTPAddress>john@demo.affect-it.dk</AutoDiscoverSMTPAddress>
+        </User>
+        <Account>
+            <AccountType>email</AccountType>
+            <Action>redirectAddr</Action>
+            <RedirectAddr>foo@example.com</RedirectAddr>
+        </Account>
+    </Response>
+</Autodiscover>'''
+        with self.assertRaises(AutoDiscoverRedirect) as e:
+            _parse_response(xml)  # Redirect to primary email
+        self.assertEqual(e.exception.redirect_email, 'foo@example.com')
+
+        # Select EXPR if it's there, and there are multiple available
+        xml = '''\
+<?xml version="1.0" encoding="utf-8"?>
+<Autodiscover xmlns="http://schemas.microsoft.com/exchange/autodiscover/responseschema/2006">
+    <Response xmlns="http://schemas.microsoft.com/exchange/autodiscover/outlook/responseschema/2006a">
+        <User>
+            <AutoDiscoverSMTPAddress>john@demo.affect-it.dk</AutoDiscoverSMTPAddress>
+        </User>
+        <Account>
+            <AccountType>email</AccountType>
+            <Action>settings</Action>
+            <Protocol>
+                <Type>EXCH</Type>
+                <EwsUrl>https://exch.example.com/EWS/Exchange.asmx</EwsUrl>
+            </Protocol>
+            <Protocol>
+                <Type>EXPR</Type>
+                <EwsUrl>https://expr.example.com/EWS/Exchange.asmx</EwsUrl>
+            </Protocol>
+        </Account>
+    </Response>
+</Autodiscover>'''
+        self.assertEqual(_parse_response(xml)[0], 'https://expr.example.com/EWS/Exchange.asmx')
+
+        # Select EXPR if EXPR is unavailable
+        xml = '''\
+<?xml version="1.0" encoding="utf-8"?>
+<Autodiscover xmlns="http://schemas.microsoft.com/exchange/autodiscover/responseschema/2006">
+    <Response xmlns="http://schemas.microsoft.com/exchange/autodiscover/outlook/responseschema/2006a">
+        <User>
+            <AutoDiscoverSMTPAddress>john@demo.affect-it.dk</AutoDiscoverSMTPAddress>
+        </User>
+        <Account>
+            <AccountType>email</AccountType>
+            <Action>settings</Action>
+            <Protocol>
+                <Type>EXCH</Type>
+                <EwsUrl>https://exch.example.com/EWS/Exchange.asmx</EwsUrl>
+            </Protocol>
+        </Account>
+    </Response>
+</Autodiscover>'''
+        self.assertEqual(_parse_response(xml)[0], 'https://exch.example.com/EWS/Exchange.asmx')
+
+        # Fail if neither EXPR nor EXPR are unavailable
+        xml = '''\
+<?xml version="1.0" encoding="utf-8"?>
+<Autodiscover xmlns="http://schemas.microsoft.com/exchange/autodiscover/responseschema/2006">
+    <Response xmlns="http://schemas.microsoft.com/exchange/autodiscover/outlook/responseschema/2006a">
+        <User>
+            <AutoDiscoverSMTPAddress>john@demo.affect-it.dk</AutoDiscoverSMTPAddress>
+        </User>
+        <Account>
+            <AccountType>email</AccountType>
+            <Action>settings</Action>
+            <Protocol>
+                <Type>XXX</Type>
+                <EwsUrl>https://xxx.example.com/EWS/Exchange.asmx</EwsUrl>
+            </Protocol>
+        </Account>
+    </Response>
+</Autodiscover>'''
+        with self.assertRaises(AutoDiscoverFailed):
+            _parse_response(xml)
 
 class FolderTest(EWSTest):
     def test_folders(self):
