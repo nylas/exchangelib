@@ -173,23 +173,20 @@ class Q(object):
 
     @classmethod
     def _lookup_to_op(cls, lookup):
-        try:
-            return {
-                cls.LOOKUP_NOT: cls.NE,
-                cls.LOOKUP_GT: cls.GT,
-                cls.LOOKUP_GTE: cls.GTE,
-                cls.LOOKUP_LT: cls.LT,
-                cls.LOOKUP_LTE: cls.LTE,
-                cls.LOOKUP_EXACT: cls.EXACT,
-                cls.LOOKUP_IEXACT: cls.IEXACT,
-                cls.LOOKUP_CONTAINS: cls.CONTAINS,
-                cls.LOOKUP_ICONTAINS: cls.ICONTAINS,
-                cls.LOOKUP_STARTSWITH: cls.STARTSWITH,
-                cls.LOOKUP_ISTARTSWITH: cls.ISTARTSWITH,
-                cls.LOOKUP_EXISTS: cls.EXISTS,
-            }[lookup]
-        except KeyError:
-            raise ValueError("Lookup '%s' is not supported" % lookup)
+        return {
+            cls.LOOKUP_NOT: cls.NE,
+            cls.LOOKUP_GT: cls.GT,
+            cls.LOOKUP_GTE: cls.GTE,
+            cls.LOOKUP_LT: cls.LT,
+            cls.LOOKUP_LTE: cls.LTE,
+            cls.LOOKUP_EXACT: cls.EXACT,
+            cls.LOOKUP_IEXACT: cls.IEXACT,
+            cls.LOOKUP_CONTAINS: cls.CONTAINS,
+            cls.LOOKUP_ICONTAINS: cls.ICONTAINS,
+            cls.LOOKUP_STARTSWITH: cls.STARTSWITH,
+            cls.LOOKUP_ISTARTSWITH: cls.ISTARTSWITH,
+            cls.LOOKUP_EXISTS: cls.EXISTS,
+        }[lookup]
 
     @classmethod
     def _conn_to_xml(cls, conn_type):
@@ -198,10 +195,7 @@ class Q(object):
             cls.OR: 't:Or',
             cls.NOT: 't:Not',
         }
-        try:
-            return create_element(xml_tag_map[conn_type])
-        except KeyError:
-            raise ValueError("Unknown conn_type: '%s'" % conn_type)
+        return create_element(xml_tag_map[conn_type])
 
     @classmethod
     def _op_to_xml(cls, op):
@@ -216,9 +210,7 @@ class Q(object):
         }
         if op in xml_tag_map:
             return create_element(xml_tag_map[op])
-
-        if op not in (cls.EXACT, cls.IEXACT, cls.CONTAINS, cls.ICONTAINS, cls.STARTSWITH, cls.ISTARTSWITH):
-            raise ValueError("Unknown op: '%s'" % op)
+        assert op in (cls.EXACT, cls.IEXACT, cls.CONTAINS, cls.ICONTAINS, cls.STARTSWITH, cls.ISTARTSWITH)
 
         # For description of Contains attribute values, see
         #     https://msdn.microsoft.com/en-us/library/office/aa580702(v=exchg.150).aspx
