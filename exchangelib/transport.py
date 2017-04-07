@@ -71,17 +71,13 @@ def get_auth_instance(credentials, auth_type):
     """
     Returns an *Auth instance suitable for the requests package
     """
-    try:
-        model = AUTH_TYPE_MAP[auth_type]
-    except KeyError:
-        raise ValueError("Authentication type '%s' not supported" % auth_type)
-    else:
-        if model is None:
-            return None
-        username = credentials.username
-        if auth_type == NTLM and credentials.type == credentials.EMAIL:
-            username = '\\' + username
-        return model(username=username, password=credentials.password)
+    model = AUTH_TYPE_MAP[auth_type]
+    if model is None:
+        return None
+    username = credentials.username
+    if auth_type == NTLM and credentials.type == credentials.EMAIL:
+        username = '\\' + username
+    return model(username=username, password=credentials.password)
 
 
 def get_autodiscover_authtype(service_endpoint, data, timeout, verify):

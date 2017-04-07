@@ -27,7 +27,7 @@ __all__ = [
     'ItemId', 'Mailbox', 'Attendee', 'Room', 'RoomList', 'Body', 'HTMLBody',
     'Q',
     'SHALLOW', 'DEEP',
-    'BASIC', 'DIGEST', 'NTLM'
+    'BASIC', 'DIGEST', 'NTLM',
     'Build', 'Version',
 ]
 
