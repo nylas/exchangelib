@@ -79,7 +79,7 @@ class ExtendedProperty(EWSElement):
         self.value = kwargs.pop('value')
         super(ExtendedProperty, self).__init__(**kwargs)
 
-    def clean(self):
+    def clean(self, version=None):
         if self.distinguished_property_set_id:
             assert not any([self.property_set_id, self.property_tag])
             assert any([self.property_id, self.property_name])

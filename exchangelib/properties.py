@@ -13,11 +13,6 @@ string_type = string_types[0]
 log = logging.getLogger(__name__)
 
 
-class Choice(text_type):
-    # A helper class used for string enums
-    pass
-
-
 class Body(text_type):
     # Helper to mark the 'body' field as a complex attribute.
     # MSDN: https://msdn.microsoft.com/en-us/library/office/jj219983(v=exchg.150).aspx
@@ -45,11 +40,11 @@ class EWSElement(object):
         if kwargs:
             raise AttributeError("%s are invalid kwargs for this class" % ', '.join("'%s'" % k for k in kwargs.keys()))
 
-    def clean(self):
+    def clean(self, version=None):
         # Validate attribute values using the field validator
         for f in self.FIELDS:
             val = getattr(self, f.name)
-            setattr(self, f.name, f.clean(val))
+            setattr(self, f.name, f.clean(val, version=version))
 
     @classmethod
     def from_xml(cls, elem):
@@ -61,7 +56,7 @@ class EWSElement(object):
         return cls(**kwargs)
 
     def to_xml(self, version):
-        self.clean()
+        self.clean(version=version)
         # WARNING: The order of addition of XML elements is VERY important. Exchange expects XML elements in a
         # specific, non-documented order and will fail with meaningless errors if the order is wrong.
         i = create_element(self.request_tag())
@@ -170,7 +165,7 @@ class ItemId(EWSElement):
         super(ItemId, self).__init__(**kwargs)
 
     def to_xml(self, version):
-        self.clean()
+        self.clean(version=version)
         elem = create_element(self.request_tag())
         # Use .set() to not fill up the create_element() cache with unique values
         elem.set(self.ID_ATTR, self.id)
@@ -227,8 +222,8 @@ class Mailbox(EWSElement):
 
     __slots__ = ('name', 'email_address', 'mailbox_type', 'item_id')
 
-    def clean(self):
-        super(Mailbox, self).clean()
+    def clean(self, version=None):
+        super(Mailbox, self).clean(version=version)
         if not self.email_address and not self.item_id:
             # See "Remarks" section of https://msdn.microsoft.com/en-us/library/office/aa565036(v=exchg.150).aspx
             raise ValueError("Mailbox must have either 'email_address' or 'item_id' set")

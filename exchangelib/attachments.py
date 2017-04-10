@@ -33,7 +33,7 @@ class AttachmentId(EWSElement):
     __slots__ = ('id', 'root_id', 'root_changekey')
 
     def to_xml(self, version):
-        self.clean()
+        self.clean(version=version)
         elem = create_element(self.request_tag())
         # Use .set() to not fill up the create_element() cache with unique values
         elem.set(self.ID_ATTR, self.id)
@@ -79,14 +79,14 @@ class Attachment(EWSElement):
         self.parent_item = kwargs.pop('parent_item', None)
         super(Attachment, self).__init__(**kwargs)
 
-    def clean(self):
+    def clean(self, version=None):
         from .items import Item
         if self.parent_item is not None:
             assert isinstance(self.parent_item, Item)
         # pylint: disable=access-member-before-definition
         if self.content_type is None and self.name is not None:
             self.content_type = mimetypes.guess_type(self.name)[0] or 'application/octet-stream'
-        super(Attachment, self).clean()
+        super(Attachment, self).clean(version=version)
 
     def attach(self):
         # Adds this attachment to an item and updates the item_id and updated changekey on the parent item

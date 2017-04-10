@@ -22,9 +22,9 @@ class IndexedElement(EWSElement):
         self.label = kwargs.pop('label', None)
         super(IndexedElement, self).__init__(**kwargs)
 
-    def clean(self):
-        self.LABEL_FIELD.clean(self.label)
-        super(IndexedElement, self).clean()
+    def clean(self, version=None):
+        self.LABEL_FIELD.clean(self.label, version=version)
+        super(IndexedElement, self).clean(version=version)
 
 
 class SingleFieldIndexedElement(IndexedElement):
@@ -41,7 +41,7 @@ class SingleFieldIndexedElement(IndexedElement):
         return cls(**kwargs)
 
     def to_xml(self, version):
-        self.clean()
+        self.clean(version=version)
         entry = create_element(self.request_tag(), Key=self.label)
         for f in self.FIELDS:
             set_xml_value(entry, f.to_xml(getattr(self, f.name), version=version), version)
@@ -90,7 +90,7 @@ class MultiFieldIndexedElement(IndexedElement):
         return cls(**kwargs)
 
     def to_xml(self, version):
-        self.clean()
+        self.clean(version=version)
         entry = create_element(self.request_tag(), Key=self.label)
         for f in self.FIELDS:
             value = getattr(self, f.name)
@@ -114,8 +114,8 @@ class PhysicalAddress(MultiFieldIndexedElement):
 
     __slots__ = ('label', 'street', 'city', 'state', 'country', 'zipcode')
 
-    def clean(self):
+    def clean(self, version=None):
         # pylint: disable=access-member-before-definition
         if isinstance(self.zipcode, int):
             self.zipcode = text_type(self.zipcode)
-        super(PhysicalAddress, self).clean()
+        super(PhysicalAddress, self).clean(version=version)

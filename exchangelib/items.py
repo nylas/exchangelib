@@ -9,9 +9,9 @@ from six import string_types
 from .ewsdatetime import UTC_NOW
 from .extended_properties import ExtendedProperty
 from .fields import BooleanField, IntegerField, DecimalField, Base64Field, TextField, ChoiceField, \
-    URIField, BodyField, DateTimeField, EWSElementField, PhoneNumberField, EmailAddressField, PhysicalAddressField, \
-    ExtendedPropertyField, AttachmentField, MailboxField, AttendeesField
-from .properties import MessageHeader, EWSElement, ItemId
+    URIField, BodyField, DateTimeField, MessageHeaderField, PhoneNumberField, EmailAddressField, PhysicalAddressField, \
+    ExtendedPropertyField, AttachmentField, MailboxField, AttendeesField, TextListField, MailboxListField
+from .properties import EWSElement, ItemId
 from .util import create_element
 from .version import EXCHANGE_2010
 
@@ -90,19 +90,18 @@ class Item(EWSElement):
         BodyField('body', field_uri='item:Body'),  # Body or HTMLBody
         AttachmentField('attachments', field_uri='item:Attachments'),  # ItemAttachment or FileAttachment
         DateTimeField('datetime_received', field_uri='item:DateTimeReceived', is_read_only=True),
-        TextField('categories', field_uri='item:Categories', is_list=True),
+        TextListField('categories', field_uri='item:Categories'),
         ChoiceField('importance', field_uri='item:Importance', choices={
             'Low', 'Normal', 'High'
         }, is_required=True, default='Normal'),
         BooleanField('is_draft', field_uri='item:IsDraft', is_read_only=True),
-        EWSElementField('headers', field_uri='item:InternetMessageHeaders', value_cls=MessageHeader, is_list=True,
-                        is_read_only=True),
+        MessageHeaderField('headers', field_uri='item:InternetMessageHeaders', is_read_only=True),
         DateTimeField('datetime_sent', field_uri='item:DateTimeSent', is_read_only=True),
         DateTimeField('datetime_created', field_uri='item:DateTimeCreated', is_read_only=True),
         # Reminder related fields
         BooleanField('reminder_is_set', field_uri='item:ReminderIsSet', is_required=True, default=False),
         DateTimeField('reminder_due_by', field_uri='item:ReminderDueBy', is_required=False,
-                      is_required_after_save=True),
+                      is_required_after_save=True, is_searchable=False),
         IntegerField('reminder_minutes_before_start', field_uri='item:ReminderMinutesBeforeStart',
                      is_required_after_save=True, default=0),
         # ExtendedProperty fields go here
@@ -414,10 +413,16 @@ class CalendarItem(Item):
                     choices={'Free', 'Tentative', 'Busy', 'OOF', 'NoData'}, is_required=True, default='Busy'),
         TextField('location', field_uri='calendar:Location', max_length=255),
         MailboxField('organizer', field_uri='calendar:Organizer', is_read_only=True),
-        AttendeesField('required_attendees', field_uri='calendar:RequiredAttendees'),
-        AttendeesField('optional_attendees', field_uri='calendar:OptionalAttendees'),
-        AttendeesField('resources', field_uri='calendar:Resources'),
+        AttendeesField('required_attendees', field_uri='calendar:RequiredAttendees', is_searchable=False),
+        AttendeesField('optional_attendees', field_uri='calendar:OptionalAttendees', is_searchable=False),
+        AttendeesField('resources', field_uri='calendar:Resources', is_searchable=False),
     ]
+
+    def clean(self, version=None):
+        # pylint: disable=access-member-before-definition
+        super(CalendarItem, self).clean(version=version)
+        if self.start and self.end and self.end < self.start:
+            raise ValueError("'end' must be greater than 'start' (%s -> %s)", self.start, self.end)
 
     def to_xml(self, version):
         # WARNING: The order of addition of XML elements is VERY important. Exchange expects XML elements in a
@@ -436,9 +441,12 @@ class Message(Item):
     # Supported attrs: see https://msdn.microsoft.com/en-us/library/office/aa494306(v=exchg.150).aspx
     # TODO: This list is incomplete
     FIELDS = Item.FIELDS + [
-        MailboxField('to_recipients', field_uri='message:ToRecipients', is_list=True, is_read_only_after_send=True),
-        MailboxField('cc_recipients', field_uri='message:CcRecipients', is_list=True, is_read_only_after_send=True),
-        MailboxField('bcc_recipients', field_uri='message:BccRecipients', is_list=True, is_read_only_after_send=True),
+        MailboxListField('to_recipients', field_uri='message:ToRecipients', is_read_only_after_send=True,
+                         is_searchable=False),
+        MailboxListField('cc_recipients', field_uri='message:CcRecipients', is_read_only_after_send=True,
+                         is_searchable=False),
+        MailboxListField('bcc_recipients', field_uri='message:BccRecipients', is_read_only_after_send=True,
+                         is_searchable=False),
         BooleanField('is_read_receipt_requested', field_uri='message:IsReadReceiptRequested',
                      is_required=True, default=False, is_read_only_after_send=True),
         BooleanField('is_delivery_receipt_requested', field_uri='message:IsDeliveryReceiptRequested',
@@ -448,7 +456,7 @@ class Message(Item):
         MailboxField('author', field_uri='message:From', is_read_only_after_send=True),
         BooleanField('is_read', field_uri='message:IsRead', is_required=True, default=False),
         BooleanField('is_response_requested', field_uri='message:IsResponseRequested', default=False, is_required=True),
-        MailboxField('reply_to', field_uri='message:ReplyTo', is_list=True, is_read_only_after_send=True),
+        MailboxField('reply_to', field_uri='message:ReplyTo', is_read_only_after_send=True, is_searchable=False),
         TextField('message_id', field_uri='message:InternetMessageId', is_read_only=True, is_read_only_after_send=True),
     ]
 
@@ -508,8 +516,8 @@ class Task(Item):
         DateTimeField('assigned_time', field_uri='task:AssignedTime', is_read_only=True),
         TextField('billing_information', field_uri='task:BillingInformation'),
         IntegerField('change_count', field_uri='task:ChangeCount', is_read_only=True),
-        TextField('companies', field_uri='task:Companies', is_list=True),
-        TextField('contacts', field_uri='task:Contacts', is_list=True),
+        TextListField('companies', field_uri='task:Companies'),
+        TextListField('contacts', field_uri='task:Contacts'),
         ChoiceField('delegation_state', field_uri='task:DelegationState', choices={
             'NoMatch', 'OwnNew', 'Owned', 'Accepted', 'Declined', 'Max'
         }, is_read_only=True),
@@ -522,18 +530,19 @@ class Task(Item):
         BooleanField('is_team_task', field_uri='task:IsTeamTask', is_read_only=True),
         TextField('mileage', field_uri='task:Mileage'),
         TextField('owner', field_uri='task:Owner', is_read_only=True),
-        DecimalField('percent_complete', field_uri='task:PercentComplete', is_required=True, default=Decimal(0.0)),
+        DecimalField('percent_complete', field_uri='task:PercentComplete', is_required=True, is_searchable=False,
+                     default=Decimal(0.0)),
         DateTimeField('start_date', field_uri='task:StartDate'),
         ChoiceField('status', field_uri='task:Status', choices={
             NOT_STARTED, 'InProgress', COMPLETED, 'WaitingOnOthers', 'Deferred'
-        }, is_required=True, default=NOT_STARTED),
+        }, is_required=True, is_searchable=False, default=NOT_STARTED),
         TextField('status_description', field_uri='task:StatusDescription', is_read_only=True),
         IntegerField('total_work', field_uri='task:TotalWork'),
     ]
 
-    def clean(self):
+    def clean(self, version=None):
         # pylint: disable=access-member-before-definition
-        super(Task, self).clean()
+        super(Task, self).clean(version=version)
         if self.due_date and self.start_date and self.due_date < self.start_date:
             log.warning("'due_date' must be greater than 'start_date' (%s vs %s). Resetting 'due_date'",
                         self.due_date, self.start_date)
@@ -586,15 +595,15 @@ class Contact(Item):
         TextField('nickname', field_uri='contacts:Nickname'),
         TextField('company_name', field_uri='contacts:CompanyName'),
         EmailAddressField('email_addresses', field_uri='contacts:EmailAddress'),
-        PhysicalAddressField('physical_addresses', field_uri='contacts:PhysicalAddress'),
+        PhysicalAddressField('physical_addresses', field_uri='contacts:PhysicalAddress', is_searchable=False),
         PhoneNumberField('phone_numbers', field_uri='contacts:PhoneNumber'),
         TextField('assistant_name', field_uri='contacts:AssistantName'),
         DateTimeField('birthday', field_uri='contacts:Birthday'),
         URIField('business_homepage', field_uri='contacts:BusinessHomePage'),
-        TextField('companies', field_uri='contacts:Companies', is_list=True),
+        TextListField('companies', field_uri='contacts:Companies', is_searchable=False),
         TextField('department', field_uri='contacts:Department'),
         TextField('generation', field_uri='contacts:Generation'),
-        # IMAddressField('im_addresses', field_uri='contacts:ImAddresses', is_list=True),
+        # IMAddressField('im_addresses', field_uri='contacts:ImAddresses'),
         TextField('job_title', field_uri='contacts:JobTitle'),
         TextField('manager', field_uri='contacts:Manager'),
         TextField('mileage', field_uri='contacts:Mileage'),

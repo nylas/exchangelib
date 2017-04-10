@@ -31,12 +31,13 @@ from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_
 from exchangelib.extended_properties import ExtendedProperty, ExternId
 from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextField, EmailField, URIField, ChoiceField, \
     BodyField, DateTimeField, Base64Field, EWSElementField, IndexedField, PhoneNumberField, EmailAddressField, \
-    PhysicalAddressField, ExtendedPropertyField, MailboxField, AttendeesField, AttachmentField
+    PhysicalAddressField, ExtendedPropertyField, MailboxField, AttendeesField, AttachmentField, TextListField, \
+    MailboxListField
 from exchangelib.folders import Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Messages, Tasks, \
     Contacts, Folder
 from exchangelib.indexed_properties import IndexedElement, EmailAddress, PhysicalAddress, PhoneNumber
 from exchangelib.items import Item, CalendarItem, Message, Contact, Task, ALL_OCCURRENCIES
-from exchangelib.properties import Attendee, Mailbox, Choice, RoomList, MessageHeader, Room, ItemId, EWSElement
+from exchangelib.properties import Attendee, Mailbox, RoomList, MessageHeader, Room, ItemId, EWSElement
 from exchangelib.protocol import Protocol
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.restriction import Restriction, Q
@@ -45,7 +46,7 @@ from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, Get
 from exchangelib.transport import NOAUTH, BASIC, DIGEST, NTLM, wrap, _get_auth_method_from_response
 from exchangelib.util import chunkify, peek, get_redirect_url, to_xml, BOM, get_domain, \
     post_ratelimited, create_element, CONNECTION_ERRORS
-from exchangelib.version import Build, Version, EXCHANGE_2007
+from exchangelib.version import Build, Version, EXCHANGE_2007, EXCHANGE_2010, EXCHANGE_2013, EXCHANGE_2016
 from exchangelib.winzone import generate_map, PYTZ_TO_MS_TIMEZONE_MAP
 
 if PY2:
@@ -416,11 +417,11 @@ class FieldTest(unittest.TestCase):
         field = TextField('foo', field_uri='bar', is_required=True, default='XXX')
         self.assertEqual(field.clean(None), 'XXX')
 
-        field = TextField('foo', field_uri='bar', is_list=True)
+        field = TextListField('foo', field_uri='bar')
         with self.assertRaises(ValueError):
             field.clean('XXX')  # Must be a list type
 
-        field = TextField('foo', field_uri='bar', is_list=True)
+        field = TextListField('foo', field_uri='bar')
         with self.assertRaises(TypeError):
             field.clean([1, 2, 3])  # List items must be correct type
 
@@ -515,7 +516,7 @@ class RestrictionTest(unittest.TestCase):
         self.assertEqual(str(r), ''.join(l.lstrip() for l in result.split('\n')))
         # Test empty Q
         q = Q()
-        self.assertEqual(q.to_xml(folder_class=Calendar), None)
+        self.assertEqual(q.to_xml(folder_class=Calendar, version=None), None)
         with self.assertRaises(ValueError):
             Restriction(q, folder_class=Calendar)
         # Test validation
@@ -882,9 +883,9 @@ class EWSTest(unittest.TestCase):
             return get_random_choice(field.choices)
         if isinstance(field, BodyField):
             return get_random_string(255)
+        if isinstance(field, TextListField):
+            return [get_random_string(16) for _ in range(random.randint(1, 4))]
         if isinstance(field, TextField):
-            if field.is_list:
-                return [get_random_string(16) for _ in range(random.randint(1, 4))]
             return get_random_string(field.max_length or 255)
         if isinstance(field, Base64Field):
             return get_random_string(255)
@@ -896,58 +897,59 @@ class EWSTest(unittest.TestCase):
             return get_random_decimal(1, 99)
         if isinstance(field, DateTimeField):
             return get_random_datetime()
-        if isinstance(field, EWSElementField):
-            if isinstance(field, AttachmentField):
-                return [FileAttachment(name='my_file.txt', content=b'test_content')]
-            if isinstance(field, MailboxField):
-                # email_address must be a real account on the server(?)
-                # TODO: Mailbox has multiple optional args but vals must match server account, so we can't easily test
+        if isinstance(field, AttachmentField):
+            return [FileAttachment(name='my_file.txt', content=b'test_content')]
+        if isinstance(field, MailboxListField):
+            # email_address must be a real account on the server(?)
+            # TODO: Mailbox has multiple optional args but vals must match server account, so we can't easily test
+            if get_random_bool():
+                return [Mailbox(email_address=self.account.primary_smtp_address)]
+            else:
+                return [self.account.primary_smtp_address]
+        if isinstance(field, MailboxField):
+            # email_address must be a real account on the server(?)
+            # TODO: Mailbox has multiple optional args but vals must match server account, so we can't easily test
+            if get_random_bool():
+                return Mailbox(email_address=self.account.primary_smtp_address)
+            else:
+                return self.account.primary_smtp_address
+        if isinstance(field, AttendeesField):
+            # Attendee must refer to a real mailbox on the server(?). We're only sure to have one
+            if get_random_bool():
+                mbx = Mailbox(email_address=self.account.primary_smtp_address)
+            else:
+                mbx = self.account.primary_smtp_address
+            with_last_response_time = get_random_bool()
+            if with_last_response_time:
+                return [Attendee(mailbox=mbx, response_type='Accept', last_response_time=get_random_datetime())]
+            else:
                 if get_random_bool():
-                    val = Mailbox(email_address=self.account.primary_smtp_address)
+                    return [Attendee(mailbox=mbx, response_type='Accept')]
                 else:
-                    val = self.account.primary_smtp_address
-                return [val] if field.is_list else val
-            if isinstance(field, AttendeesField):
-                # Attendee must refer to a real mailbox on the server(?). We're only sure to have one
-                if get_random_bool():
-                    mbx = Mailbox(email_address=self.account.primary_smtp_address)
-                else:
-                    mbx = self.account.primary_smtp_address
-                with_last_response_time = get_random_bool()
-                if with_last_response_time:
-                    val = Attendee(mailbox=mbx, response_type='Accept', last_response_time=get_random_datetime())
-                else:
-                    if get_random_bool():
-                        val = Attendee(mailbox=mbx, response_type='Accept')
-                    else:
-                        val = self.account.primary_smtp_address
-                return [val] if field.is_list else val
-        if isinstance(field, IndexedField):
-            if isinstance(field, EmailAddressField):
-                if field.is_list:
-                    addrs = []
-                    for label in EmailAddress.LABELS:
-                        addr = EmailAddress(email=get_random_email())
-                        addr.label = label
-                        addrs.append(addr)
-                    return addrs
-                return EmailAddress(email=get_random_email())
-            if isinstance(field, PhysicalAddressField):
-                addrs = []
-                for label in PhysicalAddress.LABELS:
-                    addr = PhysicalAddress(street=get_random_string(32), city=get_random_string(32),
-                                           state=get_random_string(32), country=get_random_string(32),
-                                           zipcode=get_random_string(8))
-                    addr.label = label
-                    addrs.append(addr)
-                return addrs
-            if isinstance(field, PhoneNumberField):
-                pns = []
-                for label in PhoneNumber.LABELS:
-                    pn = PhoneNumber(phone_number=get_random_string(16))
-                    pn.label = label
-                    pns.append(pn)
-                return pns
+                    return [self.account.primary_smtp_address]
+        if isinstance(field, EmailAddressField):
+            addrs = []
+            for label in EmailAddress.LABELS:
+                addr = EmailAddress(email=get_random_email())
+                addr.label = label
+                addrs.append(addr)
+            return addrs
+        if isinstance(field, PhysicalAddressField):
+            addrs = []
+            for label in PhysicalAddress.LABELS:
+                addr = PhysicalAddress(street=get_random_string(32), city=get_random_string(32),
+                                       state=get_random_string(32), country=get_random_string(32),
+                                       zipcode=get_random_string(8))
+                addr.label = label
+                addrs.append(addr)
+            return addrs
+        if isinstance(field, PhoneNumberField):
+            pns = []
+            for label in PhoneNumber.LABELS:
+                pn = PhoneNumber(phone_number=get_random_string(16))
+                pn.label = label
+                pns.append(pn)
+            return pns
         assert False, 'Unknown field %s' % field
 
 
@@ -1983,7 +1985,7 @@ class BaseItemTest(EWSTest):
             if f.name == 'resources':
                 # The test server doesn't have any resources
                 continue
-            if f.name == 'attachments':
+            if isinstance(f, AttachmentField):
                 # Attachments are handled separately
                 continue
             if f.name == 'start':
@@ -2011,11 +2013,8 @@ class BaseItemTest(EWSTest):
                 else:
                     update_kwargs[f.name] = not insert_kwargs[f.name]
                 continue
-            if f.value_cls == bool:
+            if isinstance(f, BooleanField):
                 update_kwargs[f.name] = not insert_kwargs[f.name]
-                continue
-            if f.value_cls == Choice:
-                update_kwargs[f.name] = get_random_choice([v for v in f.choices if v != insert_kwargs[f.name]])
                 continue
             if f.value_cls in (Mailbox, Attendee):
                 if insert_kwargs[f.name] is None:
@@ -2841,14 +2840,8 @@ class BaseItemTest(EWSTest):
         ids = self.test_folder.bulk_create(items=[item])
         common_qs = self.test_folder.filter(categories__contains=self.categories)
         for f in self.ITEM_CLASS.FIELDS:
-            if f.name in ('status', 'companies', 'reminder_due_by'):
-                # For some reason, EWS disallows searching on these, instead throwing ErrorInvalidValueForProperty
-                continue
-            if f.name in ('percent_complete',):
-                # This simply doesn't match anything. Error in EWS?
-                continue
-            if f.is_list and f.value_cls in (Attachment, Mailbox, Attendee, PhysicalAddress):
-                # These are not searchable, either. Maybe EWS just doesn't support it
+            if not f.is_searchable:
+                # Cannot be used in a QuerySet
                 continue
             val = getattr(item, f.name)
             if val is None:
@@ -3051,7 +3044,7 @@ class BaseItemTest(EWSTest):
                 continue
             if f.is_list:
                 old, new = set(old or ()), set(new or ())
-            self.assertEqual(old, new, (f.name, old, new, update_kwargs.get(f.name)))
+            self.assertEqual(old, new, (f.name, old, new))
 
         # Hard delete
         item_id = (item.item_id, item.changekey)
@@ -3173,11 +3166,10 @@ class BaseItemTest(EWSTest):
             if f.name == 'reminder_due_by':
                 # EWS sets a default value if it is not set on insert. Ignore
                 continue
+            old, new = getattr(item, f.name), insert_kwargs[f.name]
             if f.is_list:
-                self.assertSetEqual(set(getattr(item, f.name) or ()), set(insert_kwargs[f.name] or ()),
-                                    (f.name, repr(item), insert_kwargs))
-            else:
-                self.assertEqual(getattr(item, f.name), insert_kwargs[f.name], (f.name, repr(item), insert_kwargs))
+                old, new = set(old or ()), set(new or ())
+            self.assertEqual(old, new, (f.name, old, new))
 
         # Test update
         update_kwargs = self.get_random_update_kwargs(item=item, insert_kwargs=insert_kwargs)
@@ -3200,11 +3192,10 @@ class BaseItemTest(EWSTest):
             if f.name == 'attachments':
                 # Attachments are handled separately
                 continue
+            old, new = getattr(item, f.name), update_kwargs[f.name]
             if f.is_list:
-                self.assertSetEqual(set(getattr(item, f.name) or ()), set(update_kwargs[f.name] or ()),
-                                    (f.name, repr(item), update_kwargs))
-            else:
-                self.assertEqual(getattr(item, f.name), update_kwargs[f.name], (f.name, repr(item), update_kwargs))
+                old, new = set(old or ()), set(new or ())
+            self.assertEqual(old, new, (f.name, old, new))
 
         # Test wiping or removing fields
         wipe_kwargs = {}
@@ -3217,8 +3208,6 @@ class BaseItemTest(EWSTest):
                 continue
             if f.name == 'attachments':
                 continue
-            if f.is_list:
-                wipe_kwargs[f.name] = []
             wipe_kwargs[f.name] = None
         for k, v in wipe_kwargs.items():
             setattr(item, k, v)
@@ -3236,10 +3225,10 @@ class BaseItemTest(EWSTest):
                 continue
             if f.name == 'attachments':
                 continue
+            old, new = getattr(item, f.name), wipe_kwargs[f.name]
             if f.is_list:
-                wipe_kwargs[f.name] = []
-            wipe_kwargs[f.name] = None
-            self.assertEqual(getattr(item, f.name), wipe_kwargs[f.name], (f.name, repr(item), insert_kwargs))
+                old, new = set(old or ()), set(new or ())
+            self.assertEqual(old, new, (f.name, old, new))
 
         # Test extern_id = None, which deletes the extended property entirely
         extern_id = None

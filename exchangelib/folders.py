@@ -46,7 +46,7 @@ class DistinguishedFolderId(ItemId):
     __slots__ = 'id', 'changekey'
 
     def to_xml(self, version):
-        self.clean()
+        self.clean(version=version)
         elem = create_element(self.request_tag())
         # Use .set() to not fill up the create_element() cache with unique values
         elem.set(self.ID_ATTR, self.id)
@@ -70,15 +70,15 @@ class CalendarView(EWSElement):
 
     __slots__ = ('start', 'end', 'max_items')
 
-    def clean(self):
-        super(CalendarView, self).clean()
+    def clean(self, version=None):
+        super(CalendarView, self).clean(version=version)
         if self.end < self.start:
             raise ValueError("'start' must be before 'end'")
         if self.max_items is not None and self.max_items < 1:
             raise ValueError("'max_items' must be a positive integer")
 
     def to_xml(self, version):
-        self.clean()
+        self.clean(version=version)
         i = create_element(self.request_tag())
         for f in self.FIELDS:
             value = getattr(self, f.name)
@@ -119,8 +119,8 @@ class Folder(EWSElement):
             self.name = self.DISTINGUISHED_FOLDER_ID
         log.debug('%s created for %s', self, self.account)
 
-    def clean(self):
-        super(Folder, self).clean()
+    def clean(self,version=None):
+        super(Folder, self).clean(version=version)
         if self.account is not None:
             from .account import Account
             assert isinstance(self.account, Account)
@@ -317,7 +317,7 @@ class Folder(EWSElement):
         return cls(folder_id=fld_id, changekey=changekey, **kwargs)
 
     def to_xml(self, version):
-        self.clean()
+        self.clean(version=version)
         if self.folder_id:
             return FolderId(self.folder_id, self.changekey).to_xml(version=version)
         return DistinguishedFolderId(self.name).to_xml(version=version)
