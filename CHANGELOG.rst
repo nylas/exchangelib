@@ -2,8 +2,8 @@
 Change Log
 ==========
 
-HEAD
-----
+1.9.0
+-----
 * Expand support for ``ExtendedProperty`` to include all possible attributes. This required renaming the ``property_id``
   attribute to ``property_set_id``.
 * When using the ``Credentials`` class, ``UnauthorizedError`` is now raised if the credentials are wrong.
@@ -31,6 +31,11 @@ HEAD
   on the existence of that field on items in the folder.
 * When filtering, ``foo__in=value`` now requires the value to be a list, and ``foo__contains`` requires the value to be
   a list if the field itself is a list, e.g. ``categories__contains=['a', 'b']``.
+* Added support for fields and enum entries that are only supported in some EWS versions
+* Added a new field ``Item.text_body`` which is a read-only version of HTML body content, where HTML tags are stripped
+  by the server. Only supported from Exchange 2013 and up.
+* Added a new choice ``WorkingElsewhere`` to the ``CalendarItem.legacy_free_busy_status`` enum. Only supported from
+  Exchange 2013 and up.
 
 
 1.8.1
