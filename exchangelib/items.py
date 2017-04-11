@@ -625,8 +625,8 @@ class MeetingRequest(Item):
         TextField('subject', field_uri='item:Subject', max_length=255, is_required=True, is_read_only=True),
         MailboxField('author', field_uri='message:From', is_read_only=True),
         BooleanField('is_read', field_uri='message:IsRead', is_read_only=True),
-        DateTimeField('start', field_uri='calendar:Start', is_read_only=True),
-        DateTimeField('end', field_uri='calendar:End', is_read_only=True),
+        DateTimeField('start', field_uri='calendar:Start', is_read_only=True, supported_from=EXCHANGE_2010),
+        DateTimeField('end', field_uri='calendar:End', is_read_only=True, supported_from=EXCHANGE_2010),
     ]
 
 
@@ -639,8 +639,8 @@ class MeetingResponse(Item):
         TextField('subject', field_uri='item:Subject', max_length=255, is_required=True, is_read_only=True),
         MailboxField('author', field_uri='message:From', is_read_only=True),
         BooleanField('is_read', field_uri='message:IsRead', is_read_only=True),
-        DateTimeField('start', field_uri='calendar:Start', is_read_only=True),
-        DateTimeField('end', field_uri='calendar:End', is_read_only=True),
+        DateTimeField('start', field_uri='calendar:Start', is_read_only=True, supported_from=EXCHANGE_2010),
+        DateTimeField('end', field_uri='calendar:End', is_read_only=True, supported_from=EXCHANGE_2010),
     ]
 
 
@@ -653,8 +653,8 @@ class MeetingCancellation(Item):
         TextField('subject', field_uri='item:Subject', max_length=255, is_required=True, is_read_only=True),
         MailboxField('author', field_uri='message:From', is_read_only=True),
         BooleanField('is_read', field_uri='message:IsRead', is_read_only=True),
-        DateTimeField('start', field_uri='calendar:Start', is_read_only=True),
-        DateTimeField('end', field_uri='calendar:End', is_read_only=True),
+        DateTimeField('start', field_uri='calendar:Start', is_read_only=True, supported_from=EXCHANGE_2010),
+        DateTimeField('end', field_uri='calendar:End', is_read_only=True, supported_from=EXCHANGE_2010),
     ]
 
 
