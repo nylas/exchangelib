@@ -100,7 +100,10 @@ class EWSTimeZone(object):
     def from_pytz(cls, tz):
         # pytz timezones are dynamically generated. Subclass the tz.__class__ and add the extra Microsoft timezone
         # labels we need.
-        self_cls = type(cls.__name__, (cls, tz.__class__), dict(tz.__class__.__dict__))
+
+        # type() does not allow duplicate base classes. For static timezones, 'cls' and 'tz' are the same class.
+        base_classes = (cls,) if cls == tz.__class__ else (cls, tz.__class__)
+        self_cls = type(cls.__name__, base_classes, dict(tz.__class__.__dict__))
         try:
             self_cls.ms_id = cls.PYTZ_TO_MS_MAP[tz.zone]
         except KeyError:

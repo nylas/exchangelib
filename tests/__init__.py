@@ -294,6 +294,20 @@ class EWSDateTimeTest(unittest.TestCase):
             EWSTimeZone.from_pytz(tz)
 
     def test_ewsdatetime(self):
+        # Test a static timezone
+        tz = EWSTimeZone.timezone('Etc/GMT-5')
+        dt = tz.localize(EWSDateTime(2000, 1, 2, 3, 4, 5))
+        self.assertIsInstance(dt, EWSDateTime)
+        self.assertIsInstance(dt.tzinfo, EWSTimeZone)
+        self.assertEqual(dt.tzinfo.ms_id, tz.ms_id)
+        self.assertEqual(dt.tzinfo.ms_name, tz.ms_name)
+        self.assertEqual(str(dt), '2000-01-02 03:04:05+05:00')
+        self.assertEqual(
+            repr(dt),
+            "EWSDateTime(2000, 1, 2, 3, 4, 5, tzinfo=<StaticTzInfo 'Etc/GMT-5'>)"
+        )
+
+        # Test a DST timezone
         tz = EWSTimeZone.timezone('Europe/Copenhagen')
         dt = tz.localize(EWSDateTime(2000, 1, 2, 3, 4, 5))
         self.assertIsInstance(dt, EWSDateTime)
@@ -305,6 +319,8 @@ class EWSDateTimeTest(unittest.TestCase):
             repr(dt),
             "EWSDateTime(2000, 1, 2, 3, 4, 5, tzinfo=<DstTzInfo 'Europe/Copenhagen' CET+1:00:00 STD>)"
         )
+
+        # Test addition, subtraction, summertime etc
         self.assertIsInstance(dt + datetime.timedelta(days=1), EWSDateTime)
         self.assertIsInstance(dt - datetime.timedelta(days=1), EWSDateTime)
         self.assertIsInstance(dt - EWSDateTime.now(tz=tz), datetime.timedelta)
