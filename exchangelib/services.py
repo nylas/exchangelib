@@ -151,7 +151,10 @@ class EWSService(object):
             if api_version != hint.api_version or hint.build is None:
                 # The api_version that worked was different than our hint, or we never got a build version. Set new
                 # version for account.
-                log.info('New API version for account %s (%s -> %s)', account, hint.api_version, api_version)
+                if api_version != hint.api_version:
+                    log.debug('New API version for account %s (%s -> %s)', account, hint.api_version, api_version)
+                else:
+                    log.debug('Adding missing build number for account %s', account)
                 new_version = Version.from_response(requested_api_version=api_version, response=r.text)
                 if isinstance(self, EWSAccountService):
                     self.account.version = new_version
