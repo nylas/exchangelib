@@ -10,7 +10,7 @@ from .ewsdatetime import UTC_NOW
 from .extended_properties import ExtendedProperty
 from .fields import BooleanField, IntegerField, DecimalField, Base64Field, TextField, ChoiceField, \
     URIField, BodyField, DateTimeField, MessageHeaderField, PhoneNumberField, EmailAddressField, PhysicalAddressField, \
-    ExtendedPropertyField, AttachmentField, MailboxField, AttendeesField, TextListField, MailboxListField
+    ExtendedPropertyField, AttachmentField, MailboxField, AttendeesField, TextListField, MailboxListField, Choice
 from .properties import EWSElement, ItemId
 from .util import create_element
 from .version import EXCHANGE_2010, EXCHANGE_2013
@@ -86,15 +86,15 @@ class Item(EWSElement):
         Base64Field('mime_content', field_uri='item:MimeContent', is_read_only=True),
         TextField('subject', field_uri='item:Subject', max_length=255),
         ChoiceField('sensitivity', field_uri='item:Sensitivity', choices={
-            'Normal', 'Personal', 'Private', 'Confidential'
+            Choice('Normal'), Choice('Personal'), Choice('Private'), Choice('Confidential')
         }, is_required=True, default='Normal'),
-        TextField('text_body', field_uri='item:TextBody', supported_from=EXCHANGE_2013),
+        TextField('text_body', field_uri='item:TextBody', is_read_only=True, supported_from=EXCHANGE_2013),
         BodyField('body', field_uri='item:Body'),  # Accepts and returns Body or HTMLBody instances
         AttachmentField('attachments', field_uri='item:Attachments'),  # ItemAttachment or FileAttachment
         DateTimeField('datetime_received', field_uri='item:DateTimeReceived', is_read_only=True),
         TextListField('categories', field_uri='item:Categories'),
         ChoiceField('importance', field_uri='item:Importance', choices={
-            'Low', 'Normal', 'High'
+            Choice('Low'), Choice('Normal'), Choice('High')
         }, is_required=True, default='Normal'),
         BooleanField('is_draft', field_uri='item:IsDraft', is_read_only=True),
         MessageHeaderField('headers', field_uri='item:InternetMessageHeaders', is_read_only=True),
@@ -411,8 +411,9 @@ class CalendarItem(Item):
         DateTimeField('end', field_uri='calendar:End', is_required=True),
         BooleanField('is_all_day', field_uri='calendar:IsAllDayEvent', is_required=True, default=False),
         # TODO: The 'WorkingElsewhere' status was added in Exchange2015 but we don't support versioned choices yet
-        ChoiceField('legacy_free_busy_status', field_uri='calendar:LegacyFreeBusyStatus',
-                    choices={'Free', 'Tentative', 'Busy', 'OOF', 'NoData'}, is_required=True, default='Busy'),
+        ChoiceField('legacy_free_busy_status', field_uri='calendar:LegacyFreeBusyStatus', choices={
+            Choice('Free'), Choice('Tentative'), Choice('Busy'), Choice('OOF'), Choice('NoData')
+        }, is_required=True, default='Busy'),
         TextField('location', field_uri='calendar:Location', max_length=255),
         MailboxField('organizer', field_uri='calendar:Organizer', is_read_only=True),
         AttendeesField('required_attendees', field_uri='calendar:RequiredAttendees', is_searchable=False),
@@ -521,7 +522,7 @@ class Task(Item):
         TextListField('companies', field_uri='task:Companies'),
         TextListField('contacts', field_uri='task:Contacts'),
         ChoiceField('delegation_state', field_uri='task:DelegationState', choices={
-            'NoMatch', 'OwnNew', 'Owned', 'Accepted', 'Declined', 'Max'
+            Choice('NoMatch'), Choice('OwnNew'), Choice('Owned'), Choice('Accepted'), Choice('Declined'), Choice('Max')
         }, is_read_only=True),
         TextField('delegator', field_uri='task:Delegator', is_read_only=True),
         # 'complete_date' can be set, but is ignored by the server, which sets it to now()
@@ -536,7 +537,7 @@ class Task(Item):
                      default=Decimal(0.0)),
         DateTimeField('start_date', field_uri='task:StartDate'),
         ChoiceField('status', field_uri='task:Status', choices={
-            NOT_STARTED, 'InProgress', COMPLETED, 'WaitingOnOthers', 'Deferred'
+            Choice(NOT_STARTED), Choice('InProgress'), Choice(COMPLETED), Choice('WaitingOnOthers'), Choice('Deferred')
         }, is_required=True, is_searchable=False, default=NOT_STARTED),
         TextField('status_description', field_uri='task:StatusDescription', is_read_only=True),
         IntegerField('total_work', field_uri='task:TotalWork'),
@@ -585,10 +586,12 @@ class Contact(Item):
     FIELDS = Item.FIELDS + [
         TextField('file_as', field_uri='contacts:FileAs'),
         ChoiceField('file_as_mapping', field_uri='contacts:FileAsMapping', choices={
-            'None', 'LastCommaFirst', 'FirstSpaceLast', 'Company', 'LastCommaFirstCompany', 'CompanyLastFirst',
-            'LastFirst', 'LastFirstCompany', 'CompanyLastCommaFirst', 'LastFirstSuffix', 'LastSpaceFirstCompany',
-            'CompanyLastSpaceFirst', 'LastSpaceFirst', 'DisplayName', 'FirstName', 'LastFirstMiddleSuffix', 'LastName',
-            'Empty',
+            Choice('None'), Choice('LastCommaFirst'), Choice('FirstSpaceLast'), Choice('Company'),
+            Choice('LastCommaFirstCompany'), Choice('CompanyLastFirst'), Choice('LastFirst'),
+            Choice('LastFirstCompany'), Choice('CompanyLastCommaFirst'), Choice('LastFirstSuffix'),
+            Choice('LastSpaceFirstCompany'), Choice('CompanyLastSpaceFirst'), Choice('LastSpaceFirst'),
+            Choice('DisplayName'), Choice('FirstName'), Choice('LastFirstMiddleSuffix'), Choice('LastName'),
+            Choice('Empty'),
         }),
         TextField('display_name', field_uri='contacts:DisplayName', is_required=True),
         TextField('given_name', field_uri='contacts:GivenName'),

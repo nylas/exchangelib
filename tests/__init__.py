@@ -32,7 +32,7 @@ from exchangelib.extended_properties import ExtendedProperty, ExternId
 from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextField, EmailField, URIField, ChoiceField, \
     BodyField, DateTimeField, Base64Field, PhoneNumberField, EmailAddressField, \
     PhysicalAddressField, ExtendedPropertyField, MailboxField, AttendeesField, AttachmentField, TextListField, \
-    MailboxListField
+    MailboxListField, Choice
 from exchangelib.folders import Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Messages, Tasks, \
     Contacts, Folder
 from exchangelib.indexed_properties import IndexedElement, EmailAddress, PhysicalAddress, PhoneNumber
@@ -433,7 +433,7 @@ class FieldTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             field.clean(EWSDateTime(2017, 1, 1))  # Datetime values must be timezone aware
 
-        field = ChoiceField('foo', field_uri='bar', choices={'foo', 'bar'})
+        field = ChoiceField('foo', field_uri='bar', choices={Choice('foo'), Choice('bar')})
         with self.assertRaises(ValueError):
             field.clean('XXX')  # Value must be a valid choice
 
@@ -450,6 +450,18 @@ class FieldTest(unittest.TestCase):
             field.clean('baz', version=Version(EXCHANGE_2007))
         field.clean('baz', version=Version(EXCHANGE_2010))
         field.clean('baz', version=Version(EXCHANGE_2013))
+
+    def test_versioned_choice(self):
+        field = ChoiceField('foo', field_uri='bar', choices={
+            Choice('c1'), Choice('c2', supported_from=EXCHANGE_2010)
+        })
+        with self.assertRaises(ValueError):
+            field.clean('XXX')  # Value must be a valid choice
+        field.clean('c2', version=None)
+        with self.assertRaises(ErrorInvalidServerVersion):
+            field.clean('c2', version=Version(EXCHANGE_2007))
+        field.clean('c2', version=Version(EXCHANGE_2010))
+        field.clean('c2', version=Version(EXCHANGE_2013))
 
 
 class ItemTest(unittest.TestCase):
@@ -887,7 +899,7 @@ class EWSTest(unittest.TestCase):
         if isinstance(field, EmailField):
             return get_random_email()
         if isinstance(field, ChoiceField):
-            return get_random_choice(field.choices)
+            return get_random_choice(field.supported_choices(version=self.account.version))
         if isinstance(field, BodyField):
             return get_random_string(255)
         if isinstance(field, TextListField):
@@ -936,14 +948,14 @@ class EWSTest(unittest.TestCase):
                     return [self.account.primary_smtp_address]
         if isinstance(field, EmailAddressField):
             addrs = []
-            for label in EmailAddress.LABELS:
+            for label in EmailAddress.LABEL_FIELD.supported_choices(version=self.account.version):
                 addr = EmailAddress(email=get_random_email())
                 addr.label = label
                 addrs.append(addr)
             return addrs
         if isinstance(field, PhysicalAddressField):
             addrs = []
-            for label in PhysicalAddress.LABELS:
+            for label in PhysicalAddress.LABEL_FIELD.supported_choices(version=self.account.version):
                 addr = PhysicalAddress(street=get_random_string(32), city=get_random_string(32),
                                        state=get_random_string(32), country=get_random_string(32),
                                        zipcode=get_random_string(8))
@@ -952,7 +964,7 @@ class EWSTest(unittest.TestCase):
             return addrs
         if isinstance(field, PhoneNumberField):
             pns = []
-            for label in PhoneNumber.LABELS:
+            for label in PhoneNumber.LABEL_FIELD.supported_choices(version=self.account.version):
                 pn = PhoneNumber(phone_number=get_random_string(16))
                 pn.label = label
                 pns.append(pn)
@@ -1970,7 +1982,7 @@ class BaseItemTest(EWSTest):
                 continue
             if f.name == 'status':
                 # Start with an incomplete task
-                status = get_random_choice(f.choices - {Task.COMPLETED})
+                status = get_random_choice(f.supported_choices(version=self.account.version) - {Task.COMPLETED})
                 insert_kwargs[f.name] = status
                 if status == Task.NOT_STARTED:
                     insert_kwargs['percent_complete'] = Decimal(0)
@@ -2425,7 +2437,7 @@ class BaseItemTest(EWSTest):
         # Test order_by() on IndexedField (simple and multi-subfield). Only Contact items have these
         if self.ITEM_CLASS == Contact:
             test_items = []
-            label = random.choice(list(EmailAddress.LABELS))
+            label = self.random_val(EmailAddress.LABEL_FIELD)
             for i in range(4):
                 item = self.get_test_item()
                 item.email_addresses = [EmailAddress(email='%s@foo.com' % i, label=label)]
@@ -2445,7 +2457,7 @@ class BaseItemTest(EWSTest):
             self.bulk_delete(qs)
 
             test_items = []
-            label = random.choice(list(PhysicalAddress.LABELS))
+            label = self.random_val(PhysicalAddress.LABEL_FIELD)
             for i in range(4):
                 item = self.get_test_item()
                 item.physical_addresses = [PhysicalAddress(street='Elm St %s' % i, label=label)]

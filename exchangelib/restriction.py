@@ -301,9 +301,9 @@ class Q(object):
             field = folder.get_item_field_by_fieldname(self.fieldname)
             self._validate_field(field=field, folder=folder)
             if isinstance(field, IndexedField):
-                field_uri = field.field_uri_xml(label=self.value.label)
+                field_uri = field.field_uri_xml(version=version, label=self.value.label)
             else:
-                field_uri = field.field_uri_xml()
+                field_uri = field.field_uri_xml(version=version)
             elem.append(field_uri)
             constant = create_element('t:Constant')
             if self.op != self.EXISTS:

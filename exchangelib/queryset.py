@@ -58,7 +58,7 @@ class OrderField(object):
                 raise ValueError(
                     "IndexedField order_by() value '%s' must specify label, e.g. '%s__%s'" % (
                         s, fieldname, field.value_cls.LABEL_FIELD.default))
-            valid_labels = field.value_cls.LABELS
+            valid_labels = field.value_cls.LABEL_FIELD.supported_choices(version=folder.account.version)
             if label not in valid_labels:
                 raise ValueError(
                     "Label '%s' on IndexedField order_by() value '%s' must be one of %s" % (

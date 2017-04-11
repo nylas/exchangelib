@@ -4,7 +4,7 @@ import logging
 
 from six import string_types, text_type
 
-from .fields import EmailSubField, LabelField, SubField, TextField
+from .fields import EmailSubField, LabelField, SubField, TextField, Choice
 from .properties import EWSElement
 from .util import create_element, set_xml_value, add_xml_child
 
@@ -51,8 +51,9 @@ class SingleFieldIndexedElement(IndexedElement):
 class EmailAddress(SingleFieldIndexedElement):
     # MSDN:  https://msdn.microsoft.com/en-us/library/office/aa564757(v=exchg.150).aspx
     ELEMENT_NAME = 'Entry'
-    LABELS = {'EmailAddress1', 'EmailAddress2', 'EmailAddress3'}
-    LABEL_FIELD = LabelField('label', field_uri='Key', choices=LABELS, default='EmailAddress1')
+    LABEL_FIELD = LabelField('label', field_uri='Key', choices={
+        Choice('EmailAddress1'), Choice('EmailAddress2'), Choice('EmailAddress3')
+    }, default='EmailAddress1')
     FIELDS = [
         EmailSubField('email'),
     ]
@@ -63,12 +64,12 @@ class EmailAddress(SingleFieldIndexedElement):
 class PhoneNumber(SingleFieldIndexedElement):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa565941(v=exchg.150).aspx
     ELEMENT_NAME = 'Entry'
-    LABELS = {
-        'AssistantPhone', 'BusinessFax', 'BusinessPhone', 'BusinessPhone2', 'Callback', 'CarPhone', 'CompanyMainPhone',
-        'HomeFax', 'HomePhone', 'HomePhone2', 'Isdn', 'MobilePhone', 'OtherFax', 'OtherTelephone', 'Pager',
-        'PrimaryPhone', 'RadioPhone', 'Telex', 'TtyTddPhone',
-    }
-    LABEL_FIELD = LabelField('label', field_uri='Key', choices=LABELS, default='PrimaryPhone')
+    LABEL_FIELD = LabelField('label', field_uri='Key', choices={
+        Choice('AssistantPhone'), Choice('BusinessFax'), Choice('BusinessPhone'), Choice('BusinessPhone2'),
+        Choice('Callback'), Choice('CarPhone'), Choice('CompanyMainPhone'), Choice('HomeFax'), Choice('HomePhone'),
+        Choice('HomePhone2'), Choice('Isdn'), Choice('MobilePhone'), Choice('OtherFax'), Choice('OtherTelephone'),
+        Choice('Pager'), Choice('PrimaryPhone'), Choice('RadioPhone'), Choice('Telex'), Choice('TtyTddPhone'),
+    }, default='PrimaryPhone')
     FIELDS = [
         SubField('phone_number'),
     ]
@@ -102,8 +103,9 @@ class MultiFieldIndexedElement(IndexedElement):
 class PhysicalAddress(MultiFieldIndexedElement):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa564323(v=exchg.150).aspx
     ELEMENT_NAME = 'Entry'
-    LABELS = {'Business', 'Home', 'Other'}
-    LABEL_FIELD = LabelField('label', field_uri='Key', choices=LABELS, default='Business')
+    LABEL_FIELD = LabelField('label', field_uri='Key', choices={
+        Choice('Business'), Choice('Home'), Choice('Other')
+    }, default='Business')
     FIELDS = [
         TextField('street', field_uri='Street'),  # Street, house number, etc.
         TextField('city', field_uri='City'),

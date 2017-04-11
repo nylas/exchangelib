@@ -5,7 +5,7 @@ import logging
 
 from six import text_type, string_types
 
-from .fields import SubField, TextField, EmailField, ChoiceField, DateTimeField, EWSElementField, MailboxField
+from .fields import SubField, TextField, EmailField, ChoiceField, DateTimeField, EWSElementField, MailboxField, Choice
 from .services import MNS, TNS
 from .util import get_xml_attr, create_element
 
@@ -210,12 +210,14 @@ class RootItemId(ItemId):
 class Mailbox(EWSElement):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa565036(v=exchg.150).aspx
     ELEMENT_NAME = 'Mailbox'
-    MAILBOX_TYPES = {'Mailbox', 'PublicDL', 'PrivateDL', 'Contact', 'PublicFolder', 'Unknown', 'OneOff'}
 
     FIELDS = [
         TextField('name', field_uri='Name'),
         EmailField('email_address', field_uri='EmailAddress'),
-        ChoiceField('mailbox_type', field_uri='MailboxType', choices=MAILBOX_TYPES, default='Mailbox'),
+        ChoiceField('mailbox_type', field_uri='MailboxType', choices={
+            Choice('Mailbox'), Choice('PublicDL'), Choice('PrivateDL'), Choice('Contact'), Choice('PublicFolder'),
+            Choice('Unknown'), Choice('OneOff')
+        }, default='Mailbox'),
         EWSElementField('item_id', value_cls=ItemId),
         # There's also the 'RoutingType' element, but it's optional and must have value "SMTP"
     ]
@@ -238,11 +240,13 @@ class Mailbox(EWSElement):
 class Attendee(EWSElement):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa580339(v=exchg.150).aspx
     ELEMENT_NAME = 'Attendee'
-    RESPONSE_TYPES = {'Unknown', 'Organizer', 'Tentative', 'Accept', 'Decline', 'NoResponseReceived'}
 
     FIELDS = [
         MailboxField('mailbox', is_required=True),
-        ChoiceField('response_type', field_uri='ResponseType', choices=RESPONSE_TYPES, default='Unknown'),
+        ChoiceField('response_type', field_uri='ResponseType', choices={
+            Choice('Unknown'), Choice('Organizer'), Choice('Tentative'), Choice('Accept'), Choice('Decline'),
+            Choice('NoResponseReceived')
+        }, default='Unknown'),
         DateTimeField('last_response_time', field_uri='LastResponseTime'),
     ]
 

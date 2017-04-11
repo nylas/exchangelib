@@ -114,7 +114,7 @@ class FieldURIField(Field):
         field_elem = create_element(self.request_tag())
         return set_xml_value(field_elem, value, version=version)
 
-    def field_uri_xml(self):
+    def field_uri_xml(self, version):
         return create_element('t:FieldURI', FieldURI=self.field_uri)
 
     def request_tag(self):
@@ -260,6 +260,19 @@ class EmailField(TextField):
     pass
 
 
+class Choice(object):
+    """ Implements versioned choices for the ChoiceField field"""
+    def __init__(self, value, supported_from=None):
+        self.value = value
+        self.supported_from = supported_from
+
+    def supports_version(self, version):
+        # 'version' is a Version instance, for convenience by callers
+        if not self.supported_from or not version:
+            return True
+        return version.build >= self.supported_from
+
+
 class ChoiceField(TextField):
     def __init__(self, *args, **kwargs):
         self.choices = kwargs.pop('choices')
@@ -267,9 +280,20 @@ class ChoiceField(TextField):
 
     def clean(self, value, version=None):
         value = super(ChoiceField, self).clean(value, version=version)
-        if value is not None and value not in self.choices:
-            raise ValueError("Field '%s' value '%s' is not a valid choice (%s)" % (self.name, value, self.choices))
-        return value
+        if value is None:
+            return None
+        for c in self.choices:
+            if c.value != value:
+                continue
+            if not c.supports_version(version):
+                raise ErrorInvalidServerVersion("Choice '%s' does not support EWS builds prior to %s (server has %s)"
+                                                % (self.name, self.supported_from, version))
+            return value
+        raise ValueError("Invalid choice '%s' for field '%s'. Valid choices are: %s" % (
+            value, self.name, ', '.join(self.supported_choices(version=version))))
+
+    def supported_choices(self, version=None):
+        return {c.value for c in self.choices if c.supports_version(version)}
 
 
 class BodyField(TextField):
@@ -448,13 +472,13 @@ class IndexedField(FieldURIField):
     def to_xml(self, value, version):
         return set_xml_value(create_element('t:%s' % self.PARENT_ELEMENT_NAME), value, version)
 
-    def field_uri_xml(self, label=None, subfield=None):
+    def field_uri_xml(self, version, label=None, subfield=None):
         from .indexed_properties import MultiFieldIndexedElement
         if not label:
             # Return elements for all labels
             elems = []
-            for l in self.value_cls.LABELS:
-                elem = self.field_uri_xml(label=l)
+            for l in self.value_cls.LABEL_FIELD.supported_choices(version=version):
+                elem = self.field_uri_xml(version=version, label=l)
                 if isinstance(elem, list):
                     elems.extend(elem)
                 else:
@@ -463,12 +487,13 @@ class IndexedField(FieldURIField):
         if issubclass(self.value_cls, MultiFieldIndexedElement):
             if not subfield:
                 # Return elements for all sub-fields
-                return [self.field_uri_xml(label=label, subfield=f) for f in self.value_cls.supported_fields()]
+                return [self.field_uri_xml(version=version, label=label, subfield=f)
+                        for f in self.value_cls.supported_fields()]
             assert subfield in self.value_cls.supported_fields()
             field_uri = '%s:%s' % (self.field_uri, subfield.field_uri)
         else:
             field_uri = self.field_uri
-        assert label in self.value_cls.LABELS, (label, self.value_cls.LABELS)
+        assert label in self.value_cls.LABEL_FIELD.supported_choices(version=version)
         return create_element('t:IndexedFieldURI', FieldURI=field_uri, FieldIndex=label)
 
     @classmethod
@@ -531,7 +556,7 @@ class ExtendedPropertyField(Field):
         value.clean(version=version)
         return value
 
-    def field_uri_xml(self):
+    def field_uri_xml(self, version):
         elem = create_element('t:ExtendedFieldURI')
         cls = self.value_cls
         if cls.distinguished_property_set_id:
@@ -562,7 +587,7 @@ class ExtendedPropertyField(Field):
 
     def to_xml(self, value, version):
         extended_property = create_element(self.value_cls.request_tag())
-        set_xml_value(extended_property, self.field_uri_xml(), version=version)
+        set_xml_value(extended_property, self.field_uri_xml(version=version), version=version)
         if isinstance(value, self.value_cls):
             set_xml_value(extended_property, value, version=version)
         else:

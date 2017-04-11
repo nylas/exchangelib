@@ -478,7 +478,7 @@ class GetItem(EWSAccountService, EWSPooledMixIn):
         if additional_fields:
             additional_property_elems = []
             for f in additional_fields:
-                elems = f.field_uri_xml()
+                elems = f.field_uri_xml(version=self.account.version)
                 if isinstance(elems, list):
                     additional_property_elems.extend(elems)
                 else:
@@ -564,23 +564,22 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
             suppress_read_receipts=suppress_read_receipts,
         ))
 
-    @staticmethod
-    def _get_delete_item_elem(field, label=None, subfield=None):
+    def _get_delete_item_elem(self, field, label=None, subfield=None):
         from .fields import IndexedField
         deleteitemfield = create_element('t:DeleteItemField')
         if isinstance(field, IndexedField):
-            deleteitemfield.append(field.field_uri_xml(label=label, subfield=subfield))
+            deleteitemfield.append(field.field_uri_xml(version=self.account.version, label=label, subfield=subfield))
         else:
-            deleteitemfield.append(field.field_uri_xml())
+            deleteitemfield.append(field.field_uri_xml(version=self.account.version))
         return deleteitemfield
 
     def _get_set_item_elem(self, item_model, field, value, label=None, subfield=None):
         from .fields import IndexedField
         setitemfield = create_element('t:SetItemField')
         if isinstance(field, IndexedField):
-            setitemfield.append(field.field_uri_xml(label=label, subfield=subfield))
+            setitemfield.append(field.field_uri_xml(version=self.account.version, label=label, subfield=subfield))
         else:
-            setitemfield.append(field.field_uri_xml())
+            setitemfield.append(field.field_uri_xml(version=self.account.version))
         folderitem = create_element(item_model.request_tag())
         field_elem = field.to_xml(value, self.account.version)
         set_xml_value(folderitem, field_elem, self.account.version)
@@ -626,7 +625,7 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
                 if field.is_required or field.is_required_after_save:
                     raise ValueError('%s is a required field and may not be deleted', field.name)
                 if isinstance(field, IndexedField):
-                    for label in field.value_cls.LABELS:
+                    for label in field.value_cls.LABEL_FIELD.supported_choices(version=self.account.version):
                         if issubclass(field.value_cls, MultiFieldIndexedElement):
                             for subfield in field.value_cls.supported_fields(version=self.account.version):
                                 yield self._get_delete_item_elem(field=field, label=label, subfield=subfield)
@@ -791,7 +790,7 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
         if additional_fields:
             additional_property_elems = []
             for f in additional_fields:
-                elems = f.field_uri_xml()
+                elems = f.field_uri_xml(version=self.account.version)
                 if isinstance(elems, list):
                     additional_property_elems.extend(elems)
                 else:
@@ -814,9 +813,10 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
             assert isinstance(order, OrderField)
             field_order = create_element('t:FieldOrder', Order='Descending' if order.reverse else 'Ascending')
             if isinstance(order.field, IndexedField):
-                field_uri = order.field.field_uri_xml(label=order.label, subfield=order.subfield)
+                field_uri = order.field.field_uri_xml(version=self.account.version, label=order.label,
+                                                      subfield=order.subfield)
             else:
-                field_uri = order.field.field_uri_xml()
+                field_uri = order.field.field_uri_xml(version=self.account.version)
             field_order.append(field_uri)
             add_xml_child(finditem, 'm:SortOrder', field_order)
         parentfolderids = create_element('m:ParentFolderIds')
@@ -849,7 +849,7 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
         if additional_fields:
             additionalproperties = create_element('t:AdditionalProperties')
             for field in additional_fields:
-                additionalproperties.append(field.field_uri_xml())
+                additionalproperties.append(field.field_uri_xml(version=self.account.version))
             foldershape.append(additionalproperties)
         findfolder.append(foldershape)
         if self.account.version.build >= EXCHANGE_2010:
@@ -886,7 +886,7 @@ class GetFolder(EWSAccountService):
         if additional_fields:
             additionalproperties = create_element('t:AdditionalProperties')
             for field in additional_fields:
-                additionalproperties.append(field.field_uri_xml())
+                additionalproperties.append(field.field_uri_xml(version=self.account.version))
             foldershape.append(additionalproperties)
         getfolder.append(foldershape)
         folderids = create_element('m:FolderIds')
