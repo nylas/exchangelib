@@ -70,9 +70,9 @@ class OrderField(object):
                 try:
                     subfield = field.value_cls.get_field_by_fieldname(subfield)
                 except ValueError:
+                    fnames = ', '.join(f.name for f in field.value_cls.supported_fields(version=folder.account.version))
                     raise ValueError(
-                        "Subfield '%s' on IndexedField order_by() value '%s' must be one of %s" % (
-                            subfield, s, ', '.join(field.value_cls.fieldnames())))
+                        "Subfield '%s' on IndexedField order_by() value '%s' must be one of %s" % (subfield, s, fnames))
             if issubclass(field.value_cls, SingleFieldIndexedElement) and subfield:
                 raise ValueError("IndexedField order_by() value '%s' must not specify subfield, e.g. just %s__%s" % (
                     s, fieldname, label))
@@ -141,7 +141,7 @@ class QuerySet(object):
         if self.only_fields is None:
             # The list of fields was not restricted. Get all fields we support, as a set, but remove ItemId and
             # ChangeKey. We get them unconditionally.
-            additional_fields = {f for f in self.folder.allowed_fields() if f.name not in ('item_id', 'changekey')}
+            additional_fields = {f for f in self.folder.allowed_fields()}
         else:
             assert isinstance(self.only_fields, tuple)
             # Remove ItemId and ChangeKey. We get them unconditionally

@@ -43,7 +43,7 @@ class SingleFieldIndexedElement(IndexedElement):
     def to_xml(self, version):
         self.clean(version=version)
         entry = create_element(self.request_tag(), Key=self.label)
-        for f in self.FIELDS:
+        for f in self.supported_fields(version=version):
             set_xml_value(entry, f.to_xml(getattr(self, f.name), version=version), version)
         return entry
 
@@ -92,7 +92,7 @@ class MultiFieldIndexedElement(IndexedElement):
     def to_xml(self, version):
         self.clean(version=version)
         entry = create_element(self.request_tag(), Key=self.label)
-        for f in self.FIELDS:
+        for f in self.supported_fields(version=version):
             value = getattr(self, f.name)
             if value is not None:
                 add_xml_child(entry, f.request_tag(), value)

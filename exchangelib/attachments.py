@@ -139,7 +139,7 @@ class Attachment(EWSElement):
     def __repr__(self):
         return self.__class__.__name__ + '(%s)' % ', '.join(
             '%s=%s' % (f.name, repr(getattr(self, f.name))) for f in self.FIELDS
-            if f.name not in ('item', 'content')
+            if f.name not in ('_item', '_content')
         )
 
 

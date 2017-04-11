@@ -274,15 +274,15 @@ class Q(object):
         return expr
 
     @staticmethod
-    def _validate_field(field, folder_class):
-        if field not in folder_class.allowed_fields():
-            raise ValueError("'%s' is not a valid field when filtering on %s" % (field.name, folder_class.__name__))
+    def _validate_field(field, folder):
+        if field not in folder.allowed_fields():
+            raise ValueError("'%s' is not a valid field when filtering on %s" % (field.name, folder.__class__.__name__))
         if not field.is_searchable:
             raise ValueError("EWS does not support filtering on field '%s'" % field.name)
 
-    def to_xml(self, folder_class, version):
+    def to_xml(self, folder, version):
         # Translate this Q object to a valid Restriction XML tree
-        elem = self.xml_elem(folder_class=folder_class, version=version)
+        elem = self.xml_elem(folder=folder, version=version)
         if elem is None:
             return None
         from xml.etree.ElementTree import ElementTree
@@ -290,7 +290,7 @@ class Q(object):
         restriction.append(elem)
         return ElementTree(restriction).getroot()
 
-    def xml_elem(self, folder_class, version):
+    def xml_elem(self, folder, version):
         # Recursively build an XML tree structure of this Q object. If this is an empty leaf (the equivalent of Q()),
         # return None.
         from .fields import IndexedField
@@ -298,8 +298,8 @@ class Q(object):
             return None
         if self.is_leaf():
             elem = self._op_to_xml(self.op)
-            field = folder_class.get_item_field_by_fieldname(self.fieldname)
-            self._validate_field(field=field, folder_class=folder_class)
+            field = folder.get_item_field_by_fieldname(self.fieldname)
+            self._validate_field(field=field, folder=folder)
             if isinstance(field, IndexedField):
                 field_uri = field.field_uri_xml(label=self.value.label)
             else:
@@ -325,7 +325,7 @@ class Q(object):
             elem = self._conn_to_xml(self.AND if self.conn_type == self.NOT else self.conn_type)
             # Sort children by field name so we get stable output (for easier testing). Children should never be empty
             for c in sorted(self.children, key=lambda i: i.fieldname or ''):
-                elem.append(c.xml_elem(folder_class=folder_class, version=version))
+                elem.append(c.xml_elem(folder=folder, version=version))
         if elem is None:
             return None  # Should not be necessary, but play safe
         if self.conn_type == self.NOT:
@@ -394,17 +394,17 @@ class Restriction(object):
 
     """
 
-    def __init__(self, q, folder_class):
+    def __init__(self, q, folder):
         assert isinstance(q, Q)
         if q.is_empty():
             raise ValueError("Q object must not be empty")
         from .folders import Folder
-        assert issubclass(folder_class, Folder)
+        assert isinstance(folder, Folder)
         self.q = q
-        self.folder_class = folder_class
+        self.folder = folder
 
     def to_xml(self, version):
-        return self.q.to_xml(folder_class=self.folder_class, version=version)
+        return self.q.to_xml(folder=self.folder, version=version)
 
     def __str__(self):
         """

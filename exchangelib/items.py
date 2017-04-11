@@ -78,6 +78,7 @@ class Item(EWSElement):
 
     # 'extern_id' is not a native EWS Item field. We use it for identification when item originates in an external
     # system. The field is implemented as an extended property on the Item.
+    from .version import Build
     FIELDS = [
         TextField('item_id', field_uri='item:ItemId', is_read_only=True),
         TextField('changekey', field_uri='item:ChangeKey', is_read_only=True),
@@ -179,7 +180,7 @@ class Item(EWSElement):
         if not update_fieldnames:
             # The fields to update was not specified explicitly. Update all fields where update is possible
             update_fieldnames = []
-            for f in self.FIELDS:
+            for f in self.supported_fields(version=self.account.version):
                 if f.name == 'attachments':
                     # Attachments are handled separately after item creation
                     continue
@@ -317,7 +318,7 @@ class Item(EWSElement):
     def from_xml(cls, elem):
         assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
         item_id, changekey = cls.id_from_xml(elem)
-        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.FIELDS if f.name not in ('item_id', 'changekey')}
+        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.supported_fields()}
         elem.clear()
         return cls(item_id=item_id, changekey=changekey, **kwargs)
 
@@ -392,7 +393,7 @@ class BulkCreateResult(Item):
     @classmethod
     def from_xml(cls, elem):
         item_id, changekey = cls.id_from_xml(elem)
-        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.FIELDS if f.name not in ('item_id', 'changekey')}
+        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.supported_fields()}
         elem.clear()
         return cls(item_id=item_id, changekey=changekey, **kwargs)
 

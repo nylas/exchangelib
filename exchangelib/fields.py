@@ -7,9 +7,11 @@ import logging
 
 from six import string_types
 
+from .errors import ErrorInvalidServerVersion
 from .ewsdatetime import EWSDateTime
 from .services import TNS
 from .util import create_element, get_xml_attrs, set_xml_value, value_to_xml_text, xml_text_to_value
+from .version import Build
 
 string_type = string_types[0]
 log = logging.getLogger(__name__)
@@ -31,7 +33,7 @@ class Field(object):
     is_complex = False
 
     def __init__(self, name, is_required=False, is_required_after_save=False, is_read_only=False,
-                 is_read_only_after_send=False, is_searchable=True, default=None):
+                 is_read_only_after_send=False, is_searchable=True, default=None, supported_from=None):
         self.name = name
         self.default = default  # Default value if none is given
         self.is_required = is_required
@@ -44,8 +46,16 @@ class Field(object):
         # Define whether the field can be used in a QuerySet. For some reason, EWS disallows searching on some fields,
         # instead throwing ErrorInvalidValueForProperty
         self.is_searchable = is_searchable
+        # The Exchange build when this field was introduced. When talking with versions prior to this version,
+        # we will ignore this field.
+        if supported_from is not None:
+            assert isinstance(supported_from, Build)
+        self.supported_from = supported_from
 
     def clean(self, value, version=None):
+        if not self.supports_version(version):
+            raise ErrorInvalidServerVersion("Field '%s' does not support EWS builds prior to %s (server has %s)" % (
+                self.name, self.supported_from, version))
         if value is None:
             if self.is_required and self.default is None:
                 raise ValueError("'%s' is a required field with no default" % self.name)
@@ -72,6 +82,12 @@ class Field(object):
     @abc.abstractmethod
     def to_xml(self, value, version):
         raise NotImplementedError()
+
+    def supports_version(self, version):
+        # 'version' is a Version instance, for convenience by callers
+        if not self.supported_from or not version:
+            return True
+        return version.build >= self.supported_from
 
     def __eq__(self, other):
         return hash(self) == hash(other)
@@ -447,8 +463,8 @@ class IndexedField(FieldURIField):
         if issubclass(self.value_cls, MultiFieldIndexedElement):
             if not subfield:
                 # Return elements for all sub-fields
-                return [self.field_uri_xml(label=label, subfield=f) for f in self.value_cls.FIELDS]
-            assert subfield in self.value_cls.FIELDS
+                return [self.field_uri_xml(label=label, subfield=f) for f in self.value_cls.supported_fields()]
+            assert subfield in self.value_cls.supported_fields()
             field_uri = '%s:%s' % (self.field_uri, subfield.field_uri)
         else:
             field_uri = self.field_uri

@@ -18,7 +18,7 @@ from yaml import load
 
 from exchangelib import close_connections
 from exchangelib.account import Account, SAVE_ONLY, SEND_ONLY, SEND_AND_SAVE_COPY
-from exchangelib.attachments import Attachment, FileAttachment, ItemAttachment
+from exchangelib.attachments import FileAttachment, ItemAttachment
 from exchangelib.autodiscover import AutodiscoverProtocol, discover
 from exchangelib.configuration import Configuration
 from exchangelib.credentials import DELEGATE, IMPERSONATION, Credentials, ServiceAccount
@@ -26,11 +26,11 @@ from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalid
     AutoDiscoverCircularRedirect, AutoDiscoverFailed, ErrorNonExistentMailbox, UnknownTimeZone, \
     ErrorNameResolutionNoResults, TransportError, RedirectError, CASError, RateLimitError, UnauthorizedError, \
     ErrorInvalidChangeKey, ErrorInvalidIdMalformed, ErrorContainsFilterWrongType, ErrorAccessDenied, \
-    ErrorFolderNotFound, ErrorInvalidRequest, SOAPError
+    ErrorFolderNotFound, ErrorInvalidRequest, SOAPError, ErrorInvalidServerVersion
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.extended_properties import ExtendedProperty, ExternId
 from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextField, EmailField, URIField, ChoiceField, \
-    BodyField, DateTimeField, Base64Field, EWSElementField, IndexedField, PhoneNumberField, EmailAddressField, \
+    BodyField, DateTimeField, Base64Field, PhoneNumberField, EmailAddressField, \
     PhysicalAddressField, ExtendedPropertyField, MailboxField, AttendeesField, AttachmentField, TextListField, \
     MailboxListField
 from exchangelib.folders import Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Messages, Tasks, \
@@ -232,7 +232,7 @@ class ProtocolTest(unittest.TestCase):
                             auth_type=NTLM, verify_ssl=True, version=Version(Build(15, 1)))
         session = protocol.create_session()
         new_session = protocol.renew_session(session)
-        self.assertNotEquals(id(session), id(new_session))
+        self.assertNotEqual(id(session), id(new_session))
 
 
 class CredentialsTest(unittest.TestCase):
@@ -393,10 +393,10 @@ class PropertiesTest(unittest.TestCase):
 
     def test_itemid_equality(self):
         self.assertEqual(ItemId('X', 'Y'), ItemId('X', 'Y'))
-        self.assertNotEquals(ItemId('X', 'Y'), ItemId('X', 'Z'))
-        self.assertNotEquals(ItemId('Z', 'Y'), ItemId('X', 'Y'))
-        self.assertNotEquals(ItemId('X', 'Y'), ItemId('Z', 'Z'))
-        self.assertNotEquals(ItemId('X', 'Y'), None)
+        self.assertNotEqual(ItemId('X', 'Y'), ItemId('X', 'Z'))
+        self.assertNotEqual(ItemId('Z', 'Y'), ItemId('X', 'Y'))
+        self.assertNotEqual(ItemId('X', 'Y'), ItemId('Z', 'Z'))
+        self.assertNotEqual(ItemId('X', 'Y'), None)
 
     def test_mailbox(self):
         mbx = Mailbox(name='XXX')
@@ -443,6 +443,13 @@ class FieldTest(unittest.TestCase):
             field.clean(None)  # Value is required
         self.assertEqual(field.clean('XXX'), 'XXX')  # We can clean a simple value and keep it as a simple value
         self.assertEqual(field.clean(ExternId('XXX')), ExternId('XXX'))  # We can clean an ExternId instance as well
+
+    def test_versioned_field(self):
+        field = TextField('foo', field_uri='bar', supported_from=EXCHANGE_2010)
+        with self.assertRaises(ErrorInvalidServerVersion):
+            field.clean('baz', version=Version(EXCHANGE_2007))
+        field.clean('baz', version=Version(EXCHANGE_2010))
+        field.clean('baz', version=Version(EXCHANGE_2013))
 
 
 class ItemTest(unittest.TestCase):
@@ -512,13 +519,13 @@ class RestrictionTest(unittest.TestCase):
     </t:And>
 </m:Restriction>'''
         q = Q(Q(categories__contains='FOO') | Q(categories__contains='BAR'), start__lt=end, end__gt=start)
-        r = Restriction(q, folder_class=Calendar)
+        r = Restriction(q, folder=Calendar())
         self.assertEqual(str(r), ''.join(l.lstrip() for l in result.split('\n')))
         # Test empty Q
         q = Q()
-        self.assertEqual(q.to_xml(folder_class=Calendar, version=None), None)
+        self.assertEqual(q.to_xml(folder=Calendar(), version=None), None)
         with self.assertRaises(ValueError):
-            Restriction(q, folder_class=Calendar)
+            Restriction(q, folder=Calendar())
         # Test validation
         with self.assertRaises(ValueError):
             Q(datetime_created__range=(1,))  # Must have exactly 2 args
@@ -1934,6 +1941,9 @@ class BaseItemTest(EWSTest):
     def get_random_insert_kwargs(self):
         insert_kwargs = {}
         for f in self.ITEM_CLASS.FIELDS:
+            if not f.supports_version(self.account.version):
+                # Cannot be used with this EWS version
+                continue
             if f.is_read_only:
                 # These cannot be created
                 continue
@@ -1976,6 +1986,9 @@ class BaseItemTest(EWSTest):
         update_kwargs = {}
         now = UTC_NOW()
         for f in self.ITEM_CLASS.FIELDS:
+            if not f.supports_version(self.account.version):
+                # Cannot be used with this EWS version
+                continue
             if f.is_read_only:
                 # These cannot be changed
                 continue
@@ -2840,6 +2853,9 @@ class BaseItemTest(EWSTest):
         ids = self.test_folder.bulk_create(items=[item])
         common_qs = self.test_folder.filter(categories__contains=self.categories)
         for f in self.ITEM_CLASS.FIELDS:
+            if not f.supports_version(self.account.version):
+                # Cannot be used with this EWS version
+                continue
             if not f.is_searchable:
                 # Cannot be used in a QuerySet
                 continue
@@ -2972,6 +2988,9 @@ class BaseItemTest(EWSTest):
             assert isinstance(item, self.ITEM_CLASS)
             for f in self.ITEM_CLASS.FIELDS:
                 self.assertTrue(hasattr(item, f.name))
+                if not f.supports_version(self.account.version):
+                    # Cannot be used with this EWS version
+                    continue
                 if f.name in ('optional_attendees', 'required_attendees', 'resources'):
                     continue
                 elif f.is_read_only:
@@ -2984,6 +3003,9 @@ class BaseItemTest(EWSTest):
             assert isinstance(item, self.ITEM_CLASS)
             for f in self.ITEM_CLASS.FIELDS:
                 self.assertTrue(hasattr(item, f.name))
+                if not f.supports_version(self.account.version):
+                    # Cannot be used with this EWS version
+                    continue
                 if f.name in only_fields:
                     self.assertIsNotNone(getattr(item, f.name), (f.name, getattr(item, f.name)))
                 elif f.is_required:
@@ -3155,6 +3177,9 @@ class BaseItemTest(EWSTest):
         # Test with generator as argument
         item = list(self.account.fetch(ids=(i for i in find_ids)))[0]
         for f in self.ITEM_CLASS.FIELDS:
+            if not f.supports_version(self.account.version):
+                # Cannot be used with this EWS version
+                continue
             if f.is_read_only:
                 continue
             if f.name == 'resources':
@@ -3184,6 +3209,9 @@ class BaseItemTest(EWSTest):
         self.assertNotEqual(insert_ids[0].changekey, update_ids[0][1])  # Changekey should change when item is updated
         item = list(self.account.fetch(update_ids))[0]
         for f in self.ITEM_CLASS.FIELDS:
+            if not f.supports_version(self.account.version):
+                # Cannot be used with this EWS version
+                continue
             if f.is_read_only:
                 continue
             if f.name == 'resources':
@@ -3200,6 +3228,9 @@ class BaseItemTest(EWSTest):
         # Test wiping or removing fields
         wipe_kwargs = {}
         for f in self.ITEM_CLASS.FIELDS:
+            if not f.supports_version(self.account.version):
+                # Cannot be used with this EWS version
+                continue
             if f.is_required or f.is_required_after_save:
                 # These cannot be deleted
                 continue
@@ -3219,6 +3250,9 @@ class BaseItemTest(EWSTest):
                             wipe_ids[0][1])  # Changekey should not be the same when item is updated
         item = list(self.account.fetch(wipe_ids))[0]
         for f in self.ITEM_CLASS.FIELDS:
+            if not f.supports_version(self.account.version):
+                # Cannot be used with this EWS version
+                continue
             if f.is_required or f.is_required_after_save:
                 continue
             if f.is_read_only:
@@ -3322,7 +3356,7 @@ class BaseItemTest(EWSTest):
         attr_name = 'dead_beef'
 
         # Before register
-        self.assertNotIn(attr_name, self.ITEM_CLASS.fieldnames())
+        self.assertNotIn(attr_name, {f.name for f in self.ITEM_CLASS.supported_fields()})
         with self.assertRaises(ValueError):
             self.ITEM_CLASS.deregister(attr_name)  # Not registered yet
         with self.assertRaises(ValueError):
@@ -3332,7 +3366,7 @@ class BaseItemTest(EWSTest):
 
         # After register
         self.assertEqual(TestProp.python_type(), int)
-        self.assertIn(attr_name, self.ITEM_CLASS.fieldnames())
+        self.assertIn(attr_name, {f.name for f in self.ITEM_CLASS.supported_fields()})
 
         # Test item creation, refresh, and update
         item = self.get_test_item(folder=self.test_folder)
@@ -3353,7 +3387,7 @@ class BaseItemTest(EWSTest):
         with self.assertRaises(ValueError):
             self.ITEM_CLASS.register(attr_name='XXX', attr_cls=Mailbox)  # Not an extended property
         self.ITEM_CLASS.deregister(attr_name=attr_name)
-        self.assertNotIn(attr_name, self.ITEM_CLASS.fieldnames())
+        self.assertNotIn(attr_name, {f.name for f in self.ITEM_CLASS.supported_fields()})
 
     def test_extended_property_arraytype(self):
         # Tests array type extended properties

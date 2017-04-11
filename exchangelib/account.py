@@ -380,7 +380,7 @@ class Account(object):
     def fetch(self, ids, folder=None, only_fields=None):
         # 'folder' is used for validating only_fields
         # 'only_fields' specifies which fields to fetch, instead of all possible fields.
-        validation_folder = folder or Folder  # Default to a folder type that supports all item types
+        validation_folder = folder or Folder(account=self)  # Default to a folder type that supports all item types
         # 'ids' could be an unevaluated QuerySet, e.g. if we ended up here via `fetch(ids=some_folder.filter(...))`. In
         # that case, we want to use its iterator. Otherwise, peek() will start a count() which is wasteful because we
         # need the item IDs immediately afterwards. iterator() will only do the bare minimum.
@@ -396,7 +396,7 @@ class Account(object):
             for f in only_fields:
                 assert f in allowed_fields
         else:
-            only_fields = {f for f in validation_folder.allowed_fields() if f.name not in ('item_id', 'changekey')}
+            only_fields = {f for f in validation_folder.allowed_fields()}
         for i in GetItem(account=self).call(items=ids, additional_fields=only_fields):
             if isinstance(i, Exception):
                 yield i

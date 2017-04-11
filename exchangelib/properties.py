@@ -42,7 +42,7 @@ class EWSElement(object):
 
     def clean(self, version=None):
         # Validate attribute values using the field validator
-        for f in self.FIELDS:
+        for f in self.supported_fields(version=version):
             val = getattr(self, f.name)
             setattr(self, f.name, f.clean(val, version=version))
 
@@ -60,7 +60,7 @@ class EWSElement(object):
         # WARNING: The order of addition of XML elements is VERY important. Exchange expects XML elements in a
         # specific, non-documented order and will fail with meaningless errors if the order is wrong.
         i = create_element(self.request_tag())
-        for f in self.FIELDS:
+        for f in self.supported_fields(version=version):
             if f.is_read_only:
                 continue
             value = getattr(self, f.name)
@@ -81,9 +81,9 @@ class EWSElement(object):
         return '{%s}%s' % (cls.NAMESPACE, cls.ELEMENT_NAME)
 
     @classmethod
-    def fieldnames(cls):
-        # Return non-ID field names
-        return set(f.name for f in cls.FIELDS if f.name not in ('item_id', 'changekey'))
+    def supported_fields(cls, version=None):
+        # Return non-ID field names. If version is specified, only return the fields supported by this version
+        return tuple(f for f in cls.FIELDS if f.name not in ('item_id', 'changekey') and f.supports_version(version))
 
     @classmethod
     def get_field_by_fieldname(cls, fieldname):

@@ -80,7 +80,7 @@ class CalendarView(EWSElement):
     def to_xml(self, version):
         self.clean(version=version)
         i = create_element(self.request_tag())
-        for f in self.FIELDS:
+        for f in self.supported_fields(version=version):
             value = getattr(self, f.name)
             if value is None:
                 continue
@@ -119,7 +119,7 @@ class Folder(EWSElement):
             self.name = self.DISTINGUISHED_FOLDER_ID
         log.debug('%s created for %s', self, self.account)
 
-    def clean(self,version=None):
+    def clean(self, version=None):
         super(Folder, self).clean(version=version)
         if self.account is not None:
             from .account import Account
@@ -159,21 +159,15 @@ class Folder(EWSElement):
     def item_model_from_tag(cls, tag):
         return cls.ITEM_MODEL_MAP[tag]
 
-    @classmethod
-    def allowed_fields(cls):
+    def allowed_fields(self):
+        # Return non-ID fields of all item classes allows in this folder type
         fields = set()
-        for item_model in cls.supported_item_models:
-            fields.update(item_model.FIELDS)
+        for item_model in self.supported_item_models:
+            fields.update(set(item_model.supported_fields(version=self.account.version if self.account else None)))
         return fields
 
-    @classmethod
-    def complex_fields(cls):
-        fields = set()
-        for item_model in cls.supported_item_models:
-            for f in item_model.FIELDS:
-                if f.is_complex:
-                    fields.add(f)
-        return fields
+    def complex_fields(self):
+        return {f for f in self.allowed_fields() if f.is_complex}
 
     @classmethod
     def get_item_field_by_fieldname(cls, fieldname):
@@ -261,7 +255,7 @@ class Folder(EWSElement):
         if q.is_empty():
             restriction = None
         else:
-            restriction = Restriction(q, folder_class=self.__class__)
+            restriction = Restriction(q, folder=self)
         log.debug(
             'Finding %s items for %s (shape: %s, depth: %s, additional_fields: %s, restriction: %s)',
             self.DISTINGUISHED_FOLDER_ID,
@@ -312,7 +306,7 @@ class Folder(EWSElement):
         fld_id_elem = elem.find(FolderId.response_tag())
         fld_id = fld_id_elem.get(FolderId.ID_ATTR)
         changekey = fld_id_elem.get(FolderId.CHANGEKEY_ATTR)
-        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.FIELDS if f.name not in ('folder_id', 'changekey')}
+        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.supported_fields()}
         elem.clear()
         return cls(folder_id=fld_id, changekey=changekey, **kwargs)
 
@@ -322,13 +316,19 @@ class Folder(EWSElement):
             return FolderId(self.folder_id, self.changekey).to_xml(version=version)
         return DistinguishedFolderId(self.name).to_xml(version=version)
 
+    @classmethod
+    def supported_fields(cls, version=None):
+        return tuple(f for f in cls.FIELDS if f.name not in ('folder_id', 'changekey') and f.supports_version(version))
+
     def get_folders(self, shape=IdOnly, depth=DEEP):
         # 'depth' controls whether to return direct children or recurse into sub-folders
+        if not self.account:
+            raise ValueError('Folder must have an account')
         assert shape in SHAPE_CHOICES
         assert depth in FOLDER_TRAVERSAL_CHOICES
         folders = []
         for elem in FindFolder(folder=self).call(
-                additional_fields=[f for f in self.FIELDS if f.name not in ('folder_id', 'changekey')],
+                additional_fields=self.supported_fields(version=self.account.version),
                 shape=shape,
                 depth=depth,
                 page_size=100,
@@ -380,7 +380,7 @@ class Folder(EWSElement):
         folders = []
         for elem in GetFolder(account=account).call(
                 folder=cls(account=account),
-                additional_fields=[f for f in cls.FIELDS if f.name not in ('folder_id', 'changekey')],
+                additional_fields=cls.supported_fields(),
                 shape=shape
         ):
             if isinstance(elem, Exception):
@@ -399,7 +399,7 @@ class Folder(EWSElement):
         folders = []
         for elem in GetFolder(account=self.account).call(
                 folder=self,
-                additional_fields=[f for f in self.FIELDS if f.name not in ('folder_id', 'changekey')],
+                additional_fields=self.supported_fields(version=self.account.version),
                 shape=IdOnly
         ):
             if isinstance(elem, Exception):
