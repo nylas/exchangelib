@@ -2538,7 +2538,7 @@ class BaseItemTest(EWSTest):
         )
         # Multiple Q objects
         self.assertEqual(
-            len(self.test_folder.filter(Q(subject=item.subject), ~Q(subject=item.subject + 'XXX'))),
+            len(self.test_folder.filter(Q(subject=item.subject), ~Q(subject=item.subject[:-3] + 'XXX'))),
             1
         )
         # Multiple Q object and kwargs
@@ -2677,7 +2677,7 @@ class BaseItemTest(EWSTest):
         item = self.get_test_item()
         ids = self.test_folder.bulk_create(items=[item])
         self.assertEqual(
-            len(common_qs.filter(subject=item.subject + 'XXX')),
+            len(common_qs.filter(subject=item.subject[:-3] + 'XXX')),
             0
         )
         self.assertEqual(
@@ -2694,7 +2694,7 @@ class BaseItemTest(EWSTest):
             0
         )
         self.assertEqual(
-            len(common_qs.filter(subject__not=item.subject + 'XXX')),
+            len(common_qs.filter(subject__not=item.subject[:-3] + 'XXX')),
             1
         )
         self.bulk_delete(ids)
@@ -2704,7 +2704,7 @@ class BaseItemTest(EWSTest):
         item.subject = 'aA' + item.subject[2:]
         ids = self.test_folder.bulk_create(items=[item])
         self.assertEqual(
-            len(common_qs.filter(subject__exact=item.subject + 'XXX')),
+            len(common_qs.filter(subject__exact=item.subject[:-3] + 'XXX')),
             0
         )
         self.assertEqual(
@@ -2726,7 +2726,7 @@ class BaseItemTest(EWSTest):
         item.subject = 'aA' + item.subject[2:]
         ids = self.test_folder.bulk_create(items=[item])
         self.assertEqual(
-            len(common_qs.filter(subject__iexact=item.subject + 'XXX')),
+            len(common_qs.filter(subject__iexact=item.subject[:-3] + 'XXX')),
             0
         )
         self.assertEqual(
