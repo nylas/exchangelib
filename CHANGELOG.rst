@@ -2,6 +2,11 @@
 Change Log
 ==========
 
+1.9.1
+-----
+* Fixed XML generation for Exchange 2010 and other picky server versions
+* Fixed timezone localization for ``EWSTimeZone`` created from a static timezone
+
 1.9.0
 -----
 * Expand support for ``ExtendedProperty`` to include all possible attributes. This required renaming the ``property_id``
