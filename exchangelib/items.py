@@ -338,10 +338,10 @@ class Item(EWSElement):
             raise ValueError("'%s' must be a subclass of ExtendedProperty" % attr_cls)
         # Find the correct index for the extended property and insert the new field. We insert after 'reminder_is_set'
 
-        # TODO: This is super hacky and will need to change if we add new item fields after 'reminder_is_set'
+        # TODO: This is super hacky and will need to change if we add new item fields after 'reminder_minutes_before_start'
         # ExtendedProperty actually goes in between <HasAttachments/><ExtendedProperty/><Culture/>
         # See https://msdn.microsoft.com/en-us/library/office/aa580790(v=exchg.150).aspx
-        idx = tuple(f.name for f in cls.FIELDS).index('reminder_is_set') + 1
+        idx = tuple(f.name for f in cls.FIELDS).index('reminder_minutes_before_start') + 1
         field = ExtendedPropertyField(attr_name, value_cls=attr_cls)
         cls.add_field(field, idx=idx)
 
