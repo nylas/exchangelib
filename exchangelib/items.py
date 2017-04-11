@@ -412,7 +412,8 @@ class CalendarItem(Item):
         BooleanField('is_all_day', field_uri='calendar:IsAllDayEvent', is_required=True, default=False),
         # TODO: The 'WorkingElsewhere' status was added in Exchange2015 but we don't support versioned choices yet
         ChoiceField('legacy_free_busy_status', field_uri='calendar:LegacyFreeBusyStatus', choices={
-            Choice('Free'), Choice('Tentative'), Choice('Busy'), Choice('OOF'), Choice('NoData')
+            Choice('Free'), Choice('Tentative'), Choice('Busy'), Choice('OOF'), Choice('NoData'),
+            Choice('WorkingElsewhere', supported_from=EXCHANGE_2013)
         }, is_required=True, default='Busy'),
         TextField('location', field_uri='calendar:Location', max_length=255),
         MailboxField('organizer', field_uri='calendar:Organizer', is_read_only=True),
