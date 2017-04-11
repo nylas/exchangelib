@@ -13,7 +13,7 @@ from .fields import BooleanField, IntegerField, DecimalField, Base64Field, TextF
     ExtendedPropertyField, AttachmentField, MailboxField, AttendeesField, TextListField, MailboxListField
 from .properties import EWSElement, ItemId
 from .util import create_element
-from .version import EXCHANGE_2010
+from .version import EXCHANGE_2010, EXCHANGE_2013
 
 string_type = string_types[0]
 log = logging.getLogger(__name__)
@@ -88,7 +88,8 @@ class Item(EWSElement):
         ChoiceField('sensitivity', field_uri='item:Sensitivity', choices={
             'Normal', 'Personal', 'Private', 'Confidential'
         }, is_required=True, default='Normal'),
-        BodyField('body', field_uri='item:Body'),  # Body or HTMLBody
+        TextField('text_body', field_uri='item:TextBody', supported_from=EXCHANGE_2013),
+        BodyField('body', field_uri='item:Body'),  # Accepts and returns Body or HTMLBody instances
         AttachmentField('attachments', field_uri='item:Attachments'),  # ItemAttachment or FileAttachment
         DateTimeField('datetime_received', field_uri='item:DateTimeReceived', is_read_only=True),
         TextListField('categories', field_uri='item:Categories'),
