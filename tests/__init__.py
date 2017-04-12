@@ -1758,7 +1758,6 @@ class AutodiscoverTest(EWSTest):
             <AutoDiscoverSMTPAddress>john@demo.affect-it.dk</AutoDiscoverSMTPAddress>
         </User>
         <Account>
-            <AccountType>email</AccountType>
             <Action>redirectAddr</Action>
             <RedirectAddr>foo@example.com</RedirectAddr>
         </Account>

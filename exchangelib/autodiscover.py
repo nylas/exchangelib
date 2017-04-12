@@ -393,12 +393,13 @@ def _parse_response(response):
     if resp is None:
         _raise_response_errors(autodiscover)
     account = resp.find('{%s}Account' % RESPONSE_NS)
-    assert get_xml_attr(account, '{%s}AccountType' % RESPONSE_NS) == 'email'
     action = get_xml_attr(account, '{%s}Action' % RESPONSE_NS)
     redirect_email = get_xml_attr(account, '{%s}RedirectAddr' % RESPONSE_NS)
     if action == 'redirectAddr' and redirect_email:
         # This is redirection to e.g. Office365
         raise AutoDiscoverRedirect(redirect_email)
+    # The AccountType element is only available if we are not redirecting
+    assert get_xml_attr(account, '{%s}AccountType' % RESPONSE_NS) == 'email'
     # AutoDiscoverSMTPAddress might not be present in the XML, so primary_smtp_address might be None. In this
     # case, the original email address IS the primary address
     user = resp.find('{%s}User' % RESPONSE_NS)
