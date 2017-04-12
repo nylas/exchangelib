@@ -41,8 +41,7 @@ from exchangelib.properties import Attendee, Mailbox, RoomList, MessageHeader, R
 from exchangelib.protocol import Protocol
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.restriction import Restriction, Q
-from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, GetAttachment, CreateAttachment, \
-    DeleteAttachment, ResolveNames, TNS
+from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, GetAttachment, ResolveNames, TNS
 from exchangelib.transport import NOAUTH, BASIC, DIGEST, NTLM, wrap, _get_auth_method_from_response
 from exchangelib.util import chunkify, peek, get_redirect_url, to_xml, BOM, get_domain, \
     post_ratelimited, create_element, CONNECTION_ERRORS
@@ -721,12 +720,6 @@ class ServicesTest(unittest.TestCase):
             GetRoomLists(protocol=account.protocol).call()
         with self.assertRaises(NotImplementedError):
             GetRooms(protocol=account.protocol).call('XXX')
-        with self.assertRaises(NotImplementedError):
-            GetAttachment(account=account).call('XXX', 'YYY')
-        with self.assertRaises(NotImplementedError):
-            CreateAttachment(account=account).call('XXX', 'YYY')
-        with self.assertRaises(NotImplementedError):
-            DeleteAttachment(account=account).call('XXX')
 
 
 class TransportTest(unittest.TestCase):

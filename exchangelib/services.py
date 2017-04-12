@@ -996,8 +996,6 @@ class GetAttachment(EWSAccountService):
     element_container_name = '{%s}Attachments' % MNS
 
     def call(self, items, include_mime_content):
-        if self.protocol.version.build < EXCHANGE_2010:
-            raise NotImplementedError('%s is only supported for Exchange 2010 servers and later' % self.SERVICE_NAME)
         return self._get_elements(payload=self.get_payload(
             items=items,
             include_mime_content=include_mime_content,
@@ -1031,8 +1029,6 @@ class CreateAttachment(EWSAccountService):
     element_container_name = '{%s}Attachments' % MNS
 
     def call(self, parent_item, items):
-        if self.protocol.version.build < EXCHANGE_2010:
-            raise NotImplementedError('%s is only supported for Exchange 2010 servers and later' % self.SERVICE_NAME)
         return self._get_elements(payload=self.get_payload(
             parent_item=parent_item,
             items=items,
@@ -1061,8 +1057,6 @@ class DeleteAttachment(EWSAccountService):
     SERVICE_NAME = 'DeleteAttachment'
 
     def call(self, items):
-        if self.protocol.version.build < EXCHANGE_2010:
-            raise NotImplementedError('%s is only supported for Exchange 2010 servers and later' % self.SERVICE_NAME)
         return self._get_elements(payload=self.get_payload(
             items=items,
         ))
