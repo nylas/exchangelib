@@ -1,6 +1,5 @@
 # coding=utf-8
 import logging
-from threading import Lock
 
 from future.utils import python_2_unicode_compatible
 
@@ -8,9 +7,6 @@ from .ewsdatetime import EWSDateTime, UTC
 from .util import create_element, xml_to_str, value_to_xml_text
 
 log = logging.getLogger(__name__)
-
-_source_cache = dict()
-_source_cache_lock = Lock()
 
 
 @python_2_unicode_compatible
