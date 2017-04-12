@@ -251,6 +251,9 @@ class ProtocolTest(unittest.TestCase):
             self.assertEqual(base_p, p)
             self.assertEqual(id(base_p), id(p))
             self.assertEqual(hash(base_p), hash(p))
+            self.assertEqual(id(base_p.thread_pool), id(p.thread_pool))
+            self.assertEqual(id(base_p._session_pool), id(p._session_pool))
+
 
 class CredentialsTest(unittest.TestCase):
     def test_hash(self):

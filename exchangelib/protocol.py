@@ -192,11 +192,6 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
         for _ in range(self.SESSION_POOLSIZE):
             self._session_pool.put(self.create_session(), block=False)
 
-        # Used by services to process service requests that are able to run in parallel. Thread pool should be
-        # larger than connection the pool so we have time to process data without idling the connection.
-        thread_poolsize = 4 * self.SESSION_POOLSIZE
-        self.thread_pool = ThreadPool(processes=thread_poolsize)
-
         if version:
             isinstance(version, Version)
             self.version = version
@@ -208,6 +203,13 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
             except TransportError:
                 pass
             self.version = Version.guess(self)
+
+        # Used by services to process service requests that are able to run in parallel. Thread pool should be
+        # larger than the connection pool so we have time to process data without idling the connection.
+        # Create the pool as the last thing here, since we may fail in the version or auth type guessing, which would
+        # leave open threads around to be garbage collected.
+        thread_poolsize = 4 * self.SESSION_POOLSIZE
+        self.thread_pool = ThreadPool(processes=thread_poolsize)
 
     def get_timezones(self):
         return GetServerTimeZones(protocol=self).call()
