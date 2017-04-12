@@ -140,21 +140,38 @@ class CachingProtocol(type):
         #
         # We ignore auth_type from kwargs in the cache key. We trust caller to supply the correct auth_type - otherwise
         # __init__ will guess the correct auth type.
-        #
+
         # We may be using multiple different credentials and changing our minds on SSL verification. This key
         # combination should be safe.
-        #
         _protocol_cache_key = kwargs['service_endpoint'], kwargs['credentials'], kwargs['verify_ssl']
+
+        protocol = cls._protocol_cache.get(_protocol_cache_key)
+        if isinstance(protocol, Exception):
+            # The input data leads to a TransportError. Re-throw
+            raise protocol
+        if protocol is not None:
+            return protocol
+
         # Acquire lock to guard against multiple threads competing to cache information. Having a per-server lock is
         # probably overkill although it would reduce lock contention.
         log.debug('Waiting for _protocol_cache_lock')
         with cls._protocol_cache_lock:
             protocol = cls._protocol_cache.get(_protocol_cache_key)
-            if protocol is None:
-                log.debug("Protocol __call__ cache miss. Adding key '%s'", str(_protocol_cache_key))
+            if isinstance(protocol, Exception):
+                # Someone got ahead of us while holding the lock, but the input data leads to a TransportError. Re-throw
+                raise protocol
+            if protocol is not None:
+                # Someone got ahead of us while holding the lock
+                return protocol
+            log.debug("Protocol __call__ cache miss. Adding key '%s'", str(_protocol_cache_key))
+            try:
                 protocol = super(CachingProtocol, cls).__call__(*args, **kwargs)
-                cls._protocol_cache[_protocol_cache_key] = protocol
-        log.debug('_protocol_cache_lock released')
+            except TransportError as e:
+                # This can happen if, for example, autodiscover supplies us with a bogus EWS endpoint
+                log.warning('Failed to create cached protocol with key %s: %s', _protocol_cache_key, e)
+                cls._protocol_cache[_protocol_cache_key] = e
+                raise e
+            cls._protocol_cache[_protocol_cache_key] = protocol
         return protocol
 
     @classmethod
