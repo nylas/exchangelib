@@ -182,10 +182,9 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
         if self.auth_type is None:
             self.auth_type = get_service_authtype(service_endpoint=self.service_endpoint, versions=API_VERSIONS,
                                                   verify=self.verify_ssl, name=self.credentials.username)
-        try:
-            self.docs_auth_type = get_docs_authtype(verify=self.verify_ssl, docs_url=self.types_url)
-        except TransportError:
-            self.docs_auth_type = self.auth_type  # Default to the auth type used by the service
+
+        # Default to the auth type used by the service. We only need this if 'version' is None
+        self.docs_auth_type = self.auth_type
 
         # Try to behave nicely with the Exchange server. We want to keep the connection open between requests.
         # We also want to re-use sessions, to avoid the NTLM auth handshake on every request.
@@ -203,6 +202,11 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
             self.version = version
         else:
             # Version.guess() needs auth objects and a working session pool
+            try:
+                # Try to get the auth_type of 'types.xsd' so we can fetch it and look at the version contained there
+                self.docs_auth_type = get_docs_authtype(verify=self.verify_ssl, docs_url=self.types_url)
+            except TransportError:
+                pass
             self.version = Version.guess(self)
 
     def get_timezones(self):

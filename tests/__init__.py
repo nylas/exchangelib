@@ -213,7 +213,8 @@ class VersionTest(unittest.TestCase):
 
 
 class ConfigurationTest(unittest.TestCase):
-    def test_hardcode_all(self):
+    @requests_mock.mock()
+    def test_hardcode_all(self, m):
         # Test that we can hardcode everything without having a working server. This is useful if neither tasting or
         # guessing missing values works.
         Configuration(
