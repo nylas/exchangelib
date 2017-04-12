@@ -2,6 +2,10 @@
 Change Log
 ==========
 
+HEAD
+----
+* Added ``EWSTimeZone.localzone()`` to get the local timezone
+
 1.9.1
 -----
 * Fixed XML generation for Exchange 2010 and other picky server versions

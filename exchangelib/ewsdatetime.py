@@ -5,6 +5,7 @@ import datetime
 import logging
 
 import pytz
+import tzlocal
 
 from .errors import UnknownTimeZone
 from .winzone import PYTZ_TO_MS_TIMEZONE_MAP
@@ -118,6 +119,11 @@ class EWSTimeZone(object):
         for k, v in tz.__dict__.items():
             setattr(self, k, v)
         return self
+
+    @classmethod
+    def localzone(cls):
+        tz = tzlocal.get_localzone()
+        return cls.from_pytz(tz)
 
     @classmethod
     def timezone(cls, location):

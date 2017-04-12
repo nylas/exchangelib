@@ -285,6 +285,10 @@ class EWSDateTimeTest(unittest.TestCase):
         self.assertEqual(tz.ms_id, 'Romance Standard Time')
         # self.assertEqual(EWSTimeZone.timezone('Europe/Copenhagen').ms_name, '')  # EWS works fine without the ms_name
 
+        # Test localzone()
+        tz = EWSTimeZone.localzone()
+        self.assertIsInstance(tz, EWSTimeZone)
+
         # Test common helpers
         tz = EWSTimeZone.timezone('UTC')
         self.assertIsInstance(tz, EWSTimeZone)
