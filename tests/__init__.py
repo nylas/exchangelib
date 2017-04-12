@@ -227,13 +227,29 @@ class ConfigurationTest(unittest.TestCase):
 
 
 class ProtocolTest(unittest.TestCase):
-    def test_session(self):
+
+    @requests_mock.mock()
+    def test_session(self, m):
+        m.get('https://example.com/EWS/types.xsd', status_code=200)
         protocol = Protocol(service_endpoint='https://example.com/Foo.asmx', credentials=Credentials('A', 'B'),
                             auth_type=NTLM, verify_ssl=True, version=Version(Build(15, 1)))
         session = protocol.create_session()
         new_session = protocol.renew_session(session)
         self.assertNotEqual(id(session), id(new_session))
 
+    @requests_mock.mock()
+    def test_protocol_instance_caching(self, m):
+        # Verify that we get the same Protocol instance for the same combination of (endpoint, credentials, verify_ssl)
+        m.get('https://example.com/EWS/types.xsd', status_code=200)
+        base_p = Protocol(service_endpoint='https://example.com/Foo.asmx', credentials=Credentials('A', 'B'),
+                          auth_type=NTLM, verify_ssl=True, version=Version(Build(15, 1)))
+
+        for i in range(10):
+            p = Protocol(service_endpoint='https://example.com/Foo.asmx', credentials=Credentials('A', 'B'),
+                         auth_type=NTLM, verify_ssl=True, version=Version(Build(15, 1)))
+            self.assertEqual(base_p, p)
+            self.assertEqual(id(base_p), id(p))
+            self.assertEqual(hash(base_p), hash(p))
 
 class CredentialsTest(unittest.TestCase):
     def test_hash(self):
