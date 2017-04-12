@@ -109,7 +109,8 @@ class VersionTest(unittest.TestCase):
         version = Version(build=Build(15, 1, 2, 3))
         self.assertEqual(version.api_version, 'Exchange2016')
 
-    def test_from_response(self):
+    @requests_mock.mock()  # Just to make sure we don't make any requests
+    def test_from_response(self, m):
         # Test fallback to suggested api_version value when there is a version mismatch and response version is fishy
         version = Version.from_response(
             'Exchange2007',
@@ -213,7 +214,7 @@ class VersionTest(unittest.TestCase):
 
 
 class ConfigurationTest(unittest.TestCase):
-    @requests_mock.mock()
+    @requests_mock.mock()  # Just to make sure we don't make any requests
     def test_hardcode_all(self, m):
         # Test that we can hardcode everything without having a working server. This is useful if neither tasting or
         # guessing missing values works.
@@ -535,6 +536,7 @@ class ItemTest(unittest.TestCase):
         # We reset percent_complete to 0.0 if state is not_started
         self.assertEqual(task.percent_complete, Decimal(0))
 
+
 class RestrictionTest(unittest.TestCase):
     def setUp(self):
         self.maxDiff = None
@@ -709,9 +711,9 @@ class QuerySetTest(unittest.TestCase):
 class ServicesTest(unittest.TestCase):
     def test_invalid_server_version(self):
         # Test that we get a client-side error if we call a service that was only implemented in a later version
-        mock_account = namedtuple('mock_account', ('protocol'))
-        mock_protocol = namedtuple('mock_protocol', ('version'))
-        mock_version = namedtuple('mock_version', ('build'))
+        mock_account = namedtuple('mock_account', ('protocol',))
+        mock_protocol = namedtuple('mock_protocol', ('version',))
+        mock_version = namedtuple('mock_version', ('build',))
         account = mock_account(protocol=mock_protocol(version=mock_version(build=EXCHANGE_2007)))
         with self.assertRaises(NotImplementedError):
             GetServerTimeZones(protocol=account.protocol).call()
@@ -859,16 +861,26 @@ class UtilTest(unittest.TestCase):
         is_empty, seq = peek((i for i in [1, 2, 3]))
         self.assertEqual((is_empty, list(seq)), (False, [1, 2, 3]))
 
-    def test_get_redirect_url(self):
+    @requests_mock.mock()
+    def test_get_redirect_url(self, m):
+        m.get('https://httpbin.org/redirect-to', status_code=302, headers={'location': 'https://example.com/'})
         r = requests.get('https://httpbin.org/redirect-to?url=https://example.com/', allow_redirects=False)
         self.assertEqual(get_redirect_url(r), 'https://example.com/')
+
+        m.get('https://httpbin.org/redirect-to', status_code=302, headers={'location': 'http://example.com/'})
         r = requests.get('https://httpbin.org/redirect-to?url=http://example.com/', allow_redirects=False)
         self.assertEqual(get_redirect_url(r), 'http://example.com/')
+
+        m.get('https://httpbin.org/redirect-to', status_code=302, headers={'location': '/example'})
         r = requests.get('https://httpbin.org/redirect-to?url=/example', allow_redirects=False)
         self.assertEqual(get_redirect_url(r), 'https://httpbin.org/example')
+
+        m.get('https://httpbin.org/redirect-to', status_code=302, headers={'location': 'https://example.com'})
         with self.assertRaises(RelativeRedirect):
             r = requests.get('https://httpbin.org/redirect-to?url=https://example.com', allow_redirects=False)
             get_redirect_url(r, require_relative=True)
+
+        m.get('https://httpbin.org/redirect-to', status_code=302, headers={'location': '/example'})
         with self.assertRaises(RelativeRedirect):
             r = requests.get('https://httpbin.org/redirect-to?url=/example', allow_redirects=False)
             get_redirect_url(r, allow_relative=False)
@@ -1603,7 +1615,8 @@ class AutodiscoverTest(EWSTest):
         discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
         _autodiscover_cache.__del__()
 
-    def test_autodiscover_cache(self):
+    @requests_mock.mock(real_http=True)
+    def test_autodiscover_cache(self, m):
         from exchangelib.autodiscover import _autodiscover_cache
         import exchangelib.autodiscover
 
@@ -1628,6 +1641,7 @@ class AutodiscoverTest(EWSTest):
             auth_type=NTLM,
             verify_ssl=True
         )
+        m.post('https://example.com/blackhole.asmx', status_code=404)
         discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
         self.assertIn(cache_key, _autodiscover_cache)
 
@@ -1855,6 +1869,7 @@ class AutodiscoverTest(EWSTest):
 </Autodiscover>'''
         with self.assertRaises(AutoDiscoverFailed):
             _parse_response(xml)
+
 
 class FolderTest(EWSTest):
     def test_folders(self):
