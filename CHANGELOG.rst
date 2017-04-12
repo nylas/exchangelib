@@ -5,6 +5,8 @@ Change Log
 HEAD
 ----
 * Added ``EWSTimeZone.localzone()`` to get the local timezone
+* Support ``some_folder.get(item_id=..., changekey=...)`` as a shortcut to get a single item when you know the ID and
+  changekey.
 
 1.9.1
 -----

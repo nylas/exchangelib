@@ -99,8 +99,8 @@ class Folder(EWSElement):
     LOCALIZED_NAMES = dict()  # A map of (str)locale: (tuple)localized_folder_names
     ITEM_MODEL_MAP = {cls.response_tag(): cls for cls in ITEM_CLASSES}
     FIELDS = [
-        TextField('folder_id', field_uri='folder:FolderId'),
-        TextField('changekey', field_uri='folder:Changekey'),
+        TextField('folder_id', field_uri='folder:FolderId', is_searchable=False),
+        TextField('changekey', field_uri='folder:Changekey', is_searchable=False),
         TextField('name', field_uri='folder:DisplayName'),
         TextField('folder_class', field_uri='folder:FolderClass'),
         IntegerField('total_count', field_uri='folder:TotalCount'),
@@ -333,6 +333,7 @@ class Folder(EWSElement):
                 depth=depth,
                 page_size=100,
         ):
+            # TODO: Support the Restriction class for folders, too
             # The "FolderClass" element value is the only indication we have in the FindFolder response of which
             # folder class we should create the folder with.
             #

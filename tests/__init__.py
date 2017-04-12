@@ -2423,6 +2423,42 @@ class BaseItemTest(EWSTest):
         self.assertEqual(qs.count(), 0)  # QuerySet is empty after delete
         self.assertEqual(list(qs.none()), [])
 
+    def test_queryset_get_by_id(self):
+        item = self.get_test_item().save()
+        with self.assertRaises(ValueError):
+            list(self.test_folder.filter(item_id__in=[item.item_id]))
+        with self.assertRaises(ValueError):
+            list(self.test_folder.get(item_id=item.item_id))
+        with self.assertRaises(ValueError):
+            list(self.test_folder.get(item_id=item.item_id, changekey=item.changekey, subject='XXX'))
+
+        # Test a simple get()
+        get_item = self.test_folder.get(item_id=item.item_id, changekey=item.changekey)
+        self.assertEqual(item.item_id, get_item.item_id)
+        self.assertEqual(item.changekey, get_item.changekey)
+        self.assertEqual(item.subject, get_item.subject)
+        self.assertEqual(item.body, get_item.body)
+
+        # Test a get() from queryset
+        get_item = self.test_folder.all().get(item_id=item.item_id, changekey=item.changekey)
+        self.assertEqual(item.item_id, get_item.item_id)
+        self.assertEqual(item.changekey, get_item.changekey)
+        self.assertEqual(item.subject, get_item.subject)
+        self.assertEqual(item.body, get_item.body)
+
+        # Test a get() with only()
+        get_item = self.test_folder.all().only('subject').get(item_id=item.item_id, changekey=item.changekey)
+        self.assertEqual(item.item_id, get_item.item_id)
+        self.assertEqual(item.changekey, get_item.changekey)
+        self.assertEqual(item.subject, get_item.subject)
+        self.assertIsNone(get_item.body)
+
+    def test_queryset_nonsearchable_fields(self):
+        for f in self.ITEM_CLASS.FIELDS:
+            if not f.is_searchable:
+                with self.assertRaises(ValueError):
+                    list(self.test_folder.filter(**{f.name: 'XXX'}))
+
     def test_queryset_failure(self):
         qs = QuerySet(self.test_folder).filter(categories__contains=self.categories)
         with self.assertRaises(ValueError):

@@ -80,8 +80,8 @@ class Item(EWSElement):
     # system. The field is implemented as an extended property on the Item.
     from .version import Build
     FIELDS = [
-        TextField('item_id', field_uri='item:ItemId', is_read_only=True),
-        TextField('changekey', field_uri='item:ChangeKey', is_read_only=True),
+        TextField('item_id', field_uri='item:ItemId', is_read_only=True, is_searchable=False),
+        TextField('changekey', field_uri='item:ChangeKey', is_read_only=True, is_searchable=False),
         # TODO: MimeContent actually supports writing, but is still untested
         Base64Field('mime_content', field_uri='item:MimeContent', is_read_only=True),
         TextField('subject', field_uri='item:Subject', max_length=255),
