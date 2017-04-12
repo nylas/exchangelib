@@ -55,18 +55,7 @@ notify = sh.Command('/usr/bin/notify-send')
 zenity = sh.Command('/usr/bin/zenity')
 
 # Get the local timezone
-timedatectl = sh.Command('/usr/bin/timedatectl')
-for l in timedatectl():
-    # timedatectl output differs on varying distros
-    if 'Timezone' in l.strip():
-        tz_name = l.split()[1]
-        break
-    if 'Time zone' in l.strip():
-        tz_name = l.split()[2]
-        break
-else:
-    raise ValueError('Timezone not found')
-tz = EWSTimeZone.timezone(tz_name)
+tz = EWSTimeZone.localzone()
 
 sleep = int(sys.argv[1])  # 1st arg to this script is the number of seconds to look back in the inbox
 now = UTC_NOW()
