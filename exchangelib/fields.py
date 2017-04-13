@@ -10,7 +10,7 @@ from six import string_types
 from .errors import ErrorInvalidServerVersion
 from .ewsdatetime import EWSDateTime
 from .services import TNS
-from .util import create_element, get_xml_attrs, set_xml_value, value_to_xml_text, xml_text_to_value
+from .util import create_element, get_xml_attrs, set_xml_value, value_to_xml_text
 from .version import Build
 
 string_type = string_types[0]
@@ -137,10 +137,13 @@ class BooleanField(FieldURIField):
         val = None if field_elem is None else field_elem.text or None
         if val is not None:
             try:
-                val = xml_text_to_value(value=val, value_type=self.value_cls)
-            except ValueError:
-                pass
-            return val
+                return {
+                    'true': True,
+                    'false': False,
+                }[val]
+            except KeyError:
+                log.warning("Cannot convert value '%s' on field '%s' to type %s", val, self.name, self.value_cls)
+                return None
         return self.default
 
 
@@ -152,10 +155,10 @@ class IntegerField(FieldURIField):
         val = None if field_elem is None else field_elem.text or None
         if val is not None:
             try:
-                val = xml_text_to_value(value=val, value_type=self.value_cls)
+                return self.value_cls(val)
             except ValueError:
-                pass
-            return val
+                log.warning("Cannot convert value '%s' on field '%s' to type %s", val, self.name, self.value_cls)
+                return None
         return self.default
 
 
@@ -167,10 +170,10 @@ class DecimalField(FieldURIField):
         val = None if field_elem is None else field_elem.text or None
         if val is not None:
             try:
-                val = xml_text_to_value(value=val, value_type=self.value_cls)
+                return self.value_cls(val)
             except ValueError:
-                pass
-            return val
+                log.warning("Cannot convert value '%s' on field '%s' to type %s", val, self.name, self.value_cls)
+                return None
         return self.default
 
 
@@ -206,9 +209,10 @@ class DateTimeField(FieldURIField):
                 # still UTC, so mark them as such so EWSDateTime can still interpret the timestamps.
                 val += 'Z'
             try:
-                return xml_text_to_value(value=val, value_type=self.value_cls)
+                return self.value_cls.from_string(val)
             except ValueError:
-                pass
+                log.warning("Cannot convert value '%s' on field '%s' to type %s", val, self.name, self.value_cls)
+                return None
         return self.default
 
 
