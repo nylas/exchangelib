@@ -15,7 +15,7 @@ class Q(object):
     AND = 'AND'
     OR = 'OR'
     NOT = 'NOT'
-    CONN_TYPES = (AND, OR, NOT)
+    CONN_TYPES = {AND, OR, NOT}
 
     # EWS Operators
     EQ = '=='
@@ -31,8 +31,8 @@ class Q(object):
     STARTSWITH = 'startswith'
     ISTARTSWITH = 'istartswith'
     EXISTS = 'exists'
-    OP_TYPES = (EQ, NE, GT, GTE, LT, LTE, EXACT, IEXACT, CONTAINS, ICONTAINS, STARTSWITH, ISTARTSWITH, EXISTS)
-    CONTAINS_OPS = (EXACT, IEXACT, CONTAINS, ICONTAINS, STARTSWITH, ISTARTSWITH)
+    OP_TYPES = {EQ, NE, GT, GTE, LT, LTE, EXACT, IEXACT, CONTAINS, ICONTAINS, STARTSWITH, ISTARTSWITH, EXISTS}
+    CONTAINS_OPS = {EXACT, IEXACT, CONTAINS, ICONTAINS, STARTSWITH, ISTARTSWITH}
 
     # Valid lookups
     LOOKUP_RANGE = 'range'
@@ -49,6 +49,9 @@ class Q(object):
     LOOKUP_STARTSWITH = 'startswith'
     LOOKUP_ISTARTSWITH = 'istartswith'
     LOOKUP_EXISTS = 'exists'
+    LOOKUP_TYPES = {LOOKUP_RANGE, LOOKUP_IN, LOOKUP_NOT, LOOKUP_GT, LOOKUP_GTE, LOOKUP_LT, LOOKUP_LTE, LOOKUP_EXACT,
+                    LOOKUP_IEXACT, LOOKUP_CONTAINS, LOOKUP_ICONTAINS, LOOKUP_STARTSWITH, LOOKUP_ISTARTSWITH,
+                    LOOKUP_EXISTS}
 
     __slots__ = 'conn_type', 'fieldname', 'op', 'value', 'children'
 
@@ -69,8 +72,10 @@ class Q(object):
                 self.children.append(q)
 
         for key, value in kwargs.items():
-            if '__' in key:
-                fieldname, lookup = key.rsplit('__')
+            key_parts = key.rsplit('__', 1)
+            if len(key_parts) == 2 and key_parts[1] in self.LOOKUP_TYPES:
+                # This is a kwarg with a lookup at the end
+                fieldname, lookup = key_parts
                 if lookup == self.LOOKUP_EXISTS:
                     # value=True will fall through to further processing
                     if not value:
@@ -87,7 +92,8 @@ class Q(object):
                     continue
 
                 if lookup == self.LOOKUP_IN:
-                    # Allow '__in' lookups on list and non-list field types, specifying a list
+                    # EWS doesn't have an '__in' operator. Allow '__in' lookups on list and non-list field types,
+                    # specifying a list value. We'll emulate it as a set of OR'ed exact matches.
                     if not isinstance(value, (tuple, list, set)):
                         raise ValueError("Value for lookup '%s' must be a list" % key)
                     children = [self.__class__(**{fieldname: v}) for v in value]
@@ -164,7 +170,7 @@ class Q(object):
         try:
             value_to_xml_text(self.value)
         except ValueError:
-            raise ValueError('Value "%s" for filter in field "%s" is unsupported' % (self.value, self.fieldname))
+            raise ValueError('Value "%s" for filter on field "%s" is unsupported' % (self.value, self.fieldname))
         if isinstance(self.value, EWSDateTime):
             # We want to convert all values to UTC
             self.value = self.value.astimezone(UTC)
