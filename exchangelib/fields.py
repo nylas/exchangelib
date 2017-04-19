@@ -17,6 +17,21 @@ string_type = string_types[0]
 log = logging.getLogger(__name__)
 
 
+def split_fieldname(fieldname):
+    # Return the individual parts of a field path that may, apart from the fieldname, have label and subfield parts
+    search_parts = fieldname.split('__')
+    field = search_parts[0]
+    try:
+        label = search_parts[1]
+    except IndexError:
+        label = None
+    try:
+        subfield = search_parts[2]
+    except IndexError:
+        subfield = None
+    return field, label, subfield
+
+
 class Field(object):
     """
     Holds information related to an item field

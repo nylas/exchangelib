@@ -22,21 +22,6 @@ class DoesNotExist(Exception):
     pass
 
 
-def split_fieldname(fieldname):
-    search_parts = fieldname.lstrip('-').split('__')
-    field = search_parts[0]
-    try:
-        label = search_parts[1]
-    except IndexError:
-        label = None
-    try:
-        subfield = search_parts[2]
-    except IndexError:
-        subfield = None
-    reverse = fieldname.startswith('-')
-    return field, label, subfield, reverse
-
-
 class OrderField(object):
     """ Holds values needed to call server-side sorting on a single field """
     def __init__(self, field, label=None, subfield=None, reverse=False):
@@ -49,9 +34,10 @@ class OrderField(object):
 
     @classmethod
     def from_string(cls, s, folder):
-        from .fields import IndexedField
+        from .fields import IndexedField, split_fieldname
         from .indexed_properties import SingleFieldIndexedElement, MultiFieldIndexedElement
-        fieldname, label, subfieldname, reverse = split_fieldname(s)
+        fieldname, label, subfieldname = split_fieldname(s.lstrip('-'))
+        reverse = fieldname.startswith('-')
         field = folder.get_item_field_by_fieldname(fieldname)
         subfield = None
         if isinstance(field, IndexedField):
