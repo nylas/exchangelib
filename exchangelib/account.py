@@ -393,10 +393,12 @@ class Account(object):
             return
         if only_fields:
             allowed_fields = validation_folder.allowed_fields()
-            for f in only_fields:
+            only_fields = list(only_fields)
+            for i, f in enumerate(only_fields):
                 # Allow both Field instances and fieldnames as input
                 if isinstance(f, string_types):
-                    f = folder.get_item_field_by_fieldname(f)
+                    f = validation_folder.get_item_field_by_fieldname(f)
+                    only_fields[i] = f
                 assert f in allowed_fields
         else:
             only_fields = {f for f in validation_folder.allowed_fields()}
