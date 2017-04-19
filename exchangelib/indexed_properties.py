@@ -4,7 +4,7 @@ import logging
 
 from six import string_types, text_type
 
-from .fields import EmailSubField, LabelField, SubField, TextField, Choice
+from .fields import EmailSubField, LabelField, SubField, NamedSubField, Choice
 from .properties import EWSElement
 from .util import create_element, set_xml_value, add_xml_child
 
@@ -29,6 +29,12 @@ class IndexedElement(EWSElement):
 
 class SingleFieldIndexedElement(IndexedElement):
     __slots__ = ('label',)
+
+    @classmethod
+    def value_field(cls, version=None):
+        fields = cls.supported_fields(version=version)
+        assert len(fields) == 1
+        return fields[0]
 
     @classmethod
     def from_xml(cls, elem):
@@ -107,11 +113,11 @@ class PhysicalAddress(MultiFieldIndexedElement):
         Choice('Business'), Choice('Home'), Choice('Other')
     }, default='Business')
     FIELDS = [
-        TextField('street', field_uri='Street'),  # Street, house number, etc.
-        TextField('city', field_uri='City'),
-        TextField('state', field_uri='State'),
-        TextField('country', field_uri='CountryOrRegion'),
-        TextField('zipcode', field_uri='PostalCode'),
+        NamedSubField('street', field_uri='Street'),  # Street, house number, etc.
+        NamedSubField('city', field_uri='City'),
+        NamedSubField('state', field_uri='State'),
+        NamedSubField('country', field_uri='CountryOrRegion'),
+        NamedSubField('zipcode', field_uri='PostalCode'),
     ]
 
     __slots__ = ('label', 'street', 'city', 'state', 'country', 'zipcode')

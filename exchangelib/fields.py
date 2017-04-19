@@ -114,7 +114,7 @@ class FieldURIField(Field):
         field_elem = create_element(self.request_tag())
         return set_xml_value(field_elem, value, version=version)
 
-    def field_uri_xml(self, version):
+    def field_uri_xml(self):
         return create_element('t:FieldURI', FieldURI=self.field_uri)
 
     def request_tag(self):
@@ -455,6 +455,63 @@ class AttachmentField(EWSElementField):
         return self.default
 
 
+class LabelField(ChoiceField):
+    # A field to hold the label on an IndexedElement
+    def from_xml(self, elem):
+        return elem.get(self.field_uri)
+
+
+class SubField(Field):
+    # A field to hold the value on an SingleFieldIndexedElement
+    value_cls = string_type
+
+    def from_xml(self, elem):
+        return elem.text
+
+    def to_xml(self, value, version):
+        return value
+
+    def field_uri_xml(self, field_uri, label):
+        return create_element('t:IndexedFieldURI', FieldURI=field_uri, FieldIndex=label)
+
+    def __hash__(self):
+        return hash(self.name)
+
+
+class EmailSubField(SubField):
+    # A field to hold the value on an SingleFieldIndexedElement
+    value_cls = string_type
+
+    def from_xml(self, elem):
+        return elem.text or elem.get('Name')  # Sometimes elem.text is empty. Exchange saves the same in 'Name' attr
+
+
+class NamedSubField(SubField):
+    # A field to hold the value on an MultiFieldIndexedElement
+    value_cls = string_type
+
+    def __init__(self, *args, **kwargs):
+        self.field_uri = kwargs.pop('field_uri')
+        assert ':' not in self.field_uri
+        super(NamedSubField, self).__init__(*args, **kwargs)
+
+    def from_xml(self, elem):
+        field_elem = elem.find(self.response_tag())
+        val = None if field_elem is None else field_elem.text or None
+        if val is not None:
+            return val
+        return self.default
+
+    def field_uri_xml(self, field_uri, label):
+        return create_element('t:IndexedFieldURI', FieldURI='%s:%s' % (field_uri, self.field_uri), FieldIndex=label)
+
+    def request_tag(self):
+        return 't:%s' % self.field_uri
+
+    def response_tag(self):
+        return '{%s}%s' % (TNS, self.field_uri)
+
+
 class IndexedField(FieldURIField):
     PARENT_ELEMENT_NAME = None
 
@@ -476,29 +533,17 @@ class IndexedField(FieldURIField):
     def to_xml(self, value, version):
         return set_xml_value(create_element('t:%s' % self.PARENT_ELEMENT_NAME), value, version)
 
-    def field_uri_xml(self, version, label=None, subfield=None):
-        from .indexed_properties import MultiFieldIndexedElement
-        if not label:
-            # Return elements for all labels
-            elems = []
-            for l in self.value_cls.LABEL_FIELD.supported_choices(version=version):
-                elem = self.field_uri_xml(version=version, label=l)
-                if isinstance(elem, list):
-                    elems.extend(elem)
-                else:
-                    elems.append(elem)
-            return elems
-        if issubclass(self.value_cls, MultiFieldIndexedElement):
-            if not subfield:
-                # Return elements for all sub-fields
-                return [self.field_uri_xml(version=version, label=label, subfield=f)
-                        for f in self.value_cls.supported_fields()]
-            assert subfield in self.value_cls.supported_fields()
-            field_uri = '%s:%s' % (self.field_uri, subfield.field_uri)
-        else:
-            field_uri = self.field_uri
-        assert label in self.value_cls.LABEL_FIELD.supported_choices(version=version)
-        return create_element('t:IndexedFieldURI', FieldURI=field_uri, FieldIndex=label)
+    def field_uri_xml(self):
+        # Callers must call field_uri_xml() on the subfield
+        raise NotImplementedError()
+
+    def field_uri_xml_elems(self, version):
+        # Return elements for all labels and all subfields
+        elems = []
+        for label in self.value_cls.LABEL_FIELD.supported_choices(version=version):
+            for subfield in self.value_cls.supported_fields(version=version):
+                elems.append(subfield.field_uri_xml(field_uri=self.field_uri, label=label))
+        return elems
 
     @classmethod
     def response_tag(cls):
@@ -560,7 +605,7 @@ class ExtendedPropertyField(Field):
         value.clean(version=version)
         return value
 
-    def field_uri_xml(self, version):
+    def field_uri_xml(self):
         elem = create_element('t:ExtendedFieldURI')
         cls = self.value_cls
         if cls.distinguished_property_set_id:
@@ -591,7 +636,7 @@ class ExtendedPropertyField(Field):
 
     def to_xml(self, value, version):
         extended_property = create_element(self.value_cls.request_tag())
-        set_xml_value(extended_property, self.field_uri_xml(version=version), version=version)
+        set_xml_value(extended_property, self.field_uri_xml(), version=version)
         if isinstance(value, self.value_cls):
             set_xml_value(extended_property, value, version=version)
         else:
@@ -601,31 +646,6 @@ class ExtendedPropertyField(Field):
 
     def __hash__(self):
         return hash(self.name)
-
-
-class LabelField(ChoiceField):
-    def from_xml(self, elem):
-        return elem.get(self.field_uri)
-
-
-class SubField(Field):
-    value_cls = string_type
-
-    def from_xml(self, elem):
-        return elem.text
-
-    def to_xml(self, value, version):
-        return value
-
-    def __hash__(self):
-        return hash(self.name)
-
-
-class EmailSubField(SubField):
-    value_cls = string_type
-
-    def from_xml(self, elem):
-        return elem.text or elem.get('Name')  # Sometimes elem.text is empty. Exchange saves the same in 'Name' attr
 
 
 class ItemField(FieldURIField):

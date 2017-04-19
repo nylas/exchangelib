@@ -474,20 +474,20 @@ class GetItem(EWSAccountService, EWSPooledMixIn):
         #
         # We start with an IdOnly request. 'additional_properties' defines the additional fields we want. Supported
         # fields are available in self.folder.allowed_fields().
-        from .items import IdOnly
         from .folders import ItemId
+        from .items import IdOnly
         getitem = create_element('m:%s' % self.SERVICE_NAME)
         itemshape = create_element('m:ItemShape')
         add_xml_child(itemshape, 't:BaseShape', IdOnly)
         if additional_fields:
-            additional_property_elems = []
+            from .fields import IndexedField
+            additional_properties = []
             for f in additional_fields:
-                elems = f.field_uri_xml(version=self.account.version)
-                if isinstance(elems, list):
-                    additional_property_elems.extend(elems)
+                if isinstance(f, IndexedField):
+                    additional_properties.extend(f.field_uri_xml_elems(version=self.account.version))
                 else:
-                    additional_property_elems.append(elems)
-            add_xml_child(itemshape, 't:AdditionalProperties', additional_property_elems)
+                    additional_properties.append(f.field_uri_xml())
+            add_xml_child(itemshape, 't:AdditionalProperties', additional_properties)
         getitem.append(itemshape)
         item_ids = create_element('m:ItemIds')
         is_empty = True
@@ -568,22 +568,23 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
             suppress_read_receipts=suppress_read_receipts,
         ))
 
-    def _get_delete_item_elem(self, field, label=None, subfield=None):
+    @staticmethod
+    def _get_delete_item_elem(field, label=None, subfield=None):
         from .fields import IndexedField
         deleteitemfield = create_element('t:DeleteItemField')
         if isinstance(field, IndexedField):
-            deleteitemfield.append(field.field_uri_xml(version=self.account.version, label=label, subfield=subfield))
+            deleteitemfield.append(subfield.field_uri_xml(field_uri=field.field_uri, label=label))
         else:
-            deleteitemfield.append(field.field_uri_xml(version=self.account.version))
+            deleteitemfield.append(field.field_uri_xml())
         return deleteitemfield
 
     def _get_set_item_elem(self, item_model, field, value, label=None, subfield=None):
         from .fields import IndexedField
         setitemfield = create_element('t:SetItemField')
         if isinstance(field, IndexedField):
-            setitemfield.append(field.field_uri_xml(version=self.account.version, label=label, subfield=subfield))
+            setitemfield.append(subfield.field_uri_xml(field_uri=field.field_uri, label=label))
         else:
-            setitemfield.append(field.field_uri_xml(version=self.account.version))
+            setitemfield.append(field.field_uri_xml())
         folderitem = create_element(item_model.request_tag())
         field_elem = field.to_xml(value, self.account.version)
         set_xml_value(folderitem, field_elem, self.account.version)
@@ -630,11 +631,8 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
                     raise ValueError('%s is a required field and may not be deleted', field.name)
                 if isinstance(field, IndexedField):
                     for label in field.value_cls.LABEL_FIELD.supported_choices(version=self.account.version):
-                        if issubclass(field.value_cls, MultiFieldIndexedElement):
-                            for subfield in field.value_cls.supported_fields(version=self.account.version):
-                                yield self._get_delete_item_elem(field=field, label=label, subfield=subfield)
-                        else:
-                            yield self._get_delete_item_elem(field=field, label=label)
+                        for subfield in field.value_cls.supported_fields(version=self.account.version):
+                            yield self._get_delete_item_elem(field=field, label=label, subfield=subfield)
                 else:
                     yield self._get_delete_item_elem(field=field)
                 continue
@@ -654,8 +652,10 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
                             yield self._get_set_item_elem(item_model=item_model, field=field, value=simple_item,
                                                           label=v.label, subfield=f)
                     else:
-                        # The simpler IndexedFields without subfields
-                        yield self._get_set_item_elem(item_model=item_model, field=field, value=v, label=v.label)
+                        # The simpler IndexedFields with only one subfield
+                        subfield = field.value_cls.value_field(version=self.account.version)
+                        yield self._get_set_item_elem(item_model=item_model, field=field, value=v, label=v.label,
+                                                      subfield=subfield)
                 continue
 
             yield self._get_set_item_elem(item_model=item_model, field=field, value=value)
@@ -792,14 +792,14 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
         itemshape = create_element('m:ItemShape')
         add_xml_child(itemshape, 't:BaseShape', shape)
         if additional_fields:
-            additional_property_elems = []
+            from .fields import IndexedField
+            additional_properties = []
             for f in additional_fields:
-                elems = f.field_uri_xml(version=self.account.version)
-                if isinstance(elems, list):
-                    additional_property_elems.extend(elems)
+                if isinstance(f, IndexedField):
+                    additional_properties.extend(f.field_uri_xml_elems(version=self.account.version))
                 else:
-                    additional_property_elems.append(elems)
-            add_xml_child(itemshape, 't:AdditionalProperties', additional_property_elems)
+                    additional_properties.append(f.field_uri_xml())
+            add_xml_child(itemshape, 't:AdditionalProperties', additional_properties)
         finditem.append(itemshape)
         if calendar_view is None:
             view_type = create_element('m:IndexedPageItemView',
@@ -817,11 +817,9 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
             assert isinstance(order, OrderField)
             field_order = create_element('t:FieldOrder', Order='Descending' if order.reverse else 'Ascending')
             if isinstance(order.field, IndexedField):
-                field_uri = order.field.field_uri_xml(version=self.account.version, label=order.label,
-                                                      subfield=order.subfield)
+                field_order.append(order.subfield.field_uri_xml(field_uri=order.field.field_uri, label=order.label))
             else:
-                field_uri = order.field.field_uri_xml(version=self.account.version)
-            field_order.append(field_uri)
+                field_order.append(order.field.field_uri_xml())
             add_xml_child(finditem, 'm:SortOrder', field_order)
         parentfolderids = create_element('m:ParentFolderIds')
         parentfolderids.append(self._folder_elem(self.folder))
@@ -851,10 +849,14 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
         foldershape = create_element('m:FolderShape')
         add_xml_child(foldershape, 't:BaseShape', shape)
         if additional_fields:
-            additionalproperties = create_element('t:AdditionalProperties')
-            for field in additional_fields:
-                additionalproperties.append(field.field_uri_xml(version=self.account.version))
-            foldershape.append(additionalproperties)
+            from .fields import IndexedField
+            additional_properties = []
+            for f in additional_fields:
+                if isinstance(f, IndexedField):
+                    additional_properties.extend(f.field_uri_xml_elems(version=self.account.version))
+                else:
+                    additional_properties.append(f.field_uri_xml())
+            add_xml_child(foldershape, 't:AdditionalProperties', additional_properties)
         findfolder.append(foldershape)
         if self.account.version.build >= EXCHANGE_2010:
             indexedpageviewitem = create_element('m:IndexedPageFolderView', MaxEntriesReturned=text_type(page_size),
@@ -888,10 +890,14 @@ class GetFolder(EWSAccountService):
         foldershape = create_element('m:FolderShape')
         add_xml_child(foldershape, 't:BaseShape', shape)
         if additional_fields:
-            additionalproperties = create_element('t:AdditionalProperties')
-            for field in additional_fields:
-                additionalproperties.append(field.field_uri_xml(version=self.account.version))
-            foldershape.append(additionalproperties)
+            from .fields import IndexedField
+            additional_properties = []
+            for f in additional_fields:
+                if isinstance(f, IndexedField):
+                    additional_properties.extend(f.field_uri_xml_elems(version=self.account.version))
+                else:
+                    additional_properties.append(f.field_uri_xml())
+            add_xml_child(foldershape, 't:AdditionalProperties', additional_properties)
         getfolder.append(foldershape)
         folderids = create_element('m:FolderIds')
         folderids.append(self._folder_elem(folder))

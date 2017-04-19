@@ -290,6 +290,7 @@ class Q(object):
         # Recursively build an XML tree structure of this Q object. If this is an empty leaf (the equivalent of Q()),
         # return None.
         from .fields import IndexedField
+        from .indexed_properties import SingleFieldIndexedElement
         if self.is_empty():
             return None
         if self.is_leaf():
@@ -297,9 +298,11 @@ class Q(object):
             field = folder.get_item_field_by_fieldname(self.fieldname)
             self._validate_field(field=field, folder=folder)
             if isinstance(field, IndexedField):
-                field_uri = field.field_uri_xml(version=version, label=self.value.label)
+                assert issubclass(field.value_cls, SingleFieldIndexedElement)
+                subfield = field.value_cls.value_field(version=version)
+                field_uri = subfield.field_uri_xml(field_uri=field.field_uri, label=self.value.label)
             else:
-                field_uri = field.field_uri_xml(version=version)
+                field_uri = field.field_uri_xml()
             elem.append(field_uri)
             constant = create_element('t:Constant')
             if self.op != self.EXISTS:
