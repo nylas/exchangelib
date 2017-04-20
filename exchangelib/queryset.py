@@ -7,9 +7,9 @@ import logging
 from operator import attrgetter
 
 from future.utils import python_2_unicode_compatible
-from six import string_types
 
 from .restriction import Q
+from .util import create_element
 
 log = logging.getLogger(__name__)
 
@@ -22,54 +22,41 @@ class DoesNotExist(Exception):
     pass
 
 
-class OrderField(object):
-    """ Holds values needed to call server-side sorting on a single field """
-    def __init__(self, field, label=None, subfield=None, reverse=False):
-        # 'label' and 'subfield' are only used for IndexedField fields, and 'subfield' only for the fields that have
-        # multiple subfields (MultiFieldIndexedField).
+class FieldPath(object):
+    """ Holds values needed to point to a single field """
+    def __init__(self, field, label=None, subfield=None):
+        # 'label' and 'subfield' are only used for IndexedField fields
         self.field = field
         self.label = label
         self.subfield = subfield
-        self.reverse = reverse
 
     @classmethod
     def from_string(cls, s, folder):
-        from .fields import IndexedField, split_fieldname
-        from .indexed_properties import SingleFieldIndexedElement, MultiFieldIndexedElement
-        fieldname, label, subfieldname = split_fieldname(s.lstrip('-'))
-        reverse = fieldname.startswith('-')
-        field = folder.get_item_field_by_fieldname(fieldname)
-        subfield = None
-        if isinstance(field, IndexedField):
-            if not label:
-                raise ValueError(
-                    "IndexedField order_by() value '%s' must specify label, e.g. '%s__%s'" % (
-                        s, fieldname, field.value_cls.LABEL_FIELD.default))
-            valid_labels = field.value_cls.LABEL_FIELD.supported_choices(version=folder.account.version)
-            if label not in valid_labels:
-                raise ValueError(
-                    "Label '%s' on IndexedField order_by() value '%s' must be one of %s" % (
-                        label, s, ', '.join(valid_labels)))
-            if issubclass(field.value_cls, MultiFieldIndexedElement):
-                if not subfieldname:
-                    raise ValueError("IndexedField order_by() value '%s' must specify subfield, e.g. %s__%s__%s" % (
-                        s, fieldname, label, field.value_cls.FIELDS[0].name))
-                try:
-                    subfield = field.value_cls.get_field_by_fieldname(subfieldname)
-                except ValueError:
-                    fnames = ', '.join(f.name for f in field.value_cls.supported_fields(version=folder.account.version))
-                    raise ValueError(
-                        "Subfield '%s' on IndexedField order_by() value '%s' must be one of %s"
-                        % (subfieldname, s, fnames))
-            else:
-                assert issubclass(field.value_cls, SingleFieldIndexedElement)
-                subfield = field.value_cls.value_field(version=folder.account.version)
-                if subfieldname:
-                    raise ValueError(
-                        "IndexedField order_by() value '%s' must not specify subfield, e.g. just %s__%s"
-                        % (s, fieldname, label)
-                    )
+        from .fields import resolve_field_path
+        field, label, subfield = resolve_field_path(s, folder=folder, strict=False)
+        return cls(field=field, label=label, subfield=subfield)
+
+
+class FieldOrder(FieldPath):
+    """ Holds values needed to call server-side sorting on a single field """
+    def __init__(self, *args, **kwargs):
+        self.reverse = kwargs.pop('reverse', False)
+        super(FieldOrder, self).__init__(*args, **kwargs)
+
+    @classmethod
+    def from_string(cls, s, folder):
+        from .fields import resolve_field_path
+        field, label, subfield = resolve_field_path(s.lstrip('-'), folder=folder)
+        reverse = s.startswith('-')
         return cls(field=field, label=label, subfield=subfield, reverse=reverse)
+
+    def to_xml(self):
+        field_order = create_element('t:FieldOrder', Order='Descending' if self.reverse else 'Ascending')
+        if self.label and self.subfield:
+            field_order.append(self.subfield.field_uri_xml(field_uri=self.field.field_uri, label=self.label))
+        else:
+            field_order.append(self.field.field_uri_xml())
+        return field_order
 
 
 @python_2_unicode_compatible
@@ -119,16 +106,6 @@ class QuerySet(object):
         new_qs.return_format = self.return_format
         new_qs.calendar_view = self.calendar_view
         return new_qs
-
-    def _check_fields(self, field_names):
-        fields = []
-        for f in field_names:
-            if not isinstance(f, string_types):
-                raise ValueError("Fieldname '%s' must be a string" % f)
-            field_name = split_fieldname(f)[0]
-            field = self.folder.get_item_field_by_fieldname(field_name)
-            fields.append(field)
-        return tuple(fields)
 
     def _query(self):
         if self.only_fields is None:
@@ -382,7 +359,7 @@ class QuerySet(object):
     def only(self, *args):
         """ Fetch only the specified field names. All other item fields will be 'None' """
         try:
-            only_fields = self._check_fields(args)
+            only_fields = tuple(FieldPath.from_string(f, folder=self.folder).field for f in args)
         except ValueError as e:
             raise ValueError("%s in only()" % e.args[0])
         new_qs = self.copy()
@@ -394,11 +371,11 @@ class QuerySet(object):
         in reverse order. EWS only supports server-side sorting on a single field. Sorting on multiple fields is
         implemented client-side and will therefore make the query greedy """
         try:
-            self._check_fields(args)
+            order_fields = tuple(FieldOrder.from_string(arg, folder=self.folder) for arg in args)
         except ValueError as e:
             raise ValueError("%s in order_by()" % e.args[0])
         new_qs = self.copy()
-        new_qs.order_fields = tuple(OrderField.from_string(arg, folder=self.folder) for arg in args)
+        new_qs.order_fields = order_fields
         return new_qs
 
     def reverse(self):
@@ -413,7 +390,7 @@ class QuerySet(object):
     def values(self, *args):
         """ Return the values of the specified field names as dicts """
         try:
-            only_fields = self._check_fields(args)
+            only_fields = tuple(FieldPath.from_string(f, folder=self.folder).field for f in args)
         except ValueError as e:
             raise ValueError("%s in values()" % e.args[0])
         new_qs = self.copy()
@@ -432,7 +409,7 @@ class QuerySet(object):
         if flat and len(args) != 1:
             raise ValueError('flat=True requires exactly one field name')
         try:
-            only_fields = self._check_fields(args)
+            only_fields = tuple(FieldPath.from_string(f, folder=self.folder).field for f in args)
         except ValueError as e:
             raise ValueError("%s in values_list()" % e.args[0])
         new_qs = self.copy()

@@ -631,9 +631,6 @@ class RestrictionTest(unittest.TestCase):
 
     def test_q_failures(self):
         with self.assertRaises(ValueError):
-            # Invalid lookup
-            Q(foo__XXX=5)
-        with self.assertRaises(ValueError):
             # Invalid value
             Q(foo=None)
 

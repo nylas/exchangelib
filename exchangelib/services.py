@@ -638,8 +638,6 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
                 continue
 
             if isinstance(field, IndexedField):
-                # We need to specify the full label/subfield fielduri path to each element in the list, but the
-                # IndexedField class doesn't know how to do that yet. Generate the XML manually here for now.
                 # TODO: Maybe the set/delete logic should extend into subfields, not just overwrite the whole item.
                 for v in value:
                     # TODO: We should also delete the labels that no longer exist in the list
@@ -812,15 +810,9 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
         if restriction:
             finditem.append(restriction.to_xml(version=self.account.version))
         if order:
-            from .fields import IndexedField
-            from .queryset import OrderField
-            assert isinstance(order, OrderField)
-            field_order = create_element('t:FieldOrder', Order='Descending' if order.reverse else 'Ascending')
-            if isinstance(order.field, IndexedField):
-                field_order.append(order.subfield.field_uri_xml(field_uri=order.field.field_uri, label=order.label))
-            else:
-                field_order.append(order.field.field_uri_xml())
-            add_xml_child(finditem, 'm:SortOrder', field_order)
+            from .queryset import FieldOrder
+            assert isinstance(order, FieldOrder)
+            add_xml_child(finditem, 'm:SortOrder', order.to_xml())
         parentfolderids = create_element('m:ParentFolderIds')
         parentfolderids.append(self._folder_elem(self.folder))
         finditem.append(parentfolderids)

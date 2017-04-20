@@ -17,9 +17,16 @@ string_type = string_types[0]
 log = logging.getLogger(__name__)
 
 
-def split_fieldname(fieldname):
-    # Return the individual parts of a field path that may, apart from the fieldname, have label and subfield parts
-    search_parts = fieldname.split('__')
+def split_field_path(field_path):
+    """Return the individual parts of a field path that may, apart from the fieldname, have label and subfield parts.
+    Examples:
+        'start' -> ('start', None, None)
+        'phone_numbers__PrimaryPhone' -> ('phone_numbers', 'PrimaryPhone', None)
+        'physical_addresses__Home__street' -> ('physical_addresses', 'Home', 'street')
+    """
+    if not isinstance(field_path, string_types):
+        raise ValueError("Field path '%s' must be a string" % field_path)
+    search_parts = field_path.split('__')
     field = search_parts[0]
     try:
         label = search_parts[1]
@@ -29,6 +36,58 @@ def split_fieldname(fieldname):
         subfield = search_parts[2]
     except IndexError:
         subfield = None
+    return field, label, subfield
+
+
+def resolve_field_path(field_path, folder, strict=True):
+    # Takes the name of a field, or '__'-delimited path to a subfield, and returns the corresponding Field object,
+    # label and SubField object
+    from .indexed_properties import SingleFieldIndexedElement, MultiFieldIndexedElement
+    fieldname, label, subfieldname = split_field_path(field_path)
+    field = folder.get_item_field_by_fieldname(fieldname)
+    subfield = None
+    if isinstance(field, IndexedField):
+        if strict and not label:
+            raise ValueError(
+                "IndexedField path '%s' must specify label, e.g. '%s__%s'"
+                % (field_path, fieldname, field.value_cls.LABEL_FIELD.default)
+            )
+        valid_labels = field.value_cls.LABEL_FIELD.supported_choices(version=folder.account.version)
+        if label and label not in valid_labels:
+            raise ValueError(
+                "Label '%s' on IndexedField path '%s' must be one of %s"
+                % (label, field_path, ', '.join(valid_labels))
+            )
+        if issubclass(field.value_cls, MultiFieldIndexedElement):
+            if strict and not subfieldname:
+                raise ValueError(
+                    "IndexedField path '%s' must specify subfield, e.g. '%s__%s__%s'" % (
+                    field_path, fieldname, label, field.value_cls.FIELDS[0].name)
+                )
+
+            if subfieldname:
+                try:
+                    subfield = field.value_cls.get_field_by_fieldname(subfieldname)
+                except ValueError:
+                    fnames = ', '.join(f.name for f in field.value_cls.supported_fields(version=folder.account.version))
+                    raise ValueError(
+                        "Subfield '%s' on IndexedField path '%s' must be one of %s"
+                        % (subfieldname, field_path, fnames)
+                    )
+        else:
+            assert issubclass(field.value_cls, SingleFieldIndexedElement)
+            if subfieldname:
+                raise ValueError(
+                    "IndexedField path '%s' must not specify subfield, e.g. just '%s__%s'"
+                    % (field_path, fieldname, label)
+                )
+            subfield = field.value_cls.value_field(version=folder.account.version)
+    else:
+        if label or subfieldname:
+            raise ValueError(
+                "Field path '%s' must not specify label or subfield, e.g. just '%s'"
+                % (field_path, fieldname)
+            )
     return field, label, subfield
 
 
