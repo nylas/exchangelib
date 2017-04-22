@@ -648,6 +648,12 @@ class IndexedField(FieldURIField):
     def to_xml(self, value, version):
         return set_xml_value(create_element('t:%s' % self.PARENT_ELEMENT_NAME), value, version)
 
+    def field_paths(self, version):
+        # Return all field paths supported for this value_cls
+        for label in self.value_cls.LABEL_FIELD.supported_choices(version=version):
+            for subfield in self.value_cls.supported_fields(version=version):
+                yield FieldPath(field=self, label=label, subfield=subfield)
+
     def field_uri_xml(self):
         # Callers must call field_uri_xml() on the subfield
         raise NotImplementedError()

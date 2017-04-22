@@ -569,24 +569,16 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
         ))
 
     @staticmethod
-    def _get_delete_item_elem(field, label=None, subfield=None):
-        from .fields import IndexedField
+    def _delete_item_elem(field_path):
         deleteitemfield = create_element('t:DeleteItemField')
-        if isinstance(field, IndexedField):
-            deleteitemfield.append(subfield.field_uri_xml(field_uri=field.field_uri, label=label))
-        else:
-            deleteitemfield.append(field.field_uri_xml())
+        deleteitemfield.append(field_path.to_xml())
         return deleteitemfield
 
-    def _get_set_item_elem(self, item_model, field, value, label=None, subfield=None):
-        from .fields import IndexedField
+    def _set_item_elem(self, item_model, field_path, value):
         setitemfield = create_element('t:SetItemField')
-        if isinstance(field, IndexedField):
-            setitemfield.append(subfield.field_uri_xml(field_uri=field.field_uri, label=label))
-        else:
-            setitemfield.append(field.field_uri_xml())
+        setitemfield.append(field_path.to_xml())
         folderitem = create_element(item_model.request_tag())
-        field_elem = field.to_xml(value, self.account.version)
+        field_elem = field_path.field.to_xml(value, self.account.version)
         set_xml_value(folderitem, field_elem, self.account.version)
         setitemfield.append(folderitem)
         return setitemfield
@@ -615,7 +607,7 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
         return setitemfield_tz
 
     def _get_item_update_elems(self, item, fieldnames):
-        from .fields import IndexedField
+        from .fields import FieldPath, IndexedField
         from .indexed_properties import MultiFieldIndexedElement
         item_model = item.__class__
         meeting_timezone_added = False
@@ -630,11 +622,10 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
                 if field.is_required or field.is_required_after_save:
                     raise ValueError('%s is a required field and may not be deleted', field.name)
                 if isinstance(field, IndexedField):
-                    for label in field.value_cls.LABEL_FIELD.supported_choices(version=self.account.version):
-                        for subfield in field.value_cls.supported_fields(version=self.account.version):
-                            yield self._get_delete_item_elem(field=field, label=label, subfield=subfield)
+                    for field_path in field.field_paths(version=self.account.version):
+                        yield self._delete_item_elem(field_path=field_path)
                 else:
-                    yield self._get_delete_item_elem(field=field)
+                    yield self._delete_item_elem(field_path=FieldPath(field=field))
                 continue
 
             if isinstance(field, IndexedField):
@@ -647,16 +638,16 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
                         # only that value set.
                         for f in field.value_cls.supported_fields(version=self.account.version):
                             simple_item = field.value_cls(**{'label': v.label, f.name: getattr(v, f.name)})
-                            yield self._get_set_item_elem(item_model=item_model, field=field, value=simple_item,
-                                                          label=v.label, subfield=f)
+                            field_path = FieldPath(field=field, label=v.label, subfield=f)
+                            yield self._set_item_elem(item_model=item_model, field_path=field_path, value=simple_item)
                     else:
                         # The simpler IndexedFields with only one subfield
                         subfield = field.value_cls.value_field(version=self.account.version)
-                        yield self._get_set_item_elem(item_model=item_model, field=field, value=v, label=v.label,
-                                                      subfield=subfield)
+                        field_path = FieldPath(field=field, label=v.label, subfield=subfield)
+                        yield self._set_item_elem(item_model=item_model, field_path=field_path, value=v)
                 continue
 
-            yield self._get_set_item_elem(item_model=item_model, field=field, value=value)
+            yield self._set_item_elem(item_model=item_model, field_path=FieldPath(field=field), value=value)
             if issubclass(field.value_cls, EWSDateTime) and value.tzinfo != UTC:
                 if self.account.version.build < EXCHANGE_2010 and not meeting_timezone_added:
                     # Let's hope that we're not changing timezone, or that both 'start' and 'end' are supplied.
