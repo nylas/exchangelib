@@ -104,7 +104,7 @@ class FieldPath(object):
         field, label, subfield = resolve_field_path(s, folder=folder, strict=False)
         return cls(field=field, label=label, subfield=subfield)
 
-    def to_xml(self):
+    def to_xml(self, version=None):
         if self.label and self.subfield:
             return self.subfield.field_uri_xml(field_uri=self.field.field_uri, label=self.label)
         else:
@@ -125,10 +125,10 @@ class FieldOrder(FieldPath):
         reverse = s.startswith('-')
         return cls(field=field, label=label, subfield=subfield, reverse=reverse)
 
-    def to_xml(self):
-        field_path = super(FieldOrder, self)
+    def to_xml(self, version=None):
+        field_uri = super(FieldOrder, self).to_xml(version=version)
         field_order = create_element('t:FieldOrder', Order='Descending' if self.reverse else 'Ascending')
-        field_order.append(field_path.to_xml())
+        field_order.append(field_uri)
         return field_order
 
 

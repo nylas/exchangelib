@@ -568,15 +568,13 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
             suppress_read_receipts=suppress_read_receipts,
         ))
 
-    @staticmethod
-    def _delete_item_elem(field_path):
+    def _delete_item_elem(self, field_path):
         deleteitemfield = create_element('t:DeleteItemField')
-        deleteitemfield.append(field_path.to_xml())
-        return deleteitemfield
+        return set_xml_value(deleteitemfield, field_path, self.account.version)
 
     def _set_item_elem(self, item_model, field_path, value):
         setitemfield = create_element('t:SetItemField')
-        setitemfield.append(field_path.to_xml())
+        set_xml_value(setitemfield, field_path, self.account.version)
         folderitem = create_element(item_model.request_tag())
         field_elem = field_path.field.to_xml(value, self.account.version)
         set_xml_value(folderitem, field_elem, self.account.version)
@@ -803,7 +801,7 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
         if order:
             from .queryset import FieldOrder
             assert isinstance(order, FieldOrder)
-            add_xml_child(finditem, 'm:SortOrder', order.to_xml())
+            add_xml_child(finditem, 'm:SortOrder', order.to_xml(version=self.account.version))
         parentfolderids = create_element('m:ParentFolderIds')
         parentfolderids.append(self._folder_elem(self.folder))
         finditem.append(parentfolderids)

@@ -144,6 +144,7 @@ def xml_text_to_value(value, value_type):
 
 
 def set_xml_value(elem, value, version):
+    from .fields import FieldPath, FieldOrder
     from .folders import EWSElement
     from .ewsdatetime import EWSDateTime
     if isinstance(value, string_types + (bool, bytes, int, Decimal, EWSDateTime)):
@@ -159,7 +160,7 @@ def set_xml_value(elem, value, version):
                 add_xml_child(elem, 't:String', v)
             else:
                 raise ValueError('Unsupported type %s for list element %s on elem %s' % (type(v), v, elem))
-    elif isinstance(value, EWSElement):
+    elif isinstance(value, (FieldPath, FieldOrder, EWSElement)):
         assert version
         elem.append(value.to_xml(version=version))
     elif isinstance(value, ElementType):
