@@ -61,8 +61,8 @@ def resolve_field_path(field_path, folder, strict=True):
         if issubclass(field.value_cls, MultiFieldIndexedElement):
             if strict and not subfieldname:
                 raise ValueError(
-                    "IndexedField path '%s' must specify subfield, e.g. '%s__%s__%s'" % (
-                    field_path, fieldname, label, field.value_cls.FIELDS[0].name)
+                    "IndexedField path '%s' must specify subfield, e.g. '%s__%s__%s'"
+                    % (field_path, fieldname, label, field.value_cls.FIELDS[0].name)
                 )
 
             if subfieldname:
@@ -654,11 +654,9 @@ class IndexedField(FieldURIField):
 
     def field_uri_xml_elems(self, version):
         # Return elements for all labels and all subfields
-        elems = []
         for label in self.value_cls.LABEL_FIELD.supported_choices(version=version):
             for subfield in self.value_cls.supported_fields(version=version):
-                elems.append(subfield.field_uri_xml(field_uri=self.field_uri, label=label))
-        return elems
+                yield subfield.field_uri_xml(field_uri=self.field_uri, label=label)
 
     @classmethod
     def response_tag(cls):
