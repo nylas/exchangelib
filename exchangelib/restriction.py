@@ -53,12 +53,12 @@ class Q(object):
                     LOOKUP_IEXACT, LOOKUP_CONTAINS, LOOKUP_ICONTAINS, LOOKUP_STARTSWITH, LOOKUP_ISTARTSWITH,
                     LOOKUP_EXISTS}
 
-    __slots__ = 'conn_type', 'fieldname', 'op', 'value', 'children'
+    __slots__ = 'conn_type', 'field_path', 'op', 'value', 'children'
 
     def __init__(self, *args, **kwargs):
         self.conn_type = kwargs.pop('conn_type', self.AND)
 
-        self.fieldname = None  # Name of the field we want to filter on
+        self.field_path = None  # Name of the field we want to filter on
         self.op = None
         self.value = None
 
@@ -75,7 +75,7 @@ class Q(object):
             key_parts = key.rsplit('__', 1)
             if len(key_parts) == 2 and key_parts[1] in self.LOOKUP_TYPES:
                 # This is a kwarg with a lookup at the end
-                fieldname, lookup = key_parts
+                field_path, lookup = key_parts
                 if lookup == self.LOOKUP_EXISTS:
                     # value=True will fall through to further processing
                     if not value:
@@ -87,8 +87,8 @@ class Q(object):
                     # (both values inclusive).
                     if len(value) != 2:
                         raise ValueError("Value of lookup '%s' must have exactly 2 elements" % key)
-                    self.children.append(self.__class__(**{'%s__gte' % fieldname: value[0]}))
-                    self.children.append(self.__class__(**{'%s__lte' % fieldname: value[1]}))
+                    self.children.append(self.__class__(**{'%s__gte' % field_path: value[0]}))
+                    self.children.append(self.__class__(**{'%s__lte' % field_path: value[1]}))
                     continue
 
                 if lookup == self.LOOKUP_IN:
@@ -96,7 +96,7 @@ class Q(object):
                     # specifying a list value. We'll emulate it as a set of OR'ed exact matches.
                     if not isinstance(value, (tuple, list, set)):
                         raise ValueError("Value for lookup '%s' must be a list" % key)
-                    children = [self.__class__(**{fieldname: v}) for v in value]
+                    children = [self.__class__(**{field_path: v}) for v in value]
                     self.children.append(self.__class__(*children, conn_type=self.OR))
                     continue
 
@@ -118,7 +118,7 @@ class Q(object):
                 # have an exact match, after the call to FindItems.
                 if lookup == self.LOOKUP_CONTAINS and isinstance(value, (tuple, list, set)):
                     # '__contains' lookups on list field types
-                    children = [self.__class__(**{fieldname: v}) for v in value]
+                    children = [self.__class__(**{field_path: v}) for v in value]
                     self.children.append(self.__class__(*children, conn_type=self.AND))
                     continue
                 try:
@@ -126,18 +126,18 @@ class Q(object):
                 except KeyError:
                     raise ValueError("Lookup '%s' is not supported (called as '%s=%r')" % (lookup, key, value))
             else:
-                fieldname, op = key, self.EQ
+                field_path, op = key, self.EQ
 
             if len(args) == 0 and len(kwargs) == 1:
                 # This is a single-kwarg Q object with a lookup that requires a single value. Make this a leaf
-                self.fieldname = fieldname
+                self.field_path = field_path
                 self.op = op
                 self.value = value
                 break
 
             self.children.append(self.__class__(**{key: value}))
 
-        if len(self.children) == 1 and self.fieldname is None and self.conn_type != self.NOT:
+        if len(self.children) == 1 and self.field_path is None and self.conn_type != self.NOT:
             # We only have one child and no expression on ourselves, so we are a no-op. Flatten by taking over the child
             self._promote()
 
@@ -145,10 +145,10 @@ class Q(object):
 
     def _promote(self):
         # Flatten by taking over the only child
-        assert len(self.children) == 1 and self.fieldname is None
+        assert len(self.children) == 1 and self.field_path is None
         q = self.children[0]
         self.conn_type = q.conn_type
-        self.fieldname = q.fieldname
+        self.field_path = q.field_path
         self.op = q.op
         self.value = q.value
         self.children = q.children
@@ -159,18 +159,18 @@ class Q(object):
         assert self.conn_type in self.CONN_TYPES
         if not self.is_leaf():
             return
-        assert self.fieldname
+        assert self.field_path
         assert self.op in self.OP_TYPES
         if self.op == self.EXISTS:
             assert self.value is True
         if self.value is None:
-            raise ValueError('Value for filter on field "%s" cannot be None' % self.fieldname)
+            raise ValueError('Value for filter on field path "%s" cannot be None' % self.field_path)
         if isinstance(self.value, (tuple, list, set)):
-            raise ValueError('Value for filter on field "%s" must be a single value' % self.fieldname)
+            raise ValueError('Value for filter on field path "%s" must be a single value' % self.field_path)
         try:
             value_to_xml_text(self.value)
         except ValueError:
-            raise ValueError('Value "%s" for filter on field "%s" is unsupported' % (self.value, self.fieldname))
+            raise ValueError('Value "%s" for filter on field path "%s" is unsupported' % (self.value, self.field_path))
         if isinstance(self.value, EWSDateTime):
             # We want to convert all values to UTC
             self.value = self.value.astimezone(UTC)
@@ -255,18 +255,18 @@ class Q(object):
         return not self.children
 
     def is_empty(self):
-        return self.is_leaf() and self.fieldname is None
+        return self.is_leaf() and self.field_path is None
 
     def expr(self):
         if self.is_empty():
             return None
         if self.is_leaf():
-            expr = '%s %s %s' % (self.fieldname, self.op, repr(self.value))
+            expr = '%s %s %s' % (self.field_path, self.op, repr(self.value))
         else:
             # Sort children by field name so we get stable output (for easier testing). Children should never be empty.
             expr = (' %s ' % (self.AND if self.conn_type == self.NOT else self.conn_type)).join(
                 (c.expr() if c.is_leaf() or c.conn_type == self.NOT else '(%s)' % c.expr())
-                for c in sorted(self.children, key=lambda i: i.fieldname or '')
+                for c in sorted(self.children, key=lambda i: i.field_path or '')
             )
         if self.conn_type == self.NOT:
             # Add the NOT operator. Put children in parens if there is more than one child.
@@ -275,12 +275,17 @@ class Q(object):
             return self.conn_type + ' (%s)' % expr
         return expr
 
-    @staticmethod
-    def _validate_field(field, folder):
-        if field not in folder.allowed_fields():
-            raise ValueError("'%s' is not a valid field when filtering on %s" % (field.name, folder.__class__.__name__))
-        if not field.is_searchable:
-            raise ValueError("EWS does not support filtering on field '%s'" % field.name)
+    def _validate_field_path(self, field_path, folder):
+        from .indexed_properties import MultiFieldIndexedElement
+        if field_path.field not in folder.allowed_fields():
+            raise ValueError(
+                "'%s' is not a valid field when filtering on %s" % (field_path.field.name, folder.__class__.__name__))
+        if not field_path.field.is_searchable:
+            raise ValueError("EWS does not support filtering on field '%s'" % field_path.field.name)
+        if field_path.subfield and not field_path.subfield.is_searchable:
+            raise ValueError("EWS does not support filtering on subfield '%s'" % field_path.subfield.name)
+        if issubclass(field_path.field.value_cls, MultiFieldIndexedElement) and not field_path.subfield:
+            raise ValueError("Field path '%s' must contain a subfield" % self.field_path)
 
     def to_xml(self, folder, version):
         # Translate this Q object to a valid Restriction XML tree
@@ -295,29 +300,31 @@ class Q(object):
     def xml_elem(self, folder, version):
         # Recursively build an XML tree structure of this Q object. If this is an empty leaf (the equivalent of Q()),
         # return None.
-        from .fields import IndexedField
+        from .fields import FieldPath
         from .indexed_properties import SingleFieldIndexedElement
         if self.is_empty():
             return None
         if self.is_leaf():
             elem = self._op_to_xml(self.op)
-            field = folder.get_item_field_by_fieldname(self.fieldname)
-            self._validate_field(field=field, folder=folder)
-            if isinstance(field, IndexedField):
-                assert issubclass(field.value_cls, SingleFieldIndexedElement)
-                subfield = field.value_cls.value_field(version=version)
-                field_uri = subfield.field_uri_xml(field_uri=field.field_uri, label=self.value.label)
+            field_path = FieldPath.from_string(self.field_path, folder=folder)
+            self._validate_field_path(field_path=field_path, folder=folder)
+            if self.op == self.EXISTS:
+                value = self.value
             else:
-                field_uri = field.field_uri_xml()
-            elem.append(field_uri)
+                clean_field = field_path.subfield if (field_path.subfield and field_path.label) else field_path.field
+                if clean_field.is_list:
+                    # With __contains, we allow filtering by only one value even though the field is a list type
+                    value = clean_field.clean(value=[self.value], version=version)[0]
+                else:
+                    value = clean_field.clean(value=self.value, version=version)
+            if issubclass(field_path.field.value_cls, SingleFieldIndexedElement) and not field_path.label:
+                # We allow a filter shortcut of e.g. email_addresses__contains=EmailAddress(label='Foo', ...) instead of
+                # email_addresses__Foo_email_address=.... Set FieldPath label now so we can generate the field_uri.
+                field_path.label = value.label
+            elem.append(field_path.to_xml())
             constant = create_element('t:Constant')
             if self.op != self.EXISTS:
                 # Use .set() to not fill up the create_element() cache with unique values
-                if field.is_list and not isinstance(self.value, (tuple, list, set)):
-                    # With __contains, we allow filtering by only one value even though the field is a liste type
-                    value = field.clean(value=[self.value], version=version)[0]
-                else:
-                    value = field.clean(value=self.value, version=version)
                 constant.set('Value', value_to_xml_text(value))
                 if self.op in self.CONTAINS_OPS:
                     elem.append(constant)
@@ -329,7 +336,7 @@ class Q(object):
             # We have multiple children. If conn_type is NOT, then group children with AND. We'll add the NOT later
             elem = self._conn_to_xml(self.AND if self.conn_type == self.NOT else self.conn_type)
             # Sort children by field name so we get stable output (for easier testing). Children should never be empty
-            for c in sorted(self.children, key=lambda i: i.fieldname or ''):
+            for c in sorted(self.children, key=lambda i: i.field_path or ''):
                 elem.append(c.xml_elem(folder=folder, version=version))
         if elem is None:
             return None  # Should not be necessary, but play safe
@@ -353,7 +360,7 @@ class Q(object):
         if self.conn_type == self.NOT:
             # This is NOT NOT. Change to AND
             self.conn_type = self.AND
-            if len(self.children) == 1 and self.fieldname is None:
+            if len(self.children) == 1 and self.field_path is None:
                 self._promote()
             return self
         if self.is_leaf():
@@ -385,8 +392,8 @@ class Q(object):
 
     def __repr__(self):
         if self.is_leaf():
-            return self.__class__.__name__ + '(%s %s %s)' % (self.fieldname, self.op, repr(self.value))
-        sorted_children = tuple(sorted(self.children, key=lambda i: i.fieldname or ''))
+            return self.__class__.__name__ + '(%s %s %s)' % (self.field_path, self.op, repr(self.value))
+        sorted_children = tuple(sorted(self.children, key=lambda i: i.field_path or ''))
         if self.conn_type == self.NOT or len(self.children) > 1:
             return self.__class__.__name__ + repr((self.conn_type,) + sorted_children)
         return self.__class__.__name__ + repr(sorted_children)
