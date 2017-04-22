@@ -380,7 +380,7 @@ class Folder(EWSElement):
         assert shape in SHAPE_CHOICES
         folders = []
         for elem in GetFolder(account=account).call(
-                folder=cls(account=account),
+                folders=[cls(account=account)],
                 additional_fields=cls.supported_fields(),
                 shape=shape
         ):
@@ -399,7 +399,7 @@ class Folder(EWSElement):
             raise ValueError('Folder must have an ID')
         folders = []
         for elem in GetFolder(account=self.account).call(
-                folder=self,
+                folders=[self],
                 additional_fields=self.supported_fields(version=self.account.version),
                 shape=IdOnly
         ):

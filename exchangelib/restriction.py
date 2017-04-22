@@ -114,8 +114,8 @@ class Q(object):
                 # 'Contains' element which only supports matching on string elements, not arrays.
                 #
                 # Exact matching of categories (i.e. match ['a', 'b'] but not ['a', 'b', 'c']) could be implemented by
-                # post-processing items. Fetch 'item:Categories' with additional_fields and remove the items that don't
-                # have an exact match, after the call to FindItems.
+                # post-processing items by fetch the categories field unconditionally and removing the items that don't
+                # have an exact match.
                 if lookup == self.LOOKUP_CONTAINS and isinstance(value, (tuple, list, set)):
                     # '__contains' lookups on list field types
                     children = [self.__class__(**{field_path: v}) for v in value]

@@ -454,9 +454,6 @@ class EWSPooledMixIn(EWSService):
 
 class GetItem(EWSAccountService, EWSPooledMixIn):
     """
-    Take a list of (id, changekey) tuples and returns all items in 'account', optionally expanded with
-    'additional_fields' fields, in stable order.
-
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa563775(v=exchg.150).aspx
     """
     CHUNKSIZE = 100
@@ -464,16 +461,19 @@ class GetItem(EWSAccountService, EWSPooledMixIn):
     element_container_name = '{%s}Items' % MNS
 
     def call(self, items, additional_fields):
+        """
+        Returns all items in an account that correspond to a list of ID's, in stable order.
+
+        :param items: a list of (id, changekey) tuples or Item objects
+        :param additional_fields: the extra fields that should be returned with the item. 
+        :return: XML elements for the items, in stable order
+        """
         return self._pool_requests(payload_func=self.get_payload, **dict(
             items=items,
             additional_fields=additional_fields,
         ))
 
     def get_payload(self, items, additional_fields):
-        # Takes a list of (item_id, changekey) tuples or Item objects and returns the XML for a GetItem request.
-        #
-        # We start with an IdOnly request. 'additional_properties' defines the additional fields we want. Supported
-        # fields are available in self.folder.allowed_fields().
         from .folders import ItemId
         from .items import IdOnly
         getitem = create_element('m:%s' % self.SERVICE_NAME)
@@ -754,9 +754,6 @@ class DeleteItem(EWSAccountService, EWSPooledMixIn):
 
 class FindItem(EWSFolderService, PagingEWSMixIn):
     """
-    Gets all items for 'account' in folder 'folder_id', optionally expanded with 'additional_fields' fields,
-    optionally restricted by a Restriction definition.
-
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa566370(v=exchg.150).aspx
     """
     SERVICE_NAME = 'FindItem'
@@ -764,6 +761,18 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
     CHUNKSIZE = 100
 
     def call(self, additional_fields, restriction, order, shape, depth, calendar_view, page_size):
+        """
+        Find items in an account.
+
+        :param additional_fields: the extra fields that should be returned with the item
+        :param restriction: a Restriction object for
+        :param order: a field to sort the results by
+        :param shape: The set of attributes to return
+        :param depth: How deep in the folder structure to search for items
+        :param calendar_view: If set, returns recurring calendar items unfolded
+        :param page_size: The number of items to return per request
+        :return: XML elements for the matching items
+        """
         return self._paged_call(payload_func=self.get_payload, **dict(
             additional_fields=additional_fields,
             restriction=restriction,
@@ -810,14 +819,21 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
 
 class FindFolder(EWSFolderService, PagingEWSMixIn):
     """
-    Gets a list of folders belonging to an account.
-
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa564962(v=exchg.150).aspx
     """
     SERVICE_NAME = 'FindFolder'
     element_container_name = '{%s}Folders' % TNS
 
     def call(self, additional_fields, shape, depth, page_size):
+        """
+        Find subfolders of a folder.
+
+        :param additional_fields: the extra fields that should be returned with the folder
+        :param shape: The set of attributes to return
+        :param depth: How deep in the folder structure to search for folders
+        :param page_size: The number of items to return per request
+        :return: XML elements for the matching folders
+        """
         return self._paged_call(payload_func=self.get_payload, **dict(
             additional_fields=additional_fields,
             shape=shape,
@@ -858,15 +874,23 @@ class GetFolder(EWSAccountService):
     SERVICE_NAME = 'GetFolder'
     element_container_name = '{%s}Folders' % MNS
 
-    def call(self, folder, additional_fields, shape):
+    def call(self, folders, additional_fields, shape):
+        """
+        Takes a folder ID and returns the full information for that folder.
+
+        :param folders: a list of (id, changekey) tuples or Folder objects
+        :param additional_fields: the extra fields that should be returned with the folder.
+        :param shape: The set of attributes to return
+        :return: XML elements for the folders, in stable order
+        """
         return self._get_elements(payload=self.get_payload(
-            folder=folder,
+            folders=folders,
             additional_fields=additional_fields,
             shape=shape,
         ))
 
-    def get_payload(self, folder, additional_fields, shape):
-        assert folder
+    def get_payload(self, folders, additional_fields, shape):
+        from .folders import FolderId
         getfolder = create_element('m:%s' % self.SERVICE_NAME)
         foldershape = create_element('m:FolderShape')
         add_xml_child(foldershape, 't:BaseShape', shape)
@@ -880,9 +904,17 @@ class GetFolder(EWSAccountService):
                     additional_properties.append(f.field_uri_xml())
             add_xml_child(foldershape, 't:AdditionalProperties', additional_properties)
         getfolder.append(foldershape)
-        folderids = create_element('m:FolderIds')
-        folderids.append(self._folder_elem(folder))
-        getfolder.append(folderids)
+        folder_ids = create_element('m:FolderIds')
+        is_empty = True
+        for folder in folders:
+            is_empty = False
+            log.debug('Getting folder %s', folder)
+            if isinstance(folder, tuple):
+                set_xml_value(folder_ids, FolderId(*folder), self.account.version)
+                continue
+            folder_ids.append(self._folder_elem(folder))
+        assert not is_empty, '"folders" must not be empty'
+        getfolder.append(folder_ids)
         return getfolder
 
 
