@@ -8,8 +8,8 @@ from operator import attrgetter
 
 from future.utils import python_2_unicode_compatible
 
+from .fields import FieldPath, FieldOrder
 from .restriction import Q
-from .util import create_element
 
 log = logging.getLogger(__name__)
 
@@ -20,43 +20,6 @@ class MultipleObjectsReturned(Exception):
 
 class DoesNotExist(Exception):
     pass
-
-
-class FieldPath(object):
-    """ Holds values needed to point to a single field """
-    def __init__(self, field, label=None, subfield=None):
-        # 'label' and 'subfield' are only used for IndexedField fields
-        self.field = field
-        self.label = label
-        self.subfield = subfield
-
-    @classmethod
-    def from_string(cls, s, folder):
-        from .fields import resolve_field_path
-        field, label, subfield = resolve_field_path(s, folder=folder, strict=False)
-        return cls(field=field, label=label, subfield=subfield)
-
-
-class FieldOrder(FieldPath):
-    """ Holds values needed to call server-side sorting on a single field """
-    def __init__(self, *args, **kwargs):
-        self.reverse = kwargs.pop('reverse', False)
-        super(FieldOrder, self).__init__(*args, **kwargs)
-
-    @classmethod
-    def from_string(cls, s, folder):
-        from .fields import resolve_field_path
-        field, label, subfield = resolve_field_path(s.lstrip('-'), folder=folder)
-        reverse = s.startswith('-')
-        return cls(field=field, label=label, subfield=subfield, reverse=reverse)
-
-    def to_xml(self):
-        field_order = create_element('t:FieldOrder', Order='Descending' if self.reverse else 'Ascending')
-        if self.label and self.subfield:
-            field_order.append(self.subfield.field_uri_xml(field_uri=self.field.field_uri, label=self.label))
-        else:
-            field_order.append(self.field.field_uri_xml())
-        return field_order
 
 
 @python_2_unicode_compatible

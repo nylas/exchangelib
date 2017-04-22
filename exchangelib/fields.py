@@ -91,6 +91,47 @@ def resolve_field_path(field_path, folder, strict=True):
     return field, label, subfield
 
 
+class FieldPath(object):
+    """ Holds values needed to point to a single field """
+    def __init__(self, field, label=None, subfield=None):
+        # 'label' and 'subfield' are only used for IndexedField fields
+        self.field = field
+        self.label = label
+        self.subfield = subfield
+
+    @classmethod
+    def from_string(cls, s, folder):
+        field, label, subfield = resolve_field_path(s, folder=folder, strict=False)
+        return cls(field=field, label=label, subfield=subfield)
+
+    def to_xml(self):
+        if self.label and self.subfield:
+            return self.subfield.field_uri_xml(field_uri=self.field.field_uri, label=self.label)
+        else:
+            if isinstance(self.field, IndexedField):
+                raise ValueError("Field path for indexed field '%s' is missing label and/or subfield" % self.field.name)
+            return self.field.field_uri_xml()
+
+
+class FieldOrder(FieldPath):
+    """ Holds values needed to call server-side sorting on a single field """
+    def __init__(self, *args, **kwargs):
+        self.reverse = kwargs.pop('reverse', False)
+        super(FieldOrder, self).__init__(*args, **kwargs)
+
+    @classmethod
+    def from_string(cls, s, folder):
+        field, label, subfield = resolve_field_path(s.lstrip('-'), folder=folder)
+        reverse = s.startswith('-')
+        return cls(field=field, label=label, subfield=subfield, reverse=reverse)
+
+    def to_xml(self):
+        field_path = super(FieldOrder, self)
+        field_order = create_element('t:FieldOrder', Order='Descending' if self.reverse else 'Ascending')
+        field_order.append(field_path.to_xml())
+        return field_order
+
+
 class Field(object):
     """
     Holds information related to an item field
