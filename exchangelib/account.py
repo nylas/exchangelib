@@ -12,14 +12,14 @@ from six import text_type, string_types
 from .autodiscover import discover
 from .credentials import DELEGATE, IMPERSONATION
 from .errors import ErrorFolderNotFound, ErrorAccessDenied
+from .fields import FieldPath
 from .folders import Root, Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Tasks, Contacts, \
-    RecoverableItemsRoot, RecoverableItemsDeletions, Folder
+    RecoverableItemsRoot, RecoverableItemsDeletions, Folder, SHALLOW, DEEP
 from .items import Item, BulkCreateResult, HARD_DELETE, \
     AUTO_RESOLVE, SEND_TO_NONE, SAVE_ONLY, SEND_AND_SAVE_COPY, SEND_ONLY, SPECIFIED_OCCURRENCE_ONLY, \
     DELETE_TYPE_CHOICES, MESSAGE_DISPOSITION_CHOICES, CONFLICT_RESOLUTION_CHOICES, AFFECTED_TASK_OCCURRENCES_CHOICES, \
     SEND_MEETING_INVITATIONS_CHOICES, SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES, \
     SEND_MEETING_CANCELLATIONS_CHOICES
-from .folders import SHALLOW, DEEP
 from .protocol import Protocol
 from .queryset import QuerySet
 from .services import ExportItems, UploadItems, GetItem, CreateItem, UpdateItem, DeleteItem, MoveItem, SendItem
@@ -379,7 +379,7 @@ class Account(object):
 
     def fetch(self, ids, folder=None, only_fields=None):
         # 'folder' is used for validating only_fields
-        # 'only_fields' specifies which fields to fetch, instead of all possible fields.
+        # 'only_fields' specifies which fields to fetch, instead of all possible fields, as strings or FieldPaths.
         validation_folder = folder or Folder(account=self)  # Default to a folder type that supports all item types
         # 'ids' could be an unevaluated QuerySet, e.g. if we ended up here via `fetch(ids=some_folder.filter(...))`. In
         # that case, we want to use its iterator. Otherwise, peek() will start a count() which is wasteful because we
@@ -394,14 +394,15 @@ class Account(object):
         if only_fields:
             allowed_fields = validation_folder.allowed_fields()
             only_fields = list(only_fields)
-            for i, f in enumerate(only_fields):
-                # Allow both Field instances and fieldnames as input
-                if isinstance(f, string_types):
-                    f = validation_folder.get_item_field_by_fieldname(f)
-                    only_fields[i] = f
-                assert f in allowed_fields
+            for i, field_path in enumerate(only_fields):
+                # Allow both FieldPath instances and string field paths as input
+                if isinstance(field_path, string_types):
+                    field_path = FieldPath.from_string(field_path, folder=validation_folder)
+                    only_fields[i] = field_path
+                assert isinstance(field_path, FieldPath)
+                assert field_path.field in allowed_fields
         else:
-            only_fields = {f for f in validation_folder.allowed_fields()}
+            only_fields = {FieldPath(field=f) for f in validation_folder.allowed_fields()}
         for i in GetItem(account=self).call(items=ids, additional_fields=only_fields):
             if isinstance(i, Exception):
                 yield i
