@@ -202,13 +202,12 @@ Here are some examples of using the API:
     # Same as filter() but throws an error if exactly one item isn't returned
     item = my_folder.get(subject='unique_string')
 
-    # You can sort by a single or multiple fields. Prefix a field with '-' to reverse the sorting.
-    # Sorting by a single field is efficient. For multiple fields, the sorting is done client-side
-    # and must fetch all items in the folder first. This can be slow.
+    # You can sort by a single or multiple fields. Prefix a field with '-' to reverse the sorting. Sorting is efficient
+    # since it is done server-side.
     ordered_items = my_folder.all().order_by('subject')
     reverse_ordered_items = my_folder.all().order_by('-subject')
-    sorted_by_home_street = my_contacts.all().order_by('physical_addresses__Home__street)  # Indexed properties
-    dont_do_this = my_huge_folder.all().order_by('subject', 'categories')[:10]  # This is painful
+    sorted_by_home_street = my_contacts.all().order_by('physical_addresses__Home__street')  # Indexed properties
+    dont_do_this = my_huge_folder.all().order_by('subject', 'categories')[:10]  # This is efficient
 
     # Counting and exists
     n = my_folder.all().count()  # Efficient counting
@@ -229,7 +228,7 @@ Here are some examples of using the API:
     # A QuerySet can be sliced like a normal Python list. Slicing from the start of the QuerySet
     # is efficient (it only fetches the necessary items), but more exotic slicing requires many or all
     # items to be fetched from the server. Slicing from the end is also efficient, but then you might as
-    # well just reverse the sorting
+    # well just reverse the sorting.
     first_ten_emails = my_folder.all().order_by('-datetime_received')[:10]  # Efficient
     last_ten_emails = my_folder.all().order_by('-datetime_received')[:-10]  # Efficient, but convoluted
     next_ten_emails = my_folder.all().order_by('-datetime_received')[10:20]  # Still quite efficient

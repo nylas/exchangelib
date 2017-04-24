@@ -8,6 +8,7 @@ HEAD
   specify labels and subfields, e.g. ``.filter(phone_numbers=PhoneNumber(label='CarPhone', phone_number='123'))``
   ``.filter(phone_numbers__CarPhone='123')``, ``.filter(physical_addresses__Home__street='Elm St. 123')``,
   `.only('physical_addresses__Home__street')`` etc.
+* Improved performance of ``.order_by()`` when sorting on multiple fields.
 
 1.9.2
 -----

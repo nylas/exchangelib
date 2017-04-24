@@ -82,52 +82,29 @@ class QuerySet(object):
             additional_fields = {f for f in self.only_fields if f.field.name not in {'item_id', 'changekey'}}
         complex_fields_requested = bool(set(f.field for f in additional_fields) & self.folder.complex_fields())
 
-        # EWS can do server-side sorting on at most one field. If we have multiple order_by fields, we can let the
-        # server sort on the last field in the list. Python sorting is stable, so we can do multiple-field sort by
-        # sorting items in reverse order_by order. The first sorting pass might as well be done by the server.
-        #
-        # A caveat is that server-side sorting is not supported for calendar views. In this case, we do all the sorting
-        # client-side.
-        if self.order_fields is None:
-            must_sort_clientside = False
-            order_field = None
-            clientside_sort_fields = None
+        # EWS can do server-side sorting on multiple fields.  A caveat is that server-side sorting is not supported
+        # for calendar views. In this case, we do all the sorting client-side.
+        if self.calendar_view:
+            must_sort_clientside = bool(self.order_fields)
+            order_fields = None
         else:
-            if self.calendar_view:
-                assert len(self.order_fields)
-                must_sort_clientside = True
-                order_field = None
-                clientside_sort_fields = self.order_fields
-            elif len(self.order_fields) == 1:
-                must_sort_clientside = False
-                order_field = self.order_fields[0]
-                clientside_sort_fields = None
-            else:
-                assert len(self.order_fields) > 1
-                must_sort_clientside = True
-                order_field = self.order_fields[-1]
-                clientside_sort_fields = self.order_fields[:-1]
+            order_fields = self.order_fields
+            must_sort_clientside = False
 
         find_item_kwargs = dict(
             additional_fields=None,
-            order=order_field,
+            order_fields=order_fields,
             calendar_view=self.calendar_view,
             page_size=self.page_size,
         )
 
         if must_sort_clientside:
-            # Also fetch order_by fields that we only need for client-side sorting and that we must remove afterwards.
-            extra_order_fields = {f.field_path for f in clientside_sort_fields} - additional_fields
+            # Also fetch order_by fields that we only need for client-side sorting.
+            extra_order_fields = {f.field_path for f in self.order_fields} - additional_fields
             if extra_order_fields:
                 additional_fields.update(extra_order_fields)
         else:
             extra_order_fields = set()
-
-        if not must_sort_clientside and not additional_fields:
-            # TODO: if self.order_fields only contain item_id or changekey, we can still take this shortcut
-            # We requested no additional fields and at most one sort field, so we can take a shortcut by setting
-            # additional_fields=None. This tells find_items() to do less work
-            return self.folder.find_items(self.q, **find_item_kwargs)
 
         if complex_fields_requested:
             # The FindItems service does not support complex field types. Fallback to getting ids and calling GetItems
@@ -136,15 +113,18 @@ class QuerySet(object):
                 only_fields=additional_fields
             )
         else:
-            find_item_kwargs['additional_fields'] = additional_fields
+            # If we requested no additional fields, we can take a shortcut by setting additional_fields=None. This tells
+            # find_items() to do less work.
+            if additional_fields:
+                find_item_kwargs['additional_fields'] = additional_fields
             items = self.folder.find_items(self.q, **find_item_kwargs)
         if not must_sort_clientside:
             return items
 
-        # Resort to client-side sorting of the order_by fields that the server could not help us with. This is greedy.
-        # Sorting in Python is stable, so when we search on multiple fields, we can do a sort on each of the requested
-        # fields in reverse order. Reverse each sort operation if the field was prefixed with '-'.
-        for f in reversed(clientside_sort_fields):
+        # Resort to client-side sorting of the order_by fields. This is greedy. Sorting in Python is stable, so when
+        # sorting on multiple fields, we can just do a sort on each of the requested fields in reverse order. Reverse
+        # each sort operation if the field was marked as such.
+        for f in reversed(self.order_fields):
             items = sorted(items, key=lambda i: f.field_path.get_value(i), reverse=f.reverse)
         if not extra_order_fields:
             return items

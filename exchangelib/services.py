@@ -630,7 +630,7 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
                         # only that value set.
                         for subfield in field.value_cls.supported_fields(version=self.account.version):
                             field_path = FieldPath(field=field, label=v.label, subfield=subfield)
-                            simple_item = field.value_cls(**{'label': v.label, subfield.name: field_path.get_value(v)})
+                            simple_item = field.value_cls(**{'label': v.label, subfield.name: getattr(v, subfield.name)})
                             yield self._set_item_elem(item_model=item_model, field_path=field_path, value=simple_item)
                     else:
                         # The simpler IndexedFields with only one subfield
@@ -754,13 +754,13 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
     element_container_name = '{%s}Items' % TNS
     CHUNKSIZE = 100
 
-    def call(self, additional_fields, restriction, order, shape, depth, calendar_view, page_size):
+    def call(self, additional_fields, restriction, order_fields, shape, depth, calendar_view, page_size):
         """
         Find items in an account.
 
         :param additional_fields: the extra fields that should be returned with the item, as FieldPath objects
         :param restriction: a Restriction object for
-        :param order: a field to sort the results by
+        :param order_fields: the fields to sort the results by
         :param shape: The set of attributes to return
         :param depth: How deep in the folder structure to search for items
         :param calendar_view: If set, returns recurring calendar items unfolded
@@ -770,14 +770,15 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
         return self._paged_call(payload_func=self.get_payload, **dict(
             additional_fields=additional_fields,
             restriction=restriction,
-            order=order,
+            order_fields=order_fields,
             shape=shape,
             depth=depth,
             calendar_view=calendar_view,
             page_size=page_size,
         ))
 
-    def get_payload(self, additional_fields, restriction, order, shape, depth, calendar_view, page_size, offset=0):
+    def get_payload(self, additional_fields, restriction, order_fields, shape, depth, calendar_view, page_size,
+                    offset=0):
         finditem = create_element('m:%s' % self.SERVICE_NAME, Traversal=depth)
         itemshape = create_element('m:ItemShape')
         add_xml_child(itemshape, 't:BaseShape', shape)
@@ -797,10 +798,10 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
         finditem.append(view_type)
         if restriction:
             finditem.append(restriction.to_xml(version=self.account.version))
-        if order:
-            from .queryset import FieldOrder
-            assert isinstance(order, FieldOrder)
-            add_xml_child(finditem, 'm:SortOrder', order.to_xml(version=self.account.version))
+        if order_fields:
+            sort_order = create_element('m:SortOrder')
+            set_xml_value(sort_order, order_fields, self.account.version)
+            finditem.append(sort_order)
         parentfolderids = create_element('m:ParentFolderIds')
         parentfolderids.append(self._folder_elem(self.folder))
         finditem.append(parentfolderids)

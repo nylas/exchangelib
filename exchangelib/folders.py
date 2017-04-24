@@ -219,8 +219,8 @@ class Folder(EWSElement):
     def get(self, *args, **kwargs):
         return QuerySet(self).get(*args, **kwargs)
 
-    def find_items(self, q, shape=IdOnly, depth=SHALLOW, additional_fields=tuple(), order=None, calendar_view=None,
-                   page_size=None):
+    def find_items(self, q, shape=IdOnly, depth=SHALLOW, additional_fields=tuple(), order_fields=None,
+                   calendar_view=None, page_size=None):
         """
         Private method to call the FindItem service
 
@@ -229,7 +229,7 @@ class Folder(EWSElement):
                       fetched with fetch().
         :param depth: controls the whether to return soft-deleted items or not.
         :param additional_fields: the extra properties we want on the return objects
-        :param order: the SortOrder field, if any
+        :param order_fields: the SortOrder fields, if any
         :param calendar_view: a CalendarView instance, if any
         :param page_size: the requested number of items per page
         :return: a generator for the returned item IDs or items
@@ -268,7 +268,7 @@ class Folder(EWSElement):
         items = FindItem(folder=self).call(
             additional_fields=additional_fields,
             restriction=restriction,
-            order=order,
+            order_fields=order_fields,
             shape=shape,
             depth=depth,
             calendar_view=calendar_view,

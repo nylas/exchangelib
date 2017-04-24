@@ -2607,36 +2607,6 @@ class BaseItemTest(EWSTest):
              {'subject': 'Subj 0', 'extern_id': 'ID 0'}]
         )
 
-    def test_order_by_with_clientside_sort(self):
-        # Test sorting on a field that we didn't request
-        test_items = []
-        for i in range(2):
-            for j in range(2):
-                item = self.get_test_item()
-                item.subject = 'Subj %s' % i
-                item.extern_id = 'ID %s' % j
-                test_items.append(item)
-        self.test_folder.bulk_create(items=test_items)
-        # Test with no 'extra_order_fields' cleanup
-        qs = QuerySet(self.test_folder).filter(categories__contains=self.categories)
-        self.assertEqual(
-            [(i.subject, i.extern_id) for i in qs.order_by('subject', 'extern_id').only('subject')],
-            [('Subj 0', None),
-             ('Subj 0', None),
-             ('Subj 1', None),
-             ('Subj 1', None)]
-        )
-        # Test with 'extra_order_fields' cleanup
-        qs = QuerySet(self.test_folder).filter(categories__contains=self.categories)
-        self.assertEqual(
-            [(i.subject, i.extern_id) for i in qs.order_by('extern_id', 'subject').only('subject')],
-            [('Subj 0', None),
-             ('Subj 1', None),
-             ('Subj 0', None),
-             ('Subj 1', None)]
-        )
-        self.bulk_delete(qs)
-
     def test_finditems(self):
         now = UTC_NOW()
 
