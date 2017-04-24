@@ -1,5 +1,6 @@
 # coding=utf-8
 import datetime
+from itertools import chain
 import io
 import os
 import random
@@ -793,7 +794,7 @@ class TransportTest(unittest.TestCase):
 
 class UtilTest(unittest.TestCase):
     def test_chunkify(self):
-        # Test tuple, list, set, range, map and generator
+        # Test tuple, list, set, range, map, chain and generator
         seq = [1, 2, 3, 4, 5]
         self.assertEqual(list(chunkify(seq, chunksize=2)), [[1, 2], [3, 4], [5]])
 
@@ -807,6 +808,9 @@ class UtilTest(unittest.TestCase):
         self.assertEqual(list(chunkify(seq, chunksize=2)), [range(0, 2), range(2, 4), range(4, 5)])
 
         seq = map(int, range(5))
+        self.assertEqual(list(chunkify(seq, chunksize=2)), [[0, 1], [2, 3], [4]])
+
+        seq = chain(*[[i] for i in range(5)])
         self.assertEqual(list(chunkify(seq, chunksize=2)), [[0, 1], [2, 3], [4]])
 
         seq = (i for i in range(5))
