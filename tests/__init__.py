@@ -2009,9 +2009,11 @@ class BaseItemTest(EWSTest):
                 continue
             if f.name == 'attachments':
                 # Testing attachments is heavy. Leave this to specific tests
+                insert_kwargs[f.name] = []
                 continue
             if f.name == 'resources':
                 # The test server doesn't have any resources
+                insert_kwargs[f.name] = []
                 continue
             if f.name == 'optional_attendees':
                 # 'optional_attendees' and 'required_attendees' are mutually exclusive
@@ -2055,8 +2057,13 @@ class BaseItemTest(EWSTest):
             if not item.is_draft and f.is_read_only_after_send:
                 # These cannot be changed when the item is no longer a draft
                 continue
+            if f.name == 'attachments':
+                # Testing attachments is heavy. Leave this to specific tests
+                update_kwargs[f.name] = []
+                continue
             if f.name == 'resources':
                 # The test server doesn't have any resources
+                update_kwargs[f.name] = []
                 continue
             if isinstance(f, AttachmentField):
                 # Attachments are handled separately
@@ -3278,12 +3285,6 @@ class BaseItemTest(EWSTest):
                 continue
             if f.is_read_only:
                 continue
-            if f.name == 'resources':
-                # The test server doesn't have any resources
-                continue
-            if f.name == 'attachments':
-                # Attachments are handled separately
-                continue
             if f.name == 'reminder_due_by':
                 # EWS sets a default value if it is not set on insert. Ignore
                 continue
@@ -3294,7 +3295,7 @@ class BaseItemTest(EWSTest):
 
         # Test update
         update_kwargs = self.get_random_update_kwargs(item=item, insert_kwargs=insert_kwargs)
-        update_fieldnames = update_kwargs.keys()
+        update_fieldnames = [f for f in update_kwargs.keys() if f != 'attachments']
         for k, v in update_kwargs.items():
             setattr(item, k, v)
         # Test with generator as argument
@@ -3309,12 +3310,6 @@ class BaseItemTest(EWSTest):
                 # Cannot be used with this EWS version
                 continue
             if f.is_read_only:
-                continue
-            if f.name == 'resources':
-                # The test server doesn't have any resources
-                continue
-            if f.name == 'attachments':
-                # Attachments are handled separately
                 continue
             old, new = getattr(item, f.name), update_kwargs[f.name]
             if f.is_list:
@@ -3333,8 +3328,6 @@ class BaseItemTest(EWSTest):
             if f.is_read_only:
                 # These cannot be changed
                 continue
-            if f.name == 'attachments':
-                continue
             wipe_kwargs[f.name] = None
         for k, v in wipe_kwargs.items():
             setattr(item, k, v)
@@ -3352,8 +3345,6 @@ class BaseItemTest(EWSTest):
             if f.is_required or f.is_required_after_save:
                 continue
             if f.is_read_only:
-                continue
-            if f.name == 'attachments':
                 continue
             old, new = getattr(item, f.name), wipe_kwargs[f.name]
             if f.is_list:
