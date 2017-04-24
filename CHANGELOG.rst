@@ -2,6 +2,13 @@
 Change Log
 ==========
 
+HEAD
+----
+* Improved support for ``filter()``, ``.only()``, ``.order_by()`` etc. on indexed properties. It is now possible to
+  specify labels and subfields, e.g. ``.filter(phone_numbers=PhoneNumber(label='CarPhone', phone_number='123'))``
+  ``.filter(phone_numbers__CarPhone='123')``, ``.filter(physical_addresses__Home__street='Elm St. 123')``,
+  `.only('physical_addresses__Home__street')`` etc.
+
 1.9.2
 -----
 * Added ``EWSTimeZone.localzone()`` to get the local timezone

@@ -147,7 +147,7 @@ class FieldPath(object):
     def path(self):
         if self.label:
             from .indexed_properties import SingleFieldIndexedElement
-            if isinstance(self.field.value_cls, SingleFieldIndexedElement) or not self.subfield:
+            if issubclass(self.field.value_cls, SingleFieldIndexedElement) or not self.subfield:
                 return '%s__%s' % (self.field.name, self.label)
             return '%s__%s__%s' % (self.field.name, self.label, self.subfield.name)
         return self.field.name

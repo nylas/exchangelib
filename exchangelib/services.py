@@ -628,9 +628,9 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
                         # We have subfields. Generate SetItem XML for each subfield. SetItem only accepts items that
                         # have the one value set that we want to change. Create a new IndexedField object that has
                         # only that value set.
-                        for f in field.value_cls.supported_fields(version=self.account.version):
-                            simple_item = field.value_cls(**{'label': v.label, f.name: getattr(v, f.name)})
-                            field_path = FieldPath(field=field, label=v.label, subfield=f)
+                        for subfield in field.value_cls.supported_fields(version=self.account.version):
+                            field_path = FieldPath(field=field, label=v.label, subfield=subfield)
+                            simple_item = field.value_cls(**{'label': v.label, subfield.name: field_path.get_value(v)})
                             yield self._set_item_elem(item_model=item_model, field_path=field_path, value=simple_item)
                     else:
                         # The simpler IndexedFields with only one subfield

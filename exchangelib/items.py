@@ -601,7 +601,7 @@ class Contact(Item):
         TextField('nickname', field_uri='contacts:Nickname'),
         TextField('company_name', field_uri='contacts:CompanyName'),
         EmailAddressField('email_addresses', field_uri='contacts:EmailAddress'),
-        PhysicalAddressField('physical_addresses', field_uri='contacts:PhysicalAddress', is_searchable=False),
+        PhysicalAddressField('physical_addresses', field_uri='contacts:PhysicalAddress'),
         PhoneNumberField('phone_numbers', field_uri='contacts:PhoneNumber'),
         TextField('assistant_name', field_uri='contacts:AssistantName'),
         DateTimeField('birthday', field_uri='contacts:Birthday'),

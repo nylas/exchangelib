@@ -36,7 +36,8 @@ from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextFie
     MailboxListField, Choice, FieldPath
 from exchangelib.folders import Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Messages, Tasks, \
     Contacts, Folder
-from exchangelib.indexed_properties import IndexedElement, EmailAddress, PhysicalAddress, PhoneNumber
+from exchangelib.indexed_properties import IndexedElement, EmailAddress, PhysicalAddress, PhoneNumber, \
+    SingleFieldIndexedElement, MultiFieldIndexedElement
 from exchangelib.items import Item, CalendarItem, Message, Contact, Task, ALL_OCCURRENCIES
 from exchangelib.properties import Attendee, Mailbox, RoomList, MessageHeader, Room, ItemId, EWSElement
 from exchangelib.protocol import Protocol
@@ -2970,8 +2971,34 @@ class BaseItemTest(EWSTest):
                 # filtering 'body' or 'display_name' on Contact items doesn't work at all. Error in EWS?
                 continue
             if f.is_list:
-                # Filter multi-value fields with __in and __contains
-                filter_kwargs = [{'%s__in' % f.name: val}, {'%s__contains' % f.name: val}]
+                # Filter multi-value fields with =, __in and __contains
+                if issubclass(f.value_cls, MultiFieldIndexedElement):
+                    # For these, we need to filter on the subfield
+                    filter_kwargs = []
+                    for v in val:
+                        for subfield in f.value_cls.supported_fields(version=self.account.version):
+                            field_path = FieldPath(field=f, label=v.label, subfield=subfield)
+                            path, subval = field_path.path, field_path.get_value(item)
+                            if subval is None:
+                                continue
+                            filter_kwargs.extend([
+                                {path: subval}, {'%s__in' % path: [subval]}, {'%s__contains' % path: [subval]}
+                            ])
+                elif issubclass(f.value_cls, SingleFieldIndexedElement):
+                    # For these, we may filter by item or subfield value
+                    filter_kwargs = []
+                    for v in val:
+                        for subfield in f.value_cls.supported_fields(version=self.account.version):
+                            field_path = FieldPath(field=f, label=v.label, subfield=subfield)
+                            path, subval = field_path.path, field_path.get_value(item)
+                            if subval is None:
+                                continue
+                            filter_kwargs.extend([
+                                {f.name: v}, {path: subval},
+                                {'%s__in' % path: [subval]}, {'%s__contains' % path: [subval]}
+                            ])
+                else:
+                    filter_kwargs = [{'%s__in' % f.name: val}, {'%s__contains' % f.name: val}]
             else:
                 # Filter all others with =, __in and __contains. We could have more filters here, but these should
                 # always match.

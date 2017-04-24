@@ -166,7 +166,9 @@ class Q(object):
         if self.value is None:
             raise ValueError('Value for filter on field path "%s" cannot be None' % self.field_path)
         if is_iterable(self.value, generators_allowed=True):
-            raise ValueError('Value for filter on field path "%s" must be a single value' % self.field_path)
+            raise ValueError(
+                'Value "%s" for filter on field path "%s" must be a single value' % (self.value, self.field_path)
+            )
         try:
             value_to_xml_text(self.value)
         except ValueError:

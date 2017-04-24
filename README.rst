@@ -194,7 +194,6 @@ Here are some examples of using the API:
     all_items = my_folder.all()  # Get everything
     all_items_without_caching = my_folder.all().iterator()  # Get everything, but don't cache
     filtered_items = my_folder.filter(subject__contains='foo').exclude(categories__icontains='bar')  # Chaining
-    sparse_items = my_folder.all().only('subject', 'start')  # Only return some attributes
     status_report = my_folder.all().delete()  # Delete the items returned by the QuerySet
     items_for_2017 = my_calendar.filter(start__range=(
         tz.localize(EWSDateTime(2017, 1, 1)),
@@ -208,16 +207,24 @@ Here are some examples of using the API:
     # and must fetch all items in the folder first. This can be slow.
     ordered_items = my_folder.all().order_by('subject')
     reverse_ordered_items = my_folder.all().order_by('-subject')
+    sorted_by_home_street = my_contacts.all().order_by('physical_addresses__Home__street)  # Indexed properties
     dont_do_this = my_huge_folder.all().order_by('subject', 'categories')[:10]  # This is painful
 
     # Counting and exists
     n = my_folder.all().count()  # Efficient counting
     folder_is_empty = not my_folder.all().exists()  # Efficient tasting
 
+    # Restricting returned attributes
+    sparse_items = my_folder.all().only('subject', 'start')
+    # Dig deeper on indexed properties
+    sparse_items = my_contacts.all().only('phone_numbers')
+    sparse_items = my_contacts.all().only('phone_numbers__CarPhone')
+    sparse_items = my_contacts.all().only('physical_addresses__Home__street')
+
     # Returning values instead of objects
     ids_as_dict = my_folder.all().values('item_id', 'changekey')  # Return values as dicts, not objects
-    ids_as_list = my_folder.all().values_list('item_id', 'changekey')  # Return values as nested lists
-    all_subjects = my_folder.all().values_list('subject', flat=True)  # Return values as a flat list
+    values_as_list = my_folder.all().values_list('subject', 'body')  # Return values as nested lists
+    all_subjects = my_folder.all().values_list('physical_addresses__Home__street', flat=True)  # Return a flat list
 
     # A QuerySet can be sliced like a normal Python list. Slicing from the start of the QuerySet
     # is efficient (it only fetches the necessary items), but more exotic slicing requires many or all
