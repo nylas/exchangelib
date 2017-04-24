@@ -34,6 +34,23 @@ BOM = '\xef\xbb\xbf'
 BOM_LEN = len(BOM)
 
 
+def is_iterable(value, generators_allowed=False):
+    """
+    Checks if value is a list-like object. Don't match generators and generator-like objects here by default, because 
+    callers don't necessarily guarantee that they only iterate the value once. Take care to not match string types.
+
+    :param value: any type of object
+    :return: True or False
+    """
+    if generators_allowed:
+        if not isinstance(value, string_types) and hasattr(value, '__iter__'):
+            return True
+    else:
+        if isinstance(value, (tuple, list, set)):
+            return True
+    return False
+
+
 def chunkify(iterable, chunksize):
     """
     Splits an iterable into chunks of size ``chunksize``. The last chunk may be smaller than ``chunksize``.
@@ -149,7 +166,7 @@ def set_xml_value(elem, value, version):
     from .ewsdatetime import EWSDateTime
     if isinstance(value, string_types + (bool, bytes, int, Decimal, EWSDateTime)):
         elem.text = value_to_xml_text(value)
-    elif isinstance(value, (tuple, list, set)):
+    elif is_iterable(value, generators_allowed=True):
         for v in value:
             if isinstance(v, EWSElement):
                 assert version
