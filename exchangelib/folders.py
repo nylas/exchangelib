@@ -7,7 +7,7 @@ from future.utils import python_2_unicode_compatible
 from six import string_types
 
 from .ewsdatetime import EWSDateTime, UTC
-from .fields import IntegerField, TextField, DateTimeField
+from .fields import IntegerField, TextField, DateTimeField, FieldPath
 from .items import Item, CalendarItem, Contact, Message, Task, MeetingRequest, MeetingResponse, MeetingCancellation, \
     ITEM_CLASSES, ITEM_TRAVERSAL_CHOICES, SHAPE_CHOICES, IdOnly
 from .properties import ItemId, EWSElement
@@ -240,9 +240,9 @@ class Folder(EWSElement):
             allowed_fields = self.allowed_fields()
             complex_fields = self.complex_fields()
             for f in additional_fields:
-                if f not in allowed_fields:
+                if f.field not in allowed_fields:
                     raise ValueError("'%s' is not a field on %s" % (f, self.supported_item_models))
-                if f in complex_fields:
+                if f.field in complex_fields:
                     raise ValueError("find_items() does not support field '%s'. Use fetch() instead" % f)
         if calendar_view is not None:
             assert isinstance(calendar_view, CalendarView)
@@ -326,9 +326,10 @@ class Folder(EWSElement):
             raise ValueError('Folder must have an account')
         assert shape in SHAPE_CHOICES
         assert depth in FOLDER_TRAVERSAL_CHOICES
+        additional_fields = [FieldPath(field=f) for f in self.supported_fields(version=self.account.version)]
         folders = []
         for elem in FindFolder(folder=self).call(
-                additional_fields=self.supported_fields(version=self.account.version),
+                additional_fields=additional_fields,
                 shape=shape,
                 depth=depth,
                 page_size=100,
@@ -378,10 +379,11 @@ class Folder(EWSElement):
     @classmethod
     def get_distinguished(cls, account, shape=IdOnly):
         assert shape in SHAPE_CHOICES
+        additional_fields = [FieldPath(field=f) for f in cls.supported_fields(version=account.version)]
         folders = []
         for elem in GetFolder(account=account).call(
                 folders=[cls(account=account)],
-                additional_fields=cls.supported_fields(),
+                additional_fields=additional_fields,
                 shape=shape
         ):
             if isinstance(elem, Exception):
@@ -397,10 +399,11 @@ class Folder(EWSElement):
             raise ValueError('Folder must have an account')
         if not self.folder_id:
             raise ValueError('Folder must have an ID')
+        additional_fields = [FieldPath(field=f) for f in self.supported_fields(version=self.account.version)]
         folders = []
         for elem in GetFolder(account=self.account).call(
                 folders=[self],
-                additional_fields=self.supported_fields(version=self.account.version),
+                additional_fields=additional_fields,
                 shape=IdOnly
         ):
             if isinstance(elem, Exception):

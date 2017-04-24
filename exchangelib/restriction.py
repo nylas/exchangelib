@@ -4,7 +4,7 @@ import logging
 from future.utils import python_2_unicode_compatible
 
 from .ewsdatetime import EWSDateTime, UTC
-from .util import create_element, xml_to_str, value_to_xml_text
+from .util import create_element, xml_to_str, value_to_xml_text, is_iterable
 
 log = logging.getLogger(__name__)
 
@@ -94,7 +94,7 @@ class Q(object):
                 if lookup == self.LOOKUP_IN:
                     # EWS doesn't have an '__in' operator. Allow '__in' lookups on list and non-list field types,
                     # specifying a list value. We'll emulate it as a set of OR'ed exact matches.
-                    if not isinstance(value, (tuple, list, set)):
+                    if not is_iterable(value, generators_allowed=True):
                         raise ValueError("Value for lookup '%s' must be a list" % key)
                     children = [self.__class__(**{field_path: v}) for v in value]
                     self.children.append(self.__class__(*children, conn_type=self.OR))
@@ -116,7 +116,7 @@ class Q(object):
                 # Exact matching of categories (i.e. match ['a', 'b'] but not ['a', 'b', 'c']) could be implemented by
                 # post-processing items by fetch the categories field unconditionally and removing the items that don't
                 # have an exact match.
-                if lookup == self.LOOKUP_CONTAINS and isinstance(value, (tuple, list, set)):
+                if lookup == self.LOOKUP_CONTAINS and is_iterable(value, generators_allowed=True):
                     # '__contains' lookups on list field types
                     children = [self.__class__(**{field_path: v}) for v in value]
                     self.children.append(self.__class__(*children, conn_type=self.AND))
@@ -165,7 +165,7 @@ class Q(object):
             assert self.value is True
         if self.value is None:
             raise ValueError('Value for filter on field path "%s" cannot be None' % self.field_path)
-        if isinstance(self.value, (tuple, list, set)):
+        if is_iterable(self.value, generators_allowed=True):
             raise ValueError('Value for filter on field path "%s" must be a single value' % self.field_path)
         try:
             value_to_xml_text(self.value)

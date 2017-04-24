@@ -10,7 +10,7 @@ from six import string_types
 from .errors import ErrorInvalidServerVersion
 from .ewsdatetime import EWSDateTime
 from .services import TNS
-from .util import create_element, get_xml_attrs, set_xml_value, value_to_xml_text
+from .util import create_element, get_xml_attrs, set_xml_value, value_to_xml_text, is_iterable
 from .version import Build
 
 string_type = string_types[0]
@@ -92,43 +92,88 @@ def resolve_field_path(field_path, folder, strict=True):
 
 
 class FieldPath(object):
-    """ Holds values needed to point to a single field """
+    """ Holds values needed to point to a single field. For indexed properties, we allow setting eiterh field,
+    field and label, or field, label and subfield. This allows pointing to either the full indexed property set, a
+    property with a specific label, or a particular subfield field on that property. """
     def __init__(self, field, label=None, subfield=None):
         # 'label' and 'subfield' are only used for IndexedField fields
+        assert isinstance(field, (FieldURIField, ExtendedPropertyField))
+        if label:
+            assert isinstance(label, string_types)
+        if subfield:
+            assert isinstance(subfield, SubField)
         self.field = field
         self.label = label
         self.subfield = subfield
 
     @classmethod
-    def from_string(cls, s, folder):
-        field, label, subfield = resolve_field_path(s, folder=folder, strict=False)
+    def from_string(cls, s, folder, strict=False):
+        field, label, subfield = resolve_field_path(s, folder=folder, strict=strict)
         return cls(field=field, label=label, subfield=subfield)
 
+    def get_value(self, item):
+        # For indexed properties, get either the full property set, the property with matching label, or a particular
+        # subfield.
+        if self.label:
+            for subitem in getattr(item, self.field.name):
+                if subitem.label == self.label:
+                    if self.subfield:
+                        return getattr(subitem, self.subfield.name)
+                    return subitem
+            return None  # No item with this label
+        return getattr(item, self.field.name)
+
     def to_xml(self, version=None):
-        if self.label and self.subfield:
+        if isinstance(self.field, IndexedField):
+            if not self.label or not self.subfield:
+                raise ValueError("Field path for indexed field '%s' is missing label and/or subfield" % self.field.name)
             return self.subfield.field_uri_xml(field_uri=self.field.field_uri, label=self.label)
         else:
-            if isinstance(self.field, IndexedField):
-                raise ValueError("Field path for indexed field '%s' is missing label and/or subfield" % self.field.name)
             return self.field.field_uri_xml()
 
+    def expand(self, version):
+        # If this path does not point to a specific subfield on an indexed property, return all the possible path
+        # combinations for this field path.
+        if isinstance(self.field, IndexedField):
+            labels = [self.label] if self.label else self.field.value_cls.LABEL_FIELD.supported_choices(version=version)
+            subfields = [self.subfield] if self.subfield else self.field.value_cls.supported_fields(version=version)
+            for label in labels:
+                for subfield in subfields:
+                    yield FieldPath(field=self.field, label=label, subfield=subfield)
+        else:
+            yield self
 
-class FieldOrder(FieldPath):
-    """ Holds values needed to call server-side sorting on a single field """
-    def __init__(self, *args, **kwargs):
-        self.reverse = kwargs.pop('reverse', False)
-        super(FieldOrder, self).__init__(*args, **kwargs)
+    @property
+    def path(self):
+        if self.label:
+            from .indexed_properties import SingleFieldIndexedElement
+            if isinstance(self.field.value_cls, SingleFieldIndexedElement) or not self.subfield:
+                return '%s__%s' % (self.field.name, self.label)
+            return '%s__%s__%s' % (self.field.name, self.label, self.subfield.name)
+        return self.field.name
+
+    def __eq__(self, other):
+        return hash(self) == hash(other)
+
+    def __hash__(self):
+        return hash((self.field, self.label, self.subfield))
+
+
+class FieldOrder(object):
+    """ Holds values needed to call server-side sorting on a single field path """
+    def __init__(self, field_path, reverse=False):
+        self.field_path = field_path
+        self.reverse = reverse
 
     @classmethod
     def from_string(cls, s, folder):
-        field, label, subfield = resolve_field_path(s.lstrip('-'), folder=folder)
+        field_path = FieldPath.from_string(s.lstrip('-'), folder=folder, strict=True)
         reverse = s.startswith('-')
-        return cls(field=field, label=label, subfield=subfield, reverse=reverse)
+        return cls(field_path=field_path, reverse=reverse)
 
     def to_xml(self, version=None):
-        field_uri = super(FieldOrder, self).to_xml(version=version)
         field_order = create_element('t:FieldOrder', Order='Descending' if self.reverse else 'Ascending')
-        field_order.append(field_uri)
+        field_order.append(self.field_path.to_xml(version=version))
         return field_order
 
 
@@ -176,7 +221,7 @@ class Field(object):
                 raise ValueError("'%s' is a required field with no default" % self.name)
             return self.default
         if self.is_list:
-            if not isinstance(value, (tuple, list, set)):
+            if not is_iterable(value):
                 raise ValueError("Field '%s' value '%s' must be a list" % (self.name, value))
             for v in value:
                 if not isinstance(v, self.value_cls):
@@ -648,21 +693,9 @@ class IndexedField(FieldURIField):
     def to_xml(self, value, version):
         return set_xml_value(create_element('t:%s' % self.PARENT_ELEMENT_NAME), value, version)
 
-    def field_paths(self, version):
-        # Return all field paths supported for this value_cls
-        for label in self.value_cls.LABEL_FIELD.supported_choices(version=version):
-            for subfield in self.value_cls.supported_fields(version=version):
-                yield FieldPath(field=self, label=label, subfield=subfield)
-
     def field_uri_xml(self):
         # Callers must call field_uri_xml() on the subfield
         raise NotImplementedError()
-
-    def field_uri_xml_elems(self, version):
-        # Return elements for all labels and all subfields
-        for label in self.value_cls.LABEL_FIELD.supported_choices(version=version):
-            for subfield in self.value_cls.supported_fields(version=version):
-                yield subfield.field_uri_xml(field_uri=self.field_uri, label=label)
 
     @classmethod
     def response_tag(cls):

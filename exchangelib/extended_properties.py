@@ -10,7 +10,7 @@ from .ewsdatetime import EWSDateTime
 from .properties import EWSElement
 from .services import TNS
 from .util import create_element, add_xml_child, get_xml_attrs, get_xml_attr, set_xml_value, value_to_xml_text, \
-    xml_text_to_value
+    xml_text_to_value, is_iterable
 
 string_type = string_types[0]
 log = logging.getLogger(__name__)
@@ -105,7 +105,8 @@ class ExtendedProperty(EWSElement):
 
         python_type = self.python_type()
         if self.is_array_type():
-            assert isinstance(self.value, (tuple, list, set))
+            if not is_iterable(self.value):
+                raise ValueError("'%s' value '%s' must be a list" % (self.__class__.__name__, self.value))
             for v in self.value:
                 assert isinstance(v, python_type)
         else:

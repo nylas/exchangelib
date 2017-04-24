@@ -13,6 +13,7 @@ Exchange EWS references:
 from __future__ import unicode_literals
 
 import abc
+from itertools import chain
 import logging
 import traceback
 from xml.etree.ElementTree import ParseError
@@ -465,7 +466,7 @@ class GetItem(EWSAccountService, EWSPooledMixIn):
         Returns all items in an account that correspond to a list of ID's, in stable order.
 
         :param items: a list of (id, changekey) tuples or Item objects
-        :param additional_fields: the extra fields that should be returned with the item. 
+        :param additional_fields: the extra fields that should be returned with the item, as FieldPath objects
         :return: XML elements for the items, in stable order
         """
         return self._pool_requests(payload_func=self.get_payload, **dict(
@@ -480,14 +481,10 @@ class GetItem(EWSAccountService, EWSPooledMixIn):
         itemshape = create_element('m:ItemShape')
         add_xml_child(itemshape, 't:BaseShape', IdOnly)
         if additional_fields:
-            from .fields import IndexedField
-            additional_properties = []
-            for f in additional_fields:
-                if isinstance(f, IndexedField):
-                    additional_properties.extend(f.field_uri_xml_elems(version=self.account.version))
-                else:
-                    additional_properties.append(f.field_uri_xml())
-            add_xml_child(itemshape, 't:AdditionalProperties', additional_properties)
+            additional_properties = create_element('t:AdditionalProperties')
+            expanded_fields = chain(*(f.expand(version=self.account.version) for f in additional_fields))
+            set_xml_value(additional_properties, expanded_fields, self.account.version)
+            itemshape.append(additional_properties)
         getitem.append(itemshape)
         item_ids = create_element('m:ItemIds')
         is_empty = True
@@ -619,11 +616,8 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
                 # A value of None or [] means we want to remove this field from the item
                 if field.is_required or field.is_required_after_save:
                     raise ValueError('%s is a required field and may not be deleted', field.name)
-                if isinstance(field, IndexedField):
-                    for field_path in field.field_paths(version=self.account.version):
-                        yield self._delete_item_elem(field_path=field_path)
-                else:
-                    yield self._delete_item_elem(field_path=FieldPath(field=field))
+                for field_path in FieldPath(field=field).expand(version=self.account.version):
+                    yield self._delete_item_elem(field_path=field_path)
                 continue
 
             if isinstance(field, IndexedField):
@@ -764,7 +758,7 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
         """
         Find items in an account.
 
-        :param additional_fields: the extra fields that should be returned with the item
+        :param additional_fields: the extra fields that should be returned with the item, as FieldPath objects
         :param restriction: a Restriction object for
         :param order: a field to sort the results by
         :param shape: The set of attributes to return
@@ -788,14 +782,10 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
         itemshape = create_element('m:ItemShape')
         add_xml_child(itemshape, 't:BaseShape', shape)
         if additional_fields:
-            from .fields import IndexedField
-            additional_properties = []
-            for f in additional_fields:
-                if isinstance(f, IndexedField):
-                    additional_properties.extend(f.field_uri_xml_elems(version=self.account.version))
-                else:
-                    additional_properties.append(f.field_uri_xml())
-            add_xml_child(itemshape, 't:AdditionalProperties', additional_properties)
+            additional_properties = create_element('t:AdditionalProperties')
+            expanded_fields = chain(*(f.expand(version=self.account.version) for f in additional_fields))
+            set_xml_value(additional_properties, expanded_fields, self.account.version)
+            itemshape.append(additional_properties)
         finditem.append(itemshape)
         if calendar_view is None:
             view_type = create_element('m:IndexedPageItemView',
@@ -828,7 +818,7 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
         """
         Find subfolders of a folder.
 
-        :param additional_fields: the extra fields that should be returned with the folder
+        :param additional_fields: the extra fields that should be returned with the folder, as FieldPath objects
         :param shape: The set of attributes to return
         :param depth: How deep in the folder structure to search for folders
         :param page_size: The number of items to return per request
@@ -846,14 +836,10 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
         foldershape = create_element('m:FolderShape')
         add_xml_child(foldershape, 't:BaseShape', shape)
         if additional_fields:
-            from .fields import IndexedField
-            additional_properties = []
-            for f in additional_fields:
-                if isinstance(f, IndexedField):
-                    additional_properties.extend(f.field_uri_xml_elems(version=self.account.version))
-                else:
-                    additional_properties.append(f.field_uri_xml())
-            add_xml_child(foldershape, 't:AdditionalProperties', additional_properties)
+            additional_properties = create_element('t:AdditionalProperties')
+            expanded_fields = chain(*(f.expand(version=self.account.version) for f in additional_fields))
+            set_xml_value(additional_properties, expanded_fields, self.account.version)
+            foldershape.append(additional_properties)
         findfolder.append(foldershape)
         if self.account.version.build >= EXCHANGE_2010:
             indexedpageviewitem = create_element('m:IndexedPageFolderView', MaxEntriesReturned=text_type(page_size),
@@ -879,7 +865,7 @@ class GetFolder(EWSAccountService):
         Takes a folder ID and returns the full information for that folder.
 
         :param folders: a list of (id, changekey) tuples or Folder objects
-        :param additional_fields: the extra fields that should be returned with the folder.
+        :param additional_fields: the extra fields that should be returned with the folder, as FieldPath objects
         :param shape: The set of attributes to return
         :return: XML elements for the folders, in stable order
         """
@@ -895,14 +881,10 @@ class GetFolder(EWSAccountService):
         foldershape = create_element('m:FolderShape')
         add_xml_child(foldershape, 't:BaseShape', shape)
         if additional_fields:
-            from .fields import IndexedField
-            additional_properties = []
-            for f in additional_fields:
-                if isinstance(f, IndexedField):
-                    additional_properties.extend(f.field_uri_xml_elems(version=self.account.version))
-                else:
-                    additional_properties.append(f.field_uri_xml())
-            add_xml_child(foldershape, 't:AdditionalProperties', additional_properties)
+            additional_properties = create_element('t:AdditionalProperties')
+            expanded_fields = chain(*(f.expand(version=self.account.version) for f in additional_fields))
+            set_xml_value(additional_properties, expanded_fields, self.account.version)
+            foldershape.append(additional_properties)
         getfolder.append(foldershape)
         folder_ids = create_element('m:FolderIds')
         is_empty = True

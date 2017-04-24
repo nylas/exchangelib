@@ -12,7 +12,7 @@ from .fields import BooleanField, IntegerField, DecimalField, Base64Field, TextF
     URIField, BodyField, DateTimeField, MessageHeaderField, PhoneNumberField, EmailAddressField, PhysicalAddressField, \
     ExtendedPropertyField, AttachmentField, MailboxField, AttendeesField, TextListField, MailboxListField, Choice
 from .properties import EWSElement, ItemId
-from .util import create_element
+from .util import create_element, is_iterable
 from .version import EXCHANGE_2010, EXCHANGE_2013
 
 string_type = string_types[0]
@@ -280,7 +280,7 @@ class Item(EWSElement):
 
         Adding attachments to an existing item will update the changekey of the item.
         """
-        if not isinstance(attachments, (tuple, list, set)):
+        if not is_iterable(attachments, generators_allowed=True):
             attachments = [attachments]
         for a in attachments:
             if not a.parent_item:
@@ -298,7 +298,7 @@ class Item(EWSElement):
 
         Removing attachments from an existing item will update the changekey of the item.
         """
-        if not isinstance(attachments, (tuple, list, set)):
+        if not is_iterable(attachments, generators_allowed=True):
             attachments = [attachments]
         for a in attachments:
             assert a.parent_item is self

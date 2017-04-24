@@ -168,7 +168,7 @@ def set_xml_value(elem, value, version):
         elem.text = value_to_xml_text(value)
     elif is_iterable(value, generators_allowed=True):
         for v in value:
-            if isinstance(v, EWSElement):
+            if isinstance(v, (FieldPath, FieldOrder, EWSElement)):
                 assert version
                 elem.append(v.to_xml(version=version))
             elif isinstance(v, ElementType):
