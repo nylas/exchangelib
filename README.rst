@@ -258,9 +258,15 @@ Here are some examples of using the API:
     # Returns items that have no categories set, i.e. the field does not exist on the item on the server
     qs.filter(categories__exists=False)
 
+    # filter() also supports EWS QueryStrings. Just pass the string to filter(). QueryStrings cannot be combined with
+    # other filters. We make no attempt at validating the syntax of the QueryString - we just pass the string verbatim
+    # to EWS.
+    #
+    # Read more about the QueryString syntax here: https://msdn.microsoft.com/en-us/library/ee693615.aspx
+    items = my_folder.filter('subject:XXX')
+
     # filter() also supports Q objects that are modeled after Django Q objects, for building complex
     # boolean logic search expressions.
-    #
     q = (Q(subject__iexact='foo') | Q(subject__contains='bar')) & ~Q(subject__startswith='baz')
     items = my_folder.filter(q)
 

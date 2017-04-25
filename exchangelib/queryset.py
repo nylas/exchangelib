@@ -4,7 +4,6 @@ from __future__ import unicode_literals
 from copy import deepcopy
 from itertools import islice
 import logging
-from operator import attrgetter
 
 from future.utils import python_2_unicode_compatible
 
@@ -38,7 +37,7 @@ class QuerySet(object):
 
     def __init__(self, folder):
         self.folder = folder
-        self.q = Q()
+        self.q = Q()  # Default to no restrictions. 'None' means 'return nothing'
         self.only_fields = None
         self.order_fields = None
         self.return_format = self.NONE
@@ -289,14 +288,14 @@ class QuerySet(object):
     def filter(self, *args, **kwargs):
         """ Return everything that matches these search criteria """
         new_qs = self.copy()
-        q = Q(*args, **kwargs) or Q()
+        q = Q(*args, **kwargs)
         new_qs.q = q if new_qs.q is None else new_qs.q & q
         return new_qs
 
     def exclude(self, *args, **kwargs):
         """ Return everything that does NOT match these search criteria """
         new_qs = self.copy()
-        q = ~Q(*args, **kwargs) or Q()
+        q = ~Q(*args, **kwargs)
         new_qs.q = q if new_qs.q is None else new_qs.q & q
         return new_qs
 

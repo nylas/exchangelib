@@ -254,8 +254,13 @@ class Folder(EWSElement):
         # Build up any restrictions
         if q.is_empty():
             restriction = None
+            query_string = None
+        elif q.query_string:
+            restriction = None
+            query_string = Restriction(q, folder=self)
         else:
             restriction = Restriction(q, folder=self)
+            query_string = None
         log.debug(
             'Finding %s items for %s (shape: %s, depth: %s, additional_fields: %s, restriction: %s)',
             self.DISTINGUISHED_FOLDER_ID,
@@ -270,6 +275,7 @@ class Folder(EWSElement):
             restriction=restriction,
             order_fields=order_fields,
             shape=shape,
+            query_string=query_string,
             depth=depth,
             calendar_view=calendar_view,
             page_size=page_size,

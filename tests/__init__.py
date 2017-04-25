@@ -2918,6 +2918,27 @@ class BaseItemTest(EWSTest):
         )
         self.bulk_delete(ids)
 
+    def test_filter_with_queryset(self):
+        # We don't allow QueryString in combination with other restrictions
+        with self.assertRaises(ValueError):
+            self.test_folder.filter('subject:XXX', foo='bar')
+        with self.assertRaises(ValueError):
+            self.test_folder.filter('subject:XXX').filter(foo='bar')
+        with self.assertRaises(ValueError):
+            self.test_folder.filter(foo='bar').filter('subject:XXX')
+
+        item = self.get_test_item()
+        item.subject = 'Hello Exchangelib'
+        item.save()
+        # For some reason, the querystring search doesn't work instantly. Maybe some search indexes need updating first.
+        time.sleep(10)
+        self.assertEqual(
+            len(self.test_folder.filter('subject:"Hello Exchangelib"')),
+            1
+        )
+        item.delete()
+
+
     def test_filter_on_all_fields(self):
         # Test that we can filter on all field names that we support filtering on
         # TODO: Test filtering on subfields of IndexedField

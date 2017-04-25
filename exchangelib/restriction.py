@@ -2,6 +2,7 @@
 import logging
 
 from future.utils import python_2_unicode_compatible
+from six import string_types
 
 from .ewsdatetime import EWSDateTime, UTC
 from .util import create_element, xml_to_str, value_to_xml_text, is_iterable
@@ -53,7 +54,7 @@ class Q(object):
                     LOOKUP_IEXACT, LOOKUP_CONTAINS, LOOKUP_ICONTAINS, LOOKUP_STARTSWITH, LOOKUP_ISTARTSWITH,
                     LOOKUP_EXISTS}
 
-    __slots__ = 'conn_type', 'field_path', 'op', 'value', 'children'
+    __slots__ = 'conn_type', 'field_path', 'op', 'value', 'children', 'query_string'
 
     def __init__(self, *args, **kwargs):
         self.conn_type = kwargs.pop('conn_type', self.AND)
@@ -61,14 +62,28 @@ class Q(object):
         self.field_path = None  # Name of the field we want to filter on
         self.op = None
         self.value = None
+        self.query_string = None
 
         # Build children of Q objects from *args and **kwargs
         self.children = []
 
         for q in args:
+            if isinstance(q, string_types):
+                if kwargs or not self.is_empty():
+                    raise ValueError('A query string cannot be combined with other restrictions')
+                self.query_string = q
+                continue
+
             if not isinstance(q, self.__class__):
                 raise ValueError("Non-keyword arg '%s' must be a Q object" % q)
+            if q.query_string:
+                if kwargs or not self.is_empty():
+                    raise ValueError('A query string cannot be combined with other restrictions')
+                self.query_string = q.query_string
+                continue
             if not q.is_empty():
+                if self.query_string:
+                    raise ValueError('A query string cannot be combined with other restrictions')
                 self.children.append(q)
 
         for key, value in kwargs.items():
@@ -151,10 +166,14 @@ class Q(object):
         self.field_path = q.field_path
         self.op = q.op
         self.value = q.value
+        self.query_string = q.query_string
         self.children = q.children
 
     def clean(self):
         if self.is_empty():
+            return
+        if self.query_string:
+            assert not any([self.field_path, self.op, self.value, self.children])
             return
         assert self.conn_type in self.CONN_TYPES
         if not self.is_leaf():
@@ -257,11 +276,13 @@ class Q(object):
         return not self.children
 
     def is_empty(self):
-        return self.is_leaf() and self.field_path is None
+        return self.is_leaf() and self.field_path is None and self.query_string is None
 
     def expr(self):
         if self.is_empty():
             return None
+        if self.query_string:
+            return self.query_string
         if self.is_leaf():
             expr = '%s %s %s' % (self.field_path, self.op, repr(self.value))
         else:
@@ -290,14 +311,17 @@ class Q(object):
             raise ValueError("Field path '%s' must contain a subfield" % self.field_path)
 
     def to_xml(self, folder, version):
+        if self.query_string:
+            elem = create_element('m:QueryString')
+            elem.text = self.query_string
+            return elem
         # Translate this Q object to a valid Restriction XML tree
         elem = self.xml_elem(folder=folder, version=version)
         if elem is None:
             return None
-        from xml.etree.ElementTree import ElementTree
         restriction = create_element('m:Restriction')
         restriction.append(elem)
-        return ElementTree(restriction).getroot()
+        return restriction
 
     def xml_elem(self, folder, version):
         # Recursively build an XML tree structure of this Q object. If this is an empty leaf (the equivalent of Q()),
@@ -394,6 +418,8 @@ class Q(object):
 
     def __repr__(self):
         if self.is_leaf():
+            if self.query_string:
+                return self.__class__.__name__ + '(%s)' % repr(self.query_string)
             return self.__class__.__name__ + '(%s %s %s)' % (self.field_path, self.op, repr(self.value))
         sorted_children = tuple(sorted(self.children, key=lambda i: i.field_path or ''))
         if self.conn_type == self.NOT or len(self.children) > 1:

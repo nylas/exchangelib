@@ -754,7 +754,7 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
     element_container_name = '{%s}Items' % TNS
     CHUNKSIZE = 100
 
-    def call(self, additional_fields, restriction, order_fields, shape, depth, calendar_view, page_size):
+    def call(self, additional_fields, restriction, order_fields, shape, query_string, depth, calendar_view, page_size):
         """
         Find items in an account.
 
@@ -762,6 +762,7 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
         :param restriction: a Restriction object for
         :param order_fields: the fields to sort the results by
         :param shape: The set of attributes to return
+        :param query_string: a QueryString object
         :param depth: How deep in the folder structure to search for items
         :param calendar_view: If set, returns recurring calendar items unfolded
         :param page_size: The number of items to return per request
@@ -771,14 +772,15 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
             additional_fields=additional_fields,
             restriction=restriction,
             order_fields=order_fields,
+            query_string=query_string,
             shape=shape,
             depth=depth,
             calendar_view=calendar_view,
             page_size=page_size,
         ))
 
-    def get_payload(self, additional_fields, restriction, order_fields, shape, depth, calendar_view, page_size,
-                    offset=0):
+    def get_payload(self, additional_fields, restriction, order_fields, query_string, shape, depth, calendar_view,
+                    page_size, offset=0):
         finditem = create_element('m:%s' % self.SERVICE_NAME, Traversal=depth)
         itemshape = create_element('m:ItemShape')
         add_xml_child(itemshape, 't:BaseShape', shape)
@@ -805,6 +807,8 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
         parentfolderids = create_element('m:ParentFolderIds')
         parentfolderids.append(self._folder_elem(self.folder))
         finditem.append(parentfolderids)
+        if query_string:
+            finditem.append(query_string.to_xml(version=self.account.version))
         return finditem
 
 

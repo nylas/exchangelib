@@ -9,6 +9,7 @@ HEAD
   ``.filter(phone_numbers__CarPhone='123')``, ``.filter(physical_addresses__Home__street='Elm St. 123')``,
   `.only('physical_addresses__Home__street')`` etc.
 * Improved performance of ``.order_by()`` when sorting on multiple fields.
+* Implemented QueryString search. You can now filter using an EWS QueryString, e.g. ``filter('subject:XXX')``
 
 1.9.2
 -----
