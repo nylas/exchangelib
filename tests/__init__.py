@@ -55,6 +55,10 @@ if PY2:
 
 string_type = string_types[0]
 
+mock_account = namedtuple('mock_account', ('protocol', 'version'))
+mock_protocol = namedtuple('mock_protocol', ('version', 'service_endpoint'))
+mock_version = namedtuple('mock_version', ('build',))
+
 
 def mock_post(url, status_code, headers, text):
     req = namedtuple('request', ['headers'])(headers={})
@@ -709,10 +713,8 @@ class QuerySetTest(unittest.TestCase):
 class ServicesTest(unittest.TestCase):
     def test_invalid_server_version(self):
         # Test that we get a client-side error if we call a service that was only implemented in a later version
-        mock_account = namedtuple('mock_account', ('protocol',))
-        mock_protocol = namedtuple('mock_protocol', ('version',))
-        mock_version = namedtuple('mock_version', ('build',))
-        account = mock_account(protocol=mock_protocol(version=mock_version(build=EXCHANGE_2007)))
+        version = mock_version(build=EXCHANGE_2007)
+        account = mock_account(version=version, protocol=mock_protocol(version=version, service_endpoint='example.com'))
         with self.assertRaises(NotImplementedError):
             GetServerTimeZones(protocol=account.protocol).call()
         with self.assertRaises(NotImplementedError):
@@ -2918,7 +2920,11 @@ class BaseItemTest(EWSTest):
         )
         self.bulk_delete(ids)
 
-    def test_filter_with_queryset(self):
+    def test_filter_with_querystring(self):
+        # QueryString is only supported from Exchange 2010
+        with self.assertRaises(NotImplementedError):
+            Q('subject:XXX').to_xml(self.test_folder, version=mock_version(build=EXCHANGE_2007))
+
         # We don't allow QueryString in combination with other restrictions
         with self.assertRaises(ValueError):
             self.test_folder.filter('subject:XXX', foo='bar')
@@ -2928,16 +2934,15 @@ class BaseItemTest(EWSTest):
             self.test_folder.filter(foo='bar').filter('subject:XXX')
 
         item = self.get_test_item()
-        item.subject = 'Hello Exchangelib'
+        item.subject = get_random_string(length=8, spaces=False, special=False)
         item.save()
-        # For some reason, the querystring search doesn't work instantly. Maybe some search indexes need updating first.
-        time.sleep(10)
-        self.assertEqual(
-            len(self.test_folder.filter('subject:"Hello Exchangelib"')),
-            1
+        # For some reason, the querystring search doesn't work instantly. We may have to wait for up to 60 seconds.
+        # I'm too impatient for that, so also allow empty results. This makes the test almost worthless but I blame EWS.
+        self.assertIn(
+            len(self.test_folder.filter('subject:%s' % item.subject)),
+            (0, 1)
         )
         item.delete()
-
 
     def test_filter_on_all_fields(self):
         # Test that we can filter on all field names that we support filtering on

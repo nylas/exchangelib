@@ -6,6 +6,7 @@ from six import string_types
 
 from .ewsdatetime import EWSDateTime, UTC
 from .util import create_element, xml_to_str, value_to_xml_text, is_iterable
+from .version import EXCHANGE_2010
 
 log = logging.getLogger(__name__)
 
@@ -312,6 +313,8 @@ class Q(object):
 
     def to_xml(self, folder, version):
         if self.query_string:
+            if version.build < EXCHANGE_2010:
+                raise NotImplementedError('QueryString filtering is only supported for Exchange 2010 servers and later')
             elem = create_element('m:QueryString')
             elem.text = self.query_string
             return elem
