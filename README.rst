@@ -108,8 +108,8 @@ Folders
     account.inbox.refresh()
 
 
-Creating and sending
-^^^^^^^^^^^^^^^^^^^^
+Creating, updating, deleting, sending and moving
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: python
 
@@ -118,10 +118,11 @@ Creating and sending
     #
     # You can create, update and delete single items
     item = CalendarItem(folder=account.calendar, subject='foo')
-    item.save()
+    item.save()  # This gives the item an item_id and a changekey
     item.subject = 'bar'
-    item.save()
+    item.save()  # When the items has an item_id, this will update the item
     item.delete()
+    item.move(account.trash)  # Moves the item to the trash bin
 
     # You can also send emails:
 
@@ -172,7 +173,7 @@ Bulk operations
             )]
         ))
 
-    # bulk_update() and bulk_delete() methods are also supported.
+    # bulk_update(), bulk_delete(), bulk_move() and bulk_send() methods are also supported.
     res = account.calendar.bulk_create(items=calendar_items)
     print(res)
 
