@@ -2942,7 +2942,7 @@ class BaseItemTest(EWSTest):
             len(self.test_folder.filter('subject:%s' % item.subject)),
             (0, 1)
         )
-        item.delete()
+        item.delete(affected_task_occurrences=ALL_OCCURRENCIES)
 
     def test_filter_on_all_fields(self):
         # Test that we can filter on all field names that we support filtering on
