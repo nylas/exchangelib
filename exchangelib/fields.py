@@ -524,6 +524,7 @@ class EWSElementField(FieldURIField):
 
 class MessageHeaderField(EWSElementField):
     is_list = True
+    is_complex = True
 
     def __init__(self, *args, **kwargs):
         from .properties import MessageHeader
