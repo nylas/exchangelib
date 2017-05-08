@@ -31,7 +31,7 @@ Setup and connecting
 
     from exchangelib import DELEGATE, IMPERSONATION, Account, Credentials, ServiceAccount, \
         EWSDateTime, EWSTimeZone, Configuration, NTLM, CalendarItem, Message, \
-        Mailbox, Attendee, Q, Calendar, ExtendedProperty, FileAttachment, ItemAttachment, \
+        Mailbox, Attendee, Q, ExtendedProperty, FileAttachment, ItemAttachment, \
         HTMLBody, Build, Version
 
     # Username in WINDOMAIN\username format. Office365 wants usernames in PrimarySMTPAddress
