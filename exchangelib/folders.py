@@ -296,6 +296,16 @@ class Folder(EWSElement):
     def fetch(self, *args, **kwargs):
         return self.account.fetch(folder=self, *args, **kwargs)
 
+    def wipe(self):
+        # Recursively deletes all items in this folder and all subfolders. Use with caution!
+        for f in self.get_folders():
+            f.wipe()
+            # TODO: Also delete non-distinguished folders here when we support folder deletion
+        log.debug('Wiping folder %s', self)
+        for i in self.all().delete():
+            if isinstance(i, Exception):
+                raise i
+
     def test_access(self):
         """
         Does a simple FindItem to test (read) access to the folder. Maybe the account doesn't exist, maybe the
