@@ -27,14 +27,20 @@ class EWSDate(datetime.date):
         return self.strftime('%Y-%m-%d')
 
     @classmethod
+    def from_date(cls, d):
+        return cls(d.year, d.month, d.day)
+
+    @classmethod
     def from_string(cls, date_string):
         try:
             dt = datetime.datetime.strptime(date_string, '%Y-%m-%d')
         except ValueError:
             # Sometimes, we'll receive a date string with timezone information. Not very useful.
-            dt = datetime.datetime.strptime(date_string, '%Y-%m-%d+%H:%M')
-        return cls(year=dt.year, month=dt.month, day=dt.day)
-
+            try:
+                dt = datetime.datetime.strptime(date_string, '%Y-%m-%d+%H:%M')
+            except ValueError:
+                dt = datetime.datetime.strptime(date_string, '%Y-%m-%dZ')
+        return cls.from_date(dt.date())
 
 
 class EWSDateTime(datetime.datetime):
@@ -98,6 +104,11 @@ class EWSDateTime(datetime.datetime):
         # We want to return EWSDateTime objects
         t = super(EWSDateTime, cls).now(tz=tz)
         return cls.from_datetime(t)
+
+    def date(self):
+        # We want to return EWSDate objects
+        d = super(EWSDateTime, self).date()
+        return EWSDate.from_date(d)
 
 
 class EWSTimeZone(object):

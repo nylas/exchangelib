@@ -6,7 +6,7 @@ from .attachments import FileAttachment, ItemAttachment
 from .autodiscover import discover
 from .configuration import Configuration
 from .credentials import DELEGATE, IMPERSONATION, Credentials, ServiceAccount
-from .ewsdatetime import EWSDateTime, EWSTimeZone, UTC, UTC_NOW
+from .ewsdatetime import EWSDate, EWSDateTime, EWSTimeZone, UTC, UTC_NOW
 from .extended_properties import ExtendedProperty, ExternId
 from .folders import SHALLOW, DEEP
 from .items import CalendarItem, Contact, Message, Task
@@ -21,7 +21,7 @@ __all__ = [
     'discover',
     'Configuration',
     'DELEGATE', 'IMPERSONATION', 'Credentials', 'ServiceAccount',
-    'EWSDateTime', 'EWSTimeZone', 'UTC', 'UTC_NOW',
+    'EWSDate', 'EWSDateTime', 'EWSTimeZone', 'UTC', 'UTC_NOW',
     'ExtendedProperty',
     'CalendarItem', 'Contact', 'Message', 'Task',
     'ItemId', 'Mailbox', 'Attendee', 'Room', 'RoomList', 'Body', 'HTMLBody',
