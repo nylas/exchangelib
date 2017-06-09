@@ -413,8 +413,9 @@ class QuerySet(object):
         """ Find out if the query contains any hits, with as little effort as possible """
         return self.count() > 0
 
-    def delete(self):
-        """ Delete the items matching the query, with as little effort as possible """
+    def delete(self, page_size=1000):
+        """ Delete the items matching the query, with as little effort as possible. 'page_size' is the number of items
+        to fetch from the server per request. We're only fetching the IDs, so keep it high"""
         from .items import ALL_OCCURRENCIES
         if self._cache is not None:
             res = self.folder.account.bulk_delete(ids=self._cache, affected_task_occurrences=ALL_OCCURRENCIES)
@@ -424,4 +425,5 @@ class QuerySet(object):
         new_qs.only_fields = tuple()
         new_qs.order_fields = None
         new_qs.return_format = self.NONE
+        new_qs.page_size = page_size
         return self.folder.account.bulk_delete(ids=new_qs, affected_task_occurrences=ALL_OCCURRENCIES)
