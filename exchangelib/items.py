@@ -80,10 +80,9 @@ class Item(EWSElement):
 
     # 'extern_id' is not a native EWS Item field. We use it for identification when item originates in an external
     # system. The field is implemented as an extended property on the Item.
-    from .version import Build
     FIELDS = [
-        TextField('item_id', field_uri='item:ItemId', is_read_only=True, is_searchable=False),
-        TextField('changekey', field_uri='item:ChangeKey', is_read_only=True, is_searchable=False),
+        TextField('item_id', is_read_only=True, is_searchable=False),
+        TextField('changekey', is_read_only=True, is_searchable=False),
         # TODO: MimeContent actually supports writing, but is still untested
         Base64Field('mime_content', field_uri='item:MimeContent', is_read_only=True),
         TextField('subject', field_uri='item:Subject', max_length=255),
@@ -335,7 +334,7 @@ class Item(EWSElement):
         except ValueError:
             pass
         else:
-            raise ValueError("%s' is already registered" % attr_name)
+            raise ValueError("'%s' is already registered" % attr_name)
         if not issubclass(attr_cls, ExtendedProperty):
             raise ValueError("'%s' must be a subclass of ExtendedProperty" % attr_cls)
         # Find the correct index for the extended property and insert the new field. We insert after 'reminder_is_set'
@@ -355,7 +354,7 @@ class Item(EWSElement):
         try:
             field = cls.get_field_by_fieldname(attr_name)
         except ValueError:
-            raise ValueError("%s' is not registered" % attr_name)
+            raise ValueError("'%s' is not registered" % attr_name)
         if not isinstance(field, ExtendedPropertyField):
             raise ValueError("'%s' is not registered as an ExtendedProperty" % attr_name)
         cls.remove_field(field)
@@ -386,8 +385,8 @@ class Item(EWSElement):
 @python_2_unicode_compatible
 class BulkCreateResult(Item):
     FIELDS = [
-        TextField('item_id', field_uri='item:ItemId', is_read_only=True, is_required=True),
-        TextField('changekey', field_uri='item:ChangeKey', is_read_only=True, is_required=True),
+        TextField('item_id', is_read_only=True, is_required=True),
+        TextField('changekey', is_read_only=True, is_required=True),
         AttachmentField('attachments', field_uri='item:Attachments'),  # ItemAttachment or FileAttachment
     ]
 
