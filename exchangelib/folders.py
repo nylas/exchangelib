@@ -341,7 +341,6 @@ class Folder(EWSElement):
         assert shape in SHAPE_CHOICES
         assert depth in FOLDER_TRAVERSAL_CHOICES
         additional_fields = [FieldPath(field=f) for f in self.supported_fields(version=self.account.version)]
-        folders = []
         for elem in FindFolder(folder=self).call(
                 additional_fields=additional_fields,
                 shape=shape,
@@ -361,7 +360,7 @@ class Folder(EWSElement):
             #
             # TODO: fld_class.LOCALIZED_NAMES is most definitely neither complete nor authoritative
             if isinstance(elem, Exception):
-                folders.append(elem)
+                yield elem
                 continue
             dummy_fld = Folder.from_xml(elem=elem)  # We use from_xml() only to parse elem
             try:
@@ -371,9 +370,7 @@ class Folder(EWSElement):
                 folder_cls = self.folder_cls_from_container_class(dummy_fld.folder_class)
                 log.debug('Folder class %s matches container class %s (%s)', folder_cls, dummy_fld.folder_class,
                           dummy_fld.name)
-            folders.append(folder_cls(account=self.account,
-                                      **{f.name: getattr(dummy_fld, f.name) for f in folder_cls.FIELDS}))
-        return folders
+            yield folder_cls(account=self.account, **{f.name: getattr(dummy_fld, f.name) for f in folder_cls.FIELDS})
 
     def get_folder_by_name(self, name):
         """Takes a case-sensitive folder name and returns an instance of that folder, if a folder with that name exists

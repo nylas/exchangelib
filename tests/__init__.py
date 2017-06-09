@@ -1900,7 +1900,7 @@ class FolderTest(EWSTest):
                 f.get_item_field_by_fieldname('XXX')
 
     def test_getfolders(self):
-        folders = self.account.root.get_folders()
+        folders = list(self.account.root.get_folders())
         self.assertGreater(len(folders), 60, sorted(f.name for f in folders))
         with self.assertRaises(ValueError):
             self.account.inbox.get_folder_by_name(get_random_string(16))
