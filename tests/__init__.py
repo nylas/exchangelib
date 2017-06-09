@@ -3508,12 +3508,12 @@ class BaseItemTest(EWSTest):
         prop_val = item.dead_beef
         self.assertTrue(isinstance(prop_val, int))
         item.save()
-        item = list(self.account.fetch(ids=[(item.item_id, item.changekey)]))[0]
+        item.refresh()
         self.assertEqual(prop_val, item.dead_beef)
         new_prop_val = get_random_int(0, 256)
         item.dead_beef = new_prop_val
         item.save()
-        item = list(self.account.fetch(ids=[(item.item_id, item.changekey)]))[0]
+        item.refresh()
         self.assertEqual(new_prop_val, item.dead_beef)
 
         # Test deregister
@@ -3539,12 +3539,12 @@ class BaseItemTest(EWSTest):
         prop_val = item.dead_beef_array
         self.assertTrue(isinstance(prop_val, list))
         item.save()
-        item = list(self.account.fetch(ids=[(item.item_id, item.changekey)]))[0]
+        item.refresh()
         self.assertEqual(prop_val, item.dead_beef_array)
         new_prop_val = self.random_val(self.ITEM_CLASS.get_field_by_fieldname(attr_name))
         item.dead_beef_array = new_prop_val
         item.save()
-        item = list(self.account.fetch(ids=[(item.item_id, item.changekey)]))[0]
+        item.refresh()
         self.assertEqual(new_prop_val, item.dead_beef_array)
 
         self.ITEM_CLASS.deregister(attr_name=attr_name)
@@ -3562,12 +3562,12 @@ class BaseItemTest(EWSTest):
         prop_val = item.my_flag
         self.assertTrue(isinstance(prop_val, int))
         item.save()
-        item = list(self.account.fetch(ids=[(item.item_id, item.changekey)]))[0]
+        item.refresh()
         self.assertEqual(prop_val, item.my_flag)
         new_prop_val = self.random_val(self.ITEM_CLASS.get_field_by_fieldname(attr_name))
         item.my_flag = new_prop_val
         item.save()
-        item = list(self.account.fetch(ids=[(item.item_id, item.changekey)]))[0]
+        item.refresh()
         self.assertEqual(new_prop_val, item.my_flag)
 
         self.ITEM_CLASS.deregister(attr_name=attr_name)
@@ -3593,12 +3593,12 @@ class BaseItemTest(EWSTest):
         prop_val = item.my_flag
         self.assertTrue(isinstance(prop_val, int))
         item.save()
-        item = list(self.account.fetch(ids=[(item.item_id, item.changekey)]))[0]
+        item.refresh()
         self.assertEqual(prop_val, item.my_flag)
         new_prop_val = self.random_val(self.ITEM_CLASS.get_field_by_fieldname(attr_name))
         item.my_flag = new_prop_val
         item.save()
-        item = list(self.account.fetch(ids=[(item.item_id, item.changekey)]))[0]
+        item.refresh()
         self.assertEqual(new_prop_val, item.my_flag)
 
         self.ITEM_CLASS.deregister(attr_name=attr_name)
@@ -3618,7 +3618,7 @@ class BaseItemTest(EWSTest):
         self.assertTrue(isinstance(prop_val, bytes))
         item.save()
         item = list(self.account.fetch(ids=[(item.item_id, item.changekey)]))[0]
-        self.assertEqual(prop_val, item.my_meeting)
+        self.assertEqual(prop_val, item.my_meeting, (prop_val, item.my_meeting))
         new_prop_val = self.random_val(self.ITEM_CLASS.get_field_by_fieldname(attr_name))
         item.my_meeting = new_prop_val
         item.save()
