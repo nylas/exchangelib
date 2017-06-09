@@ -65,7 +65,7 @@ class CalendarView(EWSElement):
     FIELDS = [
         DateTimeField('start', field_uri='StartDate', is_required=True),
         DateTimeField('end', field_uri='EndDate', is_required=True),
-        IntegerField('max_items', field_uri='MaxEntriesReturned'),
+        IntegerField('max_items', field_uri='MaxEntriesReturned', min=1),
     ]
 
     __slots__ = ('start', 'end', 'max_items')
@@ -74,8 +74,6 @@ class CalendarView(EWSElement):
         super(CalendarView, self).clean(version=version)
         if self.end < self.start:
             raise ValueError("'start' must be before 'end'")
-        if self.max_items is not None and self.max_items < 1:
-            raise ValueError("'max_items' must be a positive integer")
 
     def to_xml(self, version):
         self.clean(version=version)
@@ -103,9 +101,9 @@ class Folder(EWSElement):
         TextField('changekey', field_uri='folder:Changekey', is_searchable=False),
         TextField('name', field_uri='folder:DisplayName'),
         TextField('folder_class', field_uri='folder:FolderClass'),
-        IntegerField('total_count', field_uri='folder:TotalCount'),
-        IntegerField('unread_count', field_uri='folder:UnreadCount'),
-        IntegerField('child_folder_count', field_uri='folder:ChildFolderCount'),
+        IntegerField('total_count', field_uri='folder:TotalCount', is_read_only=True),
+        IntegerField('unread_count', field_uri='folder:UnreadCount', is_read_only=True),
+        IntegerField('child_folder_count', field_uri='folder:ChildFolderCount', is_read_only=True),
     ]
 
     __slots__ = ('account', 'folder_id', 'changekey', 'name', 'folder_class', 'total_count', 'unread_count',

@@ -8,10 +8,12 @@ from six import string_types
 
 from .ewsdatetime import UTC_NOW
 from .extended_properties import ExtendedProperty
-from .fields import BooleanField, IntegerField, DecimalField, Base64Field, TextField, ChoiceField, \
+from .fields import BooleanField, IntegerField, DecimalField, Base64Field, TextField, TextListField, ChoiceField, \
     URIField, BodyField, DateTimeField, MessageHeaderField, PhoneNumberField, EmailAddressField, PhysicalAddressField, \
-    ExtendedPropertyField, AttachmentField, MailboxField, AttendeesField, TextListField, MailboxListField, Choice
+    ExtendedPropertyField, AttachmentField, RecurrenceField, MailboxField,  MailboxListField, \
+    AttendeesField, Choice, OccurrenceField, OccurrenceListField
 from .properties import EWSElement, ItemId
+from .recurrence import FirstOccurrence, LastOccurrence, Occurrence, DeletedOccurrence
 from .util import create_element, is_iterable
 from .version import EXCHANGE_2010, EXCHANGE_2013
 
@@ -105,7 +107,7 @@ class Item(EWSElement):
         DateTimeField('reminder_due_by', field_uri='item:ReminderDueBy', is_required=False,
                       is_required_after_save=True, is_searchable=False),
         IntegerField('reminder_minutes_before_start', field_uri='item:ReminderMinutesBeforeStart',
-                     is_required_after_save=True, default=0),
+                     is_required_after_save=True, min=0, default=0),
         # ExtendedProperty fields go here
         TextField('last_modified_name', field_uri='item:LastModifiedName', is_read_only=True),
         DateTimeField('last_modified_time', field_uri='item:LastModifiedTime', is_read_only=True),
@@ -410,16 +412,23 @@ class CalendarItem(Item):
         DateTimeField('start', field_uri='calendar:Start', is_required=True),
         DateTimeField('end', field_uri='calendar:End', is_required=True),
         BooleanField('is_all_day', field_uri='calendar:IsAllDayEvent', is_required=True, default=False),
-        # TODO: The 'WorkingElsewhere' status was added in Exchange2015 but we don't support versioned choices yet
         ChoiceField('legacy_free_busy_status', field_uri='calendar:LegacyFreeBusyStatus', choices={
             Choice('Free'), Choice('Tentative'), Choice('Busy'), Choice('OOF'), Choice('NoData'),
             Choice('WorkingElsewhere', supported_from=EXCHANGE_2013)
         }, is_required=True, default='Busy'),
         TextField('location', field_uri='calendar:Location', max_length=255),
+        ChoiceField('type', field_uri='calendar:CalendarItemType', choices={
+            Choice('Single'), Choice('Occurrence'), Choice('Exception'), Choice('RecurringMaster'),
+        }, is_read_only=True),
         MailboxField('organizer', field_uri='calendar:Organizer', is_read_only=True),
         AttendeesField('required_attendees', field_uri='calendar:RequiredAttendees', is_searchable=False),
         AttendeesField('optional_attendees', field_uri='calendar:OptionalAttendees', is_searchable=False),
         AttendeesField('resources', field_uri='calendar:Resources', is_searchable=False),
+        RecurrenceField('recurrence', field_uri='calendar:Recurrence', is_searchable=False),
+        OccurrenceField('first_occurrence', field_uri='calendar:FirstOccurrence', value_cls=FirstOccurrence, is_read_only=True),
+        OccurrenceField('last_occurrence', field_uri='calendar:LastOccurrence', value_cls=LastOccurrence, is_read_only=True),
+        OccurrenceListField('modified_occurrences', field_uri='calendar:ModifiedOccurrences', value_cls=Occurrence, is_read_only=True),
+        OccurrenceListField('deleted_occurrences', field_uri='calendar:DeletedOccurrences', value_cls=DeletedOccurrence, is_read_only=True),
     ]
 
     def clean(self, version=None):
@@ -516,10 +525,10 @@ class Task(Item):
     # Supported attrs: see https://msdn.microsoft.com/en-us/library/office/aa563930(v=exchg.150).aspx
     # TODO: This list is incomplete
     FIELDS = Item.FIELDS + [
-        IntegerField('actual_work', field_uri='task:ActualWork'),
+        IntegerField('actual_work', field_uri='task:ActualWork', min=0),
         DateTimeField('assigned_time', field_uri='task:AssignedTime', is_read_only=True),
         TextField('billing_information', field_uri='task:BillingInformation'),
-        IntegerField('change_count', field_uri='task:ChangeCount', is_read_only=True),
+        IntegerField('change_count', field_uri='task:ChangeCount', is_read_only=True, min=0),
         TextListField('companies', field_uri='task:Companies'),
         TextListField('contacts', field_uri='task:Contacts'),
         ChoiceField('delegation_state', field_uri='task:DelegationState', choices={
@@ -541,7 +550,7 @@ class Task(Item):
             Choice(NOT_STARTED), Choice('InProgress'), Choice(COMPLETED), Choice('WaitingOnOthers'), Choice('Deferred')
         }, is_required=True, is_searchable=False, default=NOT_STARTED),
         TextField('status_description', field_uri='task:StatusDescription', is_read_only=True),
-        IntegerField('total_work', field_uri='task:TotalWork'),
+        IntegerField('total_work', field_uri='task:TotalWork', min=0),
     ]
 
     def clean(self, version=None):

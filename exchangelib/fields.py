@@ -8,7 +8,7 @@ import logging
 from six import string_types
 
 from .errors import ErrorInvalidServerVersion
-from .ewsdatetime import EWSDateTime
+from .ewsdatetime import EWSDateTime, EWSDate
 from .services import TNS
 from .util import create_element, get_xml_attrs, set_xml_value, value_to_xml_text, is_iterable
 from .version import Build
@@ -310,6 +310,28 @@ class BooleanField(FieldURIField):
 class IntegerField(FieldURIField):
     value_cls = int
 
+    def __init__(self, *args, **kwargs):
+        self.min = kwargs.pop('min', None)
+        self.max = kwargs.pop('max', None)
+        super(IntegerField, self).__init__(*args, **kwargs)
+
+    def clean(self, value, version=None):
+        value = super(IntegerField, self).clean(value, version=version)
+        if value is not None:
+            if self.is_list:
+                for v in value:
+                    if self.min is not None and v < self.min:
+                        raise ValueError(
+                            "value '%s' on field '%s' must be greater than %s" % (value, self.name, self.min))
+                    if self.max is not None and v > self.max:
+                        raise ValueError("value '%s' on field '%s' must be less than %s" % (value, self.name, self.max))
+            else:
+                if self.min is not None and value < self.min:
+                    raise ValueError("value '%s' on field '%s' must be greater than %s" % (value, self.name, self.min))
+                if self.max is not None and value > self.max:
+                    raise ValueError("value '%s' on field '%s' must be less than %s" % (value, self.name, self.max))
+        return value
+
     def from_xml(self, elem):
         field_elem = elem.find(self.response_tag())
         val = None if field_elem is None else field_elem.text or None
@@ -322,23 +344,70 @@ class IntegerField(FieldURIField):
         return self.default
 
 
-class DecimalField(FieldURIField):
+class DecimalField(IntegerField):
     value_cls = Decimal
 
+
+class EnumField(IntegerField):
+    # A field type where you can enter either the 1-based index in an enum (tuple), or the enum value. Values will be
+    # stored internally as integers.
+    def __init__(self, *args, **kwargs):
+        self.enum = kwargs.pop('enum')
+        super(EnumField, self).__init__(*args, **kwargs)
+        self.min = 1
+        self.max = len(self.enum)
+
+    def clean(self, value, version=None):
+        if isinstance(value, string_types):
+            if value not in self.enum:
+                raise ValueError(
+                    "Value '%s' on field '%s' must be one of %s" % (value, self.name, self.enum))
+            value = self.enum.index(value) + 1
+        return super(EnumField, self).clean(value, version=version)
+
     def from_xml(self, elem):
         field_elem = elem.find(self.response_tag())
         val = None if field_elem is None else field_elem.text or None
         if val is not None:
             try:
-                return self.value_cls(val)
+                if self.is_list:
+                    return [self.enum.index(v) + 1 for v in val.split(' ')]
+                else:
+                    return self.enum.index(val) + 1
             except ValueError:
                 log.warning("Cannot convert value '%s' on field '%s' to type %s", val, self.name, self.value_cls)
                 return None
         return self.default
+
+    def to_xml(self, value, version):
+        field_elem = create_element(self.request_tag())
+        if self.is_list:
+            return set_xml_value(field_elem, ' '.join(self.enum[v - 1] for v in sorted(value)), version=version)
+        else:
+            return set_xml_value(field_elem, self.enum[value - 1], version=version)
+
+
+class EnumListField(EnumField):
+    is_list = True
+
+    def clean(self, value, version=None):
+        value = list(value)  # Convert to something we can index
+        for i, v in enumerate(value):
+            if isinstance(v, string_types):
+                if v not in self.enum:
+                    raise ValueError(
+                        "List value '%s' on field '%s' must be one of %s" % (v, self.name, self.enum))
+                value[i] = self.enum.index(v) + 1
+        if not len(value):
+            raise ValueError("Value '%s' on field '%s' must not be empty" % (value, self.name))
+        if len(value) > len(set(value)):
+            raise ValueError("List entries '%s' on field '%s' must be unique" % (value, self.name))
+        return super(EnumField, self).clean(value, version=version)
 
 
 class Base64Field(FieldURIField):
     value_cls = bytes
+    is_complex = True
 
     def from_xml(self, elem):
         field_elem = elem.find(self.response_tag())
@@ -352,11 +421,26 @@ class Base64Field(FieldURIField):
         return set_xml_value(field_elem, base64.b64encode(value).decode('ascii'), version=version)
 
 
+class DateField(FieldURIField):
+    value_cls = EWSDate
+
+    def from_xml(self, elem):
+        field_elem = elem.find(self.response_tag())
+        val = None if field_elem is None else field_elem.text or None
+        if val is not None:
+            try:
+                return self.value_cls.from_string(val)
+            except ValueError:
+                log.warning("Cannot convert value '%s' on field '%s' to type %s", val, self.name, self.value_cls)
+                return None
+        return self.default
+
+
 class DateTimeField(FieldURIField):
     value_cls = EWSDateTime
 
     def clean(self, value, version=None):
-        if value is not None and isinstance(value, EWSDateTime) and not value.tzinfo:
+        if value is not None and isinstance(value, self.value_cls) and not value.tzinfo:
             raise ValueError("Field '%s' must be timezone aware" % self.name)
         return super(DateTimeField, self).clean(value, version=version)
 
@@ -380,7 +464,7 @@ class TextField(FieldURIField):
     value_cls = string_type
 
     def __init__(self, *args, **kwargs):
-        self.max_length = kwargs.pop('max_length', None)
+        self.max_length = kwargs.pop('max_length', 255)  # Fields supporting longer messages are complex fields
         super(TextField, self).__init__(*args, **kwargs)
 
     def clean(self, value, version=None):
@@ -467,6 +551,7 @@ class BodyField(TextField):
         from .properties import Body
         self.value_cls = Body
         super(BodyField, self).__init__(*args, **kwargs)
+        self.max_length = None
 
     def clean(self, value, version=None):
         if value is not None and not isinstance(value, self.value_cls):
@@ -522,8 +607,30 @@ class EWSElementField(FieldURIField):
         return set_xml_value(field_elem, value, version=version)
 
 
-class MessageHeaderField(EWSElementField):
+class EWSElementListField(EWSElementField):
     is_list = True
+    is_complex = True
+
+
+class RecurrenceField(EWSElementField):
+    def __init__(self, *args, **kwargs):
+        from .recurrence import Recurrence
+        kwargs['value_cls'] = Recurrence
+        super(RecurrenceField, self).__init__(*args, **kwargs)
+
+    def to_xml(self, value, version):
+        return value.to_xml(version=version)
+
+
+class OccurrenceField(EWSElementField):
+    is_complex = True
+
+
+class OccurrenceListField(OccurrenceField):
+    is_list = True
+
+
+class MessageHeaderField(EWSElementListField):
     is_complex = True
 
     def __init__(self, *args, **kwargs):
@@ -533,6 +640,8 @@ class MessageHeaderField(EWSElementField):
 
 
 class MailboxField(EWSElementField):
+    is_complex = True  # FindItem only returns the name, not the email address
+
     def __init__(self, *args, **kwargs):
         from .properties import Mailbox
         kwargs['value_cls'] = Mailbox
@@ -557,8 +666,8 @@ class MailboxField(EWSElementField):
         return self.default
 
 
-class MailboxListField(EWSElementField):
-    is_list = True
+class MailboxListField(EWSElementListField):
+    is_complex = True
 
     def __init__(self, *args, **kwargs):
         from .properties import Mailbox
@@ -577,8 +686,8 @@ class MailboxListField(EWSElementField):
         return self.default
 
 
-class AttendeesField(EWSElementField):
-    is_list = True
+class AttendeesField(EWSElementListField):
+    is_complex = True
 
     def __init__(self, *args, **kwargs):
         from .properties import Attendee
@@ -593,8 +702,7 @@ class AttendeesField(EWSElementField):
         return super(AttendeesField, self).clean(value, version=version)
 
 
-class AttachmentField(EWSElementField):
-    is_list = True
+class AttachmentField(EWSElementListField):
     is_complex = True
 
     def __init__(self, *args, **kwargs):

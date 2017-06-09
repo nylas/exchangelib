@@ -26,6 +26,16 @@ class EWSDate(datetime.date):
         """
         return self.strftime('%Y-%m-%d')
 
+    @classmethod
+    def from_string(cls, date_string):
+        try:
+            dt = datetime.datetime.strptime(date_string, '%Y-%m-%d')
+        except ValueError:
+            # Sometimes, we'll receive a date string with timezone information. Not very useful.
+            dt = datetime.datetime.strptime(date_string, '%Y-%m-%d+%H:%M')
+        return cls(year=dt.year, month=dt.month, day=dt.day)
+
+
 
 class EWSDateTime(datetime.datetime):
     """

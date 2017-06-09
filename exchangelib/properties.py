@@ -71,6 +71,7 @@ class EWSElement(object):
 
     @classmethod
     def request_tag(cls):
+        assert cls.ELEMENT_NAME
         return {
             TNS: 't:%s' % cls.ELEMENT_NAME,
             MNS: 'm:%s' % cls.ELEMENT_NAME,
@@ -78,6 +79,7 @@ class EWSElement(object):
 
     @classmethod
     def response_tag(cls):
+        assert cls.NAMESPACE and cls.ELEMENT_NAME
         return '{%s}%s' % (cls.NAMESPACE, cls.ELEMENT_NAME)
 
     @classmethod
@@ -218,7 +220,7 @@ class Mailbox(EWSElement):
             Choice('Mailbox'), Choice('PublicDL'), Choice('PrivateDL'), Choice('Contact'), Choice('PublicFolder'),
             Choice('Unknown'), Choice('OneOff')
         }, default='Mailbox'),
-        EWSElementField('item_id', value_cls=ItemId),
+        EWSElementField('item_id', value_cls=ItemId, is_read_only=True),
         # There's also the 'RoutingType' element, but it's optional and must have value "SMTP"
     ]
 

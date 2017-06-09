@@ -33,7 +33,7 @@ from exchangelib.extended_properties import ExtendedProperty, ExternId
 from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextField, EmailField, URIField, ChoiceField, \
     BodyField, DateTimeField, Base64Field, PhoneNumberField, EmailAddressField, \
     PhysicalAddressField, ExtendedPropertyField, MailboxField, AttendeesField, AttachmentField, TextListField, \
-    MailboxListField, Choice, FieldPath
+    MailboxListField, Choice, FieldPath, EWSElementField
 from exchangelib.folders import Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Messages, Tasks, \
     Contacts, Folder
 from exchangelib.indexed_properties import IndexedElement, EmailAddress, PhysicalAddress, PhoneNumber, \
@@ -42,6 +42,9 @@ from exchangelib.items import Item, CalendarItem, Message, Contact, Task, ALL_OC
 from exchangelib.properties import Attendee, Mailbox, RoomList, MessageHeader, Room, ItemId, EWSElement
 from exchangelib.protocol import Protocol
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
+from exchangelib.recurrence import Recurrence, AbsoluteYearlyPattern, RelativeYearlyPattern, AbsoluteMonthlyPattern, \
+    RelativeMonthlyPattern, WeeklyPattern, DailyPattern, FirstOccurrence, LastOccurrence, Occurrence, \
+    DeletedOccurrence, NoEndPattern, EndDatePattern, NumberedPattern
 from exchangelib.restriction import Restriction, Q
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, GetAttachment, ResolveNames, TNS
 from exchangelib.transport import NOAUTH, BASIC, DIGEST, NTLM, wrap, _get_auth_method_from_response
@@ -960,9 +963,9 @@ class EWSTest(unittest.TestCase):
         if isinstance(field, BooleanField):
             return get_random_bool()
         if isinstance(field, IntegerField):
-            return get_random_int(0, 256)
+            return get_random_int(field.min or 0, field.max or 256)
         if isinstance(field, DecimalField):
-            return get_random_decimal(1, 99)
+            return get_random_decimal(field.min or 1, field.max or 99)
         if isinstance(field, DateTimeField):
             return get_random_datetime()
         if isinstance(field, AttachmentField):
@@ -1018,6 +1021,9 @@ class EWSTest(unittest.TestCase):
                 pn.label = label
                 pns.append(pn)
             return pns
+        if isinstance(field, EWSElementField):
+            if field.value_cls == Recurrence:
+                return Recurrence(pattern=DailyPattern(interval=5), start=get_random_date(), number=7)
         assert False, 'Unknown field %s' % field
 
 
@@ -2023,9 +2029,15 @@ class BaseItemTest(EWSTest):
                 insert_kwargs[f.name] = None
                 continue
             if f.name == 'start':
-                insert_kwargs[f.name], insert_kwargs['end'] = get_random_datetime_range()
+                start = get_random_date()
+                end = start + datetime.timedelta(days=1)
+                insert_kwargs[f.name], insert_kwargs['end'] = get_random_datetime_range(start, end)
+                insert_kwargs['recurrence'] = self.random_val(self.ITEM_CLASS.get_field_by_fieldname('recurrence'))
+                insert_kwargs['recurrence'].boundary.start = insert_kwargs[f.name].date()
                 continue
             if f.name == 'end':
+                continue
+            if f.name == 'recurrence':
                 continue
             if f.name == 'due_date':
                 # start_date must be before due_date
@@ -2072,9 +2084,15 @@ class BaseItemTest(EWSTest):
                 # Attachments are handled separately
                 continue
             if f.name == 'start':
-                update_kwargs[f.name], update_kwargs['end'] = get_random_datetime_range()
+                start = get_random_date()
+                end = start + datetime.timedelta(days=1)
+                update_kwargs[f.name], update_kwargs['end'] = get_random_datetime_range(start, end)
+                update_kwargs['recurrence'] = self.random_val(self.ITEM_CLASS.get_field_by_fieldname('recurrence'))
+                update_kwargs['recurrence'].boundary.start = update_kwargs[f.name].date()
                 continue
             if f.name == 'end':
+                continue
+            if f.name == 'recurrence':
                 continue
             if f.name == 'due_date':
                 # start_date must be before due_date, and before complete_date which must be in the past
@@ -3492,7 +3510,7 @@ class BaseItemTest(EWSTest):
         item.save()
         item = list(self.account.fetch(ids=[(item.item_id, item.changekey)]))[0]
         self.assertEqual(prop_val, item.dead_beef)
-        new_prop_val = get_random_int()
+        new_prop_val = get_random_int(0, 256)
         item.dead_beef = new_prop_val
         item.save()
         item = list(self.account.fetch(ids=[(item.item_id, item.changekey)]))[0]
@@ -3894,8 +3912,11 @@ class CalendarTest(BaseItemTest):
         item.reminder_is_set = True
         item.is_all_day = False
         item.save()
-        dt_start, dt_end = [dt.astimezone(self.tz) for dt in get_random_datetime_range()]
+        start = get_random_date()
+        end = start + datetime.timedelta(days=1)
+        dt_start, dt_end = [dt.astimezone(self.tz) for dt in get_random_datetime_range(start, end)]
         item.start, item.end = dt_start, dt_end
+        item.recurrence.boundary.start = dt_start.date()
         item.save()
         item.refresh()
         self.assertEqual(item.start, dt_start)
@@ -4113,17 +4134,19 @@ def get_random_date(start_date=datetime.date(1990, 1, 1), end_date=datetime.date
 def get_random_datetime(start_date=datetime.date(1990, 1, 1), end_date=datetime.date(2030, 1, 1)):
     # Create a random datetime with minute precision
     # Keep with a reasonable date range. A wider date range is unstable WRT timezones
+    max_delta = min([60 * 24, int((end_date - start_date).total_seconds() / 60)])
     random_date = get_random_date(start_date=start_date, end_date=end_date)
     random_datetime = datetime.datetime.combine(random_date, datetime.time.min) \
-        + datetime.timedelta(minutes=random.randint(0, 60 * 24))
+        + datetime.timedelta(minutes=random.randint(0, max_delta))
     return UTC.localize(EWSDateTime.from_datetime(random_datetime))
 
 
 def get_random_datetime_range(start_date=datetime.date(1990, 1, 1), end_date=datetime.date(2030, 1, 1)):
     # Create two random datetimes. Calendar items raise ErrorCalendarDurationIsTooLong if duration is > 5 years.
     # Keep with a reasonable date range. A wider date range is unstable WRT timezones
+    max_delta = min([60 * 24 * 365 * 5, int((end_date - start_date).total_seconds() / 60)])
     dt1 = get_random_datetime(start_date=start_date, end_date=end_date)
-    dt2 = dt1 + datetime.timedelta(minutes=random.randint(0, 60 * 24 * 365 * 5))
+    dt2 = dt1 + datetime.timedelta(minutes=random.randint(0, max_delta))
     return dt1, dt2
 
 
