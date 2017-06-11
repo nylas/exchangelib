@@ -42,7 +42,9 @@ class EWSElement(object):
 
     def clean(self, version=None):
         # Validate attribute values using the field validator
-        for f in self.supported_fields(version=version):
+        for f in self.FIELDS:
+            if not f.supports_version(version):
+                continue
             val = getattr(self, f.name)
             setattr(self, f.name, f.clean(val, version=version))
 

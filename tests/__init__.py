@@ -951,7 +951,9 @@ class EWSTest(unittest.TestCase):
             if field.value_cls.property_type == 'Integer':
                 return get_random_int(0, 256)
             if field.value_cls.property_type == 'Binary':
-                return get_random_string(255).encode()
+                # In the test_extended_distinguished_property test, EWS rull return 4 NULL bytes after char 16 if we
+                # send a longer bytes sequence.
+                return get_random_string(16).encode()
             assert False, (field.name, field, field.value_cls.python_type())
         if isinstance(field, URIField):
             return get_random_url()
@@ -3183,6 +3185,9 @@ class BaseItemTest(EWSTest):
                     continue
                 if f.name in ('optional_attendees', 'required_attendees', 'resources'):
                     continue
+                if f.name == 'reminder_due_by' and not item.reminder_is_set:
+                    # We delete the due date if reminder is not set
+                    continue
                 elif f.is_read_only:
                     continue
                 self.assertIsNotNone(getattr(item, f.name), (f, getattr(item, f.name)))
@@ -3254,6 +3259,13 @@ class BaseItemTest(EWSTest):
             if f.is_read_only and old is None:
                 # Some fields are automatically updated server-side
                 continue
+            if f.name == 'reminder_due_by':
+                if new is None:
+                    # EWS does not always return a value if reminder_is_set is False. Set one now
+                    new = old
+                if (new - old).days == 30:
+                    # Sometimes, 'reminder_due_by' is just set to 30 days ahead of what we requested. Yay.
+                    continue
             if f.is_list:
                 old, new = set(old or ()), set(new or ())
             self.assertEqual(old, new, (f.name, old, new))
@@ -3399,6 +3411,9 @@ class BaseItemTest(EWSTest):
             if f.is_read_only:
                 continue
             old, new = getattr(item, f.name), update_kwargs[f.name]
+            if f.name == 'reminder_due_by' and old is None:
+                # EWS does not always return a value if reminder_is_set is False. Set one now
+                item.reminder_due_date = new
             if f.is_list:
                 old, new = set(old or ()), set(new or ())
             self.assertEqual(old, new, (f.name, old, new))
