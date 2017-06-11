@@ -156,7 +156,7 @@ class QuerySet(object):
             self.VALUES: self._as_values,
             self.VALUES_LIST: self._as_values_list,
             self.FLAT: self._as_flat_values_list,
-            self.NONE: lambda res_iter: res_iter,
+            self.NONE: self._as_items,
         }[self.return_format]
         for val in result_formatter(self._query()):
             _cache.append(val)
@@ -207,6 +207,26 @@ class QuerySet(object):
             # Optimize a bit by setting self.page_size to only get as many items as strictly needed
             self.page_size = s.stop
         return islice(self.__iter__(), s.start, s.stop, s.step)
+
+    def _as_items(self, iterable):
+        from .items import Item
+        if self.only_fields:
+            only_field_names = {f.field.name for f in self.only_fields}
+            has_additional_fields = bool(only_field_names - {'item_id', 'changekey'})
+            if not has_additional_fields:
+                # _query() will return an iterator of (item_id, changekey) tuples
+                if 'changekey' not in only_field_names:
+                    for item_id, changekey in iterable:
+                        yield Item(item_id=item_id)
+                elif 'item_id' not in only_field_names:
+                    for item_id, changekey in iterable:
+                        yield Item(changekey=changekey)
+                else:
+                    for item_id, changekey in iterable:
+                        yield Item(item_id=item_id, changekey=changekey)
+                return
+        for i in iterable:
+            yield i
 
     def _as_values(self, iterable):
         assert self.only_fields, 'values() requires at least one field name'

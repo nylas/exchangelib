@@ -3138,6 +3138,38 @@ class BaseItemTest(EWSTest):
 
         self.bulk_delete(ids)
 
+    def test_complex_fields(self):
+        # Test that complex fields can be fetched using only(). This is a test for #141
+        insert_kwargs = self.get_random_insert_kwargs()
+        if 'is_all_day' in insert_kwargs:
+            insert_kwargs['is_all_day'] = False
+        item = self.ITEM_CLASS(account=self.account, folder=self.test_folder, **insert_kwargs).save()
+        for f in self.ITEM_CLASS.FIELDS:
+            if not f.supports_version(self.account.version):
+                # Cannot be used with this EWS version
+                continue
+            if f.name in ('optional_attendees', 'required_attendees', 'resources'):
+                continue
+            if f.is_read_only:
+                continue
+            if f.name == 'reminder_due_by':
+                # EWS sets a default value if it is not set on insert. Ignore
+                continue
+            old = getattr(item, f.name)
+            # Test field as single element in only()
+            for fresh_item in self.test_folder.filter(categories__contains=item.categories).only(f.name):
+                new = getattr(fresh_item, f.name)
+                if f.is_list:
+                    old, new = set(old or ()), set(new or ())
+                self.assertEqual(old, new, (f.name, old, new))
+            # Test field as one of the elements in only()
+            for fresh_item in self.test_folder.filter(categories__contains=item.categories).only('subject', f.name):
+                new = getattr(fresh_item, f.name)
+                if f.is_list:
+                    old, new = set(old or ()), set(new or ())
+                self.assertEqual(old, new, (f.name, old, new))
+        self.bulk_delete([item])
+
     def test_only_fields(self):
         item = self.get_test_item()
         self.test_folder.bulk_create(items=[item, item])
