@@ -617,6 +617,8 @@ class EWSElementListField(EWSElementField):
 
 
 class RecurrenceField(EWSElementField):
+    is_complex = True
+
     def __init__(self, *args, **kwargs):
         from .recurrence import Recurrence
         kwargs['value_cls'] = Recurrence

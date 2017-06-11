@@ -1513,7 +1513,7 @@ class CommonTest(EWSTest):
                     continue
                 if not issubclass(v, EWSElement):
                     continue
-                if issubclass(v, (Item, Folder, ExtendedProperty)):
+                if issubclass(v, (Item, Folder, ExtendedProperty, Recurrence, Occurrence)):
                     # These do not support None input
                     with self.assertRaises(Exception):
                         v.from_xml(None)
@@ -3448,7 +3448,8 @@ class BaseItemTest(EWSTest):
             for f in item.FIELDS:
                 # datetime_created and last_modified_time aren't copied, but instead are added to the new item after
                 # uploading. This means mime_content can also change. Items also get new IDs on upload.
-                if f.name in {'item_id', 'changekey', 'datetime_created', 'last_modified_time', 'mime_content'}:
+                if f.name in {'item_id', 'changekey', 'first_occurrence', 'last_occurrence', 'datetime_created',
+                              'last_modified_time', 'mime_content'}:
                     continue
                 dict_item[f.name] = getattr(item, f.name)
                 if f.name == 'attachments':
