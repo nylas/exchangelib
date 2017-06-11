@@ -26,20 +26,37 @@ class EWSDate(datetime.date):
         """
         return self.strftime('%Y-%m-%d')
 
+    def __add__(self, other):
+        dt = super(EWSDate, self).__add__(other)
+        return self.from_date(dt)  # We want to return EWSDate objects
+
+    def __sub__(self, other):
+        dt = super(EWSDate, self).__sub__(other)
+        if isinstance(dt, datetime.timedelta):
+            return dt
+        return self.from_date(dt)  # We want to return EWSDate objects
+
+    @classmethod
+    def fromordinal(cls, ordinal):
+        dt = super(EWSDate, cls).fromordinal(ordinal)
+        return cls.from_date(dt)  # We want to return EWSDate objects
+
     @classmethod
     def from_date(cls, d):
         return cls(d.year, d.month, d.day)
 
     @classmethod
     def from_string(cls, date_string):
-        try:
-            dt = datetime.datetime.strptime(date_string, '%Y-%m-%d')
-        except ValueError:
-            # Sometimes, we'll receive a date string with timezone information. Not very useful.
-            try:
+        # Sometimes, we'll receive a date string with timezone information. Not very useful.
+        if date_string.endswith('Z'):
+            dt = datetime.datetime.strptime(date_string, '%Y-%m-%dZ')
+        elif ':' in date_string:
+            if '+' in date_string:
                 dt = datetime.datetime.strptime(date_string, '%Y-%m-%d+%H:%M')
-            except ValueError:
-                dt = datetime.datetime.strptime(date_string, '%Y-%m-%dZ')
+            else:
+                dt = datetime.datetime.strptime(date_string, '%Y-%m-%d-%H:%M')
+        else:
+            dt = datetime.datetime.strptime(date_string, '%Y-%m-%d')
         return cls.from_date(dt.date())
 
 

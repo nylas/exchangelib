@@ -381,6 +381,13 @@ class EWSDateTimeTest(unittest.TestCase):
 
     def test_ewsdate(self):
         self.assertEqual(EWSDate(2000, 1, 1).ewsformat(), '2000-01-01')
+        self.assertEqual(EWSDate.from_string('2000-01-01'), EWSDate(2000, 1, 1))
+        self.assertEqual(EWSDate.from_string('2000-01-01Z'), EWSDate(2000, 1, 1))
+        self.assertEqual(EWSDate.from_string('2000-01-01+01:00'), EWSDate(2000, 1, 1))
+        self.assertEqual(EWSDate.from_string('2000-01-01-01:00'), EWSDate(2000, 1, 1))
+        self.assertIsInstance(EWSDate(2000, 1, 2) - EWSDate(2000, 1, 1), datetime.timedelta)
+        self.assertIsInstance(EWSDate(2000, 1, 2) + datetime.timedelta(days=1), EWSDate)
+        self.assertIsInstance(EWSDate(2000, 1, 2) - datetime.timedelta(days=1), EWSDate)
 
 
 class PropertiesTest(unittest.TestCase):
@@ -2096,7 +2103,7 @@ class BaseItemTest(EWSTest):
                 continue
             if f.name == 'due_date':
                 # start_date must be before due_date, and before complete_date which must be in the past
-                update_kwargs['start_date'], update_kwargs[f.name] = get_random_datetime_range(end_date=now)
+                update_kwargs['start_date'], update_kwargs[f.name] = get_random_datetime_range(end_date=now.date())
                 continue
             if f.name == 'start_date':
                 continue
@@ -4126,12 +4133,12 @@ def get_random_email():
     ))
 
 
-def get_random_date(start_date=datetime.date(1990, 1, 1), end_date=datetime.date(2030, 1, 1)):
+def get_random_date(start_date=EWSDate(1990, 1, 1), end_date=EWSDate(2030, 1, 1)):
     # Keep with a reasonable date range. A wider date range is unstable WRT timezones
     return EWSDate.fromordinal(random.randint(start_date.toordinal(), end_date.toordinal()))
 
 
-def get_random_datetime(start_date=datetime.date(1990, 1, 1), end_date=datetime.date(2030, 1, 1)):
+def get_random_datetime(start_date=EWSDate(1990, 1, 1), end_date=EWSDate(2030, 1, 1)):
     # Create a random datetime with minute precision
     # Keep with a reasonable date range. A wider date range is unstable WRT timezones
     max_delta = min([60 * 24, int((end_date - start_date).total_seconds() / 60)])
@@ -4141,7 +4148,7 @@ def get_random_datetime(start_date=datetime.date(1990, 1, 1), end_date=datetime.
     return UTC.localize(EWSDateTime.from_datetime(random_datetime))
 
 
-def get_random_datetime_range(start_date=datetime.date(1990, 1, 1), end_date=datetime.date(2030, 1, 1)):
+def get_random_datetime_range(start_date=EWSDate(1990, 1, 1), end_date=EWSDate(2030, 1, 1)):
     # Create two random datetimes. Calendar items raise ErrorCalendarDurationIsTooLong if duration is > 5 years.
     # Keep with a reasonable date range. A wider date range is unstable WRT timezones
     max_delta = min([60 * 24 * 365 * 5, int((end_date - start_date).total_seconds() / 60)])
