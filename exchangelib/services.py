@@ -609,13 +609,13 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
         for fieldname in fieldnames:
             field = item_model.get_field_by_fieldname(fieldname)
             if field.is_read_only:
-                raise ValueError('%s is a read-only field', field.name)
+                raise ValueError('%s is a read-only field' % field.name)
             value = field.clean(getattr(item, field.name), version=self.account.version)  # Make sure the value is OK
 
             if value is None or (field.is_list and not value):
                 # A value of None or [] means we want to remove this field from the item
                 if field.is_required or field.is_required_after_save:
-                    raise ValueError('%s is a required field and may not be deleted', field.name)
+                    raise ValueError('%s is a required field and may not be deleted' % field.name)
                 for field_path in FieldPath(field=field).expand(version=self.account.version):
                     yield self._delete_item_elem(field_path=field_path)
                 continue

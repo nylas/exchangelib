@@ -256,6 +256,10 @@ class Field(object):
     def __hash__(self):
         raise NotImplementedError()
 
+    def __repr__(self):
+        return self.__class__.__name__ + '(%s)' % ', '.join('%s=%r' % (f, getattr(self, f)) for f in (
+            'name', 'value_cls', 'is_list', 'is_complex', 'default'))
+
 
 class FieldURIField(Field):
     def __init__(self, *args, **kwargs):

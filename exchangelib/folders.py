@@ -158,7 +158,7 @@ class Folder(EWSElement):
         return cls.ITEM_MODEL_MAP[tag]
 
     def allowed_fields(self):
-        # Return non-ID fields of all item classes allows in this folder type
+        # Return non-ID fields of all item classes allowed in this folder type
         fields = set()
         for item_model in self.supported_item_models:
             fields.update(set(item_model.supported_fields(version=self.account.version if self.account else None)))
