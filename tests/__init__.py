@@ -3429,7 +3429,7 @@ class BaseItemTest(EWSTest):
             old, new = getattr(item, f.name), update_kwargs[f.name]
             if f.name == 'reminder_due_by' and old is None:
                 # EWS does not always return a value if reminder_is_set is False. Set one now
-                item.reminder_due_date = new
+                old = new
             if f.is_list:
                 old, new = set(old or ()), set(new or ())
             self.assertEqual(old, new, (f.name, old, new))
