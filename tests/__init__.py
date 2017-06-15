@@ -1,5 +1,7 @@
 # coding=utf-8
+from collections import namedtuple
 import datetime
+import glob
 from itertools import chain
 import io
 import os
@@ -1674,6 +1676,20 @@ class AutodiscoverTest(EWSTest):
         del _autodiscover_cache[cache_key]
         # This should also work if the cache does not contain the entry anymore
         del _autodiscover_cache[cache_key]
+
+    def test_corrupt_autodiscover_cache(self):
+        from exchangelib.autodiscover import _autodiscover_cache
+        # Insert a fake Protocol instance into the cache
+        key = (2, 'foo', 4)
+        _autodiscover_cache[key] = namedtuple('P', ['service_endpoint', 'auth_type'])(1, 'bar')
+        # Check that it exists. 'in' goes directly to the file
+        self.assertTrue(key in _autodiscover_cache)
+        # Destroy the backing cache file(s)
+        for db_file in glob.glob(_autodiscover_cache._storage_file + '*'):
+            with open(db_file, 'w') as f:
+                f.write('XXX')
+        # Check that we can recover from a destroyed file and that the entry no longer exists
+        self.assertFalse(key in _autodiscover_cache)
 
     def test_autodiscover_from_account(self):
         from exchangelib.autodiscover import _autodiscover_cache

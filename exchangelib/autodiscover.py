@@ -11,6 +11,8 @@ If you have problems autodiscovering, start by doing an official test at https:/
 """
 from __future__ import unicode_literals
 
+from contextlib import contextmanager
+import glob
 import logging
 import os
 import shelve
@@ -45,9 +47,6 @@ TIMEOUT = 10  # Seconds
 AUTODISCOVER_PERSISTENT_STORAGE = os.path.join(tempfile.gettempdir(), 'exchangelib.cache')
 
 if PY2:
-    from contextlib import contextmanager
-
-
     @contextmanager
     def shelve_open(*args, **kwargs):
         shelve_handle = shelve.open(*args, **kwargs)
@@ -57,6 +56,20 @@ if PY2:
             shelve_handle.close()
 else:
     shelve_open = shelve.open
+
+
+@contextmanager
+def shelve_open_with_failover(filename):
+    try:
+        yield shelve_open(filename)
+    except Exception as e:
+        # We can expect empty or corrupt files. Whatever happens, just delete the cache file and try again.
+        # 'shelve' may add a backend-specific suffix to the file, so also delete all files with a suffix.
+        # We don't know which file caused the error, so just delete them all.
+        for f in glob.glob(filename + '*'):
+            log.warning('Deleting invalid cache file %s (%r)', f, e)
+            os.unlink(f)
+        yield shelve_open(filename)
 
 
 @python_2_unicode_compatible
@@ -84,13 +97,13 @@ class AutodiscoverCache(object):
 
     def clear(self):
         # Wipe the entire cache
-        with shelve_open(self._storage_file) as db:
+        with shelve_open_with_failover(self._storage_file) as db:
             db.clear()
         self._protocols.clear()
 
     def __contains__(self, key):
         domain = key[0]
-        with shelve_open(self._storage_file) as db:
+        with shelve_open_with_failover(self._storage_file) as db:
             return str(domain) in db
 
     def __getitem__(self, key):
@@ -98,7 +111,7 @@ class AutodiscoverCache(object):
         if protocol:
             return protocol
         domain, credentials, verify_ssl = key
-        with shelve_open(self._storage_file) as db:
+        with shelve_open_with_failover(self._storage_file) as db:
             endpoint, auth_type = db[str(domain)]  # It's OK to fail with KeyError here
         protocol = AutodiscoverProtocol(service_endpoint=endpoint, credentials=credentials, auth_type=auth_type,
                                         verify_ssl=verify_ssl)
@@ -108,7 +121,7 @@ class AutodiscoverCache(object):
     def __setitem__(self, key, protocol):
         # Populate both local and persistent cache
         domain = key[0]
-        with shelve_open(self._storage_file) as db:
+        with shelve_open_with_failover(self._storage_file) as db:
             db[str(domain)] = (protocol.service_endpoint, protocol.auth_type)
         self._protocols[key] = protocol
 
@@ -116,7 +129,7 @@ class AutodiscoverCache(object):
         # Empty both local and persistent cache. Don't fail on non-existing entries because we could end here
         # multiple times due to race conditions.
         domain = key[0]
-        with shelve_open(self._storage_file) as db:
+        with shelve_open_with_failover(self._storage_file) as db:
             try:
                 del db[str(domain)]
             except KeyError:
