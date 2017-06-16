@@ -16,6 +16,7 @@ import glob
 import logging
 import os
 import shelve
+import sys
 import tempfile
 from threading import Lock
 
@@ -44,32 +45,26 @@ RESPONSE_NS = 'http://schemas.microsoft.com/exchange/autodiscover/outlook/respon
 
 TIMEOUT = 10  # Seconds
 
-AUTODISCOVER_PERSISTENT_STORAGE = os.path.join(tempfile.gettempdir(), 'exchangelib.cache')
-
-if PY2:
-    @contextmanager
-    def shelve_open(*args, **kwargs):
-        shelve_handle = shelve.open(*args, **kwargs)
-        try:
-            yield shelve_handle
-        finally:
-            shelve_handle.close()
-else:
-    shelve_open = shelve.open
+# 'shelve' may pickle objects using different pickle protocol versions. Encode the python version in the filename
+filename_for_version = 'exchangelib.cache.py%s%s'.format(*sys.version_info[:2])
+AUTODISCOVER_PERSISTENT_STORAGE = os.path.join(tempfile.gettempdir(), filename_for_version)
 
 
 @contextmanager
 def shelve_open_with_failover(filename):
+    # We can expect empty or corrupt files. Whatever happens, just delete the cache file and try again.
+    # 'shelve' may add a backend-specific suffix to the file, so also delete all files with a suffix.
+    # We don't know which file caused the error, so just delete them all.
     try:
-        yield shelve_open(filename)
+        shelve_handle = shelve.open(filename)
     except Exception as e:
-        # We can expect empty or corrupt files. Whatever happens, just delete the cache file and try again.
-        # 'shelve' may add a backend-specific suffix to the file, so also delete all files with a suffix.
-        # We don't know which file caused the error, so just delete them all.
         for f in glob.glob(filename + '*'):
             log.warning('Deleting invalid cache file %s (%r)', f, e)
             os.unlink(f)
-        yield shelve_open(filename)
+        shelve_handle = shelve.open(filename)
+    yield shelve_handle
+    if PY2:
+        shelve_handle.close()
 
 
 @python_2_unicode_compatible
