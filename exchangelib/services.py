@@ -601,12 +601,20 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
         setitemfield_tz.append(folderitem_tz)
         return setitemfield_tz
 
+    @staticmethod
+    def _sort_fieldnames(item_model, fieldnames):
+        # Take a list of fieldnames and return the fields in the order they are mentioned in item_class.FIELDS
+        fieldnames_set = set(fieldnames)
+        for f in item_model.FIELDS:
+            if f.name in fieldnames_set:
+                yield f.name
+
     def _get_item_update_elems(self, item, fieldnames):
         from .fields import FieldPath, IndexedField
         from .indexed_properties import MultiFieldIndexedElement
         item_model = item.__class__
         meeting_timezone_added = False
-        for fieldname in fieldnames:
+        for fieldname in self._sort_fieldnames(item_model=item_model, fieldnames=fieldnames):
             field = item_model.get_field_by_fieldname(fieldname)
             if field.is_read_only:
                 raise ValueError('%s is a read-only field' % field.name)
