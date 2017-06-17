@@ -46,7 +46,7 @@ RESPONSE_NS = 'http://schemas.microsoft.com/exchange/autodiscover/outlook/respon
 TIMEOUT = 10  # Seconds
 
 # 'shelve' may pickle objects using different pickle protocol versions. Encode the python version in the filename
-filename_for_version = 'exchangelib.cache.py%s%s'.format(*sys.version_info[:2])
+filename_for_version = 'exchangelib.cache.py{}{}'.format(*sys.version_info[:2])
 AUTODISCOVER_PERSISTENT_STORAGE = os.path.join(tempfile.gettempdir(), filename_for_version)
 
 
