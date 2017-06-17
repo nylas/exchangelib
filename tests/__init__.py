@@ -3987,7 +3987,7 @@ class CalendarTest(BaseItemTest):
         item.reminder_is_set = True
         item.is_all_day = False
         item.save()
-        # Update start, end and recurrence with timezoned datetimes. For some reson, EWS throws
+        # Update start, end and recurrence with timezoned datetimes. For some reason, EWS throws
         # 'ErrorOccurrenceTimeSpanTooBig' is we go back in time.
         start = get_random_date(start_date=item.start.date() + datetime.timedelta(days=1))
         dt_start, dt_end = [dt.astimezone(self.tz) for dt in get_random_datetime_range(start, start)]
