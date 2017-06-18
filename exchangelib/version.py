@@ -8,7 +8,7 @@ import requests.sessions
 from future.utils import python_2_unicode_compatible
 from six import text_type
 
-from .errors import TransportError, EWSWarning, ErrorInvalidSchemaVersionForMailboxVersion
+from .errors import TransportError, ErrorInvalidSchemaVersionForMailboxVersion
 from .transport import TNS, SOAPNS, get_auth_instance
 from .util import is_xml, to_xml
 

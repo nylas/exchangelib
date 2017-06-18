@@ -124,7 +124,7 @@ class QuerySet(object):
         # sorting on multiple fields, we can just do a sort on each of the requested fields in reverse order. Reverse
         # each sort operation if the field was marked as such.
         for f in reversed(self.order_fields):
-            items = sorted(items, key=lambda i: f.field_path.get_value(i), reverse=f.reverse)
+            items = sorted(items, key=f.field_path.get_value, reverse=f.reverse)
         if not extra_order_fields:
             return items
 

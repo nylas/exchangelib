@@ -362,11 +362,24 @@ class EnumField(IntegerField):
         self.max = len(self.enum)
 
     def clean(self, value, version=None):
-        if isinstance(value, string_types):
-            if value not in self.enum:
-                raise ValueError(
-                    "Value '%s' on field '%s' must be one of %s" % (value, self.name, self.enum))
-            value = self.enum.index(value) + 1
+        if self.is_list:
+            value = list(value)  # Convert to something we can index
+            for i, v in enumerate(value):
+                if isinstance(v, string_types):
+                    if v not in self.enum:
+                        raise ValueError(
+                            "List value '%s' on field '%s' must be one of %s" % (v, self.name, self.enum))
+                    value[i] = self.enum.index(v) + 1
+            if not len(value):
+                raise ValueError("Value '%s' on field '%s' must not be empty" % (value, self.name))
+            if len(value) > len(set(value)):
+                raise ValueError("List entries '%s' on field '%s' must be unique" % (value, self.name))
+        else:
+            if isinstance(value, string_types):
+                if value not in self.enum:
+                    raise ValueError(
+                        "Value '%s' on field '%s' must be one of %s" % (value, self.name, self.enum))
+                value = self.enum.index(value) + 1
         return super(EnumField, self).clean(value, version=version)
 
     def from_xml(self, elem):
@@ -393,20 +406,6 @@ class EnumField(IntegerField):
 
 class EnumListField(EnumField):
     is_list = True
-
-    def clean(self, value, version=None):
-        value = list(value)  # Convert to something we can index
-        for i, v in enumerate(value):
-            if isinstance(v, string_types):
-                if v not in self.enum:
-                    raise ValueError(
-                        "List value '%s' on field '%s' must be one of %s" % (v, self.name, self.enum))
-                value[i] = self.enum.index(v) + 1
-        if not len(value):
-            raise ValueError("Value '%s' on field '%s' must not be empty" % (value, self.name))
-        if len(value) > len(set(value)):
-            raise ValueError("List entries '%s' on field '%s' must be unique" % (value, self.name))
-        return super(EnumField, self).clean(value, version=version)
 
 
 class Base64Field(FieldURIField):

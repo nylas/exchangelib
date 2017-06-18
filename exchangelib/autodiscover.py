@@ -143,6 +143,7 @@ class AutodiscoverCache(object):
         self._protocols.clear()
 
     def __del__(self):
+        # pylint: disable=bare-except
         try:
             self.close()
         except:

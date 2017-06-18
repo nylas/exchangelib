@@ -60,6 +60,7 @@ class BaseProtocol(object):
         self._session_pool = None  # Consumers need to fill the session pool themselves
 
     def __del__(self):
+        # pylint: disable=bare-except
         try:
             self.close()
         except:
