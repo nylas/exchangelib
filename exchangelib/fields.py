@@ -279,6 +279,7 @@ class FieldURIField(Field):
         return set_xml_value(field_elem, value, version=version)
 
     def field_uri_xml(self):
+        assert self.field_uri
         return create_element('t:FieldURI', FieldURI=self.field_uri)
 
     def request_tag(self):

@@ -11,8 +11,8 @@ from .extended_properties import ExtendedProperty
 from .fields import BooleanField, IntegerField, DecimalField, Base64Field, TextField, TextListField, ChoiceField, \
     URIField, BodyField, DateTimeField, MessageHeaderField, PhoneNumberField, EmailAddressField, PhysicalAddressField, \
     ExtendedPropertyField, AttachmentField, RecurrenceField, MailboxField,  MailboxListField, \
-    AttendeesField, Choice, OccurrenceField, OccurrenceListField
-from .properties import EWSElement, ItemId
+    AttendeesField, Choice, OccurrenceField, OccurrenceListField, EWSElementField
+from .properties import EWSElement, ItemId, ConversationId
 from .recurrence import FirstOccurrence, LastOccurrence, Occurrence, DeletedOccurrence
 from .util import create_element, is_iterable
 from .version import EXCHANGE_2010, EXCHANGE_2013
@@ -110,6 +110,8 @@ class Item(EWSElement):
         # ExtendedProperty fields go here
         TextField('last_modified_name', field_uri='item:LastModifiedName', is_read_only=True),
         DateTimeField('last_modified_time', field_uri='item:LastModifiedTime', is_read_only=True),
+        EWSElementField('conversation_id', field_uri='item:ConversationId', value_cls=ConversationId,
+                        is_read_only=True),
     ]
 
     # We can't use __slots__ because we need to add extended properties dynamically
