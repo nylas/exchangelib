@@ -386,6 +386,47 @@ Attachments
     # (items that have an item_id) will update the changekey of the item.
 
 
+Troubleshooting
+^^^^^^^^^^^^^^^
+If you are having trouble using this library, the first thing to try is to enable debug logging. This will output a huge
+amount of information about what is going on, most notable the actual XML documents that are doing over the wite. This
+can be really handy to see which fields are being sent and received.
+
+.. code-block:: python
+
+    import logging
+    logging.basicConfig(level=logging.DEBUG)
+    # Your code using exchangelib goes here
+
+
+When you capture a blob of interesting XML from the output, you'll want to pretty-print it to make it readable. Paste
+the blob in your favourite editor (e.g. TextMate has a pretty-print keyboard shortcut when the editor window is in XML
+mode which also highlights the XML), or use this Python snippet:
+
+.. code-block:: python
+
+    import io
+    from lxml.etree import parse, tostring
+
+    xml_str = '''
+    paste your XML blob here
+    '''
+
+    print(tostring(parse(
+        io.BytesIO(xml_str.encode())),
+        xml_declaration=True,
+        pretty_print=True
+    ).decode())
+
+
+Most class definitions have a docstring containing at least a URL to the MSDN  page for the corresponding XML element.
+
+.. code-block:: python
+
+    from exchangelib import CalendarItem
+    print(CalendarItem.__doc__)
+
+
 Notes
 ^^^^^
 
