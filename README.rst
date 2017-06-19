@@ -302,11 +302,15 @@ Deleting
 
 Extended properties
 ^^^^^^^^^^^^^^^^^^^
+Extended properties makes it possible to attach custom key-value pairs to items stored on the Exchange server. There are
+multiple online resources that describe working with extended properties, and list many of the magic values that are
+used by existing Exchange clients to store common and custom properties. The following is not a comprehensive
+description of the possibilities, but we do intend to support all the possibilities provided by EWS.
 
 .. code-block:: python
 
     # If folder items have extended properties, you need to register them before you can access them. Create
-    # a subclass of ExtendedProperty and set your custom property_id:
+    # a subclass of ExtendedProperty and define a set of matching setup values:
     class LunchMenu(ExtendedProperty):
         property_set_id = '12345678-1234-1234-1234-123456781234'
         property_name = 'Catering from the cafeteria'
@@ -321,6 +325,24 @@ Extended properties
         print(i.lunch_menu)
     # If you change your mind, jsut remove the property again
     CalendarItem.deregister('lunch_menu')
+
+    # You can also create named properties (e.g. created from User Defined Fields in Outlook, see issue #137):
+    class LunchMenu(ExtendedProperty):
+        distinguished_property_set_id = 'PublicStrings'
+        property_name = 'Catering from the cafeteria'
+        property_type = 'String'
+
+    # We support extended properties with tags. This is the definition for the 'completed' and 'followup' flag you can
+    # add to items in Outlook (see also issue #85):
+    class Flag(ExtendedProperty):
+        property_tag = 0x1090
+        property_type = 'Integer'
+
+    # Or with property ID:
+    class MyMeetingArray(ExtendedProperty):
+        property_set_id = '00062004-0000-0000-C000-000000000046'
+        property_type = 'BinaryArray'
+        property_id = 32852
 
 
 Attachments
