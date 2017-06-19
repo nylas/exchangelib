@@ -116,15 +116,21 @@ class Item(EWSElement):
 
     def __init__(self, **kwargs):
         # 'account' is optional but allows calling 'send()' and 'delete()'
-        # 'folder' is optional but allows calling 'save()'
-        from .account import Account
+        # 'folder' is optional but allows calling 'save()'. If 'folder' has an account, and 'account' is not set,
+        # we use folder.account.
         from .folders import Folder
+        from .account import Account
         self.account = kwargs.pop('account', None)
         if self.account is not None:
             assert isinstance(self.account, Account)
         self.folder = kwargs.pop('folder', None)
         if self.folder is not None:
             assert isinstance(self.folder, Folder)
+            if self.folder.account is not None:
+                if self.account is not None:
+                    # Make sure the account from kwargs matches the folder account
+                    assert self.account == self.folder.account
+                self.account = self.folder.account
         super(Item, self).__init__(**kwargs)
         # pylint: disable=access-member-before-definition
         if self.attachments:

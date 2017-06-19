@@ -2159,7 +2159,7 @@ class BaseItemTest(EWSTest):
     def get_test_item(self, folder=None, categories=None):
         item_kwargs = self.get_random_insert_kwargs()
         item_kwargs['categories'] = categories or self.categories
-        return self.ITEM_CLASS(account=self.account, folder=folder or self.test_folder, **item_kwargs)
+        return self.ITEM_CLASS(folder=folder or self.test_folder, **item_kwargs)
 
     def test_field_names(self):
         # Test that fieldnames don't clash with Python keywords
