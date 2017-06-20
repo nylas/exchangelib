@@ -637,7 +637,7 @@ class Contact(Item):
     ]
 
 
-class PostItem(Message):
+class PostItem(Item):
     # Supported attrs: https://msdn.microsoft.com/en-us/library/office/bb891851(v=exchg.150).aspx
     # TODO: Untested. Added here to at least be able to parse folders containing PostItem
     ELEMENT_NAME = 'PostItem'
