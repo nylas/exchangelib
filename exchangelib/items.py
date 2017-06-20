@@ -637,6 +637,19 @@ class Contact(Item):
     ]
 
 
+class PostItem(Message):
+    # Supported attrs: https://msdn.microsoft.com/en-us/library/office/bb891851(v=exchg.150).aspx
+    # TODO: Untested. Added here to at least be able to parse folders containing PostItem
+    ELEMENT_NAME = 'PostItem'
+    FIELDS = Item.FIELDS + [
+        MailboxField('author', field_uri='message:From', is_read_only_after_send=True),
+        TextField('message_id', field_uri='message:InternetMessageId', is_read_only=True, is_read_only_after_send=True),
+        BooleanField('is_read', field_uri='message:IsRead', is_required=True, default=False),
+        DateTimeField('posted_time', field_uri='postitem:PostedTime', is_read_only=True),
+        MailboxField('sender', field_uri='message:Sender', is_read_only=True, is_read_only_after_send=True),
+    ]
+
+
 class MeetingRequest(Message):
     # Supported attrs: https://msdn.microsoft.com/en-us/library/office/aa565229(v=exchg.150).aspx
     # TODO: Untested and unfinished. Only the bare minimum supported to allow reading a folder that contains meeting
@@ -682,4 +695,4 @@ class MeetingCancellation(Message):
     ]
 
 
-ITEM_CLASSES = (CalendarItem, Contact, Message, Task, MeetingRequest, MeetingResponse, MeetingCancellation)
+ITEM_CLASSES = (CalendarItem, Contact, Message, Task, PostItem, MeetingRequest, MeetingResponse, MeetingCancellation)
