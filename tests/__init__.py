@@ -40,8 +40,8 @@ from exchangelib.folders import Calendar, DeletedItems, Drafts, Inbox, Outbox, S
     Contacts, Folder
 from exchangelib.indexed_properties import IndexedElement, EmailAddress, PhysicalAddress, PhoneNumber, \
     SingleFieldIndexedElement, MultiFieldIndexedElement
-from exchangelib.items import Item, CalendarItem, Message, Contact, Task, ALL_OCCURRENCIES
-from exchangelib.properties import Attendee, Mailbox, RoomList, MessageHeader, Room, ItemId, EWSElement
+from exchangelib.items import Item, CalendarItem, Message, Contact, Task, DistributionList, ALL_OCCURRENCIES
+from exchangelib.properties import Attendee, Mailbox, RoomList, MessageHeader, Room, ItemId, Member, EWSElement
 from exchangelib.protocol import Protocol
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.recurrence import Recurrence, AbsoluteYearlyPattern, RelativeYearlyPattern, AbsoluteMonthlyPattern, \
@@ -4148,6 +4148,24 @@ class ContactsTest(BaseItemTest):
     def test_paging(self):
         # TODO: This test throws random ErrorIrresolvableConflict errors on item creation for some reason.
         pass
+
+    def test_distribution_lists(self):
+        dl = DistributionList(folder=self.test_folder, display_name=get_random_string(255), categories=self.categories)
+        dl.save()
+        new_dl = self.test_folder.get(categories__contains=dl.categories)
+        self.assertEqual(new_dl.display_name, dl.display_name)
+        self.assertEqual(new_dl.members, None)
+        dl.refresh()
+
+        dl.members = set(
+            # We set mailbox_type to OneOff because otherwise the email address must be an actual account
+            Member(mailbox=Mailbox(email_address=get_random_email(), mailbox_type='OneOff')) for _ in range(4)
+        )
+        dl.save()
+        new_dl = self.test_folder.get(categories__contains=dl.categories)
+        self.assertEqual({m.mailbox.email_address for m in new_dl.members}, dl.members)
+
+        dl.delete()
 
 
 def get_random_bool():

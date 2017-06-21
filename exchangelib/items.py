@@ -11,7 +11,7 @@ from .extended_properties import ExtendedProperty
 from .fields import BooleanField, IntegerField, DecimalField, Base64Field, TextField, TextListField, ChoiceField, \
     URIField, BodyField, DateTimeField, MessageHeaderField, PhoneNumberField, EmailAddressField, PhysicalAddressField, \
     ExtendedPropertyField, AttachmentField, RecurrenceField, MailboxField,  MailboxListField, \
-    AttendeesField, Choice, OccurrenceField, OccurrenceListField, EWSElementField
+    AttendeesField, Choice, OccurrenceField, OccurrenceListField, MemberListField, EWSElementField
 from .properties import EWSElement, ItemId, ConversationId
 from .recurrence import FirstOccurrence, LastOccurrence, Occurrence, DeletedOccurrence
 from .util import create_element, is_iterable
@@ -637,6 +637,16 @@ class Contact(Item):
     ]
 
 
+class DistributionList(Item):
+    # Supported attrs: https://msdn.microsoft.com/en-us/library/office/aa566353(v=exchg.150).aspx
+    ELEMENT_NAME = 'DistributionList'
+    FIELDS = Item.FIELDS + [
+        TextField('display_name', field_uri='contacts:DisplayName', is_required=True),
+        TextField('file_as', field_uri='contacts:FileAs', is_read_only=True),
+        MemberListField('members', field_uri='distributionlist:Members'),
+    ]
+
+
 class PostItem(Item):
     # Supported attrs: https://msdn.microsoft.com/en-us/library/office/bb891851(v=exchg.150).aspx
     # TODO: Untested. Added here to at least be able to parse folders containing PostItem
@@ -695,4 +705,5 @@ class MeetingCancellation(Message):
     ]
 
 
-ITEM_CLASSES = (CalendarItem, Contact, Message, Task, PostItem, MeetingRequest, MeetingResponse, MeetingCancellation)
+ITEM_CLASSES = (CalendarItem, Contact, DistributionList, Message, PostItem, Task, MeetingRequest, MeetingResponse,
+                MeetingCancellation)

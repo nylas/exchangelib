@@ -298,3 +298,21 @@ class Room(Mailbox):
         )
         elem.clear()
         return res
+
+
+class Member(EWSElement):
+    # MSDN: https://msdn.microsoft.com/en-us/library/office/dd899487(v=exchg.150).aspx
+    ELEMENT_NAME = 'Member'
+
+    FIELDS = [
+        MailboxField('mailbox', is_required=True),
+        ChoiceField('status', field_uri='Status', choices={
+            Choice('Unrecognized'), Choice('Normal'), Choice('Demoted')
+        }, default='Normal'),
+    ]
+
+    __slots__ = ('mailbox', 'status')
+
+    def __hash__(self):
+        # TODO: maybe take 'status' into account?
+        return hash(self.mailbox)

@@ -2,6 +2,11 @@
 Change Log
 ==========
 
+HEAD
+----
+* Added minimal support for the ``PostItem`` item type
+* Added support for the ``DistributionList`` item type
+
 1.9.3
 -----
 * Improved support for ``filter()``, ``.only()``, ``.order_by()`` etc. on indexed properties. It is now possible to

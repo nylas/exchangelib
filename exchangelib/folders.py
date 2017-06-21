@@ -9,7 +9,7 @@ from six import string_types
 from .ewsdatetime import EWSDateTime, UTC
 from .fields import IntegerField, TextField, DateTimeField, FieldPath
 from .items import Item, CalendarItem, Contact, Message, Task, MeetingRequest, MeetingResponse, MeetingCancellation, \
-    ITEM_CLASSES, ITEM_TRAVERSAL_CHOICES, SHAPE_CHOICES, IdOnly
+    DistributionList, ITEM_CLASSES, ITEM_TRAVERSAL_CHOICES, SHAPE_CHOICES, IdOnly
 from .properties import ItemId, EWSElement
 from .queryset import QuerySet
 from .restriction import Restriction
@@ -634,7 +634,7 @@ class Tasks(Folder):
 class Contacts(Folder):
     DISTINGUISHED_FOLDER_ID = 'contacts'
     CONTAINER_CLASS = 'IPF.Contact'
-    supported_item_models = (Contact,)
+    supported_item_models = (Contact, DistributionList)
 
     LOCALIZED_NAMES = {
         'da_DK': (u'Kontaktpersoner',),

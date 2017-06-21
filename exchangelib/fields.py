@@ -685,11 +685,22 @@ class MailboxListField(EWSElementListField):
             value = [self.value_cls(email_address=s) if isinstance(s, string_types) else s for s in value]
         return super(MailboxListField, self).clean(value, version=version)
 
-    def from_xml(self, elem):
-        iter_elem = elem.find(self.response_tag())
-        if iter_elem is not None:
-            return [self.value_cls.from_xml(elem=e) for e in iter_elem.findall(self.value_cls.response_tag())]
-        return self.default
+
+class MemberListField(EWSElementListField):
+    is_complex = True
+
+    def __init__(self, *args, **kwargs):
+        from .properties import Member
+        kwargs['value_cls'] = Member
+        super(MemberListField, self).__init__(*args, **kwargs)
+
+    def clean(self, value, version=None):
+        if value is not None:
+            from .properties import Mailbox
+            value = [
+                self.value_cls(mailbox=Mailbox(email_address=s)) if isinstance(s, string_types) else s for s in value
+            ]
+        return super(MemberListField, self).clean(value, version=version)
 
 
 class AttendeesField(EWSElementListField):
