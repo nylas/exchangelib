@@ -155,7 +155,11 @@ class Folder(EWSElement):
 
     @classmethod
     def item_model_from_tag(cls, tag):
-        return cls.ITEM_MODEL_MAP[tag]
+        try:
+            return cls.ITEM_MODEL_MAP[tag]
+        except KeyError:
+            item_model = Folder.ITEM_MODEL_MAP[tag]
+            raise ValueError('Item type %s was unexpected in a %s folder' % (item_model.__name__, cls.__name__))
 
     def allowed_fields(self):
         # Return non-ID fields of all item classes allowed in this folder type
