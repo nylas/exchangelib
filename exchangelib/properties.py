@@ -49,11 +49,11 @@ class EWSElement(object):
             setattr(self, f.name, f.clean(val, version=version))
 
     @classmethod
-    def from_xml(cls, elem):
+    def from_xml(cls, elem, account):
         if elem is None:
             return None
         assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
-        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.FIELDS}
+        kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.FIELDS}
         elem.clear()
         return cls(**kwargs)
 
@@ -139,7 +139,7 @@ class MessageHeader(EWSElement):
     __slots__ = ('name', 'value')
 
     @classmethod
-    def from_xml(cls, elem):
+    def from_xml(cls, elem, account):
         if elem is None:
             return None
         assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
@@ -177,7 +177,7 @@ class ItemId(EWSElement):
         return elem
 
     @classmethod
-    def from_xml(cls, elem):
+    def from_xml(cls, elem, account):
         if elem is None:
             return None
         assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
@@ -285,7 +285,7 @@ class Room(Mailbox):
     ELEMENT_NAME = 'Room'
 
     @classmethod
-    def from_xml(cls, elem):
+    def from_xml(cls, elem, account):
         if elem is None:
             return None
         assert elem.tag == cls.response_tag(), (elem.tag, cls.response_tag())
@@ -294,7 +294,7 @@ class Room(Mailbox):
             name=get_xml_attr(id_elem, '{%s}Name' % TNS),
             email_address=get_xml_attr(id_elem, '{%s}EmailAddress' % TNS),
             mailbox_type=get_xml_attr(id_elem, '{%s}MailboxType' % TNS),
-            item_id=ItemId.from_xml(elem=id_elem.find(ItemId.response_tag())),
+            item_id=ItemId.from_xml(elem=id_elem.find(ItemId.response_tag()), account=account),
         )
         elem.clear()
         return res

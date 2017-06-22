@@ -113,7 +113,7 @@ class ExtendedProperty(EWSElement):
             assert isinstance(self.value, python_type)
 
     @classmethod
-    def from_xml(cls, elem):
+    def from_xml(cls, elem, account):
         # Gets value of this specific ExtendedProperty from a list of 'ExtendedProperty' XML elements
         python_type = cls.python_type()
         if cls.is_array_type():

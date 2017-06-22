@@ -325,12 +325,12 @@ class Item(EWSElement):
         return id_elem.get(ItemId.ID_ATTR), id_elem.get(ItemId.CHANGEKEY_ATTR)
 
     @classmethod
-    def from_xml(cls, elem):
+    def from_xml(cls, elem, account):
         assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
-        item_id, changekey = cls.id_from_xml(elem)
-        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.supported_fields()}
+        item_id, changekey = cls.id_from_xml(elem=elem)
+        kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.supported_fields()}
         elem.clear()
-        return cls(item_id=item_id, changekey=changekey, **kwargs)
+        return cls(account=account, item_id=item_id, changekey=changekey, **kwargs)
 
     @classmethod
     def register(cls, attr_name, attr_cls):
@@ -401,9 +401,9 @@ class BulkCreateResult(Item):
     __slots__ = ('item_id', 'changekey', 'attachments')
 
     @classmethod
-    def from_xml(cls, elem):
+    def from_xml(cls, elem, account):
         item_id, changekey = cls.id_from_xml(elem)
-        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.supported_fields()}
+        kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.supported_fields()}
         elem.clear()
         return cls(item_id=item_id, changekey=changekey, **kwargs)
 

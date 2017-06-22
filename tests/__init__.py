@@ -1,17 +1,16 @@
 # coding=utf-8
 from collections import namedtuple
 import datetime
+from decimal import Decimal
 import glob
 from itertools import chain
 import io
+from keyword import kwlist
 import os
 import random
 import string
 import time
 import unittest
-from collections import namedtuple
-from decimal import Decimal
-from keyword import kwlist
 from xml.etree.ElementTree import ParseError
 
 import requests
@@ -406,11 +405,11 @@ class PropertiesTest(unittest.TestCase):
         <t:InternetMessageHeader HeaderName="X-Mailer">Contoso Mail</t:InternetMessageHeader>
         <t:InternetMessageHeader HeaderName="Return-Path">foo@example.com</t:InternetMessageHeader>
     </t:InternetMessageHeaders>
-</Envelope'''
+</Envelope>'''
         headers_elem = to_xml(payload).find('{%s}InternetMessageHeaders' % TNS)
         headers = {}
         for elem in headers_elem.findall('{%s}InternetMessageHeader' % TNS):
-            header = MessageHeader.from_xml(elem)
+            header = MessageHeader.from_xml(elem=elem, account=None)
             headers[header.name] = header.value
         self.assertDictEqual(
             headers,
@@ -520,6 +519,56 @@ class FieldTest(unittest.TestCase):
             field.clean('c2', version=Version(EXCHANGE_2007))
         field.clean('c2', version=Version(EXCHANGE_2010))
         field.clean('c2', version=Version(EXCHANGE_2013))
+
+    def test_naive_datetime(self):
+        # Test that we can survive naive datetimes on a datetime field
+        tz = EWSTimeZone.timezone('Europe/Copenhagen')
+        account = namedtuple('Account', ['default_timezone'])(default_timezone=tz)
+        default_value = tz.localize(EWSDateTime(2017, 1, 2, 3, 4))
+        field = DateTimeField('foo', field_uri='item:DateTimeSent', default=default_value)
+
+        # TZ-aware datetime string
+        payload = '''\
+<?xml version="1.0" encoding="utf-8"?>
+<Envelope xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
+    <t:Item>
+        <t:DateTimeSent>2017-06-21T18:40:02Z</t:DateTimeSent>
+    </t:Item>
+</Envelope>'''
+        elem = to_xml(payload).find('{%s}Item' % TNS)
+        self.assertEqual(field.from_xml(elem=elem, account=account), UTC.localize(EWSDateTime(2017, 6, 21, 18, 40, 2)))
+
+        # Naive datetime string is localized to tz of the account
+        payload = '''\
+<?xml version="1.0" encoding="utf-8"?>
+<Envelope xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
+    <t:Item>
+        <t:DateTimeSent>2017-06-21T18:40:02</t:DateTimeSent>
+    </t:Item>
+</Envelope>'''
+        elem = to_xml(payload).find('{%s}Item' % TNS)
+        self.assertEqual(field.from_xml(elem=elem, account=account), tz.localize(EWSDateTime(2017, 6, 21, 18, 40, 2)))
+
+        # Garbage string returns None
+        payload = '''\
+<?xml version="1.0" encoding="utf-8"?>
+<Envelope xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
+    <t:Item>
+        <t:DateTimeSent>THIS_IS_GARBAGE</t:DateTimeSent>
+    </t:Item>
+</Envelope>'''
+        elem = to_xml(payload).find('{%s}Item' % TNS)
+        self.assertEqual(field.from_xml(elem=elem, account=account), None)
+
+        # Element not found returns default value
+        payload = '''\
+<?xml version="1.0" encoding="utf-8"?>
+<Envelope xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
+    <t:Item>
+    </t:Item>
+</Envelope>'''
+        elem = to_xml(payload).find('{%s}Item' % TNS)
+        self.assertEqual(field.from_xml(elem=elem, account=account), default_value)
 
 
 class ItemTest(unittest.TestCase):
@@ -1177,7 +1226,7 @@ class CommonTest(EWSTest):
 </s:Envelope>'''
         res = ws._get_elements_in_response(response=ws._get_soap_payload(soap_response=to_xml(xml)))
         self.assertSetEqual(
-            {RoomList.from_xml(elem).email_address for elem in res},
+            {RoomList.from_xml(elem=elem, account=None).email_address for elem in res},
             {'roomlist1@example.com', 'roomlist2@example.com'}
         )
 
@@ -1234,7 +1283,7 @@ class CommonTest(EWSTest):
 </s:Envelope>'''
         res = ws._get_elements_in_response(response=ws._get_soap_payload(soap_response=to_xml(xml)))
         self.assertSetEqual(
-            {Room.from_xml(elem).email_address for elem in res},
+            {Room.from_xml(elem=elem, account=None).email_address for elem in res},
             {'room1@example.com', 'room2@example.com'}
         )
 
@@ -1520,9 +1569,9 @@ class CommonTest(EWSTest):
                 if issubclass(v, (Item, Folder, ExtendedProperty, Recurrence, Occurrence)):
                     # These do not support None input
                     with self.assertRaises(Exception):
-                        v.from_xml(None)
+                        v.from_xml(elem=None, account=None)
                     continue
-                v.from_xml(None)  # This should work for all others
+                v.from_xml(elem=None, account=None)  # This should work for all others
 
 
 class AccountTest(EWSTest):

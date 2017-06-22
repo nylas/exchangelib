@@ -286,8 +286,8 @@ class Folder(EWSElement):
                 if isinstance(i, Exception):
                     yield i
                 else:
-                    item = self.item_model_from_tag(i.tag).from_xml(elem=i)
-                    item.account, item.folder = self.account, self
+                    item = self.item_model_from_tag(i.tag).from_xml(elem=i, account=self.account)
+                    item.folder = self
                     yield item
 
     def bulk_create(self, items, *args, **kwargs):
@@ -315,14 +315,14 @@ class Folder(EWSElement):
         return True
 
     @classmethod
-    def from_xml(cls, elem):
+    def from_xml(cls, elem, account):
         # fld_type = re.sub('{.*}', '', elem.tag)
         fld_id_elem = elem.find(FolderId.response_tag())
         fld_id = fld_id_elem.get(FolderId.ID_ATTR)
         changekey = fld_id_elem.get(FolderId.CHANGEKEY_ATTR)
-        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.supported_fields()}
+        kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.supported_fields()}
         elem.clear()
-        return cls(folder_id=fld_id, changekey=changekey, **kwargs)
+        return cls(account=account, folder_id=fld_id, changekey=changekey, **kwargs)
 
     def to_xml(self, version):
         self.clean(version=version)
@@ -362,7 +362,7 @@ class Folder(EWSElement):
             if isinstance(elem, Exception):
                 yield elem
                 continue
-            dummy_fld = Folder.from_xml(elem=elem)  # We use from_xml() only to parse elem
+            dummy_fld = Folder.from_xml(elem=elem, account=self.account)  # We use from_xml() only to parse elem
             try:
                 folder_cls = self.folder_cls_from_folder_name(folder_name=dummy_fld.name, locale=self.account.locale)
                 log.debug('Folder class %s matches localized folder name %s', folder_cls, dummy_fld.name)
@@ -399,7 +399,7 @@ class Folder(EWSElement):
         ):
             if isinstance(elem, Exception):
                 raise elem
-            folder = cls.from_xml(elem=elem)
+            folder = cls.from_xml(elem=elem, account=account)
             folder.account = account
             folders.append(folder)
         assert len(folders) == 1
@@ -419,8 +419,7 @@ class Folder(EWSElement):
         ):
             if isinstance(elem, Exception):
                 raise elem
-            folder = self.from_xml(elem=elem)
-            folder.account = self.account
+            folder = self.from_xml(elem=elem, account=self.account)
             folders.append(folder)
         assert len(folders) == 1
         fresh_folder = folders[0]

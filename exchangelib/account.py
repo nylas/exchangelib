@@ -12,6 +12,7 @@ from six import text_type, string_types
 from .autodiscover import discover
 from .credentials import DELEGATE, IMPERSONATION
 from .errors import ErrorFolderNotFound, ErrorAccessDenied
+from .ewsdatetime import EWSTimeZone, UTC
 from .fields import FieldPath
 from .folders import Root, Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Tasks, Contacts, \
     RecoverableItemsRoot, RecoverableItemsDeletions, Folder, SHALLOW, DEEP
@@ -30,11 +31,23 @@ log = getLogger(__name__)
 
 @python_2_unicode_compatible
 class Account(object):
-    """
-    Models an Exchange server user account. The primary key for an account is its PrimarySMTPAddress
+    """Models an Exchange server user account. The primary key for an account is its PrimarySMTPAddress
     """
     def __init__(self, primary_smtp_address, fullname=None, access_type=None, autodiscover=False, credentials=None,
-                 config=None, verify_ssl=True, locale=None):
+                 config=None, verify_ssl=True, locale=None, default_timezone=None):
+        """
+        :param primary_smtp_address: The primary email address associated with the account on the Exchange server
+        :param fullname: The full name of the account. Optional.
+        :param access_type: The access type granted to 'credentials' for this account. Valid options are 'delegate'
+        (default) and 'impersonation'.
+        :param autodiscover: Whether to look up the EWS endpoint automatically using the autodiscover protocol.
+        :param credentials: A Credentials object containing valid credentials for this account.
+        :param config: A Configuration object containing EWS endpoint information. Required if autodiscover is disabled
+        :param verify_ssl: If False, disables verificaiton of SSL certificates. Use at own risk.
+        :param locale: The locale of the user. Defaults to the locale of the host.
+        :param default_timezone: EWS may return some datetime values without timezone information. In this case, we will
+        assume values to be in the provided timezone. Defaults to the timezone of the host.
+        """
         if '@' not in primary_smtp_address:
             raise ValueError("primary_smtp_address '%s' is not an email address" % primary_smtp_address)
         self.primary_smtp_address = primary_smtp_address
@@ -56,6 +69,8 @@ class Account(object):
             if not config:
                 raise AttributeError('non-autodiscover requires a config')
             self.protocol = config.protocol
+        self.default_timezone = default_timezone or EWSTimeZone.localzone()
+        assert isinstance(self.default_timezone, EWSTimeZone)
         # We may need to override the default server version on a per-account basis because Microsoft may report one
         # server version up-front but delegate account requests to an older backend server.
         self.version = self.protocol.version
@@ -237,7 +252,7 @@ class Account(object):
             return []
         return list(
             i if isinstance(i, Exception)
-            else BulkCreateResult.from_xml(elem=i)
+            else BulkCreateResult.from_xml(elem=i, account=self)
             for i in CreateItem(account=self).call(
                 items=items,
                 folder=folder,
@@ -407,8 +422,8 @@ class Account(object):
             if isinstance(i, Exception):
                 yield i
             else:
-                item = validation_folder.item_model_from_tag(i.tag).from_xml(elem=i)
-                item.account, item.folder = self, folder
+                item = validation_folder.item_model_from_tag(i.tag).from_xml(elem=i, account=self)
+                item.folder = folder
                 yield item
 
     def __str__(self):

@@ -261,10 +261,10 @@ class Occurrence(EWSElement):
         return id_elem.get(ItemId.ID_ATTR), id_elem.get(ItemId.CHANGEKEY_ATTR)
 
     @classmethod
-    def from_xml(cls, elem):
+    def from_xml(cls, elem, account):
         assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
         item_id, changekey = cls.id_from_xml(elem)
-        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.supported_fields()}
+        kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.supported_fields()}
         elem.clear()
         return cls(item_id=item_id, changekey=changekey, **kwargs)
 
@@ -332,14 +332,14 @@ class Recurrence(EWSElement):
         super(Recurrence, self).__init__(**kwargs)
 
     @classmethod
-    def from_xml(cls, elem):
+    def from_xml(cls, elem, account):
         if elem is None:
             return None
         for pattern_cls in PATTERN_CLASSES:
             pattern_elem = elem.find(pattern_cls.response_tag())
             if pattern_elem is None:
                 continue
-            pattern = pattern_cls.from_xml(pattern_elem)
+            pattern = pattern_cls.from_xml(elem=pattern_elem, account=account)
             break
         else:
             pattern = None
@@ -347,7 +347,7 @@ class Recurrence(EWSElement):
             boundary_elem = elem.find(boundary_cls.response_tag())
             if boundary_elem is None:
                 continue
-            boundary = boundary_cls.from_xml(boundary_elem)
+            boundary = boundary_cls.from_xml(elem=boundary_elem, account=account)
             break
         else:
             boundary = None

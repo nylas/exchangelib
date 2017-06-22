@@ -37,11 +37,11 @@ class SingleFieldIndexedElement(IndexedElement):
         return fields[0]
 
     @classmethod
-    def from_xml(cls, elem):
+    def from_xml(cls, elem, account):
         if elem is None:
             return None
         assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
-        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.FIELDS}
+        kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.FIELDS}
         kwargs[cls.LABEL_FIELD.name] = elem.get(cls.LABEL_FIELD.field_uri)
         elem.clear()
         return cls(**kwargs)
@@ -87,12 +87,12 @@ class MultiFieldIndexedElement(IndexedElement):
     __slots__ = ('label',)
 
     @classmethod
-    def from_xml(cls, elem):
+    def from_xml(cls, elem, account):
         if elem is None:
             return None
         assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
-        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.FIELDS}
-        kwargs['label'] = cls.LABEL_FIELD.from_xml(elem=elem)
+        kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.FIELDS}
+        kwargs['label'] = cls.LABEL_FIELD.from_xml(elem=elem, account=account)
         elem.clear()
         return cls(**kwargs)
 

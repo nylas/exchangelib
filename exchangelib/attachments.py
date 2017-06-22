@@ -1,11 +1,13 @@
 from __future__ import unicode_literals
 
 import base64
+from collections import namedtuple
 import logging
 import mimetypes
 
 from six import string_types
 
+from .ewsdatetime import UTC
 from .fields import BooleanField, TextField, IntegerField, URIField, DateTimeField, EWSElementField, Base64Field, \
     ItemField
 from .properties import RootItemId, EWSElement
@@ -14,6 +16,14 @@ from .util import create_element
 
 string_type = string_types[0]
 log = logging.getLogger(__name__)
+
+
+class UTCDateTimeField(DateTimeField):
+    def from_xml(self, elem, account):
+        # Contrary to other datetime fields, the LastModifiedTime value is returned as a naive datetime but is
+        # apparently always in in UTC. Pass a fake account on to from_xml() to have the datetimes localized as UTC.
+        fake_utc_account = namedtuple('Account', ['default_timezone'])(default_timezone=UTC)
+        return super(UTCDateTimeField, self).from_xml(elem=elem, account=fake_utc_account)
 
 
 class AttachmentId(EWSElement):
@@ -44,7 +54,7 @@ class AttachmentId(EWSElement):
         return elem
 
     @classmethod
-    def from_xml(cls, elem):
+    def from_xml(cls, elem, account):
         if elem is None:
             return None
         assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
@@ -68,7 +78,7 @@ class Attachment(EWSElement):
         TextField('content_id', field_uri='ContentId'),
         URIField('content_location', field_uri='ContentLocation'),
         IntegerField('size', field_uri='Size', is_read_only=True),  # Attachment size in bytes
-        DateTimeField('last_modified_time', field_uri='LastModifiedTime'),
+        UTCDateTimeField('last_modified_time', field_uri='LastModifiedTime'),
         BooleanField('is_inline', field_uri='IsInline'),
     ]
 
@@ -95,7 +105,7 @@ class Attachment(EWSElement):
         if not self.parent_item or not self.parent_item.account:
             raise ValueError('Parent item %s must have an account' % self.parent_item)
         items = list(
-            i if isinstance(i, Exception) else self.from_xml(elem=i)
+            i if isinstance(i, Exception) else self.from_xml(elem=i, account=self.parent_item.account)
             for i in CreateAttachment(account=self.parent_item.account).call(parent_item=self.parent_item, items=[self])
         )
         assert len(items) == 1
@@ -118,7 +128,7 @@ class Attachment(EWSElement):
         if not self.parent_item or not self.parent_item.account:
             raise ValueError('Parent item %s must have an account' % self.parent_item)
         items = list(
-            i if isinstance(i, Exception) else RootItemId.from_xml(elem=i)
+            i if isinstance(i, Exception) else RootItemId.from_xml(elem=i, account=self.parent_item.account)
             for i in DeleteAttachment(account=self.parent_item.account).call(items=[self.attachment_id])
         )
         assert len(items) == 1
@@ -192,11 +202,11 @@ class FileAttachment(Attachment):
         self._content = value
 
     @classmethod
-    def from_xml(cls, elem):
+    def from_xml(cls, elem, account):
         if elem is None:
             return None
         assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
-        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.FIELDS}
+        kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.FIELDS}
         kwargs['content'] = kwargs.pop('_content')
         elem.clear()
         return cls(**kwargs)
@@ -229,7 +239,7 @@ class ItemAttachment(Attachment):
         if not self.parent_item or not self.parent_item.account:
             raise ValueError('%s must have an account' % self.__class__.__name__)
         items = list(
-            i if isinstance(i, Exception) else self.__class__.from_xml(elem=i)
+            i if isinstance(i, Exception) else self.__class__.from_xml(elem=i, account=self.parent_item.account)
             for i in GetAttachment(account=self.parent_item.account).call(
                 items=[self.attachment_id], include_mime_content=True)
         )
@@ -248,11 +258,11 @@ class ItemAttachment(Attachment):
         self._item = value
 
     @classmethod
-    def from_xml(cls, elem):
+    def from_xml(cls, elem, account):
         if elem is None:
             return None
         assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
-        kwargs = {f.name: f.from_xml(elem=elem) for f in cls.FIELDS}
+        kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.FIELDS}
         kwargs['item'] = kwargs.pop('_item')
         elem.clear()
         return cls(**kwargs)

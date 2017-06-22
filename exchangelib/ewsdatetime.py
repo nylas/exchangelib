@@ -13,6 +13,10 @@ from .winzone import PYTZ_TO_MS_TIMEZONE_MAP
 log = logging.getLogger(__name__)
 
 
+class NaiveDateTimeNotAllowed(ValueError):
+    pass
+
+
 class EWSDate(datetime.date):
     """
     Extends the normal date implementation to satisfy EWS
@@ -113,7 +117,12 @@ class EWSDateTime(datetime.datetime):
     @classmethod
     def from_string(cls, date_string):
         # Assume UTC and return timezone-aware EWSDateTime objects
-        local_dt = super(EWSDateTime, cls).strptime(date_string, '%Y-%m-%dT%H:%M:%SZ')
+        try:
+            local_dt = super(EWSDateTime, cls).strptime(date_string, '%Y-%m-%dT%H:%M:%SZ')
+        except ValueError:
+            # This is a naive datetime. Don't allow this, but signal caller with an appropriate error
+            local_dt = super(EWSDateTime, cls).strptime(date_string, '%Y-%m-%dT%H:%M:%S')
+            raise NaiveDateTimeNotAllowed(local_dt)
         return UTC.localize(cls.from_datetime(local_dt))
 
     @classmethod

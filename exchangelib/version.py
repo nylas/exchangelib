@@ -81,7 +81,7 @@ class Build(object):
             raise ValueError("Exchange major versions below 8 don't support EWS (%s)", text_type(self))
 
     @classmethod
-    def from_xml(cls, elem):
+    def from_xml(cls, elem, account):
         xml_elems_map = {
             'major_version': 'MajorVersion',
             'minor_version': 'MinorVersion',
@@ -239,7 +239,7 @@ class Version(object):
         if info is None:
             raise TransportError('No ServerVersionInfo in response: %s' % response)
         try:
-            build = Build.from_xml(elem=info)
+            build = Build.from_xml(elem=info, account=None)
         except ValueError:
             raise TransportError('Bad ServerVersionInfo in response: %s' % response)
         # Not all Exchange servers send the Version element
