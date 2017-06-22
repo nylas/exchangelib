@@ -6,6 +6,9 @@ HEAD
 ----
 * Added minimal support for the ``PostItem`` item type
 * Added support for the ``DistributionList`` item type
+* Added support for receiving naive datetimes from the server. They will be localized using the new ``default_timezone``
+  attribute on ``Account``
+* Added experimental support for recurring calendar items. See examples in issue #37.
 
 1.9.3
 -----
