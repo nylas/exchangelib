@@ -9,6 +9,8 @@ task, contact and distribution list items.
 .. image:: https://badge.fury.io/py/exchangelib.svg
     :target: https://badge.fury.io/py/exchangelib
 
+.. image:: https://img.shields.io/pypi/pyversions/exchangelib.svg   
+
 .. image:: https://landscape.io/github/ecederstrand/exchangelib/master/landscape.png
    :target: https://landscape.io/github/ecederstrand/exchangelib/master
 
