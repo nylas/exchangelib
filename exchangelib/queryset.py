@@ -302,7 +302,6 @@ class QuerySet(object):
         """ Return a query that is guaranteed to be empty  """
         new_qs = self.copy()
         new_qs.q = None
-        new_qs._cache = None
         return new_qs
 
     def filter(self, *args, **kwargs):

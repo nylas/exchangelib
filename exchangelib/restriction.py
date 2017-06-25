@@ -350,7 +350,7 @@ class Q(object):
                 # We allow a filter shortcut of e.g. email_addresses__contains=EmailAddress(label='Foo', ...) instead of
                 # email_addresses__Foo_email_address=.... Set FieldPath label now so we can generate the field_uri.
                 field_path.label = value.label
-            elem.append(field_path.to_xml(version=version))
+            elem.append(field_path.to_xml())
             constant = create_element('t:Constant')
             if self.op != self.EXISTS:
                 # Use .set() to not fill up the create_element() cache with unique values

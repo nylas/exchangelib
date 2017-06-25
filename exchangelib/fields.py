@@ -123,7 +123,7 @@ class FieldPath(object):
             return None  # No item with this label
         return getattr(item, self.field.name)
 
-    def to_xml(self, version=None):
+    def to_xml(self):
         if isinstance(self.field, IndexedField):
             if not self.label or not self.subfield:
                 raise ValueError("Field path for indexed field '%s' is missing label and/or subfield" % self.field.name)
@@ -171,9 +171,9 @@ class FieldOrder(object):
         reverse = s.startswith('-')
         return cls(field_path=field_path, reverse=reverse)
 
-    def to_xml(self, version=None):
+    def to_xml(self):
         field_order = create_element('t:FieldOrder', Order='Descending' if self.reverse else 'Ascending')
-        field_order.append(self.field_path.to_xml(version=version))
+        field_order.append(self.field_path.to_xml())
         return field_order
 
 

@@ -461,6 +461,7 @@ def _get_hostname_from_srv(hostname):
         for rdata in answers:
             try:
                 vals = rdata.to_text().strip().rstrip('.').split(' ')
+                # pylint: disable=expression-not-assigned
                 int(vals[0]), int(vals[1]), int(vals[2])  # Just to raise errors if these are not ints
                 svr = vals[3]
             except (ValueError, KeyError) as e:

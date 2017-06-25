@@ -170,7 +170,9 @@ def set_xml_value(elem, value, version):
         elem.text = value_to_xml_text(value)
     elif is_iterable(value, generators_allowed=True):
         for v in value:
-            if isinstance(v, (FieldPath, FieldOrder, EWSElement)):
+            if isinstance(v, (FieldPath, FieldOrder)):
+                elem.append(v.to_xml())
+            elif isinstance(v, EWSElement):
                 assert version
                 elem.append(v.to_xml(version=version))
             elif isinstance(v, ElementType):
@@ -179,7 +181,9 @@ def set_xml_value(elem, value, version):
                 add_xml_child(elem, 't:String', v)
             else:
                 raise ValueError('Unsupported type %s for list element %s on elem %s' % (type(v), v, elem))
-    elif isinstance(value, (FieldPath, FieldOrder, EWSElement)):
+    elif isinstance(value, (FieldPath, FieldOrder)):
+        elem.append(value.to_xml())
+    elif isinstance(value, EWSElement):
         assert version
         elem.append(value.to_xml(version=version))
     elif isinstance(value, ElementType):
