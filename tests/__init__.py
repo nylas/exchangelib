@@ -7,7 +7,9 @@ from itertools import chain
 import io
 from keyword import kwlist
 import os
+import psutil
 import random
+import socket
 import string
 import time
 import unittest
@@ -263,6 +265,18 @@ class ProtocolTest(unittest.TestCase):
             self.assertEqual(hash(base_p), hash(p))
             self.assertEqual(id(base_p.thread_pool), id(p.thread_pool))
             self.assertEqual(id(base_p._session_pool), id(p._session_pool))
+
+    def test_close(self):
+        proc = psutil.Process()
+        ip_addr = socket.gethostbyname('httpbin.org')
+        protocol = Protocol(service_endpoint='http://httpbin.org', credentials=Credentials('A', 'B'),
+                            auth_type=NOAUTH, verify_ssl=True, version=Version(Build(15, 1)))
+        session = protocol.get_session()
+        session.get('http://httpbin.org')
+        self.assertEqual([p.raddr[0] for p in proc.connections() if p.raddr[0] == ip_addr], [ip_addr])
+        protocol.release_session(session)
+        protocol.close()
+        self.assertEqual([p.raddr[0] for p in proc.connections() if p.raddr[0] == ip_addr], [])
 
 
 class CredentialsTest(unittest.TestCase):

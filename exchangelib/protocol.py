@@ -72,7 +72,7 @@ class BaseProtocol(object):
         while True:
             try:
                 self._session_pool.get(block=False).close_socket(self.service_endpoint)
-            except (Empty, ReferenceError, AttributeError):
+            except Empty:
                 break
 
     def get_session(self):
@@ -181,7 +181,6 @@ class CachingProtocol(type):
             service_endpoint = key[0]
             log.debug("Service endpoint '%s': Closing sessions", service_endpoint)
             protocol.close()
-            del protocol
         mcs._protocol_cache.clear()
 
 
@@ -265,11 +264,4 @@ class EWSSession(requests.sessions.Session):
 
     def close_socket(self, url):
         # Close underlying socket. This ensures we don't leave stray sockets around after program exit.
-        adapter = self.get_adapter(url)
-        pool = adapter.get_connection(url)
-        for _ in range(pool.pool.qsize()):
-            conn = pool._get_conn()
-            if conn.sock:
-                log.debug('Closing socket %s', text_type(conn.sock.getsockname()))
-                conn.sock.shutdown(socket.SHUT_RDWR)
-                conn.sock.close()
+        self.get_adapter(url).close()
