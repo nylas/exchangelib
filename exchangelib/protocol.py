@@ -9,7 +9,6 @@ from __future__ import unicode_literals
 
 import logging
 import random
-import socket
 from multiprocessing.pool import ThreadPool
 from threading import Lock
 
@@ -17,7 +16,6 @@ import requests.adapters
 import requests.sessions
 from future.utils import with_metaclass, python_2_unicode_compatible
 from future.moves.queue import LifoQueue, Empty, Full
-from six import text_type
 
 from .credentials import Credentials
 from .errors import TransportError
