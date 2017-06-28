@@ -343,10 +343,12 @@ def post_ratelimited(protocol, session, url, headers, data, timeout=None, verify
     The contract on sessions here is to return the session that ends up being used, or retiring the session if we
     intend to raise an exception. We give up on max_wait timeout, not number of retries
     """
+    thread_id = get_ident()
     wait = 10  # seconds
+    retry = 0
     redirects = 0
     log_msg = '''\
-Retry: %(i)s
+Retry: %(retry)s
 Waited: %(wait)s
 Timeout: %(timeout)s
 Session: %(session_id)s
@@ -362,76 +364,35 @@ Response headers: %(response_headers)s
 Request data: %(request_data)s
 Response data: %(response_data)s
 '''
-    log_vals = dict(i=0, wait=0, timeout=timeout, session_id=session.session_id, thread_id=get_ident(),
-                    auth=session.auth, url=url, verify=verify, allow_redirects=allow_redirects, response_time=None,
-                    status_code=None, request_headers=headers, response_headers=None, request_data=data,
-                    response_data=None)
     try:
         while True:
-            log.debug('Session %(session_id)s thread %(thread_id)s: retry %(i)s timeout %(timeout)s POST\'ing to '
-                      '%(url)s after %(wait)s s wait', log_vals)
+            log.debug('Session %s thread %s: retry %s timeout %s POST\'ing to %s after %ss wait', session.session_id,
+                      thread_id, retry, timeout, url, wait)
             d1 = time_func()
             try:
                 r = session.post(url=url, headers=headers, data=data, allow_redirects=False, timeout=timeout,
                                  verify=verify)
             except CONNECTION_ERRORS as e:
-                log.debug(
-                    'Session %(session_id)s thread %(thread_id)s: timeout or connection error POST\'ing to %(url)s',
-                    log_vals)
+                log.debug('Session %s thread %s: connection error POST\'ing to %s', session.session_id, thread_id, url)
                 r = DummyResponse()
                 r.request.headers = headers
                 r.headers = {'TimeoutException': e}
             d2 = time_func()
-            log_vals['response_time'] = d2 - d1
-            log_vals['status_code'] = r.status_code
-            log_vals['request_headers'] = r.request.headers
-            log_vals['response_headers'] = r.headers
-            log_vals['response_data'] = getattr(r, 'text', '')
+            log_vals = dict(retry=retry, wait=wait, timeout=timeout, session_id=session.session_id, thread_id=thread_id,
+                            auth=session.auth, url=url, verify=verify, allow_redirects=allow_redirects,
+                            response_time=d2 - d1, status_code=r.status_code, request_headers=r.request.headers,
+                            response_headers=r.headers, request_data=data, response_data=getattr(r, 'text', ''))
             log.debug(log_msg, log_vals)
-            # The genericerrorpage.htm/internalerror.asp is ridiculous behaviour for random outages. Redirect to
-            # '/internalsite/internalerror.asp' or '/internalsite/initparams.aspx' is caused by e.g. SSL certificate
-            # f*ckups on the Exchange server.
-            if (r.status_code == 401) \
-                    or (r.headers.get('connection') == 'close') \
-                    or (r.status_code == 302 and r.headers.get('location', '').lower() ==
-                        '/ews/genericerrorpage.htm?aspxerrorpath=/ews/exchange.asmx') \
-                    or (r.status_code == 503):
-                # Maybe stale session. Get brand new one. But wait a bit, since the server may be rate-limiting us.
-                # This can be 302 redirect to error page, 401 authentication error or 503 service unavailable
-                if r.status_code not in (302, 401, 503):
-                    # Only retry if we didn't get a useful response
-                    break
-                if protocol.credentials.fail_fast:
-                    break
-                log_vals['i'] += 1
-                log_vals['wait'] = wait
-                if wait > protocol.credentials.max_wait:
-                    # We lost patience. Session is cleaned up in outer loop
-                    raise RateLimitError(
-                        'Session %(session_id)s URL %(url)s: Max timeout reached' % log_vals)
-                log.info("Session %(session_id)s thread %(thread_id)s: Connection error on URL %(url)s "
-                         "(code %(status_code)s). Cool down %(wait)s secs", log_vals)
+            if _may_retry_on_error(r, protocol, wait):
+                log.info("Session %s thread %s: Connection error on URL %s (code %s). Cool down %s secs",
+                         session.session_id, thread_id, url, r.status_code, wait)
                 time.sleep(wait)  # Increase delay for every retry
+                retry += 1
                 wait *= 2
                 session = protocol.renew_session(session)
-                log_vals['wait'] = wait
-                log_vals['session_id'] = session.session_id
                 continue
             if r.status_code == 302:
-                # If we get a normal 302 redirect, requests will issue a GET to that URL. We still want to POST
-                try:
-                    redirect_url = get_redirect_url(response=r, allow_relative=False)
-                except RelativeRedirect as e:
-                    log.debug("'allow_redirects' only supports relative redirects (%s -> %s)", url, e.value)
-                    raise RedirectError(url=e.value)
-                if not allow_redirects:
-                    raise TransportError('Redirect not allowed but we were redirected (%s -> %s)' % (url, redirect_url))
-                url = redirect_url
-                log_vals['url'] = url
-                log.debug('302 Redirected to %s', url)
-                redirects += 1
-                if redirects > MAX_REDIRECTS:
-                    raise TransportError('Max redirect count exceeded')
+                url, redirects = _redirect_or_fail(r, redirects, allow_redirects)
                 continue
             break
     except (RateLimitError, RedirectError) as e:
@@ -439,11 +400,8 @@ Response data: %(response_data)s
         protocol.retire_session(session)
         raise
     except Exception as e:
-        # Let higher layers handle this. Add data for better debugging.
-        log_msg = '%(exc_cls)s: %(exc_msg)s\n' + log_msg
-        log_vals['exc_cls'] = e.__class__.__name__
-        log_vals['exc_msg'] = text_type(e)
-        log.error(log_msg, log_vals)
+        # Let higher layers handle this. Add full context for better debugging.
+        log.error('%s: %s\n%s', e.__class__.__name__, text_type(e), log_msg % log_vals)
         protocol.retire_session(session)
         raise
     if r.status_code == 500 and r.text and is_xml(r.text):
@@ -451,20 +409,64 @@ Response data: %(response_data)s
         log.debug('Got status code %s but trying to parse content anyway', r.status_code)
     elif r.status_code != 200:
         protocol.retire_session(session)
-        cas_error = r.headers.get('X-CasErrorCode')
-        if cas_error:
-            raise CASError(cas_error=cas_error, response=r)
-        if r.status_code == 500 and ('The specified server version is invalid' in r.text or
-                                     'ErrorInvalidSchemaVersionForMailboxVersion' in r.text):
-            raise ErrorInvalidSchemaVersionForMailboxVersion('Invalid server version')
-        if 'The referenced account is currently locked out' in r.text:
-            raise TransportError('The service account is currently locked out')
-        if r.status_code == 401 and protocol.credentials.fail_fast:
-            # This is a login failure
-            raise UnauthorizedError('Wrong username or password for %s' % url)
-        if 'TimeoutException' in r.headers:
-            raise r.headers['TimeoutException']
-        # This could be anything. Let higher layers handle this
-        raise TransportError('Unknown failure\n' + log_msg % log_vals)
-    log.debug('Session %(session_id)s thread %(thread_id)s: Useful response from %(url)s', log_vals)
+        _raise_response_errors(r, protocol, log_msg, log_vals)  # Always raises an exception
+    log.debug('Session %s thread %s: Useful response from %s', session.session_id, thread_id, url)
     return r, session
+
+
+def _may_retry_on_error(r, protocol, wait):
+    # The genericerrorpage.htm/internalerror.asp is ridiculous behaviour for random outages. Redirect to
+    # '/internalsite/internalerror.asp' or '/internalsite/initparams.aspx' is caused by e.g. SSL certificate
+    # f*ckups on the Exchange server.
+    if (r.status_code == 401) \
+            or (r.headers.get('connection') == 'close') \
+            or (r.status_code == 302 and r.headers.get('location', '').lower() ==
+                '/ews/genericerrorpage.htm?aspxerrorpath=/ews/exchange.asmx') \
+            or (r.status_code == 503):
+        # Maybe stale session. Get brand new one. But wait a bit, since the server may be rate-limiting us.
+        # This can be 302 redirect to error page, 401 authentication error or 503 service unavailable
+        if r.status_code not in (302, 401, 503):
+            # Only retry if we didn't get a useful response
+            return False
+        if protocol.credentials.fail_fast:
+            return False
+        if wait > protocol.credentials.max_wait:
+            # We lost patience. Session is cleaned up in outer loop
+            raise RateLimitError('URL %s: Max timeout reached' % r.url)
+        return True
+    return False
+
+
+def _redirect_or_fail(r, redirects, allow_redirects):
+    # Retry with no delay. If we let requests handle redirects automatically, it would issue a GET to that
+    # URL. We still want to POST.
+    try:
+        redirect_url = get_redirect_url(response=r, allow_relative=False)
+    except RelativeRedirect as e:
+        log.debug("'allow_redirects' only supports relative redirects (%s -> %s)", r.url, e.value)
+        raise RedirectError(url=e.value)
+    if not allow_redirects:
+        raise TransportError('Redirect not allowed but we were redirected (%s -> %s)' % (r.url, redirect_url))
+    log.debug('302 Redirected to %s', redirect_url)
+    redirects += 1
+    if redirects > MAX_REDIRECTS:
+        raise TransportError('Max redirect count exceeded')
+    return redirect_url, redirects
+
+
+def _raise_response_errors(r, protocol, log_msg, log_vals):
+    cas_error = r.headers.get('X-CasErrorCode')
+    if cas_error:
+        raise CASError(cas_error=cas_error, response=r)
+    if r.status_code == 500 and ('The specified server version is invalid' in r.text or
+                                         'ErrorInvalidSchemaVersionForMailboxVersion' in r.text):
+        raise ErrorInvalidSchemaVersionForMailboxVersion('Invalid server version')
+    if 'The referenced account is currently locked out' in r.text:
+        raise TransportError('The service account is currently locked out')
+    if r.status_code == 401 and protocol.credentials.fail_fast:
+        # This is a login failure
+        raise UnauthorizedError('Wrong username or password for %s' % r.url)
+    if 'TimeoutException' in r.headers:
+        raise r.headers['TimeoutException']
+    # This could be anything. Let higher layers handle this. Add full context for better debugging.
+    raise TransportError('Unknown failure\n' + log_msg % log_vals)
