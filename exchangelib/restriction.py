@@ -191,7 +191,7 @@ class Q(object):
             )
         try:
             value_to_xml_text(self.value)
-        except ValueError:
+        except NotImplementedError:
             raise ValueError('Value "%s" for filter on field path "%s" is unsupported' % (self.value, self.field_path))
         if isinstance(self.value, EWSDateTime):
             # We want to convert all values to UTC

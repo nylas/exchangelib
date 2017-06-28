@@ -147,7 +147,7 @@ def value_to_xml_text(value):
         return value.email_address
     if isinstance(value, Attendee):
         return value.mailbox.email_address
-    raise ValueError('Unsupported type: %s (%s)' % (type(value), value))
+    raise NotImplementedError('Unsupported type: %s (%s)' % (type(value), value))
 
 
 def xml_text_to_value(value, value_type):
