@@ -268,11 +268,11 @@ class ProtocolTest(unittest.TestCase):
 
     def test_close(self):
         proc = psutil.Process()
-        ip_addr = socket.gethostbyname('httpbin.org')
-        protocol = Protocol(service_endpoint='http://httpbin.org', credentials=Credentials('A', 'B'),
+        ip_addr = socket.gethostbyname('example.com')
+        protocol = Protocol(service_endpoint='http://example.com', credentials=Credentials('A', 'B'),
                             auth_type=NOAUTH, verify_ssl=True, version=Version(Build(15, 1)))
         session = protocol.get_session()
-        session.get('http://httpbin.org')
+        session.get('http://example.com')
         self.assertEqual([p.raddr[0] for p in proc.connections() if p.raddr[0] == ip_addr], [ip_addr])
         protocol.release_session(session)
         protocol.close()
