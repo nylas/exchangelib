@@ -12,7 +12,7 @@ from six import text_type, string_types
 from .autodiscover import discover
 from .credentials import DELEGATE, IMPERSONATION
 from .errors import ErrorFolderNotFound, ErrorAccessDenied
-from .ewsdatetime import EWSTimeZone
+from .ewsdatetime import EWSTimeZone, UTC
 from .fields import FieldPath
 from .folders import Root, Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Tasks, Contacts, \
     RecoverableItemsRoot, RecoverableItemsDeletions, Folder, SHALLOW, DEEP
@@ -69,7 +69,12 @@ class Account(object):
             if not config:
                 raise AttributeError('non-autodiscover requires a config')
             self.protocol = config.protocol
-        self.default_timezone = default_timezone or EWSTimeZone.localzone()
+        try:
+            self.default_timezone = default_timezone or EWSTimeZone.localzone()
+        except ValueError as e:
+            # There is no translation from local timezone name to Windows timezone name
+            log.warning(e.args[0] + '. Fallback to UTC')
+            self.default_timezone = UTC
         assert isinstance(self.default_timezone, EWSTimeZone)
         # We may need to override the default server version on a per-account basis because Microsoft may report one
         # server version up-front but delegate account requests to an older backend server.
