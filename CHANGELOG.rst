@@ -2,6 +2,10 @@
 Change Log
 ==========
 
+HEAD
+----
+* Added support for the ``effective_rights``field on items and folders.
+
 1.9.4
 -----
 * Added minimal support for the ``PostItem`` item type

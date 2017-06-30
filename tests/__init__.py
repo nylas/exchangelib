@@ -2061,6 +2061,8 @@ class FolderTest(EWSTest):
                     if field.name in ('account', 'folder_id', 'changekey'):
                         # These are needed for a successful refresh()
                         continue
+                    if field.is_read_only:
+                        continue
                     setattr(f, field.name, self.random_val(field))
                 f.refresh()
                 for field in folder_cls.FIELDS:

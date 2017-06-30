@@ -7,7 +7,7 @@ from future.utils import python_2_unicode_compatible
 from six import string_types
 
 from .ewsdatetime import EWSDateTime, UTC
-from .fields import IntegerField, TextField, DateTimeField, FieldPath
+from .fields import IntegerField, TextField, DateTimeField, FieldPath, EffectiveRightsField
 from .items import Item, CalendarItem, Contact, Message, Task, MeetingRequest, MeetingResponse, MeetingCancellation, \
     DistributionList, ITEM_CLASSES, ITEM_TRAVERSAL_CHOICES, SHAPE_CHOICES, IdOnly
 from .properties import ItemId, EWSElement
@@ -99,15 +99,16 @@ class Folder(EWSElement):
     FIELDS = [
         TextField('folder_id', field_uri='folder:FolderId', is_searchable=False),
         TextField('changekey', field_uri='folder:Changekey', is_searchable=False),
-        TextField('name', field_uri='folder:DisplayName'),
         TextField('folder_class', field_uri='folder:FolderClass'),
+        TextField('name', field_uri='folder:DisplayName'),
         IntegerField('total_count', field_uri='folder:TotalCount', is_read_only=True),
-        IntegerField('unread_count', field_uri='folder:UnreadCount', is_read_only=True),
         IntegerField('child_folder_count', field_uri='folder:ChildFolderCount', is_read_only=True),
+        IntegerField('unread_count', field_uri='folder:UnreadCount', is_read_only=True),
+        EffectiveRightsField('effective_rights', field_uri='folder:EffectiveRights', is_read_only=True),
     ]
 
-    __slots__ = ('account', 'folder_id', 'changekey', 'name', 'folder_class', 'total_count', 'unread_count',
-                 'child_folder_count')
+    __slots__ = ('account', 'folder_id', 'changekey', 'folder_class', 'name', 'total_count', 'child_folder_count',
+                 'unread_count', 'effective_rights')
 
     def __init__(self, **kwargs):
         self.account = kwargs.pop('account', None)

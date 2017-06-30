@@ -10,8 +10,8 @@ from .ewsdatetime import UTC_NOW
 from .extended_properties import ExtendedProperty
 from .fields import BooleanField, IntegerField, DecimalField, Base64Field, TextField, TextListField, ChoiceField, \
     URIField, BodyField, DateTimeField, MessageHeaderField, PhoneNumberField, EmailAddressField, PhysicalAddressField, \
-    ExtendedPropertyField, AttachmentField, RecurrenceField, MailboxField,  MailboxListField, \
-    AttendeesField, Choice, OccurrenceField, OccurrenceListField, MemberListField, EWSElementField
+    ExtendedPropertyField, AttachmentField, RecurrenceField, MailboxField,  MailboxListField, AttendeesField, Choice, \
+    OccurrenceField, OccurrenceListField, MemberListField, EWSElementField, EffectiveRightsField
 from .properties import EWSElement, ItemId, ConversationId
 from .recurrence import FirstOccurrence, LastOccurrence, Occurrence, DeletedOccurrence
 from .util import create_element, is_iterable
@@ -108,6 +108,7 @@ class Item(EWSElement):
         IntegerField('reminder_minutes_before_start', field_uri='item:ReminderMinutesBeforeStart',
                      is_required_after_save=True, min=0, default=0),
         # ExtendedProperty fields go here
+        EffectiveRightsField('effective_rights', field_uri='item:EffectiveRights', is_read_only=True),
         TextField('last_modified_name', field_uri='item:LastModifiedName', is_read_only=True),
         DateTimeField('last_modified_time', field_uri='item:LastModifiedTime', is_read_only=True),
         EWSElementField('conversation_id', field_uri='item:ConversationId', value_cls=ConversationId,

@@ -5,7 +5,8 @@ import logging
 
 from six import text_type, string_types
 
-from .fields import SubField, TextField, EmailField, ChoiceField, DateTimeField, EWSElementField, MailboxField, Choice
+from .fields import SubField, TextField, EmailField, ChoiceField, DateTimeField, EWSElementField, MailboxField, Choice, \
+    BooleanField
 from .services import MNS, TNS
 from .util import get_xml_attr, create_element
 
@@ -316,3 +317,24 @@ class Member(EWSElement):
     def __hash__(self):
         # TODO: maybe take 'status' into account?
         return hash(self.mailbox)
+
+
+class EffectiveRights(EWSElement):
+    # MSDN: https://msdn.microsoft.com/en-us/library/office/bb891883(v=exchg.150).aspx
+    ELEMENT_NAME = 'EffectiveRights'
+
+    FIELDS = [
+        BooleanField('create_associated', field_uri='CreateAssociated', default=False),
+        BooleanField('create_contents', field_uri='CreateContents', default=False),
+        BooleanField('create_hierarchy', field_uri='CreateHierarchy', default=False),
+        BooleanField('delete', field_uri='Delete', default=False),
+        BooleanField('modify', field_uri='Modify', default=False),
+        BooleanField('read', field_uri='Read', default=False),
+        BooleanField('view_private_items', field_uri='ViewPrivateItems', default=False),
+    ]
+
+    __slots__ = ('create_associated', 'create_contents', 'create_hierarchy', 'delete', 'modify', 'read',
+                 'view_private_items')
+
+    def __contains__(self, item):
+        return getattr(self, item, False)
