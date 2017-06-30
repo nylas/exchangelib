@@ -347,7 +347,7 @@ class Item(EWSElement):
             raise ValueError("'%s' must be a subclass of ExtendedProperty" % attr_cls)
         # Find the correct index for the extended property and insert the new field. We insert after 'reminder_is_set'
 
-        # TODO: This is super hacky and will need to change if we add new item fields after 'reminder_minutes_before_start'
+        # TODO: This is super hacky and will need to change if we add new fields after 'reminder_minutes_before_start'
         # ExtendedProperty actually goes in between <HasAttachments/><ExtendedProperty/><Culture/>
         # See https://msdn.microsoft.com/en-us/library/office/aa580790(v=exchg.150).aspx
         idx = tuple(f.name for f in cls.FIELDS).index('reminder_minutes_before_start') + 1
@@ -432,10 +432,14 @@ class CalendarItem(Item):
         AttendeesField('optional_attendees', field_uri='calendar:OptionalAttendees', is_searchable=False),
         AttendeesField('resources', field_uri='calendar:Resources', is_searchable=False),
         RecurrenceField('recurrence', field_uri='calendar:Recurrence', is_searchable=False),
-        OccurrenceField('first_occurrence', field_uri='calendar:FirstOccurrence', value_cls=FirstOccurrence, is_read_only=True),
-        OccurrenceField('last_occurrence', field_uri='calendar:LastOccurrence', value_cls=LastOccurrence, is_read_only=True),
-        OccurrenceListField('modified_occurrences', field_uri='calendar:ModifiedOccurrences', value_cls=Occurrence, is_read_only=True),
-        OccurrenceListField('deleted_occurrences', field_uri='calendar:DeletedOccurrences', value_cls=DeletedOccurrence, is_read_only=True),
+        OccurrenceField('first_occurrence', field_uri='calendar:FirstOccurrence', value_cls=FirstOccurrence,
+                        is_read_only=True),
+        OccurrenceField('last_occurrence', field_uri='calendar:LastOccurrence', value_cls=LastOccurrence,
+                        is_read_only=True),
+        OccurrenceListField('modified_occurrences', field_uri='calendar:ModifiedOccurrences', value_cls=Occurrence,
+                            is_read_only=True),
+        OccurrenceListField('deleted_occurrences', field_uri='calendar:DeletedOccurrences', value_cls=DeletedOccurrence,
+                            is_read_only=True),
     ]
 
     def clean(self, version=None):

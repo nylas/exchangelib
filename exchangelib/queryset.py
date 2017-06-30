@@ -174,7 +174,8 @@ class QuerySet(object):
         # and we're ordering on at most one field), and will only fill the cache if the entire query is iterated.
         if isinstance(idx_or_slice, int):
             return self._getitem_idx(idx_or_slice)
-        return self._getitem_slice(idx_or_slice)
+        else:
+            return self._getitem_slice(idx_or_slice)
 
     def _getitem_idx(self, idx):
         from .services import FindItem
@@ -184,7 +185,7 @@ class QuerySet(object):
         if idx < 0:
             # Support negative indexes by reversing the queryset and negating the index value
             reverse_idx = -(idx+1)
-            return self.reverse()._getitem_idx(reverse_idx)
+            return self.reverse()[reverse_idx]
         else:
             if self._cache is None and idx < FindItem.CHUNKSIZE:
                 # Optimize a bit by setting self.page_size to only get as many items as strictly needed

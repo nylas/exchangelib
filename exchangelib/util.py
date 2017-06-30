@@ -40,6 +40,7 @@ def is_iterable(value, generators_allowed=False):
     callers don't necessarily guarantee that they only iterate the value once. Take care to not match string types.
 
     :param value: any type of object
+    :param generators_allowed: if True, generators will be treated as iterable
     :return: True or False
     """
     if generators_allowed:
@@ -459,7 +460,7 @@ def _raise_response_errors(r, protocol, log_msg, log_vals):
     if cas_error:
         raise CASError(cas_error=cas_error, response=r)
     if r.status_code == 500 and ('The specified server version is invalid' in r.text or
-                                         'ErrorInvalidSchemaVersionForMailboxVersion' in r.text):
+                                 'ErrorInvalidSchemaVersionForMailboxVersion' in r.text):
         raise ErrorInvalidSchemaVersionForMailboxVersion('Invalid server version')
     if 'The referenced account is currently locked out' in r.text:
         raise TransportError('The service account is currently locked out')
