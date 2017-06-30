@@ -199,7 +199,9 @@ class Version(object):
         # same as the auth type for docs.
         log.debug('Getting %s with auth type %s', types_url, auth.__class__.__name__)
         # Some servers send an empty response if we send 'Connection': 'close' header
+        from .protocol import BaseProtocol
         with requests.sessions.Session() as s:
+            s.mount(types_url, BaseProtocol.get_adapter())
             r = s.get(url=types_url, auth=auth, allow_redirects=False, stream=False, verify=verify_ssl)
         log.debug('Request headers: %s', r.request.headers)
         log.debug('Response code: %s', r.status_code)

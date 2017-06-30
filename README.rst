@@ -84,6 +84,11 @@ Setup and connecting
         primary_smtp_address=primary_smtp_address, config=config, autodiscover=False, access_type=DELEGATE
     )
 
+    # If you need proxy support or custom TLS validation, you can supply a custom 'requests' transport adapter, as
+    # described in http://docs.python-requests.org/en/master/user/advanced/#transport-adapters
+    from exchangelib.protocol import BaseProtocol
+    BaseProcotol.HTTP_ADAPTER_CLS = MyAdapterClass
+
 
 Folders
 ^^^^^^^

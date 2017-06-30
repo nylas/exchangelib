@@ -5,6 +5,7 @@ Change Log
 HEAD
 ----
 * Added support for the ``effective_rights``field on items and folders.
+* Added support for custom ``requests`` transport adapters, to allow proxy support, custom TLS validation etc.
 
 1.9.4
 -----

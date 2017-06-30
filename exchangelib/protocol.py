@@ -46,6 +46,9 @@ class BaseProtocol(object):
     # Timeout for HTTP requests
     TIMEOUT = 120
 
+    # The adapter class to use for HTTP requests. Override this if you need e.g. proxy support or specific TLS versions
+    HTTP_ADAPTER_CLS = requests.adapters.HTTPAdapter
+
     def __init__(self, service_endpoint, credentials, auth_type, verify_ssl):
         assert isinstance(credentials, Credentials)
         if auth_type is not None:
@@ -72,6 +75,16 @@ class BaseProtocol(object):
                 self._session_pool.get(block=False).close_socket(self.service_endpoint)
             except Empty:
                 break
+
+    @classmethod
+    def get_adapter(cls):
+        # We want just one connection per session. No retries, since we wrap all requests in our own retry handler
+        return cls.HTTP_ADAPTER_CLS(
+            pool_block=True,
+            pool_connections=cls.CONNECTIONS_PER_SESSION,
+            pool_maxsize=cls.CONNECTIONS_PER_SESSION,
+            max_retries=0,
+        )
 
     def get_session(self):
         _timeout = 60  # Rate-limit messages about session starvation
@@ -110,16 +123,9 @@ class BaseProtocol(object):
     def create_session(self):
         session = EWSSession(self)
         session.auth = get_auth_instance(credentials=self.credentials, auth_type=self.auth_type)
-        # Leave this inside the loop because headers are mutable
+        # Create a copy of the headers because headers are mutable and session users may modify headers
         session.headers.update(DEFAULT_HEADERS.copy())
-        scheme = 'https' if self.has_ssl else 'http'
-        # We want just one connection per session. No retries, since we wrap all requests in our own retry handler
-        session.mount('%s://' % scheme, requests.adapters.HTTPAdapter(
-            pool_block=True,
-            pool_connections=self.CONNECTIONS_PER_SESSION,
-            pool_maxsize=self.CONNECTIONS_PER_SESSION,
-            max_retries=0
-        ))
+        session.mount(self.service_endpoint, self.get_adapter())
         log.debug('Server %s: Created session %s', self.server, session.session_id)
         return session
 

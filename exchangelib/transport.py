@@ -84,7 +84,9 @@ def get_autodiscover_authtype(service_endpoint, data, timeout, verify):
     # First issue a HEAD request to look for a location header. This is the autodiscover HTTP redirect method. If there
     # was no redirect, continue trying a POST request with a valid payload.
     log.debug('Getting autodiscover auth type for %s %s', service_endpoint, timeout)
+    from .protocol import BaseProtocol
     with requests.sessions.Session() as s:
+        s.mount(service_endpoint, BaseProtocol.get_adapter())
         r = s.head(url=service_endpoint, headers=DEFAULT_HEADERS.copy(), timeout=timeout, allow_redirects=False,
                    verify=verify)
         if r.status_code == 302:
@@ -105,7 +107,9 @@ def get_autodiscover_authtype(service_endpoint, data, timeout, verify):
 def get_docs_authtype(docs_url, verify):
     # Get auth type by tasting headers from the server. Don't do HEAD requests. It's too error prone.
     log.debug('Getting docs auth type for %s', docs_url)
+    from .protocol import BaseProtocol
     with requests.sessions.Session() as s:
+        s.mount(docs_url, BaseProtocol.get_adapter())
         r = s.get(url=docs_url, headers=DEFAULT_HEADERS.copy(), allow_redirects=True, verify=verify)
     return _get_auth_method_from_response(response=r)
 
@@ -116,7 +120,9 @@ def get_service_authtype(service_endpoint, versions, verify, name):
     log.debug('Getting service auth type for %s', service_endpoint)
     # We don't know the API version yet, but we need it to create a valid request because some Exchange servers only
     # respond when given a valid request. Try all known versions. Gross.
+    from .protocol import BaseProtocol
     with requests.sessions.Session() as s:
+        s.mount(service_endpoint, BaseProtocol.get_adapter())
         for version in versions:
             data = dummy_xml(version=version, name=name)
             log.debug('Requesting %s from %s', data, service_endpoint)
