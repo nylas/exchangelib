@@ -298,12 +298,10 @@ class EWSFolderService(EWSAccountService):
 
 
 class PagingEWSMixIn(EWSService):
-    def _paged_call(self, payload_func, **kwargs):
+    def _paged_call(self, payload_func, max_items, **kwargs):
         account = self.account if isinstance(self, EWSAccountService) else None
         log_prefix = 'EWS %s, account %s, service %s' % (self.protocol.service_endpoint, account, self.SERVICE_NAME)
         next_offset = 0
-        calendar_view = kwargs.get('calendar_view')
-        max_items = None if calendar_view is None else calendar_view.max_items  # Hack, see below
         item_count = 0
         while True:
             log.debug('%s: Getting items at offset %s', log_prefix, next_offset)
@@ -320,9 +318,6 @@ class PagingEWSMixIn(EWSService):
                     item_count += 1
                     yield elem
                 if max_items and item_count >= max_items:
-                    # With CalendarViews where max_count is smaller than the actual item count in the view, it's
-                    # difficult to find out if pagination is finished - IncludesLastItemInRange is false, and
-                    # IndexedPagingOffset is not set. This hack is the least messy solution.
                     log.debug("'max_items' count reached")
                     break
             if not next_offset:
@@ -762,7 +757,8 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
     element_container_name = '{%s}Items' % TNS
     CHUNKSIZE = 100
 
-    def call(self, additional_fields, restriction, order_fields, shape, query_string, depth, calendar_view, page_size):
+    def call(self, additional_fields, restriction, order_fields, shape, query_string, depth, calendar_view, page_size,
+             max_items):
         """
         Find items in an account.
 
@@ -774,9 +770,10 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
         :param depth: How deep in the folder structure to search for items
         :param calendar_view: If set, returns recurring calendar items unfolded
         :param page_size: The number of items to return per request
+        :param max_items: the max number of items to return
         :return: XML elements for the matching items
         """
-        return self._paged_call(payload_func=self.get_payload, **dict(
+        return self._paged_call(payload_func=self.get_payload, max_items=max_items, **dict(
             additional_fields=additional_fields,
             restriction=restriction,
             order_fields=order_fields,
@@ -827,7 +824,7 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
     SERVICE_NAME = 'FindFolder'
     element_container_name = '{%s}Folders' % TNS
 
-    def call(self, additional_fields, shape, depth, page_size):
+    def call(self, additional_fields, shape, depth, page_size, max_items):
         """
         Find subfolders of a folder.
 
@@ -837,7 +834,7 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
         :param page_size: The number of items to return per request
         :return: XML elements for the matching folders
         """
-        return self._paged_call(payload_func=self.get_payload, **dict(
+        return self._paged_call(payload_func=self.get_payload, max_items=max_items, **dict(
             additional_fields=additional_fields,
             shape=shape,
             depth=depth,

@@ -43,6 +43,7 @@ class QuerySet(object):
         self.return_format = self.NONE
         self.calendar_view = None
         self.page_size = None
+        self.max_items = None
 
         self._cache = None
 
@@ -95,6 +96,7 @@ class QuerySet(object):
             order_fields=order_fields,
             calendar_view=self.calendar_view,
             page_size=self.page_size,
+            max_items=self.max_items,
         )
 
         if must_sort_clientside:
@@ -172,6 +174,8 @@ class QuerySet(object):
     def __getitem__(self, idx_or_slice):
         # Support indexing and slicing. This is non-greedy when possible (slicing start, stop and step are not negative,
         # and we're ordering on at most one field), and will only fill the cache if the entire query is iterated.
+        # TODO: We could optimize this for large indexes or slices (e.g. [999] or [999:1002]) by letting the FindItem
+        # service expose the 'offset' value, so we don't need to get the first 999 items.
         if isinstance(idx_or_slice, int):
             return self._getitem_idx(idx_or_slice)
         else:
@@ -188,8 +192,10 @@ class QuerySet(object):
             return self.reverse()[reverse_idx]
         else:
             if self._cache is None and idx < FindItem.CHUNKSIZE:
-                # Optimize a bit by setting self.page_size to only get as many items as strictly needed
-                self.page_size = idx + 1
+                # If idx is small, optimize a bit by setting self.page_size to only get as many items as strictly needed
+                if idx < 100:
+                    self.page_size = idx + 1
+                self.max_items = idx + 1
             # Support non-negative indexes by consuming the iterator up to the index
             for i, val in enumerate(self.__iter__()):
                 if i == idx:
@@ -205,8 +211,12 @@ class QuerySet(object):
             list(self.__iter__())
             return self._cache[s]
         if self._cache is None and s.stop is not None and s.stop < FindItem.CHUNKSIZE:
-            # Optimize a bit by setting self.page_size to only get as many items as strictly needed
-            self.page_size = s.stop
+            # If the range is small, optimize a bit by setting self.page_size to only get as many items as strictly
+            # needed.
+            if s.stop < 100:
+                self.page_size = s.stop
+            # Calculate the max number of items this query could possibly return. It's OK if s.stop is None
+            self.max_items = s.stop
         return islice(self.__iter__(), s.start, s.stop, s.step)
 
     def _as_items(self, iterable):

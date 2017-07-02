@@ -223,7 +223,7 @@ class Folder(EWSElement):
         return QuerySet(self).get(*args, **kwargs)
 
     def find_items(self, q, shape=IdOnly, depth=SHALLOW, additional_fields=tuple(), order_fields=None,
-                   calendar_view=None, page_size=None):
+                   calendar_view=None, page_size=None, max_items=None):
         """
         Private method to call the FindItem service
 
@@ -235,6 +235,7 @@ class Folder(EWSElement):
         :param order_fields: the SortOrder fields, if any
         :param calendar_view: a CalendarView instance, if any
         :param page_size: the requested number of items per page
+        :param max_items: the max number of items to return
         :return: a generator for the returned item IDs or items
         """
         assert shape in SHAPE_CHOICES
@@ -282,6 +283,7 @@ class Folder(EWSElement):
             depth=depth,
             calendar_view=calendar_view,
             page_size=page_size,
+            max_items=calendar_view.max_items if calendar_view else max_items,
         )
         if shape == IdOnly and additional_fields is None:
             for i in items:
@@ -351,6 +353,7 @@ class Folder(EWSElement):
                 shape=shape,
                 depth=depth,
                 page_size=100,
+                max_items=None,
         ):
             # TODO: Support the Restriction class for folders, too
             # The "FolderClass" element value is the only indication we have in the FindFolder response of which
