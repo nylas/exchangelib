@@ -388,7 +388,7 @@ class EWSDateTimeTest(unittest.TestCase):
         self.assertIsInstance(dt - EWSDateTime.now(tz=tz), datetime.timedelta)
         self.assertIsInstance(EWSDateTime.now(tz=tz), EWSDateTime)
         self.assertEqual(dt, EWSDateTime.from_datetime(tz.localize(datetime.datetime(2000, 1, 2, 3, 4, 5))))
-        self.assertEqual(dt.ewsformat(), '2000-01-02T03:04:05')
+        self.assertEqual(dt.ewsformat(), '2000-01-02T03:04:05+01:00')
         utc_tz = EWSTimeZone.timezone('UTC')
         self.assertEqual(dt.astimezone(utc_tz).ewsformat(), '2000-01-02T02:04:05Z')
         # Test summertime
@@ -398,7 +398,7 @@ class EWSDateTimeTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             EWSDateTime(2000, 1, 1, tzinfo=tz)
         # Test normalize, for completeness
-        self.assertEqual(tz.normalize(tz.localize(EWSDateTime(2000, 1, 1))).ewsformat(), '2000-01-01T00:00:00')
+        self.assertEqual(tz.normalize(tz.localize(EWSDateTime(2000, 1, 1))).ewsformat(), '2000-01-01T00:00:00+01:00')
 
     def test_generate(self):
         try:
@@ -637,8 +637,8 @@ class RestrictionTest(unittest.TestCase):
 
     def test_q(self):
         tz = EWSTimeZone.timezone('Europe/Copenhagen')
-        start = tz.localize(EWSDateTime(1900, 9, 26, 8, 0, 0))
-        end = tz.localize(EWSDateTime(2200, 9, 26, 11, 0, 0))
+        start = tz.localize(EWSDateTime(1950, 9, 26, 8, 0, 0))
+        end = tz.localize(EWSDateTime(2050, 9, 26, 11, 0, 0))
         result = '''\
 <m:Restriction>
     <t:And>
@@ -655,13 +655,13 @@ class RestrictionTest(unittest.TestCase):
         <t:IsGreaterThan>
             <t:FieldURI FieldURI="calendar:End" />
             <t:FieldURIOrConstant>
-                <t:Constant Value="1900-09-26T07:10:00Z" />
+                <t:Constant Value="1950-09-26T08:00:00+01:00" />
             </t:FieldURIOrConstant>
         </t:IsGreaterThan>
         <t:IsLessThan>
             <t:FieldURI FieldURI="calendar:Start" />
             <t:FieldURIOrConstant>
-                <t:Constant Value="2200-09-26T10:00:00Z" />
+                <t:Constant Value="2050-09-26T11:00:00+01:00" />
             </t:FieldURIOrConstant>
         </t:IsLessThan>
     </t:And>
@@ -2171,7 +2171,7 @@ class BaseItemTest(EWSTest):
                 # Attachments are handled separately
                 continue
             if f.name == 'start':
-                start = get_random_date()
+                start = get_random_date(start_date=insert_kwargs['end'].date())
                 update_kwargs[f.name], update_kwargs['end'] = \
                     get_random_datetime_range(start_date=start, end_date=start, tz=self.tz)
                 update_kwargs['recurrence'] = self.random_val(self.ITEM_CLASS.get_field_by_fieldname('recurrence'))
@@ -2215,7 +2215,8 @@ class BaseItemTest(EWSTest):
         if update_kwargs.get('is_all_day', False):
             # For is_all_day items, EWS will remove the time part of start and end values
             update_kwargs['start'] = update_kwargs['start'].replace(hour=0, minute=0, second=0, microsecond=0)
-            update_kwargs['end'] = update_kwargs['end'].replace(hour=0, minute=0, second=0, microsecond=0)
+            update_kwargs['end'] = update_kwargs['end'].replace(hour=0, minute=0, second=0, microsecond=0) \
+                                   + datetime.timedelta(days=1)
         if self.ITEM_CLASS == CalendarItem:
             # EWS always sets due date to 'start'
             update_kwargs['reminder_due_by'] = update_kwargs['start']

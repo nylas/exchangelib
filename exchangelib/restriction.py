@@ -4,7 +4,6 @@ import logging
 from future.utils import python_2_unicode_compatible
 from six import string_types
 
-from .ewsdatetime import EWSDateTime, UTC
 from .util import create_element, xml_to_str, value_to_xml_text, is_iterable
 from .version import EXCHANGE_2010
 
@@ -193,9 +192,6 @@ class Q(object):
             value_to_xml_text(self.value)
         except NotImplementedError:
             raise ValueError('Value "%s" for filter on field path "%s" is unsupported' % (self.value, self.field_path))
-        if isinstance(self.value, EWSDateTime):
-            # We want to convert all values to UTC
-            self.value = self.value.astimezone(UTC)
 
     @classmethod
     def _lookup_to_op(cls, lookup):

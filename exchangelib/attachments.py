@@ -1,13 +1,11 @@
 from __future__ import unicode_literals
 
 import base64
-from collections import namedtuple
 import logging
 import mimetypes
 
 from six import string_types
 
-from .ewsdatetime import UTC
 from .fields import BooleanField, TextField, IntegerField, URIField, DateTimeField, EWSElementField, Base64Field, \
     ItemField
 from .properties import RootItemId, EWSElement
@@ -16,14 +14,6 @@ from .util import create_element
 
 string_type = string_types[0]
 log = logging.getLogger(__name__)
-
-
-class UTCDateTimeField(DateTimeField):
-    def from_xml(self, elem, account):
-        # Contrary to other datetime fields, the LastModifiedTime value is returned as a naive datetime but is
-        # apparently always in in UTC. Pass a fake account on to from_xml() to have the datetimes localized as UTC.
-        fake_utc_account = namedtuple('Account', ['default_timezone'])(default_timezone=UTC)
-        return super(UTCDateTimeField, self).from_xml(elem=elem, account=fake_utc_account)
 
 
 class AttachmentId(EWSElement):
@@ -78,7 +68,7 @@ class Attachment(EWSElement):
         TextField('content_id', field_uri='ContentId'),
         URIField('content_location', field_uri='ContentLocation'),
         IntegerField('size', field_uri='Size', is_read_only=True),  # Attachment size in bytes
-        UTCDateTimeField('last_modified_time', field_uri='LastModifiedTime'),
+        DateTimeField('last_modified_time', field_uri='LastModifiedTime'),
         BooleanField('is_inline', field_uri='IsInline'),
     ]
 

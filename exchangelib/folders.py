@@ -6,7 +6,6 @@ import logging
 from future.utils import python_2_unicode_compatible
 from six import string_types
 
-from .ewsdatetime import EWSDateTime, UTC
 from .fields import IntegerField, TextField, DateTimeField, FieldPath, EffectiveRightsField
 from .items import Item, CalendarItem, Contact, Message, Task, MeetingRequest, MeetingResponse, MeetingCancellation, \
     DistributionList, ITEM_CLASSES, ITEM_TRAVERSAL_CHOICES, SHAPE_CHOICES, IdOnly
@@ -82,8 +81,6 @@ class CalendarView(EWSElement):
             value = getattr(self, f.name)
             if value is None:
                 continue
-            if f.value_cls == EWSDateTime:
-                value = value.astimezone(UTC)
             i.set(f.field_uri, value_to_xml_text(value))
         return i
 

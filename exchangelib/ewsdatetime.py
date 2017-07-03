@@ -25,7 +25,7 @@ class EWSDate(datetime.date):
         """
         ISO 8601 format to satisfy xs:date as interpreted by EWS. Example: 2009-01-15
         """
-        return self.strftime('%Y-%m-%d')
+        return self.isoformat()
 
     def __add__(self, other):
         dt = super(EWSDate, self).__add__(other)
@@ -88,7 +88,7 @@ class EWSDateTime(datetime.datetime):
             raise ValueError('EWSDateTime must be timezone-aware')
         if self.tzinfo.zone == 'UTC':
             return self.strftime('%Y-%m-%dT%H:%M:%SZ')
-        return self.strftime('%Y-%m-%dT%H:%M:%S')
+        return self.replace(microsecond=0).isoformat()
 
     @classmethod
     def from_datetime(cls, d):
@@ -195,7 +195,6 @@ class EWSTimeZone(object):
         # super() returns a dt.tzinfo of class pytz.tzinfo.FooBar. We need to return type EWSTimeZone
         res = super(EWSTimeZone, self).localize(dt)
         return res.replace(tzinfo=self.from_pytz(res.tzinfo))
-
 
 UTC = EWSTimeZone.timezone('UTC')
 
