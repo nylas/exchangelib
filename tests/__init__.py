@@ -1009,7 +1009,7 @@ class EWSTest(unittest.TestCase):
                                     credentials=Credentials(settings['username'], settings['password']),
                                     verify_ssl=settings['verify_ssl'])
         self.account = Account(primary_smtp_address=settings['account'], access_type=DELEGATE, config=self.config,
-                               locale='da_DK')
+                               locale='da_DK', default_timezone=self.tz)
         self.maxDiff = None
 
     def bulk_delete(self, ids):
@@ -1055,7 +1055,7 @@ class EWSTest(unittest.TestCase):
         if isinstance(field, DecimalField):
             return get_random_decimal(field.min or 1, field.max or 99)
         if isinstance(field, DateTimeField):
-            return get_random_datetime()
+            return get_random_datetime(tz=self.tz)
         if isinstance(field, AttachmentField):
             return [FileAttachment(name='my_file.txt', content=b'test_content')]
         if isinstance(field, MailboxListField):
@@ -1080,7 +1080,9 @@ class EWSTest(unittest.TestCase):
                 mbx = self.account.primary_smtp_address
             with_last_response_time = get_random_bool()
             if with_last_response_time:
-                return [Attendee(mailbox=mbx, response_type='Accept', last_response_time=get_random_datetime())]
+                return [
+                    Attendee(mailbox=mbx, response_type='Accept', last_response_time=get_random_datetime(tz=self.tz))
+                ]
             else:
                 if get_random_bool():
                     return [Attendee(mailbox=mbx, response_type='Accept')]
@@ -1128,12 +1130,11 @@ class CommonTest(EWSTest):
 
     def test_wrap(self):
         # Test payload wrapper with both delegation, impersonation and timezones
-        MockAccount = namedtuple('Account', ['access_type', 'primary_smtp_address'])
         MockTZ = namedtuple('EWSTimeZone', ['ms_id'])
+        MockAccount = namedtuple('Account', ['access_type', 'primary_smtp_address', 'default_timezone'])
         content = create_element('AAA')
         version = 'BBB'
-        account = MockAccount(DELEGATE, 'foo@example.com')
-        tz = MockTZ('XXX')
+        account = MockAccount(DELEGATE, 'foo@example.com', MockTZ('XXX'))
         wrapped = wrap(content=content, version=version, account=account)
         self.assertEqual(
             self.pprint(wrapped),
@@ -1144,35 +1145,17 @@ class CommonTest(EWSTest):
     xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
   <s:Header>
     <t:RequestServerVersion Version="BBB"/>
+    <t:TimeZoneContext>
+      <t:TimeZoneDefinition Id="XXX"/>
+    </t:TimeZoneContext>
   </s:Header>
   <s:Body>
     <AAA/>
   </s:Body>
 </s:Envelope>
 ''')
-        account = MockAccount(IMPERSONATION, 'foo@example.com')
+        account = MockAccount(IMPERSONATION, 'foo@example.com', MockTZ('XXX'))
         wrapped = wrap(content=content, version=version, account=account)
-        self.assertEqual(
-            self.pprint(wrapped),
-            b'''<?xml version='1.0' encoding='utf-8'?>
-<s:Envelope
-    xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"
-    xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"
-    xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
-  <s:Header>
-    <t:RequestServerVersion Version="BBB"/>
-    <t:ExchangeImpersonation>
-      <t:ConnectingSID>
-        <t:PrimarySmtpAddress>foo@example.com</t:PrimarySmtpAddress>
-      </t:ConnectingSID>
-    </t:ExchangeImpersonation>
-  </s:Header>
-  <s:Body>
-    <AAA/>
-  </s:Body>
-</s:Envelope>
-''')
-        wrapped = wrap(content=content, version=version, account=account, ewstimezone=tz)
         self.assertEqual(
             self.pprint(wrapped),
             b'''<?xml version='1.0' encoding='utf-8'?>
@@ -2134,7 +2117,8 @@ class BaseItemTest(EWSTest):
                 continue
             if f.name == 'start':
                 start = get_random_date()
-                insert_kwargs[f.name], insert_kwargs['end'] = get_random_datetime_range(start, start)
+                insert_kwargs[f.name], insert_kwargs['end'] = \
+                    get_random_datetime_range(start_date=start, end_date=start, tz=self.tz)
                 insert_kwargs['recurrence'] = self.random_val(self.ITEM_CLASS.get_field_by_fieldname('recurrence'))
                 insert_kwargs['recurrence'].boundary.start = insert_kwargs[f.name].date()
                 continue
@@ -2144,7 +2128,7 @@ class BaseItemTest(EWSTest):
                 continue
             if f.name == 'due_date':
                 # start_date must be before due_date
-                insert_kwargs['start_date'], insert_kwargs[f.name] = get_random_datetime_range()
+                insert_kwargs['start_date'], insert_kwargs[f.name] = get_random_datetime_range(tz=self.tz)
                 continue
             if f.name == 'start_date':
                 continue
@@ -2188,7 +2172,8 @@ class BaseItemTest(EWSTest):
                 continue
             if f.name == 'start':
                 start = get_random_date()
-                update_kwargs[f.name], update_kwargs['end'] = get_random_datetime_range(start, start)
+                update_kwargs[f.name], update_kwargs['end'] = \
+                    get_random_datetime_range(start_date=start, end_date=start, tz=self.tz)
                 update_kwargs['recurrence'] = self.random_val(self.ITEM_CLASS.get_field_by_fieldname('recurrence'))
                 update_kwargs['recurrence'].boundary.start = update_kwargs[f.name].date()
                 continue
@@ -2198,7 +2183,8 @@ class BaseItemTest(EWSTest):
                 continue
             if f.name == 'due_date':
                 # start_date must be before due_date, and before complete_date which must be in the past
-                update_kwargs['start_date'], update_kwargs[f.name] = get_random_datetime_range(end_date=now.date())
+                update_kwargs['start_date'], update_kwargs[f.name] = \
+                    get_random_datetime_range(end_date=now.date(), tz=self.tz)
                 continue
             if f.name == 'start_date':
                 continue
@@ -4069,7 +4055,8 @@ class CalendarTest(BaseItemTest):
         # Update start, end and recurrence with timezoned datetimes. For some reason, EWS throws
         # 'ErrorOccurrenceTimeSpanTooBig' is we go back in time.
         start = get_random_date(start_date=item.start.date() + datetime.timedelta(days=1))
-        dt_start, dt_end = [dt.astimezone(self.tz) for dt in get_random_datetime_range(start, start)]
+        dt_start, dt_end = [dt.astimezone(self.tz) for dt in
+                            get_random_datetime_range(start_date=start, end_date=start, tz=self.tz)]
         item.start, item.end = dt_start, dt_end
         item.recurrence.boundary.start = dt_start.date()
         item.save()
@@ -4304,22 +4291,22 @@ def get_random_date(start_date=EWSDate(1990, 1, 1), end_date=EWSDate(2030, 1, 1)
     return EWSDate.fromordinal(random.randint(start_date.toordinal(), end_date.toordinal()))
 
 
-def get_random_datetime(start_date=EWSDate(1990, 1, 1), end_date=EWSDate(2030, 1, 1)):
+def get_random_datetime(start_date=EWSDate(1990, 1, 1), end_date=EWSDate(2030, 1, 1), tz=UTC):
     # Create a random datetime with minute precision. Both dates are inclusive.
     # Keep with a reasonable date range. A wider date range than the default values is unstable WRT timezones.
     random_date = get_random_date(start_date=start_date, end_date=end_date)
     random_datetime = datetime.datetime.combine(random_date, datetime.time.min) \
         + datetime.timedelta(minutes=random.randint(0, 60 * 24))
-    return UTC.localize(EWSDateTime.from_datetime(random_datetime))
+    return tz.localize(EWSDateTime.from_datetime(random_datetime))
 
 
-def get_random_datetime_range(start_date=EWSDate(1990, 1, 1), end_date=EWSDate(2030, 1, 1)):
+def get_random_datetime_range(start_date=EWSDate(1990, 1, 1), end_date=EWSDate(2030, 1, 1), tz=UTC):
     # Create two random datetimes.  Both dates are inclusive.
     # Keep with a reasonable date range. A wider date range than the default values is unstable WRT timezones.
     # Calendar items raise ErrorCalendarDurationIsTooLong if duration is > 5 years.
     return sorted([
-        get_random_datetime(start_date=start_date, end_date=end_date),
-        get_random_datetime(start_date=start_date, end_date=end_date),
+        get_random_datetime(start_date=start_date, end_date=end_date, tz=tz),
+        get_random_datetime(start_date=start_date, end_date=end_date, tz=tz),
     ])
 
 

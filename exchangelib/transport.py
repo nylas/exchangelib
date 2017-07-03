@@ -36,7 +36,7 @@ DEFAULT_ENCODING = 'utf-8'
 DEFAULT_HEADERS = {'Content-Type': 'text/xml; charset=%s' % DEFAULT_ENCODING, 'Accept-Encoding': 'compress, gzip'}
 
 
-def wrap(content, version, account=None, ewstimezone=None):
+def wrap(content, version, account=None):
     """
     Generate the necessary boilerplate XML for a raw SOAP request. The XML is specific to the server version.
     ExchangeImpersonation allows to act as the user we want to impersonate.
@@ -49,15 +49,15 @@ def wrap(content, version, account=None, ewstimezone=None):
     header = create_element('s:Header')
     requestserverversion = create_element('t:RequestServerVersion', Version=version)
     header.append(requestserverversion)
-    if account and account.access_type == IMPERSONATION:
-        exchangeimpersonation = create_element('t:ExchangeImpersonation')
-        connectingsid = create_element('t:ConnectingSID')
-        add_xml_child(connectingsid, 't:PrimarySmtpAddress', account.primary_smtp_address)
-        exchangeimpersonation.append(connectingsid)
-        header.append(exchangeimpersonation)
-    if ewstimezone:
+    if account:
+        if account.access_type == IMPERSONATION:
+            exchangeimpersonation = create_element('t:ExchangeImpersonation')
+            connectingsid = create_element('t:ConnectingSID')
+            add_xml_child(connectingsid, 't:PrimarySmtpAddress', account.primary_smtp_address)
+            exchangeimpersonation.append(connectingsid)
+            header.append(exchangeimpersonation)
         timezonecontext = create_element('t:TimeZoneContext')
-        timezonedefinition = create_element('t:TimeZoneDefinition', Id=ewstimezone.ms_id)
+        timezonedefinition = create_element('t:TimeZoneDefinition', Id=account.default_timezone.ms_id)
         timezonecontext.append(timezonedefinition)
         header.append(timezonecontext)
     envelope.append(header)
