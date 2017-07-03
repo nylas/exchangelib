@@ -85,6 +85,10 @@ class AutoDiscoverRedirect(AutoDiscoverError):
         return 'AutoDiscover redirects to %s' % self.redirect_email
 
 
+class NaiveDateTimeNotAllowed(ValueError):
+    pass
+
+
 class UnknownTimeZone(EWSError):
     pass
 

@@ -30,7 +30,7 @@ from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalid
     AutoDiscoverCircularRedirect, AutoDiscoverFailed, ErrorNonExistentMailbox, UnknownTimeZone, \
     ErrorNameResolutionNoResults, TransportError, RedirectError, CASError, RateLimitError, UnauthorizedError, \
     ErrorInvalidChangeKey, ErrorInvalidIdMalformed, ErrorContainsFilterWrongType, ErrorAccessDenied, \
-    ErrorFolderNotFound, ErrorInvalidRequest, SOAPError, ErrorInvalidServerVersion
+    ErrorFolderNotFound, ErrorInvalidRequest, SOAPError, ErrorInvalidServerVersion, NaiveDateTimeNotAllowed
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.extended_properties import ExtendedProperty, ExternId
 from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextField, EmailField, URIField, ChoiceField, \
@@ -367,6 +367,20 @@ class EWSDateTimeTest(unittest.TestCase):
             repr(dt),
             "EWSDateTime(2000, 1, 2, 3, 4, 5, tzinfo=<DstTzInfo 'Europe/Copenhagen' CET+1:00:00 STD>)"
         )
+
+        # Test from_string
+        with self.assertRaises(NaiveDateTimeNotAllowed):
+            EWSDateTime.from_string('2000-01-02T03:04:05')
+        self.assertEqual(
+            EWSDateTime.from_string('2000-01-02T03:04:05+01:00'),
+            UTC.localize(EWSDateTime(2000, 1, 2, 2, 4, 5))
+        )
+        self.assertEqual(
+            EWSDateTime.from_string('2000-01-02T03:04:05Z'),
+            UTC.localize(EWSDateTime(2000, 1, 2, 3, 4, 5))
+        )
+        self.assertIsInstance(EWSDateTime.from_string('2000-01-02T03:04:05+01:00'), EWSDateTime)
+        self.assertIsInstance(EWSDateTime.from_string('2000-01-02T03:04:05Z'), EWSDateTime)
 
         # Test addition, subtraction, summertime etc
         self.assertIsInstance(dt + datetime.timedelta(days=1), EWSDateTime)

@@ -4,17 +4,14 @@ from __future__ import unicode_literals
 import datetime
 import logging
 
+import dateutil.parser
 import pytz
 import tzlocal
 
-from .errors import UnknownTimeZone
+from .errors import NaiveDateTimeNotAllowed, UnknownTimeZone
 from .winzone import PYTZ_TO_MS_TIMEZONE_MAP
 
 log = logging.getLogger(__name__)
-
-
-class NaiveDateTimeNotAllowed(ValueError):
-    pass
 
 
 class EWSDate(datetime.date):
@@ -83,7 +80,9 @@ class EWSDateTime(datetime.datetime):
 
     def ewsformat(self):
         """
-        ISO 8601 format to satisfy xs:datetime as interpreted by EWS. Example: 2009-01-15T13:45:56Z
+        ISO 8601 format to satisfy xs:datetime as interpreted by EWS. Examples:
+            2009-01-15T13:45:56Z
+            2009-01-15T13:45:56+01:00
         """
         if not self.tzinfo:
             raise ValueError('EWSDateTime must be timezone-aware')
@@ -116,14 +115,20 @@ class EWSDateTime(datetime.datetime):
 
     @classmethod
     def from_string(cls, date_string):
-        # Assume UTC and return timezone-aware EWSDateTime objects
-        try:
-            local_dt = super(EWSDateTime, cls).strptime(date_string, '%Y-%m-%dT%H:%M:%SZ')
-        except ValueError:
-            # This is a naive datetime. Don't allow this, but signal caller with an appropriate error
+        # Parses several common datetime formats and returns timezone-aware EWSDateTime objects
+        if date_string.endswith('Z'):
+            # UTC datetime
+            naive_dt = super(EWSDateTime, cls).strptime(date_string, '%Y-%m-%dT%H:%M:%SZ')
+            return UTC.localize(cls.from_datetime(naive_dt))
+        if len(date_string) == 19:
+            # This is probably a naive datetime. Don't allow this, but signal caller with an appropriate error
             local_dt = super(EWSDateTime, cls).strptime(date_string, '%Y-%m-%dT%H:%M:%S')
             raise NaiveDateTimeNotAllowed(local_dt)
-        return UTC.localize(cls.from_datetime(local_dt))
+        # This is probably a datetime value with timezone information. This comes in the form '+/-HH:MM' but the Python
+        # strptime '%z' directive cannot yet handle full ISO8601 formatted timezone information (see
+        # http://bugs.python.org/issue15873). Use the 'dateutil' package instead.
+        aware_dt = dateutil.parser.parse(date_string)
+        return cls.from_datetime(aware_dt.astimezone(UTC))
 
     @classmethod
     def now(cls, tz=None):
