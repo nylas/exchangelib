@@ -4064,6 +4064,20 @@ class CalendarTest(BaseItemTest):
         self.assertEqual(item.start, dt_start)
         self.assertEqual(item.end, dt_end)
 
+    def test_all_day_datetimes(self):
+        # Test that start and end datetimes for all-day items are returned in the datetime of the account.
+        start = get_random_date()
+        start_dt, end_dt = \
+            get_random_datetime_range(start_date=start, end_date=start + datetime.timedelta(days=365), tz=self.tz)
+        item = self.ITEM_CLASS(folder=self.test_folder, start=start_dt, end=end_dt, is_all_day=True,
+                               categories=self.categories)
+        item.save()
+
+        item = self.test_folder.all().only('start', 'end').get(item_id=item.item_id, changekey=item.changekey)
+        self.assertEqual(item.start.astimezone(self.tz).time(), datetime.time(0, 0))
+        self.assertEqual(item.end.astimezone(self.tz).time(), datetime.time(0, 0))
+        item.delete()
+
     def test_view(self):
         item1 = self.ITEM_CLASS(
             account=self.account,
