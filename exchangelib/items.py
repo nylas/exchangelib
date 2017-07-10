@@ -417,6 +417,7 @@ class CalendarItem(Item):
     """
     ELEMENT_NAME = 'CalendarItem'
     FIELDS = Item.FIELDS + [
+        TextField('uid', field_uri='calendar:UID', is_required=False, is_required_after_save=True, is_searchable=False),
         DateTimeField('start', field_uri='calendar:Start', is_required=True),
         DateTimeField('end', field_uri='calendar:End', is_required=True),
         BooleanField('is_all_day', field_uri='calendar:IsAllDayEvent', is_required=True, default=False),
@@ -425,6 +426,7 @@ class CalendarItem(Item):
             Choice('WorkingElsewhere', supported_from=EXCHANGE_2013)
         }, is_required=True, default='Busy'),
         TextField('location', field_uri='calendar:Location', max_length=255),
+        BooleanField('is_cancelled', field_uri='calendar:IsCancelled', is_read_only=True),
         ChoiceField('type', field_uri='calendar:CalendarItemType', choices={
             Choice('Single'), Choice('Occurrence'), Choice('Exception'), Choice('RecurringMaster'),
         }, is_read_only=True),
