@@ -139,7 +139,9 @@ Creating, updating, deleting, sending and moving
         account=a,
         subject='Daily motivation',
         body='All bodies are beautiful',
-        to_recipients=[Mailbox(email_address='anne@example.com')]
+        to_recipients=[Mailbox(email_address='anne@example.com'), Mailbox(email_address='bob@example.com')],
+        cc_recipients=['carl@example.com', 'denice@example.com'],  # Simple strings work, too
+        bcc_recipients=[Mailbox(email_address='erik@example.com'), 'felicity@example.com'],  # Or a mix of both
     )
     m.send()
 
