@@ -392,6 +392,9 @@ Attachments
     # Remove the attachment again
     item.detach(my_file)
 
+    # Attachments cannot be updated via EWS. In this case, you must to detach the attachment, update the 
+    # relevant fields, and attach the updated attachment.
+
     # Be aware that adding and deleting attachments from items that are already created in Exchange
     # (items that have an item_id) will update the changekey of the item.
 
