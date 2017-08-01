@@ -37,8 +37,10 @@ Setup and connecting
         Mailbox, Attendee, Q, ExtendedProperty, FileAttachment, ItemAttachment, \
         HTMLBody, Build, Version
 
-    # Username in WINDOMAIN\username format. Office365 wants usernames in PrimarySMTPAddress
-    # ('myusername@example.com') format. UPN format is also supported.
+    # Specify your credentials. Username us usually in WINDOMAIN\username format, where WINDOMAIN is 
+    # the name of the Windows Domain your username is connected to, but some servers also
+    # accept usernames in PrimarySMTPAddress ('myusername@example.com') format (Office365 requires it). 
+    # UPN format is also supported, if your server expects that.
     credentials = Credentials(username='MYWINDOMAIN\\myusername', password='topsecret')
 
     # If you're running long-running jobs, you may want to enable fault-tolerance. Fault-tolerance
@@ -50,7 +52,9 @@ Setup and connecting
     # If you want to enable the fault tolerance, create credentials as a service account instead:
     credentials = ServiceAccount(username='FOO\\bar', password='topsecret')
 
-    # Set up a target account and do an autodiscover lookup to find the target EWS endpoint:
+    # Set up a target account and do an autodiscover lookup to find the target EWS endpoint. 
+    # 'primary_smtp_address' may be your own email address or the primary email address of any other 
+    # account on the server that you have been granted access to:
     account = Account(primary_smtp_address='john@example.com', credentials=credentials,
                       autodiscover=True, access_type=DELEGATE)
 
@@ -59,9 +63,8 @@ Setup and connecting
     account = Account(primary_smtp_address='john@example.com', credentials=credentials,
                       autodiscover=True, access_type=IMPERSONATION)
 
-
-    # If the server doesn't support autodiscover, use a Configuration object to set the server
-    # location:
+    # If the server doesn't support autodiscover, or you want to avoid the overhead of autodiscover, 
+    # use a Configuration object to set the server location instead:
     config = Configuration(server='mail.example.com', credentials=credentials)
     account = Account(primary_smtp_address='john@example.com', config=config,
                       autodiscover=False, access_type=DELEGATE)
