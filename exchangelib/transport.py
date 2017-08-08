@@ -89,7 +89,7 @@ def get_autodiscover_authtype(service_endpoint, data, timeout, verify):
         s.mount(service_endpoint, BaseProtocol.get_adapter())
         r = s.head(url=service_endpoint, headers=DEFAULT_HEADERS.copy(), timeout=timeout, allow_redirects=False,
                    verify=verify)
-        if r.status_code == 302:
+        if r.status_code in (301, 302):
             try:
                 redirect_url = get_redirect_url(r, require_relative=True)
                 log.debug('Autodiscover HTTP redirect to %s', redirect_url)
@@ -143,7 +143,7 @@ def _get_auth_method_from_response(response):
     log.debug('Response headers: %s', response.headers)
     if response.status_code == 200:
         return NOAUTH
-    if response.status_code == 302:
+    if response.status_code in (301, 302):
         # Some servers are set up to redirect to OWA on all requests except POST to EWS/Exchange.asmx
         try:
             redirect_url = get_redirect_url(response, allow_relative=False)
