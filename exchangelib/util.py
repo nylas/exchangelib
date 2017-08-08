@@ -392,7 +392,7 @@ Response data: %(response_data)s
                 wait *= 2
                 session = protocol.renew_session(session)
                 continue
-            if r.status_code == 302:
+            if r.status_code in (301, 302):
                 url, redirects = _redirect_or_fail(r, redirects, allow_redirects)
                 continue
             break
