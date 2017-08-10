@@ -2234,7 +2234,7 @@ class BaseItemTest(EWSTest):
 
     def test_magic(self):
         item = self.get_test_item()
-        self.assertIn('item_id', str(item))
+        self.assertIn('subject=', str(item))
         self.assertIn(item.__class__.__name__, repr(item))
 
     def test_validation(self):

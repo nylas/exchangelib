@@ -383,7 +383,9 @@ class Item(EWSElement):
         ))
 
     def __str__(self):
-        return '\n'.join('%s: %s' % (f.name, getattr(self, f.name)) for f in self.FIELDS)
+        return self.__class__.__name__ + '(%s)' % ', '.join(
+            '%s=%s' % (f.name, repr(getattr(self, f.name))) for f in self.FIELDS if getattr(self, f.name) is not None
+        )
 
     def __repr__(self):
         return self.__class__.__name__ + '(%s)' % ', '.join(
@@ -530,19 +532,6 @@ class Message(Item):
                 send_meeting_invitations=send_meeting_invitations
             )
         assert res is None
-
-    def __str__(self):
-        """Return a human-readable string representation of a Message."""
-        if hasattr(self, 'item_id'):
-            item_id = "'{}'".format(self.item_id)
-        else:
-            item_id = 'None'
-        if hasattr(self, 'subject'):
-            subject = "'{}'".format(self.subject)
-        else:
-            subject = 'None'
-
-        return "Message(id={}, subject={})".format(item_id, subject)
 
 
 class Task(Item):
