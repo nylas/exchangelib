@@ -21,7 +21,9 @@ def generate_map():
     return tz_map
 
 
-PYTZ_TO_MS_TIMEZONE_MAP = {
+# This map is generated irregularly from generate_map(). Do not edit manually - make corrections to
+# PYTZ_TO_MS_TIMEZONE_MAP instead. We provide this map to avoid hammering the CLDR_WINZONE_URL.
+CLDR_TO_MS_TIMEZONE_MAP = {
     'Africa/Abidjan': 'Greenwich Standard Time',
     'Africa/Accra': 'Greenwich Standard Time',
     'Africa/Addis_Ababa': 'E. Africa Standard Time',
@@ -484,7 +486,11 @@ PYTZ_TO_MS_TIMEZONE_MAP = {
     'UTC': 'UTC',
 }
 
-# Add some timezone names used by pytz but not found in the CLDR
-PYTZ_TO_MS_TIMEZONE_MAP.update({
+# Add timezone names used by pytz (which gets timezone names from IANA) that are not found in the CLDR.
+# A full list of the IANA names missing in CLDR can be found with:
+#
+#    sorted(set(pytz.all_timezones) - set(CLDR_TO_MS_TIMEZONE_MAP))
+#
+PYTZ_TO_MS_TIMEZONE_MAP = dict(CLDR_TO_MS_TIMEZONE_MAP, **{
     'Asia/Kolkata': 'India Standard Time',
 })
