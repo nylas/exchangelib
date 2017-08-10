@@ -93,6 +93,7 @@ class Item(EWSElement):
         BodyField('body', field_uri='item:Body'),  # Accepts and returns Body or HTMLBody instances
         AttachmentField('attachments', field_uri='item:Attachments'),  # ItemAttachment or FileAttachment
         DateTimeField('datetime_received', field_uri='item:DateTimeReceived', is_read_only=True),
+        IntegerField('size', field_uri='item:Size', is_read_only=True),  # Item size in bytes
         TextListField('categories', field_uri='item:Categories'),
         ChoiceField('importance', field_uri='item:Importance', choices={
             Choice('Low'), Choice('Normal'), Choice('High')
