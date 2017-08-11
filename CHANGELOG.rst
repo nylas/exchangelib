@@ -9,6 +9,7 @@ HEAD
 * Default value for the ``affected_task_occurrences`` argument to ``Item.move_to_trash()``, ``Item.soft_delete()``
   and ``Item.delete()`` was changed to ``'AllOccurrences'`` as a less surprising default when working with simple
   tasks.
+* Added ``Task.complete()`` helper method to mark tasks as complete.
 
 1.9.4
 -----

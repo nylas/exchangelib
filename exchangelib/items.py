@@ -605,6 +605,13 @@ class Task(Item):
                             self.NOT_STARTED, self.percent_complete)
                 self.percent_complete = Decimal(0)
 
+    def complete(self):
+        # pylint: disable=access-member-before-definition
+        # A helper method to mark a task as complete on the server
+        self.status = Task.COMPLETED
+        self.percent_complete = Decimal(100)
+        self.save()
+
 
 class Contact(Item):
     ELEMENT_NAME = 'Contact'

@@ -4226,6 +4226,16 @@ class TasksTest(BaseItemTest):
     TEST_FOLDER = 'tasks'
     ITEM_CLASS = Task
 
+    def test_complete(self):
+        item = self.get_test_item().save()
+        item.refresh()
+        self.assertNotEqual(item.status, Task.COMPLETED)
+        self.assertNotEqual(item.percent_complete, Decimal(100))
+        item.complete()
+        item.refresh()
+        self.assertEqual(item.status, Task.COMPLETED)
+        self.assertEqual(item.percent_complete, Decimal(100))
+
 
 class ContactsTest(BaseItemTest):
     TEST_FOLDER = 'contacts'
