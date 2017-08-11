@@ -186,14 +186,22 @@ class EWSTimeZone(object):
             raise UnknownTimeZone("Timezone '%s' is unknown by pytz" % location)
         return cls.from_pytz(tz)
 
-    def normalize(self, dt):
+    def normalize(self, dt, is_dst=False):
         # super() returns a dt.tzinfo of class pytz.tzinfo.FooBar. We need to return type EWSTimeZone
-        res = super(EWSTimeZone, self).normalize(dt)
+        if is_dst:
+            # Not all pytz timezones support 'is_dst' argument. Only pass it on if it's set explicitly.
+            res = super(EWSTimeZone, self).normalize(dt, is_dst=is_dst)
+        else:
+            res = super(EWSTimeZone, self).normalize(dt)
         return res.replace(tzinfo=self.from_pytz(res.tzinfo))
 
-    def localize(self, dt):
+    def localize(self, dt, is_dst=False):
         # super() returns a dt.tzinfo of class pytz.tzinfo.FooBar. We need to return type EWSTimeZone
-        res = super(EWSTimeZone, self).localize(dt)
+        if is_dst:
+            # Not all pytz timezones support 'is_dst' argument. Only pass it on if it's set explicitly.
+            res = super(EWSTimeZone, self).localize(dt, is_dst=is_dst)
+        else:
+            res = super(EWSTimeZone, self).localize(dt)
         return res.replace(tzinfo=self.from_pytz(res.tzinfo))
 
 UTC = EWSTimeZone.timezone('UTC')
