@@ -6,6 +6,9 @@ HEAD
 ----
 * Added support for the ``effective_rights``field on items and folders.
 * Added support for custom ``requests`` transport adapters, to allow proxy support, custom TLS validation etc.
+* Default value for the ``affected_task_occurrences`` argument to ``Item.move_to_trash()``, ``Item.soft_delete()``
+  and ``Item.delete()`` was changed to ``'AllOccurrences'`` as a less surprising default when working with simple
+  tasks.
 
 1.9.4
 -----

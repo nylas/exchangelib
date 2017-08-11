@@ -249,15 +249,15 @@ class Item(EWSElement):
         self.item_id, self.changekey = res[0]
         self.folder = to_folder
 
-    def move_to_trash(self, send_meeting_cancellations=SEND_TO_NONE,
-                      affected_task_occurrences=SPECIFIED_OCCURRENCE_ONLY, suppress_read_receipts=True):
+    def move_to_trash(self, send_meeting_cancellations=SEND_TO_NONE, affected_task_occurrences=ALL_OCCURRENCIES,
+                      suppress_read_receipts=True):
         # Delete and move to the trash folder.
         self._delete(delete_type=MOVE_TO_DELETED_ITEMS, send_meeting_cancellations=send_meeting_cancellations,
                      affected_task_occurrences=affected_task_occurrences, suppress_read_receipts=suppress_read_receipts)
         self.item_id, self.changekey = None, None
         self.folder = self.folder.account.trash
 
-    def soft_delete(self, send_meeting_cancellations=SEND_TO_NONE, affected_task_occurrences=SPECIFIED_OCCURRENCE_ONLY,
+    def soft_delete(self, send_meeting_cancellations=SEND_TO_NONE, affected_task_occurrences=ALL_OCCURRENCIES,
                     suppress_read_receipts=True):
         # Delete and move to the dumpster, if it is enabled.
         self._delete(delete_type=SOFT_DELETE, send_meeting_cancellations=send_meeting_cancellations,
@@ -265,7 +265,7 @@ class Item(EWSElement):
         self.item_id, self.changekey = None, None
         self.folder = self.folder.account.recoverable_deleted_items
 
-    def delete(self, send_meeting_cancellations=SEND_TO_NONE, affected_task_occurrences=SPECIFIED_OCCURRENCE_ONLY,
+    def delete(self, send_meeting_cancellations=SEND_TO_NONE, affected_task_occurrences=ALL_OCCURRENCIES,
                suppress_read_receipts=True):
         # Remove the item permanently. No copies are stored anywhere.
         self._delete(delete_type=HARD_DELETE, send_meeting_cancellations=send_meeting_cancellations,

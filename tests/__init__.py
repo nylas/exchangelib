@@ -41,7 +41,7 @@ from exchangelib.folders import Calendar, DeletedItems, Drafts, Inbox, Outbox, S
     Contacts, Folder
 from exchangelib.indexed_properties import IndexedElement, EmailAddress, PhysicalAddress, PhoneNumber, \
     SingleFieldIndexedElement, MultiFieldIndexedElement
-from exchangelib.items import Item, CalendarItem, Message, Contact, Task, DistributionList, ALL_OCCURRENCIES
+from exchangelib.items import Item, CalendarItem, Message, Contact, Task, DistributionList
 from exchangelib.properties import Attendee, Mailbox, RoomList, MessageHeader, Room, ItemId, Member, EWSElement
 from exchangelib.protocol import Protocol
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
@@ -1014,7 +1014,7 @@ class EWSTest(unittest.TestCase):
 
     def bulk_delete(self, ids):
         # Clean up items and check return values
-        for res in self.account.bulk_delete(ids, affected_task_occurrences=ALL_OCCURRENCIES):
+        for res in self.account.bulk_delete(ids):
             self.assertEqual(res, True)
 
     def random_val(self, field):
@@ -2346,7 +2346,7 @@ class BaseItemTest(EWSTest):
             item = self.get_test_item()
             item.save()
             item_id, changekey = item.item_id, item.changekey
-            item.delete(affected_task_occurrences=ALL_OCCURRENCIES)
+            item.delete()
             item.item_id, item.changekey = item_id, changekey
             item.refresh()  # Refresh an item that doesn't exist
 
@@ -2361,7 +2361,7 @@ class BaseItemTest(EWSTest):
             item = self.get_test_item()
             item.save()
             item_id, changekey = item.item_id, item.changekey
-            item.delete(affected_task_occurrences=ALL_OCCURRENCIES)
+            item.delete()
             item.item_id, item.changekey = item_id, changekey
             item.move(to_folder=self.test_folder)  # Item disappeared
 
@@ -2371,14 +2371,14 @@ class BaseItemTest(EWSTest):
             item.delete()  # Must have an account
         with self.assertRaises(ValueError):
             item = self.get_test_item()
-            item.delete(affected_task_occurrences=ALL_OCCURRENCIES)  # Must be an existing item
+            item.delete()  # Must be an existing item
         with self.assertRaises(ErrorItemNotFound):
             item = self.get_test_item()
             item.save()
             item_id, changekey = item.item_id, item.changekey
-            item.delete(affected_task_occurrences=ALL_OCCURRENCIES)
+            item.delete()
             item.item_id, item.changekey = item_id, changekey
-            item.delete(affected_task_occurrences=ALL_OCCURRENCIES)  # Item disappeared
+            item.delete()  # Item disappeared
 
     def test_querysets(self):
         test_items = []
@@ -3049,7 +3049,7 @@ class BaseItemTest(EWSTest):
             len(self.test_folder.filter('subject:%s' % item.subject)),
             (0, 1)
         )
-        item.delete(affected_task_occurrences=ALL_OCCURRENCIES)
+        item.delete()
 
     def test_filter_on_all_fields(self):
         # Test that we can filter on all field names that we support filtering on
@@ -3352,7 +3352,7 @@ class BaseItemTest(EWSTest):
 
         # Hard delete
         item_id = (item.item_id, item.changekey)
-        item.delete(affected_task_occurrences=ALL_OCCURRENCIES)
+        item.delete()
         for e in self.account.fetch(ids=[item_id]):
             # It's gone from the account
             self.assertIsInstance(e, ErrorItemNotFound)
@@ -3384,7 +3384,7 @@ class BaseItemTest(EWSTest):
         item = self.get_test_item().save()
         item_id = (item.item_id, item.changekey)
         # Soft delete
-        item.soft_delete(affected_task_occurrences=ALL_OCCURRENCIES)
+        item.soft_delete()
         for e in self.account.fetch(ids=[item_id]):
             # It's gone from the test folder
             self.assertIsInstance(e, ErrorItemNotFound)
@@ -3400,7 +3400,7 @@ class BaseItemTest(EWSTest):
         item = self.get_test_item().save()
         item_id = (item.item_id, item.changekey)
         # Move to trash
-        item.move_to_trash(affected_task_occurrences=ALL_OCCURRENCIES)
+        item.move_to_trash()
         for e in self.account.fetch(ids=[item_id]):
             # Not in the test folder anymore
             self.assertIsInstance(e, ErrorItemNotFound)
@@ -3435,7 +3435,7 @@ class BaseItemTest(EWSTest):
         item.subject = 'XXX'
         item.refresh()
         self.assertEqual(item.subject, orig_subject)
-        item.delete(affected_task_occurrences=ALL_OCCURRENCIES)
+        item.delete()
         with self.assertRaises(ValueError):
             # Item no longer has an ID
             item.refresh()
@@ -3607,7 +3607,7 @@ class BaseItemTest(EWSTest):
         #  id.
         ids = [(item.item_id, item.changekey) for item in items]
         # Delete one of the items, this will cause an error
-        items[3].delete(affected_task_occurrences=ALL_OCCURRENCIES)
+        items[3].delete()
 
         export_results = self.account.export(ids)
         self.assertEqual(len(items), len(export_results))
@@ -4027,14 +4027,14 @@ class BaseItemTest(EWSTest):
         # Test that bulk_* can handle EWS errors and return the errors in order without losing non-failure results
         items1 = [self.get_test_item().save() for _ in range(3)]
         items1[1].changekey = 'XXX'
-        for i, res in enumerate(self.account.bulk_delete(items1, affected_task_occurrences=ALL_OCCURRENCIES)):
+        for i, res in enumerate(self.account.bulk_delete(items1)):
             if i == 1:
                 self.assertIsInstance(res, ErrorInvalidChangeKey)
             else:
                 self.assertEqual(res, True)
         items2 = [self.get_test_item().save() for _ in range(3)]
         items2[1].item_id = 'AAAA=='
-        for i, res in enumerate(self.account.bulk_delete(items2, affected_task_occurrences=ALL_OCCURRENCIES)):
+        for i, res in enumerate(self.account.bulk_delete(items2)):
             if i == 1:
                 self.assertIsInstance(res, ErrorInvalidIdMalformed)
             else:
