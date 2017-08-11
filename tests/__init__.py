@@ -3497,7 +3497,7 @@ class BaseItemTest(EWSTest):
                 item.reminder_due_by = new
             if f.name == 'reminder_due_by' and old is not None and new is not None:
                 # EWS sometimes randomly sets the new reminder due date to 30 days before we wanted it(!)
-                if old - new == datetime.timedelta(30):
+                if old.astimezone(self.tz).date() - new.astimezone(self.tz).date() == datetime.timedelta(days=30):
                     old = new
                     item.reminder_due_by = new
             if f.is_list:
