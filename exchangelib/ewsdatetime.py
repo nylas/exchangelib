@@ -76,7 +76,8 @@ class EWSDateTime(datetime.datetime):
         if 'tzinfo' in kwargs:
             raise ValueError('Do not set tzinfo directly. Use EWSTimeZone.localize() instead')
         # Some internal methods still need to set tzinfo in the constructor. Use a magic kwarg for that.
-        kwargs['tzinfo'] = kwargs.pop('ewstzinfo', None)
+        if 'ewstzinfo' in kwargs:
+            kwargs['tzinfo'] = kwargs.pop('ewstzinfo')
         self = super(EWSDateTime, cls).__new__(cls, *args, **kwargs)
         return self
 
