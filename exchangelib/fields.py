@@ -461,7 +461,7 @@ class DateTimeField(FieldURIField):
                     local_dt = e.args[0]
                     log.info('Encountered naive datetime %s on field %s. Assuming timezone %s', local_dt, self.name,
                              account.default_timezone)
-                    return account.default_timezone.localize(self.value_cls.from_datetime(local_dt))
+                    return account.default_timezone.localize(local_dt)
                 log.warning("Cannot convert value '%s' on field '%s' to type %s", val, self.name, self.value_cls)
                 return None
         return self.default

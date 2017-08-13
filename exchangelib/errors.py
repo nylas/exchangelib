@@ -93,6 +93,14 @@ class UnknownTimeZone(EWSError):
     pass
 
 
+class AmbiguousTimeError(EWSError):
+    pass
+
+
+class NonExistentTimeError(EWSError):
+    pass
+
+
 class ResponseMessageError(TransportError):
     pass
 

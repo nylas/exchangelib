@@ -30,7 +30,8 @@ from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalid
     AutoDiscoverCircularRedirect, AutoDiscoverFailed, ErrorNonExistentMailbox, UnknownTimeZone, \
     ErrorNameResolutionNoResults, TransportError, RedirectError, CASError, RateLimitError, UnauthorizedError, \
     ErrorInvalidChangeKey, ErrorInvalidIdMalformed, ErrorContainsFilterWrongType, ErrorAccessDenied, \
-    ErrorFolderNotFound, ErrorInvalidRequest, SOAPError, ErrorInvalidServerVersion, NaiveDateTimeNotAllowed
+    ErrorFolderNotFound, ErrorInvalidRequest, SOAPError, ErrorInvalidServerVersion, NaiveDateTimeNotAllowed, \
+    AmbiguousTimeError, NonExistentTimeError
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.extended_properties import ExtendedProperty, ExternId
 from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextField, EmailField, URIField, ChoiceField, \
@@ -340,6 +341,30 @@ class EWSDateTimeTest(unittest.TestCase):
         tz.zone = 'UNKNOWN'
         with self.assertRaises(ValueError):
             EWSTimeZone.from_pytz(tz)
+
+    def test_localize(self):
+        # Test some cornercases around DST
+        tz = EWSTimeZone.timezone('Europe/Copenhagen')
+        self.assertEqual(
+            str(tz.localize(EWSDateTime(2023, 10, 29, 2, 36, 0))),
+            '2023-10-29 02:36:00+01:00'
+        )
+        with self.assertRaises(AmbiguousTimeError):
+            tz.localize(EWSDateTime(2023, 10, 29, 2, 36, 0), is_dst=None)
+        self.assertEqual(
+            str(tz.localize(EWSDateTime(2023, 10, 29, 2, 36, 0), is_dst=True)),
+            '2023-10-29 02:36:00+02:00'
+        )
+        self.assertEqual(
+            str(tz.localize(EWSDateTime(2023, 3, 26, 2, 36, 0))),
+            '2023-03-26 02:36:00+01:00'
+        )
+        with self.assertRaises(NonExistentTimeError):
+            tz.localize(EWSDateTime(2023, 3, 26, 2, 36, 0), is_dst=None)
+        self.assertEqual(
+            str(tz.localize(EWSDateTime(2023, 3, 26, 2, 36, 0), is_dst=True)),
+            '2023-03-26 02:36:00+02:00'
+        )
 
     def test_ewsdatetime(self):
         # Test a static timezone
