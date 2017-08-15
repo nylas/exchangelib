@@ -137,20 +137,23 @@ Creating, updating, deleting, sending and moving
 
 .. code-block:: python
 
-    # Create the calendar items in the user's standard calendar.  If you want to access a
-    # non-standard calendar, choose a different one from account.folders[Calendar]
+    # Here's an example of creatnig a calendar item in the user's standard calendar.  If you want to 
+    # access a non-standard calendar, choose a different one from account.folders[Calendar].
     #
-    # You can create, update and delete single items
+    # You can create, update and delete single items:
     item = CalendarItem(folder=account.calendar, subject='foo')
-    item.save()  # This gives the item an item_id and a changekey
+    item.save()  # This gives the item an 'item_id' and a 'changekey' value
+    # Update a field. All fields have a corresponding Python type that must be used.
     item.subject = 'bar'
+    # Print all available fields on the 'CalendarItem' class. Beware that some fields are read-only, or 
+    # read-only after the item has been saved or sent, and some fields are not supported on old versions 
+    # of Exchange.
+    print(CalendarItem.FIELDS)
     item.save()  # When the items has an item_id, this will update the item
     item.delete()
     item.move(account.trash)  # Moves the item to the trash bin
 
-    # You can also send emails:
-
-    # If you don't want a local copy
+    # You can also send emails. If you don't want a local copy:
     m = Message(
         account=a,
         subject='Daily motivation',
