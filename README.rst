@@ -52,9 +52,22 @@ Setup and connecting
     # If you want to enable the fault tolerance, create credentials as a service account instead:
     credentials = ServiceAccount(username='FOO\\bar', password='topsecret')
 
+    # An Account is the account on the Exchange server that you want to connect to. This can be 
+    # the account associated with the credentials you connect with, or any other account on the 
+    # server that you have been granted access to.
+    # 'primary_smtp_address' is the primary SMTP address assigned the account. If you enable 
+    # autodiscover, an alias address will work, too. In this case, 'Account.primary_smtp_address' 
+    # will be set to the primary SMTP address.
+    my_account = Account(primary_smtp_address='myusername@example.com', credentials=credentials,
+                         autodiscover=True, access_type=DELEGATE)
+    johns_account = Account(primary_smtp_address='john@example.com', credentials=credentials,
+                            autodiscover=True, access_type=DELEGATE)
+    marys_account = Account(primary_smtp_address='mary@example.com', credentials=credentials,
+                            autodiscover=True, access_type=DELEGATE)
+    still_marys_account = Account(primary_smtp_address='alias_for_mary@example.com', 
+                                  credentials=credentials, autodiscover=True, access_type=DELEGATE)
+    
     # Set up a target account and do an autodiscover lookup to find the target EWS endpoint. 
-    # 'primary_smtp_address' may be your own email address or the primary email address of any other 
-    # account on the server that you have been granted access to:
     account = Account(primary_smtp_address='john@example.com', credentials=credentials,
                       autodiscover=True, access_type=DELEGATE)
 
