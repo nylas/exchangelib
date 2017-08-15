@@ -1,6 +1,7 @@
 # coding=utf-8
 from collections import namedtuple
 import datetime
+from dateutil.relativedelta import relativedelta
 from decimal import Decimal
 import glob
 from itertools import chain
@@ -3521,8 +3522,10 @@ class BaseItemTest(EWSTest):
                 old = new
                 item.reminder_due_by = new
             if f.name == 'reminder_due_by' and old is not None and new is not None:
-                # EWS sometimes randomly sets the new reminder due date to 30 days before we wanted it(!)
-                if old.astimezone(self.tz).date() - new.astimezone(self.tz).date() == datetime.timedelta(days=30):
+                # EWS sometimes randomly sets the new reminder due date to one month before we wanted it(!)
+                old_date = old.astimezone(self.tz).date()
+                new_date = new.astimezone(self.tz).date()
+                if old_date - relativedelta(month=1) == new_date:
                     old = new
                     item.reminder_due_by = new
             if f.is_list:
