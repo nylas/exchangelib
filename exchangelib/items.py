@@ -98,6 +98,7 @@ class Item(EWSElement):
         ChoiceField('importance', field_uri='item:Importance', choices={
             Choice('Low'), Choice('Normal'), Choice('High')
         }, is_required=True, default='Normal'),
+        TextField('in_reply_to', field_uri='item:InReplyTo'),
         BooleanField('is_draft', field_uri='item:IsDraft', is_read_only=True),
         MessageHeaderField('headers', field_uri='item:InternetMessageHeaders', is_read_only=True),
         DateTimeField('datetime_sent', field_uri='item:DateTimeSent', is_read_only=True),
@@ -486,6 +487,7 @@ class Message(Item):
         MailboxField('author', field_uri='message:From', is_read_only_after_send=True),
         BooleanField('is_read', field_uri='message:IsRead', is_required=True, default=False),
         BooleanField('is_response_requested', field_uri='message:IsResponseRequested', default=False, is_required=True),
+        TextField('references', field_uri='message:References'),
         MailboxField('reply_to', field_uri='message:ReplyTo', is_read_only_after_send=True, is_searchable=False),
         TextField('message_id', field_uri='message:InternetMessageId', is_read_only=True, is_read_only_after_send=True),
     ]
