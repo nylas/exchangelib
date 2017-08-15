@@ -52,9 +52,22 @@ Setup and connecting
     # If you want to enable the fault tolerance, create credentials as a service account instead:
     credentials = ServiceAccount(username='FOO\\bar', password='topsecret')
 
+    # An Account is the account on the Exchange server that you want to connect to. This can be 
+    # the account associated with the credentials you connect with, or any other account on the 
+    # server that you have been granted access to.
+    # 'primary_smtp_address' is the primary SMTP address assigned the account. If you enable 
+    # autodiscover, an alias address will work, too. In this case, 'Account.primary_smtp_address' 
+    # will be set to the primary SMTP address.
+    my_account = Account(primary_smtp_address='myusername@example.com', credentials=credentials,
+                         autodiscover=True, access_type=DELEGATE)
+    johns_account = Account(primary_smtp_address='john@example.com', credentials=credentials,
+                            autodiscover=True, access_type=DELEGATE)
+    marys_account = Account(primary_smtp_address='mary@example.com', credentials=credentials,
+                            autodiscover=True, access_type=DELEGATE)
+    still_marys_account = Account(primary_smtp_address='alias_for_mary@example.com', 
+                                  credentials=credentials, autodiscover=True, access_type=DELEGATE)
+    
     # Set up a target account and do an autodiscover lookup to find the target EWS endpoint. 
-    # 'primary_smtp_address' may be your own email address or the primary email address of any other 
-    # account on the server that you have been granted access to:
     account = Account(primary_smtp_address='john@example.com', credentials=credentials,
                       autodiscover=True, access_type=DELEGATE)
 
@@ -124,20 +137,23 @@ Creating, updating, deleting, sending and moving
 
 .. code-block:: python
 
-    # Create the calendar items in the user's standard calendar.  If you want to access a
-    # non-standard calendar, choose a different one from account.folders[Calendar]
+    # Here's an example of creatnig a calendar item in the user's standard calendar.  If you want to 
+    # access a non-standard calendar, choose a different one from account.folders[Calendar].
     #
-    # You can create, update and delete single items
+    # You can create, update and delete single items:
     item = CalendarItem(folder=account.calendar, subject='foo')
-    item.save()  # This gives the item an item_id and a changekey
+    item.save()  # This gives the item an 'item_id' and a 'changekey' value
+    # Update a field. All fields have a corresponding Python type that must be used.
     item.subject = 'bar'
+    # Print all available fields on the 'CalendarItem' class. Beware that some fields are read-only, or 
+    # read-only after the item has been saved or sent, and some fields are not supported on old versions 
+    # of Exchange.
+    print(CalendarItem.FIELDS)
     item.save()  # When the items has an item_id, this will update the item
     item.delete()
     item.move(account.trash)  # Moves the item to the trash bin
 
-    # You can also send emails:
-
-    # If you don't want a local copy
+    # You can also send emails. If you don't want a local copy:
     m = Message(
         account=a,
         subject='Daily motivation',
