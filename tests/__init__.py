@@ -3525,7 +3525,7 @@ class BaseItemTest(EWSTest):
                 # EWS sometimes randomly sets the new reminder due date to one month before we wanted it(!)
                 old_date = old.astimezone(self.tz).date()
                 new_date = new.astimezone(self.tz).date()
-                if old_date - relativedelta(month=1) == new_date:
+                if relativedelta(old_date, new_date) == relativedelta(month=1):
                     old = new
                     item.reminder_due_by = new
             if f.is_list:
