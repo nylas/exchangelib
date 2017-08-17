@@ -3517,17 +3517,22 @@ class BaseItemTest(EWSTest):
             if f.is_read_only:
                 continue
             old, new = getattr(item, f.name), update_kwargs[f.name]
-            if f.name == 'reminder_due_by' and old is None:
-                # EWS does not always return a value if reminder_is_set is False. Set one now
-                old = new
-                item.reminder_due_by = new
-            if f.name == 'reminder_due_by' and old is not None and new is not None:
-                # EWS sometimes randomly sets the new reminder due date to one month before we wanted it(!)
-                old_date = old.astimezone(self.tz).date()
-                new_date = new.astimezone(self.tz).date()
-                if relativedelta(old_date, new_date) == relativedelta(month=1):
-                    old = new
+            if f.name == 'reminder_due_by':
+                if old is None:
+                    # EWS does not always return a value if reminder_is_set is False. Set one now
                     item.reminder_due_by = new
+                    continue
+                elif old is not None and new is not None:
+                    # EWS sometimes randomly sets the new reminder due date to one month before we wanted it, and
+                    # sometimes 30 days before. But only sometimes...
+                    old_date = old.astimezone(self.tz).date()
+                    new_date = new.astimezone(self.tz).date()
+                    if relativedelta(month=1) + new_date == old_date:
+                        item.reminder_due_by = new
+                        continue
+                    elif old_date - new_date == datetime.timedelta(days=30):
+                        item.reminder_due_by = new
+                        continue
             if f.is_list:
                 old, new = set(old or ()), set(new or ())
             self.assertEqual(old, new, (f.name, old, new))
@@ -4352,10 +4357,14 @@ def get_random_date(start_date=EWSDate(1990, 1, 1), end_date=EWSDate(2030, 1, 1)
 def get_random_datetime(start_date=EWSDate(1990, 1, 1), end_date=EWSDate(2030, 1, 1), tz=UTC):
     # Create a random datetime with minute precision. Both dates are inclusive.
     # Keep with a reasonable date range. A wider date range than the default values is unstable WRT timezones.
-    random_date = get_random_date(start_date=start_date, end_date=end_date)
-    random_datetime = datetime.datetime.combine(random_date, datetime.time.min) \
-        + datetime.timedelta(minutes=random.randint(0, 60 * 24))
-    return tz.localize(EWSDateTime.from_datetime(random_datetime))
+    while True:
+        try:
+            random_date = get_random_date(start_date=start_date, end_date=end_date)
+            random_datetime = datetime.datetime.combine(random_date, datetime.time.min) \
+                + datetime.timedelta(minutes=random.randint(0, 60 * 24))
+            return tz.localize(EWSDateTime.from_datetime(random_datetime), is_dst=None)
+        except (AmbiguousTimeError, NonExistentTimeError):
+            pass
 
 
 def get_random_datetime_range(start_date=EWSDate(1990, 1, 1), end_date=EWSDate(2030, 1, 1), tz=UTC):
