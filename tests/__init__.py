@@ -4058,6 +4058,36 @@ class BaseItemTest(EWSTest):
         item.attach(attachment3)
         item.detach(attachment3)
 
+    def test_recursive_attachments(self):
+        # Test that we can handle an item which has an attached item, which has an attached item...
+        item = self.get_test_item(folder=self.test_folder)
+        attached_item_level_1 = self.get_test_item(folder=self.test_folder)
+        attached_item_level_2 = self.get_test_item(folder=self.test_folder)
+        attached_item_level_3 = self.get_test_item(folder=self.test_folder)
+
+        attached_item_level_3.save()
+        attachment_level_3 = ItemAttachment(name='attached_item_level_3', item=attached_item_level_3)
+        attached_item_level_2.attach(attachment_level_3)
+        attached_item_level_2.save()
+        attachment_level_2 = ItemAttachment(name='attached_item_level_2', item=attached_item_level_2)
+        attached_item_level_1.attach(attachment_level_2)
+        attached_item_level_1.save()
+        attachment_level_1 = ItemAttachment(name='attached_item_level_1', item=attached_item_level_1)
+        item.attach(attachment_level_1)
+        item.save()
+
+        self.assertEqual(
+            item.attachments[0].item.attachments[0].item.attachments[0].item.subject,
+            attached_item_level_3.subject
+        )
+
+        # Also test a fresh item
+        new_item = self.test_folder.get(item_id=item.item_id, changekey=item.changekey)
+        self.assertEqual(
+            new_item.attachments[0].item.attachments[0].item.attachments[0].item.subject,
+            attached_item_level_3.subject
+        )
+
     def test_bulk_failure(self):
         # Test that bulk_* can handle EWS errors and return the errors in order without losing non-failure results
         items1 = [self.get_test_item().save() for _ in range(3)]
