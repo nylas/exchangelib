@@ -411,11 +411,50 @@ Attachments
     # Remove the attachment again
     item.detach(my_file)
 
-    # Attachments cannot be updated via EWS. In this case, you must to detach the attachment, update the 
+    # Attachments cannot be updated via EWS. In this case, you must to detach the attachment, update the
     # relevant fields, and attach the updated attachment.
 
     # Be aware that adding and deleting attachments from items that are already created in Exchange
     # (items that have an item_id) will update the changekey of the item.
+
+
+Recurring calendar items
+^^^^^^^^^^^^^^^^^^^^^^^^
+There is full read-write support for creating recurring calendar items. You can create daily, weekly, monthly and
+yearly recurrences (the latter two in relative and absolute versions).
+
+Here's an example of creating 7 occurrences on Mondays and Wednesdays of every third week, starting September 1, 2017:
+
+.. code-block:: python
+
+    from exchangelib.recurrence import Recurrence, WeeklyPattern, MONDAY, WEDNESDAY
+
+    item = CalendarItem(
+        folder=a.calendar,
+        start=tz.localize(EWSDateTime(2017, 9, 1, 11)),
+        end=tz.localize(EWSDateTime(2017, 9, 1, 13)),
+        subject='Hello Recurrence',
+        recurrence=Recurrence(
+            pattern=WeeklyPattern(interval=3, weekdays=[MONDAY, WEDNESDAY]),
+            start=EWSDate(2017, 9, 1),
+            number=7
+        ),
+    )
+
+    # Occurrence data for the master item
+    for i in a.calendar.filter(start__lt=end, end__gt=start):
+        print(i.subject, i.start, i.end)
+        print(i.recurrence)
+        print(i.first_occurrence)
+        print(i.last_occurrence)
+        for o in i.modified_occurrences:
+            print(o)
+        for o in i.deleted_occurrences:
+            print(o)
+
+    # All occurrences expanded
+    for i in a.calendar.view(start=end, end=start):
+        print(i.subject, i.start, i.end)
 
 
 Troubleshooting
