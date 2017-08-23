@@ -11,7 +11,8 @@ from .extended_properties import ExtendedProperty
 from .fields import BooleanField, IntegerField, DecimalField, Base64Field, TextField, TextListField, ChoiceField, \
     URIField, BodyField, DateTimeField, MessageHeaderField, PhoneNumberField, EmailAddressField, PhysicalAddressField, \
     ExtendedPropertyField, AttachmentField, RecurrenceField, MailboxField,  MailboxListField, AttendeesField, Choice, \
-    OccurrenceField, OccurrenceListField, MemberListField, EWSElementField, EffectiveRightsField, TimeZoneField
+    OccurrenceField, OccurrenceListField, MemberListField, EWSElementField, EffectiveRightsField, TimeZoneField, \
+    CultureField
 from .properties import EWSElement, ItemId, ConversationId
 from .recurrence import FirstOccurrence, LastOccurrence, Occurrence, DeletedOccurrence
 from .util import create_element, is_iterable
@@ -99,20 +100,29 @@ class Item(EWSElement):
             Choice('Low'), Choice('Normal'), Choice('High')
         }, is_required=True, default='Normal'),
         TextField('in_reply_to', field_uri='item:InReplyTo'),
+        BooleanField('is_submitted', field_uri='item:IsSubmitted', is_read_only=True),
         BooleanField('is_draft', field_uri='item:IsDraft', is_read_only=True),
+        BooleanField('is_from_me', field_uri='item:IsFromMe', is_read_only=True),
+        BooleanField('is_resend', field_uri='item:IsResend', is_read_only=True),
+        BooleanField('is_unmodified', field_uri='item:IsUnmodified', is_read_only=True),
         MessageHeaderField('headers', field_uri='item:InternetMessageHeaders', is_read_only=True),
         DateTimeField('datetime_sent', field_uri='item:DateTimeSent', is_read_only=True),
         DateTimeField('datetime_created', field_uri='item:DateTimeCreated', is_read_only=True),
         # Reminder related fields
+        DateTimeField('reminder_due_by', field_uri='item:ReminderDueBy', is_required_after_save=True,
+                      is_searchable=False),
         BooleanField('reminder_is_set', field_uri='item:ReminderIsSet', is_required=True, default=False),
-        DateTimeField('reminder_due_by', field_uri='item:ReminderDueBy', is_required=False,
-                      is_required_after_save=True, is_searchable=False),
         IntegerField('reminder_minutes_before_start', field_uri='item:ReminderMinutesBeforeStart',
                      is_required_after_save=True, min=0, default=0),
+        TextField('display_cc', field_uri='item:DisplayCc', is_read_only=True),
+        TextField('display_to', field_uri='item:DisplayTo', is_read_only=True),
+        CultureField('culture', field_uri='item:Culture', is_required_after_save=True, is_searchable=False),
+        BooleanField('has_attachments', field_uri='item:HasAttachments', is_read_only=True),
         # ExtendedProperty fields go here
         EffectiveRightsField('effective_rights', field_uri='item:EffectiveRights', is_read_only=True),
         TextField('last_modified_name', field_uri='item:LastModifiedName', is_read_only=True),
         DateTimeField('last_modified_time', field_uri='item:LastModifiedTime', is_read_only=True),
+        BooleanField('is_associated', field_uri='item:IsAssociated', is_read_only=True),
         EWSElementField('conversation_id', field_uri='item:ConversationId', value_cls=ConversationId,
                         is_read_only=True),
     ]
@@ -348,12 +358,11 @@ class Item(EWSElement):
             raise ValueError("'%s' is already registered" % attr_name)
         if not issubclass(attr_cls, ExtendedProperty):
             raise ValueError("'%s' must be a subclass of ExtendedProperty" % attr_cls)
-        # Find the correct index for the extended property and insert the new field. We insert after 'reminder_is_set'
-
-        # TODO: This is super hacky and will need to change if we add new fields after 'reminder_minutes_before_start'
-        # ExtendedProperty actually goes in between <HasAttachments/><ExtendedProperty/><Culture/>
-        # See https://msdn.microsoft.com/en-us/library/office/aa580790(v=exchg.150).aspx
-        idx = tuple(f.name for f in cls.FIELDS).index('reminder_minutes_before_start') + 1
+        # ExtendedProperty is not a real field, but a placeholder in the fields list. See
+        #   https://msdn.microsoft.com/en-us/library/office/aa580790(v=exchg.150).aspx
+        #
+        # Find the correct index for the new extended property, which is after 'has_attachments', and insert.
+        idx = tuple(f.name for f in cls.FIELDS).index('has_attachments') + 1
         field = ExtendedPropertyField(attr_name, value_cls=attr_cls)
         cls.add_field(field, idx=idx)
 
@@ -421,7 +430,7 @@ class CalendarItem(Item):
     """
     ELEMENT_NAME = 'CalendarItem'
     FIELDS = Item.FIELDS + [
-        TextField('uid', field_uri='calendar:UID', is_required=False, is_required_after_save=True, is_searchable=False),
+        TextField('uid', field_uri='calendar:UID', is_required_after_save=True, is_searchable=False),
         DateTimeField('start', field_uri='calendar:Start', is_required=True),
         DateTimeField('end', field_uri='calendar:End', is_required=True),
         BooleanField('is_all_day', field_uri='calendar:IsAllDayEvent', is_required=True, default=False),

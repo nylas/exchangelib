@@ -539,6 +539,11 @@ class EmailField(TextField):
     pass
 
 
+class CultureField(TextField):
+    # Helper to mark strings that are # RFC 1766 culture values.
+    pass
+
+
 class Choice(object):
     """ Implements versioned choices for the ChoiceField field"""
     def __init__(self, value, supported_from=None):

@@ -38,7 +38,7 @@ from exchangelib.extended_properties import ExtendedProperty, ExternId
 from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextField, EmailField, URIField, ChoiceField, \
     BodyField, DateTimeField, Base64Field, PhoneNumberField, EmailAddressField, \
     PhysicalAddressField, ExtendedPropertyField, MailboxField, AttendeesField, AttachmentField, TextListField, \
-    MailboxListField, Choice, FieldPath, EWSElementField
+    MailboxListField, Choice, FieldPath, EWSElementField, CultureField
 from exchangelib.folders import Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Messages, Tasks, \
     Contacts, Folder
 from exchangelib.indexed_properties import IndexedElement, EmailAddress, PhysicalAddress, PhoneNumber, \
@@ -1066,6 +1066,8 @@ class EWSTest(unittest.TestCase):
             return get_random_email()
         if isinstance(field, ChoiceField):
             return get_random_choice(field.supported_choices(version=self.account.version))
+        if isinstance(field, CultureField):
+            return get_random_choice(['da-DK', 'de-DE', 'en-US', 'es-ES', 'fr-CA', 'nl-NL', 'ru-RU', 'sv-SE'])
         if isinstance(field, BodyField):
             return get_random_string(255)
         if isinstance(field, TextListField):
