@@ -9,6 +9,7 @@ from future.utils import python_2_unicode_compatible
 
 from .fields import FieldPath, FieldOrder
 from .restriction import Q
+from .version import EXCHANGE_2010
 
 log = logging.getLogger(__name__)
 
@@ -80,6 +81,16 @@ class QuerySet(object):
             assert isinstance(self.only_fields, tuple)
             # Remove ItemId and ChangeKey. We get them unconditionally
             additional_fields = {f for f in self.only_fields if f.field.name not in {'item_id', 'changekey'}}
+
+            # For CalendarItem items, we want to inject internal timezone fields. See also CalendarItem.clean()
+            if self.folder.account.version.build < EXCHANGE_2010:
+                if 'start' in additional_fields or 'end' in additional_fields:
+                    additional_fields.add('_meeting_timezone')
+            else:
+                if 'start' in additional_fields:
+                    additional_fields.add('_start_timezone')
+                if 'end' in additional_fields:
+                    additional_fields.add('_end_timezone')
         complex_fields_requested = bool(set(f.field for f in additional_fields) & self.folder.complex_fields())
 
         # EWS can do server-side sorting on multiple fields.  A caveat is that server-side sorting is not supported

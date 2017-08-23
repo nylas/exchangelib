@@ -4105,7 +4105,11 @@ class CalendarTest(BaseItemTest):
 
     def test_all_day_datetimes(self):
         # Test that start and end datetimes for all-day items are returned in the datetime of the account.
-        start = get_random_date()
+
+        # The timezone we're testing (CET/CEST) had a DST date change in 1996 (see
+        # https://en.wikipedia.org/wiki/Summer_Time_in_Europe). The Microsoft timezone definition on the server
+        # does not observe that, but pytz does. So random datetimes before 1996 will fail this test.
+        start = get_random_date(start_date=EWSDate(1996, 1, 1))
         start_dt, end_dt = \
             get_random_datetime_range(start_date=start, end_date=start + datetime.timedelta(days=365), tz=self.tz)
         item = self.ITEM_CLASS(folder=self.test_folder, start=start_dt, end=end_dt, is_all_day=True,
@@ -4113,8 +4117,8 @@ class CalendarTest(BaseItemTest):
         item.save()
 
         item = self.test_folder.all().only('start', 'end').get(item_id=item.item_id, changekey=item.changekey)
-        self.assertEqual(item.start.astimezone(self.tz).time(), datetime.time(0, 0))
-        self.assertEqual(item.end.astimezone(self.tz).time(), datetime.time(0, 0))
+        self.assertEqual(item.start.astimezone(self.tz).time(), datetime.time(0, 0), (item.start, item.end))
+        self.assertEqual(item.end.astimezone(self.tz).time(), datetime.time(0, 0), (item.start, item.end))
         item.delete()
 
     def test_view(self):

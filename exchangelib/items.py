@@ -11,7 +11,7 @@ from .extended_properties import ExtendedProperty
 from .fields import BooleanField, IntegerField, DecimalField, Base64Field, TextField, TextListField, ChoiceField, \
     URIField, BodyField, DateTimeField, MessageHeaderField, PhoneNumberField, EmailAddressField, PhysicalAddressField, \
     ExtendedPropertyField, AttachmentField, RecurrenceField, MailboxField,  MailboxListField, AttendeesField, Choice, \
-    OccurrenceField, OccurrenceListField, MemberListField, EWSElementField, EffectiveRightsField
+    OccurrenceField, OccurrenceListField, MemberListField, EWSElementField, EffectiveRightsField, TimeZoneField
 from .properties import EWSElement, ItemId, ConversationId
 from .recurrence import FirstOccurrence, LastOccurrence, Occurrence, DeletedOccurrence
 from .util import create_element, is_iterable
@@ -447,6 +447,12 @@ class CalendarItem(Item):
                             is_read_only=True),
         OccurrenceListField('deleted_occurrences', field_uri='calendar:DeletedOccurrences', value_cls=DeletedOccurrence,
                             is_read_only=True),
+        TimeZoneField('_meeting_timezone', field_uri='calendar:MeetingTimeZone', deprecated_from=EXCHANGE_2010,
+                      is_read_only=True, is_searchable=False),
+        TimeZoneField('_start_timezone', field_uri='calendar:StartTimeZone', supported_from=EXCHANGE_2010,
+                      is_read_only=True, is_searchable=False),
+        TimeZoneField('_end_timezone', field_uri='calendar:EndTimeZone', supported_from=EXCHANGE_2010,
+                      is_read_only=True, is_searchable=False),
     ]
 
     def clean(self, version=None):
@@ -454,17 +460,15 @@ class CalendarItem(Item):
         super(CalendarItem, self).clean(version=version)
         if self.start and self.end and self.end < self.start:
             raise ValueError("'end' must be greater than 'start' (%s -> %s)", self.start, self.end)
-
-    def to_xml(self, version):
-        # WARNING: The order of addition of XML elements is VERY important. Exchange expects XML elements in a
-        # specific, non-documented order and will fail with meaningless errors if the order is wrong.
-        i = super(CalendarItem, self).to_xml(version=version)
-        if version.build < EXCHANGE_2010:
-            i.append(create_element('t:MeetingTimeZone', TimeZoneName=self.start.tzinfo.ms_id))
-        else:
-            i.append(create_element('t:StartTimeZone', Id=self.start.tzinfo.ms_id, Name=self.start.tzinfo.ms_name))
-            i.append(create_element('t:EndTimeZone', Id=self.end.tzinfo.ms_id, Name=self.end.tzinfo.ms_name))
-        return i
+        if version:
+            if version.build < EXCHANGE_2010:
+                self._meeting_timezone = self.start.tzinfo
+                self._start_timezone = None
+                self._end_timezone = None
+            else:
+                self._meeting_timezone = None
+                self._start_timezone = self.start.tzinfo
+                self._end_timezone = self.end.tzinfo
 
 
 class Message(Item):

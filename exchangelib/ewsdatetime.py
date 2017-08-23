@@ -155,6 +155,25 @@ class EWSTimeZone(object):
     services.GetServerTimeZones.
     """
     PYTZ_TO_MS_MAP = PYTZ_TO_MS_TIMEZONE_MAP
+    MS_TO_PYTZ_MAP = dict((v, k) for k, v in PYTZ_TO_MS_MAP.items())
+
+    def __eq__(self, other):
+        # Microsoft timezones are less granular than pytz, so an EWSTimeZone created from 'Europe/Copenhagen' may return
+        # from the server as 'Europe/Copenhagen'. We're catering for Microsoft here, so base equality on the Microsoft
+        # timezone ID.
+        return self.ms_id == other.ms_id
+
+    def __hash__(self):
+        return super(EWSTimeZone, self).__hash__()
+
+    @classmethod
+    def from_ms_id(cls, ms_id):
+        # Create a timezone instance from a Microsoft timezone ID. This is lossy because there is not a 1:1 translation
+        # from MS timezone ID to pytz timezone.
+        try:
+            return cls.timezone(cls.MS_TO_PYTZ_MAP[ms_id])
+        except KeyError:
+            raise UnknownTimeZone("Windows timezone ID '%s' is unknown by CLDR" % ms_id)
 
     @classmethod
     def from_pytz(cls, tz):

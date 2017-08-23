@@ -15,9 +15,6 @@ def generate_map():
     for e in fromstring(r.content).find('windowsZones').find('mapTimezones').findall('mapZone'):
         for location in e.get('type').split(' '):
             tz_map[location] = e.get('other')
-    # Add some missing but helpful translations
-    tz_map['UTC'] = str('UTC')
-    tz_map['GMT'] = str('GMT Standard Time')
     return tz_map
 
 
@@ -430,7 +427,6 @@ CLDR_TO_MS_TIMEZONE_MAP = {
     'Europe/Zagreb': 'Central European Standard Time',
     'Europe/Zaporozhye': 'FLE Standard Time',
     'Europe/Zurich': 'W. Europe Standard Time',
-    'GMT': 'GMT Standard Time',
     'Indian/Antananarivo': 'E. Africa Standard Time',
     'Indian/Chagos': 'Central Asia Standard Time',
     'Indian/Christmas': 'SE Asia Standard Time',
@@ -483,7 +479,6 @@ CLDR_TO_MS_TIMEZONE_MAP = {
     'Pacific/Truk': 'West Pacific Standard Time',
     'Pacific/Wake': 'UTC+12',
     'Pacific/Wallis': 'UTC+12',
-    'UTC': 'UTC',
 }
 
 # Add timezone names used by pytz (which gets timezone names from IANA) that are not found in the CLDR.
@@ -493,4 +488,6 @@ CLDR_TO_MS_TIMEZONE_MAP = {
 #
 PYTZ_TO_MS_TIMEZONE_MAP = dict(CLDR_TO_MS_TIMEZONE_MAP, **{
     'Asia/Kolkata': 'India Standard Time',
+    'UTC': 'UTC',
+    'GMT': 'GMT Standard Time',
 })

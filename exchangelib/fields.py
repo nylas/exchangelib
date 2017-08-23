@@ -8,7 +8,7 @@ import logging
 from six import string_types
 
 from .errors import ErrorInvalidServerVersion
-from .ewsdatetime import EWSDateTime, EWSDate, NaiveDateTimeNotAllowed
+from .ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, NaiveDateTimeNotAllowed
 from .services import TNS
 from .util import create_element, get_xml_attrs, set_xml_value, value_to_xml_text, is_iterable
 from .version import Build
@@ -193,7 +193,8 @@ class Field(object):
     is_complex = False
 
     def __init__(self, name, is_required=False, is_required_after_save=False, is_read_only=False,
-                 is_read_only_after_send=False, is_searchable=True, default=None, supported_from=None):
+                 is_read_only_after_send=False, is_searchable=True, default=None, supported_from=None,
+                 deprecated_from=None):
         self.name = name
         self.default = default  # Default value if none is given
         self.is_required = is_required
@@ -211,6 +212,11 @@ class Field(object):
         if supported_from is not None:
             assert isinstance(supported_from, Build)
         self.supported_from = supported_from
+        # The Exchange build when this field was deprecated. When talking with versions at or later than this version,
+        # we will ignore this field.
+        if deprecated_from is not None:
+            assert isinstance(deprecated_from, Build)
+        self.deprecated_from = deprecated_from
 
     def clean(self, value, version=None):
         if not self.supports_version(version):
@@ -245,9 +251,13 @@ class Field(object):
 
     def supports_version(self, version):
         # 'version' is a Version instance, for convenience by callers
-        if not self.supported_from or not version:
+        if not version:
             return True
-        return version.build >= self.supported_from
+        if self.supported_from and version.build < self.supported_from:
+            return False
+        if self.deprecated_from and version.build >= self.deprecated_from:
+            return False
+        return True
 
     def __eq__(self, other):
         return hash(self) == hash(other)
@@ -465,6 +475,20 @@ class DateTimeField(FieldURIField):
                 log.warning("Cannot convert value '%s' on field '%s' to type %s", val, self.name, self.value_cls)
                 return None
         return self.default
+
+
+class TimeZoneField(FieldURIField):
+    value_cls = EWSTimeZone
+
+    def from_xml(self, elem, account):
+        field_elem = elem.find(self.response_tag())
+        if field_elem is not None:
+            ms_id = field_elem.get('Id')
+            return self.value_cls.from_ms_id(ms_id)
+        return self.default
+
+    def to_xml(self, value, version):
+        return create_element('t:%s' % self.field_uri_postfix, Id=value.ms_id, Name=value.ms_name)
 
 
 class TextField(FieldURIField):

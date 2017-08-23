@@ -29,7 +29,7 @@ from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, 
     ErrorTooManyObjectsOpened, ErrorInvalidLicense, ErrorInvalidSchemaVersionForMailboxVersion, \
     ErrorInvalidServerVersion, ErrorItemNotFound, ErrorADUnavailable, ResponseMessageError, ErrorInvalidChangeKey, \
     ErrorItemSave, ErrorInvalidIdMalformed, ErrorMessageSizeExceeded, UnauthorizedError, ErrorCannotDeleteTaskOccurrence, \
-    ErrorMimeContentConversionFailed, ErrorRecurrenceHasNoOccurrence 
+    ErrorMimeContentConversionFailed, ErrorRecurrenceHasNoOccurrence
 from .ewsdatetime import EWSDateTime, UTC
 from .transport import wrap, SOAPNS, TNS, MNS, ENS
 from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, ElementType, \
@@ -47,7 +47,7 @@ class EWSService(object):
     # Return exception instance instead of raising exceptions for the following errors when contained in an element
     ERRORS_TO_CATCH_IN_RESPONSE = (
         EWSWarning, ErrorCannotDeleteObject, ErrorInvalidChangeKey, ErrorItemNotFound, ErrorItemSave,
-        ErrorInvalidIdMalformed, ErrorMessageSizeExceeded, ErrorCannotDeleteTaskOccurrence, 
+        ErrorInvalidIdMalformed, ErrorMessageSizeExceeded, ErrorCannotDeleteTaskOccurrence,
         ErrorMimeContentConversionFailed, ErrorRecurrenceHasNoOccurrence,
     )
     # Similarly, define the erors we want to return unraised
@@ -575,46 +575,43 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
         setitemfield.append(folderitem)
         return setitemfield
 
-    def _get_meeting_timezone_elem(self, item_model, field, value):
-        # Always set timezone explicitly when updating date fields, except for UTC datetimes which do not need to
-        # supply an explicit timezone. Exchange 2007 wants "MeetingTimeZone" instead of explicit timezone on each
-        # datetime field.
-        setitemfield_tz = create_element('t:SetItemField')
-        folderitem_tz = create_element(item_model.request_tag())
-        if self.account.version.build < EXCHANGE_2010:
-            fielduri_tz = create_element('t:FieldURI', FieldURI='calendar:MeetingTimeZone')
-            timezone = create_element('t:MeetingTimeZone', TimeZoneName=value.tzinfo.ms_id)
-        else:
-            if field.name == 'start':
-                fielduri_tz = create_element('t:FieldURI', FieldURI='calendar:StartTimeZone')
-                timezone = create_element('t:StartTimeZone', Id=value.tzinfo.ms_id, Name=value.tzinfo.ms_name)
-            elif field.name == 'end':
-                fielduri_tz = create_element('t:FieldURI', FieldURI='calendar:EndTimeZone')
-                timezone = create_element('t:EndTimeZone', Id=value.tzinfo.ms_id, Name=value.tzinfo.ms_name)
-            else:
-                raise ValueError('Cannot set timezone for other datetime values than start and end')
-        setitemfield_tz.append(fielduri_tz)
-        folderitem_tz.append(timezone)
-        setitemfield_tz.append(folderitem_tz)
-        return setitemfield_tz
-
     @staticmethod
     def _sort_fieldnames(item_model, fieldnames):
-        # Take a list of fieldnames and return the fields in the order they are mentioned in item_class.FIELDS
-        fieldnames_set = set(fieldnames)
+        # Take a list of fieldnames and return the fields in the order they are mentioned in item_class.FIELDS.
         for f in item_model.FIELDS:
-            if f.name in fieldnames_set:
+            if f.name in fieldnames:
                 yield f.name
 
     def _get_item_update_elems(self, item, fieldnames):
         from .fields import FieldPath, IndexedField
         from .indexed_properties import MultiFieldIndexedElement
+        from .items import CalendarItem
         item_model = item.__class__
-        meeting_timezone_added = False
-        for fieldname in self._sort_fieldnames(item_model=item_model, fieldnames=fieldnames):
+        fieldnames_set = set(fieldnames)
+
+        if item_model == CalendarItem:
+            # For CalendarItem items, we want to inject internal timezone fields. See also CalendarItem.clean()
+            if self.account.version.build < EXCHANGE_2010:
+                if 'start' in fieldnames_set or 'end' in fieldnames_set:
+                    fieldnames_set.add('_meeting_timezone')
+                    item._meeting_timezone = item.start.tzinfo
+                    item._start_timezone = None
+                    item._end_timezone = None
+            else:
+                item._meeting_timezone = None
+                if 'start' in fieldnames_set:
+                    fieldnames_set.add('_start_timezone')
+                    item._start_timezone = item.start.tzinfo
+                if 'end' in fieldnames_set:
+                    fieldnames_set.add('_end_timezone')
+                    item._end_timezone = item.end.tzinfo
+
+        for fieldname in self._sort_fieldnames(item_model=item_model, fieldnames=fieldnames_set):
             field = item_model.get_field_by_fieldname(fieldname)
             if field.is_read_only:
-                raise ValueError('%s is a read-only field' % field.name)
+                if field.name not in ('_meeting_timezone', '_start_timezone', '_end_timezone'):
+                    # Timezone fields are treated specially
+                    raise ValueError('%s is a read-only field' % field.name)
             value = field.clean(getattr(item, field.name), version=self.account.version)  # Make sure the value is OK
 
             if value is None or (field.is_list and not value):
@@ -645,18 +642,6 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
                 continue
 
             yield self._set_item_elem(item_model=item_model, field_path=FieldPath(field=field), value=value)
-            if issubclass(field.value_cls, EWSDateTime) and value.tzinfo != UTC:
-                if self.account.version.build < EXCHANGE_2010 and not meeting_timezone_added:
-                    # Let's hope that we're not changing timezone, or that both 'start' and 'end' are supplied.
-                    # Exchange 2007 doesn't support different timezone on start and end.
-                    yield self._get_meeting_timezone_elem(item_model=item_model, field=field, value=value)
-                    meeting_timezone_added = True
-                elif field.name in ('start', 'end'):
-                    # EWS does not support updating the timezone for fields that are not the 'start' or 'end'
-                    # field. Either supply the date in UTC or in the same timezone as originally created.
-                    yield self._get_meeting_timezone_elem(item_model=item_model, field=field, value=value)
-                else:
-                    log.warning("Skipping timezone for field '%s'", field.name)
 
     def get_payload(self, items, conflict_resolution, message_disposition, send_meeting_invitations_or_cancellations,
                     suppress_read_receipts):

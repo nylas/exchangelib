@@ -20,11 +20,12 @@ from .items import Item, BulkCreateResult, HARD_DELETE, \
     AUTO_RESOLVE, SEND_TO_NONE, SAVE_ONLY, SEND_AND_SAVE_COPY, SEND_ONLY, ALL_OCCURRENCIES, \
     DELETE_TYPE_CHOICES, MESSAGE_DISPOSITION_CHOICES, CONFLICT_RESOLUTION_CHOICES, AFFECTED_TASK_OCCURRENCES_CHOICES, \
     SEND_MEETING_INVITATIONS_CHOICES, SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES, \
-    SEND_MEETING_CANCELLATIONS_CHOICES
+    SEND_MEETING_CANCELLATIONS_CHOICES, CalendarItem
 from .protocol import Protocol
 from .queryset import QuerySet
 from .services import ExportItems, UploadItems, GetItem, CreateItem, UpdateItem, DeleteItem, MoveItem, SendItem
 from .util import get_domain, peek
+from .version import EXCHANGE_2010
 
 log = getLogger(__name__)
 
@@ -414,6 +415,7 @@ class Account(object):
         if only_fields:
             allowed_fields = validation_folder.allowed_fields()
             only_fields = list(only_fields)
+            has_start, has_end = False, False
             for i, field_path in enumerate(only_fields):
                 # Allow both FieldPath instances and string field paths as input
                 if isinstance(field_path, string_types):
@@ -421,6 +423,21 @@ class Account(object):
                     only_fields[i] = field_path
                 assert isinstance(field_path, FieldPath)
                 assert field_path.field in allowed_fields
+                if field_path.field.name == 'start':
+                    has_start = True
+                elif field_path.field.name == 'end':
+                    has_end = True
+
+            # For CalendarItem items, we want to inject internal timezone fields. See also CalendarItem.clean()
+            if CalendarItem in validation_folder.supported_item_models:
+                if self.version.build < EXCHANGE_2010:
+                    if has_start or has_end:
+                        only_fields.append(FieldPath.from_string('_meeting_timezone', folder=validation_folder))
+                else:
+                    if has_start:
+                        only_fields.append(FieldPath.from_string('_start_timezone', folder=validation_folder))
+                    if has_end:
+                        only_fields.append(FieldPath.from_string('_end_timezone', folder=validation_folder))
         else:
             only_fields = {FieldPath(field=f) for f in validation_folder.allowed_fields()}
         for i in GetItem(account=self).call(items=ids, additional_fields=only_fields):
