@@ -37,9 +37,9 @@ Setup and connecting
         Mailbox, Attendee, Q, ExtendedProperty, FileAttachment, ItemAttachment, \
         HTMLBody, Build, Version
 
-    # Specify your credentials. Username us usually in WINDOMAIN\username format, where WINDOMAIN is 
+    # Specify your credentials. Username is usually in WINDOMAIN\username format, where WINDOMAIN is
     # the name of the Windows Domain your username is connected to, but some servers also
-    # accept usernames in PrimarySMTPAddress ('myusername@example.com') format (Office365 requires it). 
+    # accept usernames in PrimarySMTPAddress ('myusername@example.com') format (Office365 requires it).
     # UPN format is also supported, if your server expects that.
     credentials = Credentials(username='MYWINDOMAIN\\myusername', password='topsecret')
 
@@ -52,11 +52,11 @@ Setup and connecting
     # If you want to enable the fault tolerance, create credentials as a service account instead:
     credentials = ServiceAccount(username='FOO\\bar', password='topsecret')
 
-    # An Account is the account on the Exchange server that you want to connect to. This can be 
-    # the account associated with the credentials you connect with, or any other account on the 
+    # An Account is the account on the Exchange server that you want to connect to. This can be
+    # the account associated with the credentials you connect with, or any other account on the
     # server that you have been granted access to.
-    # 'primary_smtp_address' is the primary SMTP address assigned the account. If you enable 
-    # autodiscover, an alias address will work, too. In this case, 'Account.primary_smtp_address' 
+    # 'primary_smtp_address' is the primary SMTP address assigned the account. If you enable
+    # autodiscover, an alias address will work, too. In this case, 'Account.primary_smtp_address'
     # will be set to the primary SMTP address.
     my_account = Account(primary_smtp_address='myusername@example.com', credentials=credentials,
                          autodiscover=True, access_type=DELEGATE)
@@ -64,10 +64,10 @@ Setup and connecting
                             autodiscover=True, access_type=DELEGATE)
     marys_account = Account(primary_smtp_address='mary@example.com', credentials=credentials,
                             autodiscover=True, access_type=DELEGATE)
-    still_marys_account = Account(primary_smtp_address='alias_for_mary@example.com', 
+    still_marys_account = Account(primary_smtp_address='alias_for_mary@example.com',
                                   credentials=credentials, autodiscover=True, access_type=DELEGATE)
-    
-    # Set up a target account and do an autodiscover lookup to find the target EWS endpoint. 
+
+    # Set up a target account and do an autodiscover lookup to find the target EWS endpoint.
     account = Account(primary_smtp_address='john@example.com', credentials=credentials,
                       autodiscover=True, access_type=DELEGATE)
 
@@ -76,7 +76,7 @@ Setup and connecting
     account = Account(primary_smtp_address='john@example.com', credentials=credentials,
                       autodiscover=True, access_type=IMPERSONATION)
 
-    # If the server doesn't support autodiscover, or you want to avoid the overhead of autodiscover, 
+    # If the server doesn't support autodiscover, or you want to avoid the overhead of autodiscover,
     # use a Configuration object to set the server location instead:
     config = Configuration(server='mail.example.com', credentials=credentials)
     account = Account(primary_smtp_address='john@example.com', config=config,
@@ -137,7 +137,7 @@ Creating, updating, deleting, sending and moving
 
 .. code-block:: python
 
-    # Here's an example of creating a calendar item in the user's standard calendar.  If you want to 
+    # Here's an example of creating a calendar item in the user's standard calendar.  If you want to
     # access a non-standard calendar, choose a different one from account.folders[Calendar].
     #
     # You can create, update and delete single items:
@@ -145,8 +145,8 @@ Creating, updating, deleting, sending and moving
     item.save()  # This gives the item an 'item_id' and a 'changekey' value
     # Update a field. All fields have a corresponding Python type that must be used.
     item.subject = 'bar'
-    # Print all available fields on the 'CalendarItem' class. Beware that some fields are read-only, or 
-    # read-only after the item has been saved or sent, and some fields are not supported on old versions 
+    # Print all available fields on the 'CalendarItem' class. Beware that some fields are read-only, or
+    # read-only after the item has been saved or sent, and some fields are not supported on old versions
     # of Exchange.
     print(CalendarItem.FIELDS)
     item.save()  # When the items has an item_id, this will update the item
