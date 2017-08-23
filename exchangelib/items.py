@@ -15,7 +15,7 @@ from .fields import BooleanField, IntegerField, DecimalField, Base64Field, TextF
     CultureField
 from .properties import EWSElement, ItemId, ConversationId
 from .recurrence import FirstOccurrence, LastOccurrence, Occurrence, DeletedOccurrence
-from .util import create_element, is_iterable
+from .util import is_iterable
 from .version import EXCHANGE_2010, EXCHANGE_2013
 
 string_type = string_types[0]
