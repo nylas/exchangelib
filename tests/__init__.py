@@ -2408,6 +2408,32 @@ class BaseItemTest(EWSTest):
             item.item_id, item.changekey = item_id, changekey
             item.delete()  # Item disappeared
 
+    def test_unsupported_fields(self):
+        # Create a field that is not supported by any current versions. Test that we fail when using this field
+        class UnsupportedProp(ExtendedProperty):
+            property_set_id = 'deadcafe-beef-beef-beef-deadcafebeef'
+            property_name = 'Unsupported Property'
+            property_type = 'String'
+
+        attr_name = 'unsupported_property'
+        self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=UnsupportedProp)
+        for f in self.ITEM_CLASS.FIELDS:
+            if f.name == attr_name:
+                f.supported_from = Build(99, 99, 99, 99)
+
+        with self.assertRaises(ValueError):
+            self.test_folder.get(**{attr_name: 'XXX'})
+        with self.assertRaises(ValueError):
+            list(self.test_folder.filter(**{attr_name: 'XXX'}))
+        with self.assertRaises(ValueError):
+            list(self.test_folder.all().only(attr_name))
+        with self.assertRaises(ValueError):
+            list(self.test_folder.all().values(attr_name))
+        with self.assertRaises(ValueError):
+            list(self.test_folder.all().values_list(attr_name))
+
+        self.ITEM_CLASS.deregister(attr_name=attr_name)
+
     def test_querysets(self):
         test_items = []
         for i in range(4):

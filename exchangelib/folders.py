@@ -242,9 +242,9 @@ class Folder(EWSElement):
             complex_fields = self.complex_fields()
             for f in additional_fields:
                 if f.field not in allowed_fields:
-                    raise ValueError("'%s' is not a field on %s" % (f, self.supported_item_models))
+                    raise ValueError("'%s' is not a valid field on %s" % (f.field.name, self.supported_item_models))
                 if f.field in complex_fields:
-                    raise ValueError("find_items() does not support field '%s'. Use fetch() instead" % f)
+                    raise ValueError("find_items() does not support field '%s'. Use fetch() instead" % f.field.name)
         if calendar_view is not None:
             assert isinstance(calendar_view, CalendarView)
         if page_size is None:
