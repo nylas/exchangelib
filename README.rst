@@ -141,8 +141,10 @@ Creating, updating, deleting, sending and moving
     # access a non-standard calendar, choose a different one from account.folders[Calendar].
     #
     # You can create, update and delete single items:
+    from exchangelib.items import SEND_ONLY_TO_ALL, SEND_ONLY_TO_CHANGED
     item = CalendarItem(folder=account.calendar, subject='foo')
     item.save()  # This gives the item an 'item_id' and a 'changekey' value
+    item.save(send_meeting_invitations=SEND_ONLY_TO_ALL)  # Send a meeting invitation to attendees
     # Update a field. All fields have a corresponding Python type that must be used.
     item.subject = 'bar'
     # Print all available fields on the 'CalendarItem' class. Beware that some fields are read-only, or
@@ -150,8 +152,13 @@ Creating, updating, deleting, sending and moving
     # of Exchange.
     print(CalendarItem.FIELDS)
     item.save()  # When the items has an item_id, this will update the item
-    item.delete()
-    item.move(account.trash)  # Moves the item to the trash bin
+    item.save(update_fields=['subject'])  # Only updates certain fields
+    item.save(send_meeting_invitations=SEND_ONLY_TO_CHANGED)  # Send meeting invitation, but only to attendee changes
+    item.delete()  # Hard deletinon
+    item.delete(send_meeting_cancellations=SEND_ONLY_TO_ALL)  # Send meeting cancellations to all attendees
+    item.soft_delete()  # Delete, but keep a copy in the recoverable items folder
+    item.move_to_trash()  # Move to the trash folder
+    item.move(account.trash)  # Also moves the item to the trash folder
 
     # You can also send emails. If you don't want a local copy:
     m = Message(
@@ -205,6 +212,11 @@ Bulk operations
     # bulk_update(), bulk_delete(), bulk_move() and bulk_send() methods are also supported.
     res = account.calendar.bulk_create(items=calendar_items)
     print(res)
+
+    # Buk delete items found as a queryset
+    res = account.inbox.filter(subject__startswith='Invoice').delete()
+    print(res)
+
 
 
 Searching
@@ -317,16 +329,6 @@ Here are some examples of using the API:
     )
     for item in items:
         print(item.start, item.end, item.subject, item.body, item.location)
-
-
-Deleting
-^^^^^^^^
-
-.. code-block:: python
-
-    # Delete the calendar items we found, when 'items' is a queryset
-    res = items.delete()
-    print(res)
 
 
 Extended properties
@@ -455,6 +457,23 @@ Here's an example of creating 7 occurrences on Mondays and Wednesdays of every t
     # All occurrences expanded
     for i in a.calendar.view(start=end, end=start):
         print(i.subject, i.start, i.end)
+
+
+Timestamps
+^^^^^^^^^^
+
+Each email has four timestamps associated with it:
+
+* `datetime_created`
+* `datetime_sent`
+* `datetime_received`
+* `last_modified_time`
+
+All these fields are read-only in exchangelib. These fields are not modifiable
+via EWS. All of those fields are of the type
+`exchangelib.ewsdatetime.EWSDateTime`.
+
+The `datetime_sent` can be before `datetime_created`.
 
 
 Troubleshooting

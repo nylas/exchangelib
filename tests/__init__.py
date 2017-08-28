@@ -2570,6 +2570,10 @@ class BaseItemTest(EWSTest):
             list(self.test_folder.get(item_id=item.item_id))
         with self.assertRaises(ValueError):
             list(self.test_folder.get(item_id=item.item_id, changekey=item.changekey, subject='XXX'))
+        with self.assertRaises(ValueError):
+            list(self.test_folder.get(item_id=None, changekey='foo'))
+        with self.assertRaises(ValueError):
+            list(self.test_folder.get(item_id='foo', changekey=None))
 
         # Test a simple get()
         get_item = self.test_folder.get(item_id=item.item_id, changekey=item.changekey)

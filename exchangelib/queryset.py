@@ -6,6 +6,7 @@ from itertools import islice
 import logging
 
 from future.utils import python_2_unicode_compatible
+from six import string_types
 
 from .fields import FieldPath, FieldOrder
 from .restriction import Q
@@ -425,10 +426,12 @@ class QuerySet(object):
         elif not args and set(kwargs.keys()) == {'item_id', 'changekey'}:
             # We allow calling get(item_id=..., changekey=...) to get a single item, but only if exactly these two
             # kwargs are present.
-            items = list(self.folder.fetch(
-                ids=[(kwargs['item_id'], kwargs['changekey'])],
-                only_fields=self.only_fields,
-            ))
+            item_id, changekey = kwargs['item_id'], kwargs['changekey']
+            if not isinstance(item_id, string_types):
+                raise ValueError("'item_id' must be a string")
+            if not isinstance(changekey, string_types):
+                raise ValueError("'changekey' must be a string")
+            items = list(self.folder.fetch(ids=[(item_id, changekey)], only_fields=self.only_fields))
         else:
             new_qs = self.filter(*args, **kwargs)
             items = list(new_qs.__iter__())
