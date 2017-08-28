@@ -580,6 +580,14 @@ class ChoiceField(TextField):
         return {c.value for c in self.choices if c.supports_version(version)}
 
 
+class TextBodyField(TextField):
+    is_complex = True
+
+    def __init__(self, *args, **kwargs):
+        super(TextBodyField, self).__init__(*args, **kwargs)
+        self.max_length = None
+
+
 class BodyField(TextField):
     is_complex = True
 

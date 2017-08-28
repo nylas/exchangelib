@@ -3310,6 +3310,16 @@ class BaseItemTest(EWSTest):
                 self.assertEqual(old, new, (f.name, old, new))
         self.bulk_delete([item])
 
+    def test_text_body(self):
+        if self.account.version.build < EXCHANGE_2013:
+            raise self.skipTest('Exchange version too old')
+        item = self.get_test_item()
+        item.body = 'X' * 500  # Make body longer than the normal 256 char text field limit
+        item.save()
+        fresh_item = self.test_folder.filter(categories__contains=item.categories).only('text_body')[0]
+        self.assertEqual(fresh_item.text_body, item.body)
+        item.delete()
+
     def test_only_fields(self):
         item = self.get_test_item()
         self.test_folder.bulk_create(items=[item, item])

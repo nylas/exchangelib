@@ -12,7 +12,7 @@ from .fields import BooleanField, IntegerField, DecimalField, Base64Field, TextF
     URIField, BodyField, DateTimeField, MessageHeaderField, PhoneNumberField, EmailAddressField, PhysicalAddressField, \
     ExtendedPropertyField, AttachmentField, RecurrenceField, MailboxField,  MailboxListField, AttendeesField, Choice, \
     OccurrenceField, OccurrenceListField, MemberListField, EWSElementField, EffectiveRightsField, TimeZoneField, \
-    CultureField
+    CultureField, TextBodyField
 from .properties import EWSElement, ItemId, ConversationId
 from .recurrence import FirstOccurrence, LastOccurrence, Occurrence, DeletedOccurrence
 from .util import is_iterable
@@ -90,7 +90,7 @@ class Item(EWSElement):
         ChoiceField('sensitivity', field_uri='item:Sensitivity', choices={
             Choice('Normal'), Choice('Personal'), Choice('Private'), Choice('Confidential')
         }, is_required=True, default='Normal'),
-        TextField('text_body', field_uri='item:TextBody', is_read_only=True, supported_from=EXCHANGE_2013),
+        TextBodyField('text_body', field_uri='item:TextBody', is_read_only=True, supported_from=EXCHANGE_2013),
         BodyField('body', field_uri='item:Body'),  # Accepts and returns Body or HTMLBody instances
         AttachmentField('attachments', field_uri='item:Attachments'),  # ItemAttachment or FileAttachment
         DateTimeField('datetime_received', field_uri='item:DateTimeReceived', is_read_only=True),
