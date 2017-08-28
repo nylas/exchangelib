@@ -49,7 +49,7 @@ from exchangelib.protocol import Protocol
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.recurrence import Recurrence, AbsoluteYearlyPattern, RelativeYearlyPattern, AbsoluteMonthlyPattern, \
     RelativeMonthlyPattern, WeeklyPattern, DailyPattern, FirstOccurrence, LastOccurrence, Occurrence, \
-    DeletedOccurrence, NoEndPattern, EndDatePattern, NumberedPattern
+    DeletedOccurrence, NoEndPattern, EndDatePattern, NumberedPattern, MONDAY, WEDNESDAY
 from exchangelib.restriction import Restriction, Q
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, GetAttachment, ResolveNames, TNS
 from exchangelib.transport import NOAUTH, BASIC, DIGEST, NTLM, wrap, _get_auth_method_from_response
@@ -4228,6 +4228,56 @@ class CalendarTest(BaseItemTest):
         self.assertListEqual(
             [i for i in qs.order_by('subject').values('subject') if i['subject'] in (item1.subject, item2.subject)],
             [{'subject': s} for s in sorted([item1.subject, item2.subject])]
+        )
+
+    def test_recurring_items(self):
+        item = CalendarItem(
+            folder=self.test_folder,
+            start=self.tz.localize(EWSDateTime(2017, 9, 4, 11)),
+            end=self.tz.localize(EWSDateTime(2017, 9, 4, 13)),
+            subject='Hello Recurrence',
+            recurrence=Recurrence(
+                pattern=WeeklyPattern(interval=3, weekdays=[MONDAY, WEDNESDAY]),
+                start=EWSDate(2017, 9, 4),
+                number=7
+            ),
+            categories=self.categories,
+        ).save()
+
+        # Occurrence data for the master item
+        fresh_item = self.test_folder.get(item_id=item.item_id, changekey=item.changekey)
+        self.assertEqual(
+            str(fresh_item.recurrence),
+            'Pattern: Occurs on weekdays Monday, Wednesday of every 3 week(s) where the first day of the week is '
+            'Monday, Boundary: NumberedPattern(EWSDate(2017, 9, 4), 7)'
+        )
+        self.assertEqual(fresh_item.first_occurrence.start, self.tz.localize(EWSDateTime(2017, 9, 4, 11)))
+        self.assertEqual(fresh_item.first_occurrence.end, self.tz.localize(EWSDateTime(2017, 9, 4, 13)))
+        self.assertEqual(fresh_item.last_occurrence.start, self.tz.localize(EWSDateTime(2017, 11, 6, 11)))
+        self.assertEqual(fresh_item.last_occurrence.end, self.tz.localize(EWSDateTime(2017, 11, 6, 13)))
+        self.assertEqual(fresh_item.modified_occurrences, None)
+        self.assertEqual(fresh_item.deleted_occurrences, None)
+
+        # All occurrences expanded
+        all_start_times = []
+        for i in self.test_folder.view(
+                start=self.tz.localize(EWSDateTime(2017, 9, 1)),
+                end=self.tz.localize(EWSDateTime(2017, 12, 1))
+        ).only('start', 'categories').order_by('start'):
+            if i.categories != self.categories:
+                continue
+            all_start_times.append(i.start)
+        self.assertListEqual(
+            all_start_times,
+            [
+                self.tz.localize(EWSDateTime(2017, 9, 4, 11)),
+                self.tz.localize(EWSDateTime(2017, 9, 6, 11)),
+                self.tz.localize(EWSDateTime(2017, 9, 25, 11)),
+                self.tz.localize(EWSDateTime(2017, 9, 27, 11)),
+                self.tz.localize(EWSDateTime(2017, 10, 16, 11)),
+                self.tz.localize(EWSDateTime(2017, 10, 18, 11)),
+                self.tz.localize(EWSDateTime(2017, 11, 6, 11)),
+            ]
         )
 
 
