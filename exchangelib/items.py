@@ -470,7 +470,6 @@ class CalendarItem(Item):
 
     def clean_timezone_fields(self, version):
         # Sets proper values on the timezone fields and returns the fields that were set
-        meeting_tz_field, start_tz_field, end_tz_field = self.timezone_fields()
         if version.build < EXCHANGE_2010:
             self._meeting_timezone = self.start.tzinfo if self.start else None
             self._start_timezone = None
