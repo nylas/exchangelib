@@ -6,10 +6,10 @@ import logging
 from future.utils import python_2_unicode_compatible
 from six import string_types
 
-from .fields import IntegerField, TextField, DateTimeField, FieldPath, EffectiveRightsField
+from .fields import IntegerField, TextField, DateTimeField, FieldPath, EffectiveRightsField, MailboxField
 from .items import Item, CalendarItem, Contact, Message, Task, MeetingRequest, MeetingResponse, MeetingCancellation, \
     DistributionList, ITEM_CLASSES, ITEM_TRAVERSAL_CHOICES, SHAPE_CHOICES, IdOnly
-from .properties import ItemId, EWSElement
+from .properties import ItemId, Mailbox, EWSElement
 from .queryset import QuerySet
 from .restriction import Restriction
 from .services import FindFolder, GetFolder, FindItem
@@ -40,9 +40,10 @@ class DistinguishedFolderId(ItemId):
     FIELDS = [
         TextField('id', field_uri=ItemId.ID_ATTR, is_required=True),
         TextField('changekey', field_uri=ItemId.CHANGEKEY_ATTR, is_required=False),
+        MailboxField('mailbox', is_required=False)
     ]
 
-    __slots__ = 'id', 'changekey'
+    __slots__ = 'id', 'changekey', 'mailbox'
 
     def to_xml(self, version):
         self.clean(version=version)
@@ -51,6 +52,8 @@ class DistinguishedFolderId(ItemId):
         elem.set(self.ID_ATTR, self.id)
         if self.changekey:
             elem.set(self.CHANGEKEY_ATTR, self.changekey)
+        if self.mailbox:
+            elem.append(self.get_field_by_fieldname('mailbox').to_xml(self.mailbox, version=version))
         return elem
 
 
@@ -330,9 +333,13 @@ class Folder(EWSElement):
 
     def to_xml(self, version):
         self.clean(version=version)
-        if self.folder_id:
-            return FolderId(self.folder_id, self.changekey).to_xml(version=version)
-        return DistinguishedFolderId(self.name).to_xml(version=version)
+        if self.is_distinguished:
+            return DistinguishedFolderId(
+                id=self.name,
+                changekey=self.changekey,
+                mailbox=Mailbox(email_address=self.account.primary_smtp_address)
+            ).to_xml(version=version)
+        return FolderId(id=self.folder_id, changekey=self.changekey).to_xml(version=version)
 
     @classmethod
     def supported_fields(cls, version=None):
