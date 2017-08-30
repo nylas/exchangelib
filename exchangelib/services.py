@@ -293,9 +293,9 @@ class EWSAccountService(EWSService):
 
 class EWSFolderService(EWSAccountService):
 
-    def __init__(self, folder):
-        self.folder = folder
-        super(EWSFolderService, self).__init__(account=folder.account)
+    def __init__(self, account, folders):
+        self.folders = folders
+        super(EWSFolderService, self).__init__(account=account)
 
 
 class PagingEWSMixIn(EWSService):
@@ -798,7 +798,8 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
             set_xml_value(sort_order, order_fields, self.account.version)
             finditem.append(sort_order)
         parentfolderids = create_element('m:ParentFolderIds')
-        parentfolderids.append(self._folder_elem(self.folder))
+        for folder in self.folders:
+            parentfolderids.append(self._folder_elem(folder))
         finditem.append(parentfolderids)
         if query_string:
             finditem.append(query_string.to_xml(version=self.account.version))
@@ -846,7 +847,8 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
         else:
             assert offset == 0, 'Offset is %s' % offset
         parentfolderids = create_element('m:ParentFolderIds')
-        parentfolderids.append(self._folder_elem(self.folder))
+        for folder in self.folders:
+            parentfolderids.append(self._folder_elem(folder))
         findfolder.append(parentfolderids)
         return findfolder
 

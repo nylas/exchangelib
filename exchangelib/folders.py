@@ -274,7 +274,7 @@ class Folder(EWSElement):
             additional_fields,
             restriction.q if restriction else None,
         )
-        items = FindItem(folder=self).call(
+        items = FindItem(account=self.account, folders=[self]).call(
             additional_fields=additional_fields,
             restriction=restriction,
             order_fields=order_fields,
@@ -352,7 +352,7 @@ class Folder(EWSElement):
         assert shape in SHAPE_CHOICES
         assert depth in FOLDER_TRAVERSAL_CHOICES
         additional_fields = [FieldPath(field=f) for f in self.supported_fields(version=self.account.version)]
-        for elem in FindFolder(folder=self).call(
+        for elem in FindFolder(account=self.account, folders=[self]).call(
                 additional_fields=additional_fields,
                 shape=shape,
                 depth=depth,
