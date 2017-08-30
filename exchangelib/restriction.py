@@ -64,99 +64,109 @@ class Q(object):
         self.value = None
         self.query_string = None
 
-        # Build children of Q objects from *args and **kwargs
+        # Parsing of args and kwargs may require child elements
         self.children = []
 
-        for q in args:
-            if isinstance(q, string_types):
-                if kwargs or not self.is_empty():
-                    raise ValueError('A query string cannot be combined with other restrictions')
-                self.query_string = q
-                continue
+        # Remove any empty Q elements in args before proceeding
+        args = tuple(a for a in args if not (isinstance(a, self.__class__) and a.is_empty()))
 
+        # Check for query string, or Q object containing query string, as the only argument
+        if len(args) == 1 and not kwargs:
+            if isinstance(args[0], string_types):
+                self.query_string = args[0]
+                return
+            if isinstance(args[0], self.__class__) and args[0].query_string:
+                self.query_string = args[0].query_string
+                return
+
+        # Parse args which must be Q objects
+        for q in args:
             if not isinstance(q, self.__class__):
                 raise ValueError("Non-keyword arg '%s' must be a Q object" % q)
             if q.query_string:
-                if kwargs or not self.is_empty():
-                    raise ValueError('A query string cannot be combined with other restrictions')
-                self.query_string = q.query_string
-                continue
-            if not q.is_empty():
-                if self.query_string:
-                    raise ValueError('A query string cannot be combined with other restrictions')
-                self.children.append(q)
+                raise ValueError(
+                    'A query string cannot be combined with other restrictions (args: %s, kwargs: %s)', args, kwargs
+                )
+            self.children.append(q)
 
+        # Parse keyword args and extract the filter
+        is_single_kwarg = len(args) == 0 and len(kwargs) == 1
         for key, value in kwargs.items():
-            key_parts = key.rsplit('__', 1)
-            if len(key_parts) == 2 and key_parts[1] in self.LOOKUP_TYPES:
-                # This is a kwarg with a lookup at the end
-                field_path, lookup = key_parts
-                if lookup == self.LOOKUP_EXISTS:
-                    # value=True will fall through to further processing
-                    if not value:
-                        self.children.append(~self.__class__(**{key: True}))
-                        continue
-
-                if lookup == self.LOOKUP_RANGE:
-                    # EWS doesn't have a 'range' operator. Emulate 'foo__range=(1, 2)' as 'foo__gte=1 and foo__lte=2'
-                    # (both values inclusive).
-                    if len(value) != 2:
-                        raise ValueError("Value of lookup '%s' must have exactly 2 elements" % key)
-                    self.children.append(self.__class__(**{'%s__gte' % field_path: value[0]}))
-                    self.children.append(self.__class__(**{'%s__lte' % field_path: value[1]}))
-                    continue
-
-                if lookup == self.LOOKUP_IN:
-                    # EWS doesn't have an '__in' operator. Allow '__in' lookups on list and non-list field types,
-                    # specifying a list value. We'll emulate it as a set of OR'ed exact matches.
-                    if not is_iterable(value, generators_allowed=True):
-                        raise ValueError("Value for lookup '%s' must be a list" % key)
-                    children = [self.__class__(**{field_path: v}) for v in value]
-                    self.children.append(self.__class__(*children, conn_type=self.OR))
-                    continue
-
-                # Filtering on list types is a bit quirky. The only lookup type I have found to work is:
-                #
-                #     item:Categories == 'foo' AND item:Categories == 'bar' AND ...
-                #
-                #     item:Categories == 'foo' OR item:Categories == 'bar' OR ...
-                #
-                # The former returns items that have all these categories, but maybe also others. The latter returns
-                # items that have at least one of these categories. This translates to the 'contains' and 'in' lookups.
-                # Both versions are case-insensitive.
-                #
-                # Exact matching and case-sensitive or partial-string matching is not possible since that requires the
-                # 'Contains' element which only supports matching on string elements, not arrays.
-                #
-                # Exact matching of categories (i.e. match ['a', 'b'] but not ['a', 'b', 'c']) could be implemented by
-                # post-processing items by fetch the categories field unconditionally and removing the items that don't
-                # have an exact match.
-                if lookup == self.LOOKUP_CONTAINS and is_iterable(value, generators_allowed=True):
-                    # '__contains' lookups on list field types
-                    children = [self.__class__(**{field_path: v}) for v in value]
-                    self.children.append(self.__class__(*children, conn_type=self.AND))
-                    continue
-                try:
-                    op = self._lookup_to_op(lookup)
-                except KeyError:
-                    raise ValueError("Lookup '%s' is not supported (called as '%s=%r')" % (lookup, key, value))
-            else:
-                field_path, op = key, self.EQ
-
-            if len(args) == 0 and len(kwargs) == 1:
-                # This is a single-kwarg Q object with a lookup that requires a single value. Make this a leaf
-                self.field_path = field_path
-                self.op = op
-                self.value = value
-                break
-
-            self.children.append(self.__class__(**{key: value}))
+            children = self._get_children_from_kwarg(key=key, value=value, is_single_kwarg=is_single_kwarg)
+            self.children.extend(children)
 
         if len(self.children) == 1 and self.field_path is None and self.conn_type != self.NOT:
             # We only have one child and no expression on ourselves, so we are a no-op. Flatten by taking over the child
             self._promote()
 
         self.clean()
+
+    def _get_children_from_kwarg(self, key, value, is_single_kwarg=False):
+        # Generates Q objects corresponding to a single keyword argument. Makes this a leaf if there are no children to
+        # generate.
+        key_parts = key.rsplit('__', 1)
+        if len(key_parts) == 2 and key_parts[1] in self.LOOKUP_TYPES:
+            # This is a kwarg with a lookup at the end
+            field_path, lookup = key_parts
+            if lookup == self.LOOKUP_EXISTS:
+                # value=True will fall through to further processing
+                if not value:
+                    return [~self.__class__(**{key: True})]
+
+            if lookup == self.LOOKUP_RANGE:
+                # EWS doesn't have a 'range' operator. Emulate 'foo__range=(1, 2)' as 'foo__gte=1 and foo__lte=2'
+                # (both values inclusive).
+                if len(value) != 2:
+                    raise ValueError("Value of lookup '%s' must have exactly 2 elements" % key)
+                return [
+                    self.__class__(**{'%s__gte' % field_path: value[0]}),
+                    self.__class__(**{'%s__lte' % field_path: value[1]}),
+                ]
+
+            if lookup == self.LOOKUP_IN:
+                # EWS doesn't have an '__in' operator. Allow '__in' lookups on list and non-list field types,
+                # specifying a list value. We'll emulate it as a set of OR'ed exact matches.
+                if not is_iterable(value, generators_allowed=True):
+                    raise ValueError("Value for lookup '%s' must be a list" % key)
+                children = [self.__class__(**{field_path: v}) for v in value]
+                return [self.__class__(*children, conn_type=self.OR)]
+
+            # Filtering on list types is a bit quirky. The only lookup type I have found to work is:
+            #
+            #     item:Categories == 'foo' AND item:Categories == 'bar' AND ...
+            #
+            #     item:Categories == 'foo' OR item:Categories == 'bar' OR ...
+            #
+            # The former returns items that have all these categories, but maybe also others. The latter returns
+            # items that have at least one of these categories. This translates to the 'contains' and 'in' lookups.
+            # Both versions are case-insensitive.
+            #
+            # Exact matching and case-sensitive or partial-string matching is not possible since that requires the
+            # 'Contains' element which only supports matching on string elements, not arrays.
+            #
+            # Exact matching of categories (i.e. match ['a', 'b'] but not ['a', 'b', 'c']) could be implemented by
+            # post-processing items by fetch the categories field unconditionally and removing the items that don't
+            # have an exact match.
+            if lookup == self.LOOKUP_CONTAINS and is_iterable(value, generators_allowed=True):
+                # '__contains' lookups on list field types
+                children = [self.__class__(**{field_path: v}) for v in value]
+                return [self.__class__(*children, conn_type=self.AND)]
+
+            try:
+                op = self._lookup_to_op(lookup)
+            except KeyError:
+                raise ValueError("Lookup '%s' is not supported (called as '%s=%r')" % (lookup, key, value))
+        else:
+            field_path, op = key, self.EQ
+
+        if not is_single_kwarg:
+            return [self.__class__(**{key: value})]
+
+        # This is a single-kwarg Q object with a lookup that requires a single value. Make this a leaf
+        self.field_path = field_path
+        self.op = op
+        self.value = value
+        return []
 
     def _promote(self):
         # Flatten by taking over the only child
