@@ -430,14 +430,15 @@ class Account(object):
 
             # For CalendarItem items, we want to inject internal timezone fields. See also CalendarItem.clean()
             if CalendarItem in validation_folder.supported_item_models:
+                meeting_tz_field, start_tz_field, end_tz_field = CalendarItem.timezone_fields()
                 if self.version.build < EXCHANGE_2010:
                     if has_start or has_end:
-                        only_fields.append(FieldPath.from_string('_meeting_timezone', folder=validation_folder))
+                        only_fields.append(FieldPath(field=meeting_tz_field))
                 else:
                     if has_start:
-                        only_fields.append(FieldPath.from_string('_start_timezone', folder=validation_folder))
+                        only_fields.append(FieldPath(field=start_tz_field))
                     if has_end:
-                        only_fields.append(FieldPath.from_string('_end_timezone', folder=validation_folder))
+                        only_fields.append(FieldPath(field=end_tz_field))
         else:
             only_fields = {FieldPath(field=f) for f in validation_folder.allowed_fields()}
         for i in GetItem(account=self).call(items=ids, additional_fields=only_fields):

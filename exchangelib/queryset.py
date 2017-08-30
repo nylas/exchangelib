@@ -8,6 +8,7 @@ import logging
 from future.utils import python_2_unicode_compatible
 from six import string_types
 
+from .items import CalendarItem
 from .fields import FieldPath, FieldOrder
 from .restriction import Q
 from .version import EXCHANGE_2010
@@ -72,7 +73,7 @@ class QuerySet(object):
         new_qs.calendar_view = self.calendar_view
         return new_qs
 
-    def _query(self):
+    def _additional_fields(self):
         if self.only_fields is None:
             # The list of field paths was not restricted. Get all field paths we support, as a set, but remove item_id
             # and changekey. We get them unconditionally.
@@ -83,18 +84,25 @@ class QuerySet(object):
             # Remove ItemId and ChangeKey. We get them unconditionally
             additional_fields = {f for f in self.only_fields if f.field.name not in {'item_id', 'changekey'}}
 
-            # For CalendarItem items, we want to inject internal timezone fields. See also CalendarItem.clean()
+            # For CalendarItem items, we want to inject internal timezone fields into the requested fields.
+            has_start = 'start' in {f.field.name for f in additional_fields}
+            has_end = 'end' in {f.field.name for f in additional_fields}
+            meeting_tz_field, start_tz_field, end_tz_field = CalendarItem.timezone_fields()
             if self.folder.account.version.build < EXCHANGE_2010:
-                if 'start' in additional_fields or 'end' in additional_fields:
-                    additional_fields.add('_meeting_timezone')
+                if has_start or has_end:
+                    additional_fields.add(FieldPath(field=meeting_tz_field))
             else:
-                if 'start' in additional_fields:
-                    additional_fields.add('_start_timezone')
-                if 'end' in additional_fields:
-                    additional_fields.add('_end_timezone')
+                if has_start:
+                    additional_fields.add(FieldPath(field=start_tz_field))
+                if has_end:
+                    additional_fields.add(FieldPath(field=end_tz_field))
+        return additional_fields
+
+    def _query(self):
+        additional_fields = self._additional_fields()
         complex_fields_requested = bool(set(f.field for f in additional_fields) & self.folder.complex_fields())
 
-        # EWS can do server-side sorting on multiple fields.  A caveat is that server-side sorting is not supported
+        # EWS can do server-side sorting on multiple fields. A caveat is that server-side sorting is not supported
         # for calendar views. In this case, we do all the sorting client-side.
         if self.calendar_view:
             must_sort_clientside = bool(self.order_fields)

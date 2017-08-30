@@ -464,20 +464,29 @@ class CalendarItem(Item):
                       is_read_only=True, is_searchable=False),
     ]
 
+    @classmethod
+    def timezone_fields(cls):
+        return [f for f in cls.FIELDS if isinstance(f, TimeZoneField)]
+
+    def clean_timezone_fields(self, version):
+        # Sets proper values on the timezone fields and returns the fields that were set
+        meeting_tz_field, start_tz_field, end_tz_field = self.timezone_fields()
+        if version.build < EXCHANGE_2010:
+            self._meeting_timezone = self.start.tzinfo if self.start else None
+            self._start_timezone = None
+            self._end_timezone = None
+        else:
+            self._meeting_timezone = None
+            self._start_timezone = self.start.tzinfo if self.start else None
+            self._end_timezone = self.end.tzinfo if self.end else None
+
     def clean(self, version=None):
         # pylint: disable=access-member-before-definition
         super(CalendarItem, self).clean(version=version)
         if self.start and self.end and self.end < self.start:
             raise ValueError("'end' must be greater than 'start' (%s -> %s)", self.start, self.end)
         if version:
-            if version.build < EXCHANGE_2010:
-                self._meeting_timezone = self.start.tzinfo
-                self._start_timezone = None
-                self._end_timezone = None
-            else:
-                self._meeting_timezone = None
-                self._start_timezone = self.start.tzinfo
-                self._end_timezone = self.end.tzinfo
+            self.clean_timezone_fields(version=version)
 
 
 class Message(Item):

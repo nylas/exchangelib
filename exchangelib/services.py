@@ -30,7 +30,6 @@ from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, 
     ErrorInvalidServerVersion, ErrorItemNotFound, ErrorADUnavailable, ResponseMessageError, ErrorInvalidChangeKey, \
     ErrorItemSave, ErrorInvalidIdMalformed, ErrorMessageSizeExceeded, UnauthorizedError, ErrorCannotDeleteTaskOccurrence, \
     ErrorMimeContentConversionFailed, ErrorRecurrenceHasNoOccurrence
-from .ewsdatetime import EWSDateTime, UTC
 from .transport import wrap, SOAPNS, TNS, MNS, ENS
 from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, ElementType, \
     xml_to_str, set_xml_value
@@ -582,36 +581,38 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
             if f.name in fieldnames:
                 yield f.name
 
+    def _add_timezone_fieldnames(self, item, fieldnames_set):
+        # For CalendarItem items where we update 'start' or 'end', we want to update internal timezone fields
+        from .items import CalendarItem
+        timezone_fieldnames = set()
+
+        if item.__class__ == CalendarItem:
+            has_start = 'start' in fieldnames_set
+            has_end = 'end' in fieldnames_set
+            item.clean_timezone_fields(version=self.account.version)
+            meeting_tz_field, start_tz_field, end_tz_field = CalendarItem.timezone_fields()
+            if self.account.version.build < EXCHANGE_2010:
+                if has_start or has_end:
+                    timezone_fieldnames.add(meeting_tz_field.name)
+            else:
+                if has_start:
+                    timezone_fieldnames.add(start_tz_field.name)
+                if has_end:
+                    timezone_fieldnames.add(end_tz_field.name)
+        return timezone_fieldnames
+
     def _get_item_update_elems(self, item, fieldnames):
         from .fields import FieldPath, IndexedField
         from .indexed_properties import MultiFieldIndexedElement
-        from .items import CalendarItem
         item_model = item.__class__
         fieldnames_set = set(fieldnames)
-
-        if item_model == CalendarItem:
-            # For CalendarItem items, we want to inject internal timezone fields. See also CalendarItem.clean()
-            if self.account.version.build < EXCHANGE_2010:
-                if 'start' in fieldnames_set or 'end' in fieldnames_set:
-                    fieldnames_set.add('_meeting_timezone')
-                    item._meeting_timezone = item.start.tzinfo
-                    item._start_timezone = None
-                    item._end_timezone = None
-            else:
-                item._meeting_timezone = None
-                if 'start' in fieldnames_set:
-                    fieldnames_set.add('_start_timezone')
-                    item._start_timezone = item.start.tzinfo
-                if 'end' in fieldnames_set:
-                    fieldnames_set.add('_end_timezone')
-                    item._end_timezone = item.end.tzinfo
+        timezone_fieldnames = self._add_timezone_fieldnames(item=item, fieldnames_set=fieldnames_set)
 
         for fieldname in self._sort_fieldnames(item_model=item_model, fieldnames=fieldnames_set):
             field = item_model.get_field_by_fieldname(fieldname)
-            if field.is_read_only:
-                if field.name not in ('_meeting_timezone', '_start_timezone', '_end_timezone'):
-                    # Timezone fields are treated specially
-                    raise ValueError('%s is a read-only field' % field.name)
+            if field.is_read_only and field.name not in timezone_fieldnames:
+                # Timezone fields are ok, even though they are marked read-only
+                raise ValueError('%s is a read-only field' % field.name)
             value = field.clean(getattr(item, field.name), version=self.account.version)  # Make sure the value is OK
 
             if value is None or (field.is_list and not value):
