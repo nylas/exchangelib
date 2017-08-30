@@ -67,6 +67,7 @@ class Build(object):
         15: {
             0: 'Exchange2013',  # Minor builds starting from 847 are Exchange2013_SP1, see api_version()
             1: 'Exchange2016',
+            20: 'Exchange2016',  # This is Office365. See issue #221
         },
     }
 
@@ -99,7 +100,10 @@ class Build(object):
     def api_version(self):
         if self.major_version == 15 and self.minor_version == 0 and self.major_build >= 847:
             return 'Exchange2013_SP1'
-        return self.API_VERSION_MAP[self.major_version][self.minor_version]
+        try:
+            return self.API_VERSION_MAP[self.major_version][self.minor_version]
+        except KeyError:
+            raise ValueError('API version for build %s is unknown' % self)
 
     def __cmp__(self, other):
         # __cmp__ is not a magic method in Python3. We'll just use it here to implement comparison operators
@@ -228,6 +232,11 @@ class Version(object):
         except ErrorInvalidSchemaVersionForMailboxVersion:
             raise TransportError('Unable to guess version')
 
+    @staticmethod
+    def _is_invalid_version_string(s):
+        # Check if a version string is bogus
+        return s.startswith('V2_') or s[:6] in ('V2015_', 'V2016_', 'V2017_')
+
     @classmethod
     def from_response(cls, requested_api_version, response):
         try:
@@ -247,10 +256,9 @@ class Version(object):
         # Not all Exchange servers send the Version element
         api_version_from_server = info.get('Version') or build.api_version()
         if api_version_from_server != requested_api_version:
-            if api_version_from_server.startswith('V2_') \
-                    or api_version_from_server.startswith('V2015_') \
-                    or api_version_from_server.startswith('V2016_'):
-                # Office 365 is an expert in sending invalid API version strings...
+            if cls._is_invalid_version_string(api_version_from_server):
+                # For unknown reasons, Office 365 may respond with an API version strings that is invalid in a request.
+                # Detect these so we can fallback to a valid version string.
                 log.info('API version "%s" worked but server reports version "%s". Using "%s"', requested_api_version,
                          api_version_from_server, requested_api_version)
                 api_version_from_server = requested_api_version

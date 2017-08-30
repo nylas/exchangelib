@@ -110,9 +110,9 @@ class BuildTest(unittest.TestCase):
         self.assertEqual(Build(15, 0, 1, 1).api_version(), 'Exchange2013')
         self.assertEqual(Build(15, 0, 1, 1).api_version(), 'Exchange2013')
         self.assertEqual(Build(15, 0, 847, 0).api_version(), 'Exchange2013_SP1')
-        with self.assertRaises(KeyError):
+        with self.assertRaises(ValueError):
             Build(16, 0).api_version()
-        with self.assertRaises(KeyError):
+        with self.assertRaises(ValueError):
             Build(15, 4).api_version()
 
 
