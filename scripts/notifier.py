@@ -63,7 +63,7 @@ emails_since = now - timedelta(seconds=sleep)
 cal_items_before = now + timedelta(seconds=sleep * 4)  # Longer notice of upcoming appointments than new emails
 username, _, password = netrc().authenticators('office365')
 c = Credentials(username, password)
-a = Account(primary_smtp_address=c.username, credentials=c, access_type=DELEGATE, autodiscover=True, verify_ssl=False)
+a = Account(primary_smtp_address=c.username, credentials=c, access_type=DELEGATE, autodiscover=True)
 
 for msg in a.calendar.view(start=now, end=cal_items_before)\
         .only('start', 'end', 'subject', 'location')\
