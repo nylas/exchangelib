@@ -216,6 +216,11 @@ class ConversationId(ItemId):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/dd899527(v=exchg.150).aspx
     ELEMENT_NAME = 'ConversationId'
 
+    FIELDS = [
+        TextField('id', field_uri=ItemId.ID_ATTR, is_required=True),
+        TextField('changekey', field_uri=ItemId.CHANGEKEY_ATTR, is_required=False),  # Sometimes required, see MSDN link
+    ]
+
     __slots__ = ItemId.__slots__
 
 
