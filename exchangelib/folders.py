@@ -335,7 +335,7 @@ class Folder(EWSElement):
         self.clean(version=version)
         if self.is_distinguished:
             return DistinguishedFolderId(
-                id=self.name,
+                id=self.DISTINGUISHED_FOLDER_ID,
                 changekey=self.changekey,
                 mailbox=Mailbox(email_address=self.account.primary_smtp_address)
             ).to_xml(version=version)
