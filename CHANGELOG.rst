@@ -2,6 +2,10 @@
 Change Log
 ==========
 
+1.9.6
+-----
+* Support new Office365 build numbers
+
 1.9.5
 -----
 * Added support for the ``effective_rights``field on items and folders.
