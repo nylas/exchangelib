@@ -10,7 +10,7 @@ python:
 install:
 - pip install -U pip setuptools
 - pip install cython
-- pip install git+ssh://git@github.com/lxml/lxml.git
+- pip install https://github.com/lxml/lxml.git
 - pip install .
 - pip install PyYAML
 - pip install coverage
