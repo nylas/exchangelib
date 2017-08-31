@@ -321,7 +321,7 @@ if not PY2:
     CONNECTION_ERRORS += (ConnectionResetError,)
 
 
-def post_ratelimited(protocol, session, url, headers, data, timeout=None, verify=True, allow_redirects=False):
+def post_ratelimited(protocol, session, url, headers, data, verify=True, allow_redirects=False):
     """
     There are two error-handling policies implemented here: a fail-fast policy intended for stand-alone scripts which
     fails on all responses except HTTP 200. The other policy is intended for long-running tasks that need to respect
@@ -368,10 +368,10 @@ Response data: %(response_data)s
     try:
         while True:
             log.debug('Session %s thread %s: retry %s timeout %s POST\'ing to %s after %ss wait', session.session_id,
-                      thread_id, retry, timeout, url, wait)
+                      thread_id, retry, protocol.TIMEOUT, url, wait)
             d1 = time_func()
             try:
-                r = session.post(url=url, headers=headers, data=data, allow_redirects=False, timeout=timeout,
+                r = session.post(url=url, headers=headers, data=data, allow_redirects=False, timeout=protocol.TIMEOUT,
                                  verify=verify)
             except CONNECTION_ERRORS as e:
                 log.debug('Session %s thread %s: connection error POST\'ing to %s', session.session_id, thread_id, url)
@@ -379,10 +379,12 @@ Response data: %(response_data)s
                 r.request.headers = headers
                 r.headers = {'TimeoutException': e}
             d2 = time_func()
-            log_vals = dict(retry=retry, wait=wait, timeout=timeout, session_id=session.session_id, thread_id=thread_id,
-                            auth=session.auth, url=url, verify=verify, allow_redirects=allow_redirects,
-                            response_time=d2 - d1, status_code=r.status_code, request_headers=r.request.headers,
-                            response_headers=r.headers, request_data=data, response_data=getattr(r, 'text', ''))
+            log_vals = dict(
+                retry=retry, wait=wait, timeout=protocol.TIMEOUT, session_id=session.session_id, thread_id=thread_id,
+                auth=session.auth, url=url, verify=verify, allow_redirects=allow_redirects, response_time=d2 - d1,
+                status_code=r.status_code, request_headers=r.request.headers, response_headers=r.headers,
+                request_data=data, response_data=getattr(r, 'text', '')
+            )
             log.debug(log_msg, log_vals)
             if _may_retry_on_error(r, protocol, wait):
                 log.info("Session %s thread %s: Connection error on URL %s (code %s). Cool down %s secs",

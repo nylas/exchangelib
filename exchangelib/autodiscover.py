@@ -43,8 +43,6 @@ AUTODISCOVER_NS = 'http://schemas.microsoft.com/exchange/autodiscover/outlook/re
 ERROR_NS = 'http://schemas.microsoft.com/exchange/autodiscover/responseschema/2006'
 RESPONSE_NS = 'http://schemas.microsoft.com/exchange/autodiscover/outlook/responseschema/2006a'
 
-TIMEOUT = 10  # Seconds
-
 # 'shelve' may pickle objects using different pickle protocol versions. Encode the python version in the filename
 filename_for_version = 'exchangelib.cache.py{}{}'.format(*sys.version_info[:2])
 AUTODISCOVER_PERSISTENT_STORAGE = os.path.join(tempfile.gettempdir(), filename_for_version)
@@ -333,8 +331,7 @@ def _autodiscover_quick(credentials, email, protocol):
 def _get_autodiscover_auth_type(url, email, verify):
     try:
         data = _get_autodiscover_payload(email=email)
-        return transport.get_autodiscover_authtype(service_endpoint=url, data=data, timeout=TIMEOUT,
-                                                   verify=verify)
+        return transport.get_autodiscover_authtype(service_endpoint=url, data=data, verify=verify)
     except TransportError as e:
         if isinstance(e, RedirectError):
             raise
@@ -363,8 +360,8 @@ def _get_autodiscover_response(protocol, email):
         # redirects depending on the POST data content.
         session = protocol.get_session()
         r, session = post_ratelimited(protocol=protocol, session=session, url=protocol.service_endpoint,
-                                      headers=DEFAULT_HEADERS.copy(), data=data, timeout=protocol.TIMEOUT,
-                                      verify=protocol.verify_ssl, allow_redirects=True)
+                                      headers=DEFAULT_HEADERS.copy(), data=data, verify=protocol.verify_ssl,
+                                      allow_redirects=True)
         protocol.release_session(session)
         log.debug('Response headers: %s', r.headers)
     except RedirectError:
@@ -435,7 +432,7 @@ def _parse_response(response):
 def _get_canonical_name(hostname):
     log.debug('Attempting to get canonical name for %s', hostname)
     resolver = dns.resolver.Resolver()
-    resolver.timeout = TIMEOUT
+    resolver.timeout = AutodiscoverProtocol.TIMEOUT
     try:
         canonical_name = resolver.query(hostname).canonical_name.to_unicode().rstrip('.')
     except dns.resolver.NXDOMAIN:
@@ -455,7 +452,7 @@ def _get_hostname_from_srv(hostname):
     # The first three numbers in the service line are priority, weight, port
     log.debug('Attempting to get SRV record on %s', hostname)
     resolver = dns.resolver.Resolver()
-    resolver.timeout = TIMEOUT
+    resolver.timeout = AutodiscoverProtocol.TIMEOUT
     try:
         answers = resolver.query(hostname, 'SRV')
         for rdata in answers:
@@ -479,7 +476,7 @@ def _get_hostname_from_srv(hostname):
 @python_2_unicode_compatible
 class AutodiscoverProtocol(BaseProtocol):
     # Protocol which implements the bare essentials for autodiscover
-    TIMEOUT = TIMEOUT
+    TIMEOUT = 10  # Seconds
 
     def __init__(self, *args, **kwargs):
         super(AutodiscoverProtocol, self).__init__(*args, **kwargs)

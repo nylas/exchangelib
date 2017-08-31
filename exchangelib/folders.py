@@ -231,7 +231,8 @@ class Folder(EWSElement):
         :param shape: controls the exact fields returned are governed by. Be aware that complex elements can only be
                       fetched with fetch().
         :param depth: controls the whether to return soft-deleted items or not.
-        :param additional_fields: the extra properties we want on the return objects
+        :param additional_fields: the extra properties we want on the return objects. If None, we'll return
+                                  (item_id, changekey) tuples instead of Item obejcts.
         :param order_fields: the SortOrder fields, if any
         :param calendar_view: a CalendarView instance, if any
         :param page_size: the requested number of items per page
