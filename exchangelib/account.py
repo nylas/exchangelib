@@ -412,32 +412,7 @@ class Account(object):
             # empty 'ids' and return early.
             return
         if only_fields:
-            allowed_fields = validation_folder.allowed_fields()
-            only_fields = list(only_fields)
-            has_start, has_end = False, False
-            for i, field_path in enumerate(only_fields):
-                # Allow both FieldPath instances and string field paths as input
-                if isinstance(field_path, string_types):
-                    field_path = FieldPath.from_string(field_path, folder=validation_folder)
-                    only_fields[i] = field_path
-                assert isinstance(field_path, FieldPath)
-                assert field_path.field in allowed_fields
-                if field_path.field.name == 'start':
-                    has_start = True
-                elif field_path.field.name == 'end':
-                    has_end = True
-
-            # For CalendarItem items, we want to inject internal timezone fields. See also CalendarItem.clean()
-            if CalendarItem in validation_folder.supported_item_models:
-                meeting_tz_field, start_tz_field, end_tz_field = CalendarItem.timezone_fields()
-                if self.version.build < EXCHANGE_2010:
-                    if has_start or has_end:
-                        only_fields.append(FieldPath(field=meeting_tz_field))
-                else:
-                    if has_start:
-                        only_fields.append(FieldPath(field=start_tz_field))
-                    if has_end:
-                        only_fields.append(FieldPath(field=end_tz_field))
+            only_fields = validation_folder.validate_fields(fields=only_fields)
         else:
             only_fields = {FieldPath(field=f) for f in validation_folder.allowed_fields()}
         for i in GetItem(account=self).call(items=ids, additional_fields=only_fields):

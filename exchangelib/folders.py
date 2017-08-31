@@ -172,6 +172,40 @@ class Folder(EWSElement):
     def complex_fields(self):
         return {f for f in self.allowed_fields() if f.is_complex}
 
+    def validate_fields(self, fields):
+        # Takes a list of fieldnames or FieldPath objects meant for fetching, and checks that they are valid for this
+        # folder. Turns them into FieldPath objects and adds internal timezone fields if necessary.
+        from .version import EXCHANGE_2010
+        allowed_fields = self.allowed_fields()
+        fields = list(fields)
+        has_start, has_end = False, False
+        for i, field_path in enumerate(fields):
+            # Allow both FieldPath instances and string field paths as input
+            if isinstance(field_path, string_types):
+                field_path = FieldPath.from_string(field_path, folder=self)
+                fields[i] = field_path
+            if not isinstance(field_path, FieldPath):
+                raise ValueError("Field '%s' must be a string or FieldPath object" % field_path)
+            if not field_path.field in allowed_fields:
+                raise ValueError("'%s' is not a valid field on %s" % (field_path.field, self.supported_item_models))
+            if field_path.field.name == 'start':
+                has_start = True
+            elif field_path.field.name == 'end':
+                has_end = True
+
+        # For CalendarItem items, we want to inject internal timezone fields. See also CalendarItem.clean()
+        if CalendarItem in self.supported_item_models:
+            meeting_tz_field, start_tz_field, end_tz_field = CalendarItem.timezone_fields()
+            if self.account.version.build < EXCHANGE_2010:
+                if has_start or has_end:
+                    fields.append(FieldPath(field=meeting_tz_field))
+            else:
+                if has_start:
+                    fields.append(FieldPath(field=start_tz_field))
+                if has_end:
+                    fields.append(FieldPath(field=end_tz_field))
+        return fields
+
     @classmethod
     def get_item_field_by_fieldname(cls, fieldname):
         for item_model in cls.supported_item_models:
