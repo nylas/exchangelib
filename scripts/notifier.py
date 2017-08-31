@@ -22,7 +22,7 @@ You can keep the notifier running by adding this to your shell startup script:
 
 Where `~/office365-notifier/notify.sh` contains this:
 
-cd  ~/office365-notifier
+cd "$( dirname "$0" )"
 if [ ! -d "office365_env" ]; then
     virtualenv -p python3 office365_env
 fi
