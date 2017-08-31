@@ -2,6 +2,17 @@
 Change Log
 ==========
 
+HEAD
+----
+* Removed the ``verify_ssl`` argument to ``Account``, ``discover`` and ``Configuration``. If you need to disable SSL
+  verification, register a custom ``HTTPAdapter`` class. A sample adapter class is provided for convenience:
+
+  .. code-block:: python
+
+      from exchangelib.protocol import BaseProtocol, NoVerifyHTTPAdapter
+      BaseProcotol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
+
+
 1.9.6
 -----
 * Support new Office365 build numbers

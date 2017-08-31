@@ -49,7 +49,7 @@ class BaseProtocol(object):
     # The adapter class to use for HTTP requests. Override this if you need e.g. proxy support or specific TLS versions
     HTTP_ADAPTER_CLS = requests.adapters.HTTPAdapter
 
-    def __init__(self, service_endpoint, credentials, auth_type, verify_ssl):
+    def __init__(self, service_endpoint, credentials, auth_type):
         assert isinstance(credentials, Credentials)
         if auth_type is not None:
             assert auth_type in AUTH_TYPE_MAP, 'Unsupported auth type %s' % auth_type
@@ -57,7 +57,6 @@ class BaseProtocol(object):
         self.credentials = credentials
         self.service_endpoint = service_endpoint
         self.auth_type = auth_type
-        self.verify_ssl = verify_ssl
         self._session_pool = None  # Consumers need to fill the session pool themselves
 
     def __del__(self):
@@ -72,7 +71,7 @@ class BaseProtocol(object):
         log.debug('Server %s: Closing sessions', self.server)
         while True:
             try:
-                self._session_pool.get(block=False).close_socket(self.service_endpoint)
+                self._session_pool.get(block=False).close()
             except Empty:
                 break
 
@@ -109,14 +108,14 @@ class BaseProtocol(object):
     def retire_session(self, session):
         # The session is useless. Close it completely and place a fresh session in the pool
         log.debug('Server %s: Retiring session %s', self.server, session.session_id)
-        session.close_socket(self.service_endpoint)
+        session.close()
         del session
         self.release_session(self.create_session())
 
     def renew_session(self, session):
         # The session is useless. Close it completely and place a fresh session in the pool
         log.debug('Server %s: Renewing session %s', self.server, session.session_id)
-        session.close_socket(self.service_endpoint)
+        session.close()
         del session
         return self.create_session()
 
@@ -125,13 +124,13 @@ class BaseProtocol(object):
         session.auth = get_auth_instance(credentials=self.credentials, auth_type=self.auth_type)
         # Create a copy of the headers because headers are mutable and session users may modify headers
         session.headers.update(DEFAULT_HEADERS.copy())
-        session.mount(self.service_endpoint, self.get_adapter())
+        session.mount('http://', adapter=self.get_adapter())
+        session.mount('https://', adapter=self.get_adapter())
         log.debug('Server %s: Created session %s', self.server, session.session_id)
         return session
 
     def __repr__(self):
-        return self.__class__.__name__ + repr((self.service_endpoint, self.credentials, self.auth_type,
-                                               self.verify_ssl))
+        return self.__class__.__name__ + repr((self.service_endpoint, self.credentials, self.auth_type))
 
 
 class CachingProtocol(type):
@@ -148,7 +147,7 @@ class CachingProtocol(type):
 
         # We may be using multiple different credentials and changing our minds on SSL verification. This key
         # combination should be safe.
-        _protocol_cache_key = kwargs['service_endpoint'], kwargs['credentials'], kwargs['verify_ssl']
+        _protocol_cache_key = kwargs['service_endpoint'], kwargs['credentials']
 
         protocol = cls._protocol_cache.get(_protocol_cache_key)
         if isinstance(protocol, Exception):
@@ -202,7 +201,7 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
         # Autodetect authentication type if necessary
         if self.auth_type is None:
             self.auth_type = get_service_authtype(service_endpoint=self.service_endpoint, versions=API_VERSIONS,
-                                                  verify=self.verify_ssl, name=self.credentials.username)
+                                                  name=self.credentials.username)
 
         # Default to the auth type used by the service. We only need this if 'version' is None
         self.docs_auth_type = self.auth_type
@@ -220,7 +219,7 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
             # Version.guess() needs auth objects and a working session pool
             try:
                 # Try to get the auth_type of 'types.xsd' so we can fetch it and look at the version contained there
-                self.docs_auth_type = get_docs_authtype(verify=self.verify_ssl, docs_url=self.types_url)
+                self.docs_auth_type = get_docs_authtype(docs_url=self.types_url)
             except TransportError:
                 pass
             self.version = Version.guess(self)
@@ -266,6 +265,8 @@ class EWSSession(requests.sessions.Session):
         self.protocol = protocol
         super(EWSSession, self).__init__()
 
-    def close_socket(self, url):
-        # Close underlying socket. This ensures we don't leave stray sockets around after program exit.
-        self.get_adapter(url).close()
+
+class NoVerifyHTTPAdapter(requests.adapters.HTTPAdapter):
+    # An HTTP adapter that ignores SSL validation errors. Use at own risk.
+    def cert_verify(self, conn, url, verify, cert):
+        super(NoVerifyHTTPAdapter, self).cert_verify(conn=conn, url=url, verify=False, cert=cert)

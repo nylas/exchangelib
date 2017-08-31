@@ -23,9 +23,15 @@ except FileNotFoundError:
 categories = ['perftest']
 tz = EWSTimeZone.timezone('America/New_York')
 
-config = Configuration(server=settings['server'],
-                       credentials=ServiceAccount(settings['username'], settings['password']),
-                       verify_ssl=settings['verify_ssl'])
+verify_ssl = settings.get('verify_ssl', True)
+if not verify_ssl:
+    from exchangelib.protocol import BaseProtocol, NoVerifyHTTPAdapter
+    BaseProtocol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
+
+config = Configuration(
+    server=settings['server'],
+    credentials=ServiceAccount(settings['username'], settings['password'])
+)
 print('Exchange server: %s' % config.protocol.server)
 
 account = Account(config=config, primary_smtp_address=settings['account'], access_type=DELEGATE)

@@ -134,7 +134,6 @@ class EWSService(object):
                 url=self.protocol.service_endpoint,
                 headers=None,
                 data=soap_payload,
-                verify=self.protocol.verify_ssl,
                 allow_redirects=False)
             self.protocol.release_session(session)
             log.debug('Trying API version %s for account %s', api_version, account)

@@ -102,8 +102,9 @@ Setup and connecting
 
     # If you need proxy support or custom TLS validation, you can supply a custom 'requests' transport adapter, as
     # described in http://docs.python-requests.org/en/master/user/advanced/#transport-adapters
-    from exchangelib.protocol import BaseProtocol
-    BaseProcotol.HTTP_ADAPTER_CLS = MyAdapterClass
+    # exchangelib provides a sample adapter which ignores SSL validation errors. Use at own risk.
+    from exchangelib.protocol import BaseProtocol, NoVerifyHTTPAdapter
+    BaseProcotol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
 
 
 Folders

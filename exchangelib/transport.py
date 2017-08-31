@@ -80,15 +80,16 @@ def get_auth_instance(credentials, auth_type):
     return model(username=username, password=credentials.password)
 
 
-def get_autodiscover_authtype(service_endpoint, data, verify):
+def get_autodiscover_authtype(service_endpoint, data):
     # First issue a HEAD request to look for a location header. This is the autodiscover HTTP redirect method. If there
     # was no redirect, continue trying a POST request with a valid payload.
     log.debug('Getting autodiscover auth type for %s', service_endpoint)
     from .autodiscover import AutodiscoverProtocol
     with requests.sessions.Session() as s:
-        s.mount(service_endpoint, AutodiscoverProtocol.get_adapter())
+        s.mount('http://', adapter=AutodiscoverProtocol.get_adapter())
+        s.mount('https://', adapter=AutodiscoverProtocol.get_adapter())
         r = s.head(url=service_endpoint, headers=DEFAULT_HEADERS.copy(), timeout=AutodiscoverProtocol.TIMEOUT,
-                   allow_redirects=False, verify=verify)
+                   allow_redirects=False)
         if r.status_code in (301, 302):
             try:
                 redirect_url = get_redirect_url(r, require_relative=True)
@@ -100,22 +101,22 @@ def get_autodiscover_authtype(service_endpoint, data, verify):
             # Some MS servers are masters of messing up HTTP, issuing 302 to an error page with zero content.
             # Give this URL a chance with a POST request.
         r = s.post(url=service_endpoint, headers=DEFAULT_HEADERS.copy(), data=data,
-                   timeout=AutodiscoverProtocol.TIMEOUT, allow_redirects=False, verify=verify)
+                   timeout=AutodiscoverProtocol.TIMEOUT, allow_redirects=False)
     return _get_auth_method_from_response(response=r)
 
 
-def get_docs_authtype(docs_url, verify):
+def get_docs_authtype(docs_url):
     # Get auth type by tasting headers from the server. Don't do HEAD requests. It's too error prone.
     log.debug('Getting docs auth type for %s', docs_url)
     from .protocol import BaseProtocol
     with requests.sessions.Session() as s:
-        s.mount(docs_url, BaseProtocol.get_adapter())
-        r = s.get(url=docs_url, headers=DEFAULT_HEADERS.copy(), allow_redirects=True, verify=verify,
-                  timeout=BaseProtocol.TIMEOUT)
+        s.mount('http://', adapter=BaseProtocol.get_adapter())
+        s.mount('https://', adapter=BaseProtocol.get_adapter())
+        r = s.get(url=docs_url, headers=DEFAULT_HEADERS.copy(), allow_redirects=True, timeout=BaseProtocol.TIMEOUT)
     return _get_auth_method_from_response(response=r)
 
 
-def get_service_authtype(service_endpoint, versions, verify, name):
+def get_service_authtype(service_endpoint, versions, name):
     # Get auth type by tasting headers from the server. Only do POST requests. HEAD is too error prone, and some servers
     # are set up to redirect to OWA on all requests except POST to /EWS/Exchange.asmx
     log.debug('Getting service auth type for %s', service_endpoint)
@@ -123,12 +124,13 @@ def get_service_authtype(service_endpoint, versions, verify, name):
     # respond when given a valid request. Try all known versions. Gross.
     from .protocol import BaseProtocol
     with requests.sessions.Session() as s:
-        s.mount(service_endpoint, BaseProtocol.get_adapter())
+        s.mount('http://', adapter=BaseProtocol.get_adapter())
+        s.mount('https://', adapter=BaseProtocol.get_adapter())
         for version in versions:
             data = dummy_xml(version=version, name=name)
             log.debug('Requesting %s from %s', data, service_endpoint)
             r = s.post(url=service_endpoint, headers=DEFAULT_HEADERS.copy(), data=data, allow_redirects=True,
-                       timeout=BaseProtocol.TIMEOUT, verify=verify)
+                       timeout=BaseProtocol.TIMEOUT)
             try:
                 auth_type = _get_auth_method_from_response(response=r)
                 log.debug('Auth type is %s', auth_type)

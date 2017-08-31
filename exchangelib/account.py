@@ -35,7 +35,7 @@ class Account(object):
     """Models an Exchange server user account. The primary key for an account is its PrimarySMTPAddress
     """
     def __init__(self, primary_smtp_address, fullname=None, access_type=None, autodiscover=False, credentials=None,
-                 config=None, verify_ssl=True, locale=None, default_timezone=None):
+                 config=None, locale=None, default_timezone=None):
         """
         :param primary_smtp_address: The primary email address associated with the account on the Exchange server
         :param fullname: The full name of the account. Optional.
@@ -44,7 +44,6 @@ class Account(object):
         :param autodiscover: Whether to look up the EWS endpoint automatically using the autodiscover protocol.
         :param credentials: A Credentials object containing valid credentials for this account.
         :param config: A Configuration object containing EWS endpoint information. Required if autodiscover is disabled
-        :param verify_ssl: If False, disables verificaiton of SSL certificates. Use at own risk.
         :param locale: The locale of the user. Defaults to the locale of the host.
         :param default_timezone: EWS may return some datetime values without timezone information. In this case, we will
         assume values to be in the provided timezone. Defaults to the timezone of the host.
@@ -65,7 +64,7 @@ class Account(object):
             if config:
                 raise AttributeError('config is ignored when autodiscover is active')
             self.primary_smtp_address, self.protocol = discover(email=self.primary_smtp_address,
-                                                                credentials=credentials, verify_ssl=verify_ssl)
+                                                                credentials=credentials)
         else:
             if not config:
                 raise AttributeError('non-autodiscover requires a config')

@@ -12,6 +12,7 @@ import psutil
 import random
 import socket
 import string
+import tempfile
 import time
 import unittest
 from xml.etree.ElementTree import ParseError
@@ -45,7 +46,7 @@ from exchangelib.indexed_properties import IndexedElement, EmailAddress, Physica
     SingleFieldIndexedElement, MultiFieldIndexedElement
 from exchangelib.items import Item, CalendarItem, Message, Contact, Task, DistributionList
 from exchangelib.properties import Attendee, Mailbox, RoomList, MessageHeader, Room, ItemId, Member, EWSElement
-from exchangelib.protocol import Protocol
+from exchangelib.protocol import BaseProtocol, Protocol, NoVerifyHTTPAdapter
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.recurrence import Recurrence, AbsoluteYearlyPattern, RelativeYearlyPattern, AbsoluteMonthlyPattern, \
     RelativeMonthlyPattern, WeeklyPattern, DailyPattern, FirstOccurrence, LastOccurrence, Occurrence, \
@@ -236,7 +237,6 @@ class ConfigurationTest(unittest.TestCase):
             has_ssl=True,
             credentials=Credentials('foo', 'bar'),
             auth_type=NTLM,
-            verify_ssl=True,
             version=Version(build=Build(15, 1, 2, 3), api_version='foo'),
         )
 
@@ -247,21 +247,21 @@ class ProtocolTest(unittest.TestCase):
     def test_session(self, m):
         m.get('https://example.com/EWS/types.xsd', status_code=200)
         protocol = Protocol(service_endpoint='https://example.com/Foo.asmx', credentials=Credentials('A', 'B'),
-                            auth_type=NTLM, verify_ssl=True, version=Version(Build(15, 1)))
+                            auth_type=NTLM, version=Version(Build(15, 1)))
         session = protocol.create_session()
         new_session = protocol.renew_session(session)
         self.assertNotEqual(id(session), id(new_session))
 
     @requests_mock.mock()
     def test_protocol_instance_caching(self, m):
-        # Verify that we get the same Protocol instance for the same combination of (endpoint, credentials, verify_ssl)
+        # Verify that we get the same Protocol instance for the same combination of (endpoint, credentials)
         m.get('https://example.com/EWS/types.xsd', status_code=200)
         base_p = Protocol(service_endpoint='https://example.com/Foo.asmx', credentials=Credentials('A', 'B'),
-                          auth_type=NTLM, verify_ssl=True, version=Version(Build(15, 1)))
+                          auth_type=NTLM, version=Version(Build(15, 1)))
 
         for i in range(10):
             p = Protocol(service_endpoint='https://example.com/Foo.asmx', credentials=Credentials('A', 'B'),
-                         auth_type=NTLM, verify_ssl=True, version=Version(Build(15, 1)))
+                         auth_type=NTLM, version=Version(Build(15, 1)))
             self.assertEqual(base_p, p)
             self.assertEqual(id(base_p), id(p))
             self.assertEqual(hash(base_p), hash(p))
@@ -272,7 +272,7 @@ class ProtocolTest(unittest.TestCase):
         proc = psutil.Process()
         ip_addr = socket.gethostbyname('example.com')
         protocol = Protocol(service_endpoint='http://example.com', credentials=Credentials('A', 'B'),
-                            auth_type=NOAUTH, verify_ssl=True, version=Version(Build(15, 1)))
+                            auth_type=NOAUTH, version=Version(Build(15, 1)))
         session = protocol.get_session()
         session.get('http://example.com')
         self.assertEqual([p.raddr[0] for p in proc.connections() if p.raddr[0] == ip_addr], [ip_addr])
@@ -1029,11 +1029,18 @@ class EWSTest(unittest.TestCase):
             print('Skipping %s - no settings.yml file found' % self.__class__.__name__)
             print('Copy settings.yml.sample to settings.yml and enter values for your test server')
             raise unittest.SkipTest('Skipping %s - no settings.yml file found' % self.__class__.__name__)
+
+        verify_ssl = settings.get('verify_ssl', True)
+        if not verify_ssl:
+            from exchangelib.protocol import BaseProtocol, NoVerifyHTTPAdapter
+            BaseProtocol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
+
         self.tz = EWSTimeZone.timezone('Europe/Copenhagen')
         self.categories = [get_random_string(length=10, spaces=False, special=False)]
-        self.config = Configuration(server=settings['server'],
-                                    credentials=Credentials(settings['username'], settings['password']),
-                                    verify_ssl=settings['verify_ssl'])
+        self.config = Configuration(
+            server=settings['server'],
+            credentials=Credentials(settings['username'], settings['password'])
+        )
         self.account = Account(primary_smtp_address=settings['account'], access_type=DELEGATE, config=self.config,
                                locale='da_DK', default_timezone=self.tz)
         self.maxDiff = None
@@ -1386,8 +1393,7 @@ class CommonTest(EWSTest):
         with self.assertRaises(UnauthorizedError):
             Configuration(
                 service_endpoint=self.config.protocol.service_endpoint,
-                credentials=Credentials(self.config.protocol.credentials.username, 'WRONG_PASSWORD'),
-                verify_ssl=self.config.protocol.verify_ssl)
+                credentials=Credentials(self.config.protocol.credentials.username, 'WRONG_PASSWORD'))
         with self.assertRaises(AutoDiscoverFailed):
             Account(
                 primary_smtp_address=self.account.primary_smtp_address,
@@ -1724,7 +1730,7 @@ class AutodiscoverTest(EWSTest):
 
         # Empty the cache
         _autodiscover_cache.clear()
-        cache_key = (self.account.domain, self.config.credentials, self.config.protocol.verify_ssl)
+        cache_key = (self.account.domain, self.config.credentials)
         # Not cached
         self.assertNotIn(cache_key, _autodiscover_cache)
         discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
@@ -1740,8 +1746,7 @@ class AutodiscoverTest(EWSTest):
         _autodiscover_cache[cache_key] = AutodiscoverProtocol(
             service_endpoint='https://example.com/blackhole.asmx',
             credentials=Credentials('leet_user', 'cannaguess'),
-            auth_type=NTLM,
-            verify_ssl=True
+            auth_type=NTLM
         )
         m.post('https://example.com/blackhole.asmx', status_code=404)
         discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
@@ -1832,7 +1837,7 @@ class AutodiscoverTest(EWSTest):
 
         # Test that we catch circular redirects when cache is empty. This is a different code path
         _orig = exchangelib.autodiscover._try_autodiscover
-        def _mock4(hostname, credentials, email, verify):
+        def _mock4(hostname, credentials, email):
             raise AutoDiscoverRedirect(redirect_email=self.account.primary_smtp_address)
         exchangelib.autodiscover._try_autodiscover = _mock4
         exchangelib.autodiscover._autodiscover_cache.clear()
@@ -1841,7 +1846,7 @@ class AutodiscoverTest(EWSTest):
         exchangelib.autodiscover._try_autodiscover = _orig
 
         # Test that we can survive being asked to lookup with another address, when cache is empty
-        def _mock5(hostname, credentials, email, verify):
+        def _mock5(hostname, credentials, email):
             if email == 'xxxxxx@%s' % self.account.domain:
                 raise ErrorNonExistentMailbox(email)
             raise AutoDiscoverRedirect(redirect_email='xxxxxx@'+self.account.domain)
@@ -1985,6 +1990,58 @@ class AutodiscoverTest(EWSTest):
 </Autodiscover>'''
         with self.assertRaises(AutoDiscoverFailed):
             _parse_response(xml)
+
+    def test_disable_ssl_verification(self):
+        import exchangelib.autodiscover
+
+        # A normal discover should succeed
+        exchangelib.autodiscover._autodiscover_cache.clear()
+        discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
+
+        # Smash SSL verification using an untrusted certificate
+        with tempfile.NamedTemporaryFile() as f:
+            f.write(b'''\
+ -----BEGIN CERTIFICATE-----
+MIIENzCCAx+gAwIBAgIJAOYfYfw7NCOcMA0GCSqGSIb3DQEBBQUAMIGxMQswCQYD
+VQQGEwJVUzERMA8GA1UECAwITWFyeWxhbmQxFDASBgNVBAcMC0ZvcmVzdCBIaWxs
+MScwJQYDVQQKDB5UaGUgQXBhY2hlIFNvZnR3YXJlIEZvdW5kYXRpb24xFjAUBgNV
+BAsMDUFwYWNoZSBUaHJpZnQxEjAQBgNVBAMMCWxvY2FsaG9zdDEkMCIGCSqGSIb3
+DQEJARYVZGV2QHRocmlmdC5hcGFjaGUub3JnMB4XDTE0MDQwNzE4NTgwMFoXDTIy
+MDYyNDE4NTgwMFowgbExCzAJBgNVBAYTAlVTMREwDwYDVQQIDAhNYXJ5bGFuZDEU
+MBIGA1UEBwwLRm9yZXN0IEhpbGwxJzAlBgNVBAoMHlRoZSBBcGFjaGUgU29mdHdh
+cmUgRm91bmRhdGlvbjEWMBQGA1UECwwNQXBhY2hlIFRocmlmdDESMBAGA1UEAwwJ
+bG9jYWxob3N0MSQwIgYJKoZIhvcNAQkBFhVkZXZAdGhyaWZ0LmFwYWNoZS5vcmcw
+ggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCqE9TE9wEXp5LRtLQVDSGQ
+GV78+7ZtP/I/ZaJ6Q6ZGlfxDFvZjFF73seNhAvlKlYm/jflIHYLnNOCySN8I2Xw6
+L9MbC+jvwkEKfQo4eDoxZnOZjNF5J1/lZtBeOowMkhhzBMH1Rds351/HjKNg6ZKg
+2Cldd0j7HbDtEixOLgLbPRpBcaYrLrNMasf3Hal+x8/b8ue28x93HSQBGmZmMIUw
+AinEu/fNP4lLGl/0kZb76TnyRpYSPYojtS6CnkH+QLYnsRREXJYwD1Xku62LipkX
+wCkRTnZ5nUsDMX6FPKgjQFQCWDXG/N096+PRUQAChhrXsJ+gF3NqWtDmtrhVQF4n
+AgMBAAGjUDBOMB0GA1UdDgQWBBQo8v0wzQPx3EEexJPGlxPK1PpgKjAfBgNVHSME
+GDAWgBQo8v0wzQPx3EEexJPGlxPK1PpgKjAMBgNVHRMEBTADAQH/MA0GCSqGSIb3
+DQEBBQUAA4IBAQBGFRiJslcX0aJkwZpzTwSUdgcfKbpvNEbCNtVohfQVTI4a/oN5
+U+yqDZJg3vOaOuiAZqyHcIlZ8qyesCgRN314Tl4/JQ++CW8mKj1meTgo5YFxcZYm
+T9vsI3C+Nzn84DINgI9mx6yktIt3QOKZRDpzyPkUzxsyJ8J427DaimDrjTR+fTwD
+1Dh09xeeMnSa5zeV1HEDyJTqCXutLetwQ/IyfmMBhIx+nvB5f67pz/m+Dv6V0r3I
+p4HCcdnDUDGJbfqtoqsAATQQWO+WWuswB6mOhDbvPTxhRpZq6AkgWqv4S+u3M2GO
+r5p9FrBgavAw5bKO54C0oQKpN/5fta5l6Ws0
+-----END CERTIFICATE-----''')
+            os.environ['REQUESTS_CA_BUNDLE'] = f.name
+
+            # Now discover should fail. SSL errors mean we exhaust all autodiscover attempts
+            with self.assertRaises(AutoDiscoverFailed):
+                exchangelib.autodiscover._autodiscover_cache.clear()
+                discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
+
+            # Make sure we can survive SSL validation errors when using the custom adapter
+            exchangelib.autodiscover._autodiscover_cache.clear()
+            BaseProtocol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
+            discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
+
+        # Test that the adapter also works when validation is OK again
+        del os.environ['REQUESTS_CA_BUNDLE']
+        exchangelib.autodiscover._autodiscover_cache.clear()
+        discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
 
 
 class FolderTest(EWSTest):
