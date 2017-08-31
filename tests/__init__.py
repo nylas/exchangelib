@@ -1414,28 +1414,28 @@ class CommonTest(EWSTest):
 
         # Test the straight, HTTP 200 path
         session.post = mock_post(url, 200, {}, 'foo')
-        r, session = post_ratelimited(protocol=protocol, session=session, url='', headers=None, data='')
+        r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
         self.assertEqual(r.text, 'foo')
 
         # Test exceptions raises by the POST request
         for err_cls in CONNECTION_ERRORS:
             session.post = mock_session_exception(err_cls)
             with self.assertRaises(err_cls):
-                r, session = post_ratelimited(protocol=protocol, session=session, url='', headers=None, data='')
+                r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
 
         # Test bad exit codes and headers
         session.post = mock_post(url, 401, {}, '')
         with self.assertRaises(UnauthorizedError):
-            r, session = post_ratelimited(protocol=protocol, session=session, url='', headers=None, data='')
+            r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
         session.post = mock_post(url, 999, {'connection': 'close'}, '')
         with self.assertRaises(TransportError):
-            r, session = post_ratelimited(protocol=protocol, session=session, url='', headers=None, data='')
+            r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
         session.post = mock_post(url, 302, {'location': '/ews/genericerrorpage.htm?aspxerrorpath=/ews/exchange.asmx'}, '')
         with self.assertRaises(TransportError):
-            r, session = post_ratelimited(protocol=protocol, session=session, url='', headers=None, data='')
+            r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
         session.post = mock_post(url, 503, {}, '')
         with self.assertRaises(TransportError):
-            r, session = post_ratelimited(protocol=protocol, session=session, url='', headers=None, data='')
+            r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
 
         # No redirect header
         session.post = mock_post(url, 302, {}, '')
@@ -1481,12 +1481,12 @@ class CommonTest(EWSTest):
         session.post = mock_post(url, 503, {'connection': 'close'}, '')
         protocol.renew_session = lambda s: s  # Return the same session so it's still mocked
         with self.assertRaises(RateLimitError):
-            r, session = post_ratelimited(protocol=protocol, session=session, url='', headers=None, data='')
+            r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
         # Test something larger than the default wait, so we retry at least once
         protocol.credentials.max_wait = 15
         session.post = mock_post(url, 503, {'connection': 'close'}, '')
         with self.assertRaises(RateLimitError):
-            r, session = post_ratelimited(protocol=protocol, session=session, url='', headers=None, data='')
+            r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
 
         protocol.release_session(session)
         protocol.credentials = credentials
@@ -1994,6 +1994,8 @@ class AutodiscoverTest(EWSTest):
     def test_disable_ssl_verification(self):
         import exchangelib.autodiscover
 
+        default_adapter_cls = BaseProtocol.HTTP_ADAPTER_CLS
+
         # A normal discover should succeed
         exchangelib.autodiscover._autodiscover_cache.clear()
         discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
@@ -2042,6 +2044,9 @@ r5p9FrBgavAw5bKO54C0oQKpN/5fta5l6Ws0
         del os.environ['REQUESTS_CA_BUNDLE']
         exchangelib.autodiscover._autodiscover_cache.clear()
         discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
+
+        # Reset adapter
+        BaseProtocol.HTTP_ADAPTER_CLS = default_adapter_cls
 
 
 class FolderTest(EWSTest):
