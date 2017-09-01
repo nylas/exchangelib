@@ -1030,9 +1030,8 @@ class EWSTest(unittest.TestCase):
             print('Copy settings.yml.sample to settings.yml and enter values for your test server')
             raise unittest.SkipTest('Skipping %s - no settings.yml file found' % self.__class__.__name__)
 
-        verify_ssl = settings.get('verify_ssl', True)
-        if not verify_ssl:
-            from exchangelib.protocol import BaseProtocol, NoVerifyHTTPAdapter
+        self.verify_ssl = settings.get('verify_ssl', True)
+        if not self.verify_ssl:
             BaseProtocol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
 
         self.tz = EWSTimeZone.timezone('Europe/Copenhagen')
@@ -1992,6 +1991,9 @@ class AutodiscoverTest(EWSTest):
             _parse_response(xml)
 
     def test_disable_ssl_verification(self):
+        if not self.verify_ssl:
+            # We can only run this test if we haven't already disabled SSL
+            raise self.skipTest('SSL verification already disabled')
         import exchangelib.autodiscover
 
         default_adapter_cls = BaseProtocol.HTTP_ADAPTER_CLS
@@ -2028,25 +2030,28 @@ T9vsI3C+Nzn84DINgI9mx6yktIt3QOKZRDpzyPkUzxsyJ8J427DaimDrjTR+fTwD
 p4HCcdnDUDGJbfqtoqsAATQQWO+WWuswB6mOhDbvPTxhRpZq6AkgWqv4S+u3M2GO
 r5p9FrBgavAw5bKO54C0oQKpN/5fta5l6Ws0
 -----END CERTIFICATE-----''')
-            os.environ['REQUESTS_CA_BUNDLE'] = f.name
+            try:
+                os.environ['REQUESTS_CA_BUNDLE'] = f.name
 
-            # Now discover should fail. SSL errors mean we exhaust all autodiscover attempts
-            with self.assertRaises(AutoDiscoverFailed):
+                # Now discover should fail. SSL errors mean we exhaust all autodiscover attempts
+                with self.assertRaises(AutoDiscoverFailed):
+                    exchangelib.autodiscover._autodiscover_cache.clear()
+                    discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
+
+                # Make sure we can survive SSL validation errors when using the custom adapter
                 exchangelib.autodiscover._autodiscover_cache.clear()
+                BaseProtocol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
                 discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
 
-            # Make sure we can survive SSL validation errors when using the custom adapter
-            exchangelib.autodiscover._autodiscover_cache.clear()
-            BaseProtocol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
-            discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
-
-        # Test that the adapter also works when validation is OK again
-        del os.environ['REQUESTS_CA_BUNDLE']
-        exchangelib.autodiscover._autodiscover_cache.clear()
-        discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
-
-        # Reset adapter
-        BaseProtocol.HTTP_ADAPTER_CLS = default_adapter_cls
+                # Test that the custom adapter also works when validation is OK again
+                del os.environ['REQUESTS_CA_BUNDLE']
+                exchangelib.autodiscover._autodiscover_cache.clear()
+                discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
+            finally:
+                # Reset environment
+                os.environ.pop('REQUESTS_CA_BUNDLE', None)  # May already have been deleted
+                exchangelib.autodiscover._autodiscover_cache.clear()
+                BaseProtocol.HTTP_ADAPTER_CLS = default_adapter_cls
 
 
 class FolderTest(EWSTest):
