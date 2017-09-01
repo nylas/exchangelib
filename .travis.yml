@@ -1,23 +1,28 @@
 language: python
+
 os:
 - linux
+
 python:
 - '2.7'
 - '3.4'
 - '3.5'
 - '3.6'
 - nightly
+
+before_install:
+- openssl aes-256-cbc -K $encrypted_e7f042a9cf96_key -iv $encrypted_e7f042a9cf96_iv
+  -in settings.yml.enc -out settings.yml -d
+
 install:
-- pip install -U pip setuptools
-- pip install cython
-- pip install git+https://github.com/lxml/lxml.git
+# Currently, only lxml master branch compiles with Python nightly
+- if [[ "$( python --version | grep 'a' )" == "" ]] ; then pip install cython && pip install git+https://github.com/lxml/lxml.git ; fi
 - pip install .
 - pip install PyYAML
 - pip install coverage
 - pip install coveralls
+
 script:
 - coverage run --source=exchangelib setup.py test
+
 after_success: coveralls
-before_install:
-- openssl aes-256-cbc -K $encrypted_e7f042a9cf96_key -iv $encrypted_e7f042a9cf96_iv
-  -in settings.yml.enc -out settings.yml -d
