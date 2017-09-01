@@ -259,14 +259,10 @@ def _try_autodiscover(hostname, credentials, email):
                         raise AutoDiscoverFailed('All steps in the autodiscover protocol failed')
 
 
-def _autodiscover_hostname(hostname, credentials, email, has_ssl):
-    # Tries to get autodiscover data on a specific host. If we are HTTP redirected, we restart the autodiscover dance on
-    # the new host.
-    url = '%s://%s/Autodiscover/Autodiscover.xml' % ('https' if has_ssl else 'http', hostname)
-    log.debug('Trying autodiscover on %s', url)
-    auth_type = None
+def _get_auth_type_or_raise(url, email, hostname):
+    # Returns the auth type of the URL. Raises any redirection errors
     try:
-        auth_type = _get_autodiscover_auth_type(url=url, email=email)
+        return _get_autodiscover_auth_type(url=url, email=email)
     except RedirectError as e:
         redirect_url, redirect_hostname, redirect_has_ssl = e.url, e.server, e.has_ssl
         log.debug('We were redirected to %s', redirect_url)
@@ -284,6 +280,13 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl):
             raise_from(AutoDiscoverFailed('We were redirected to the same host'), e)
         raise_from(RedirectError(url='%s://%s' % ('https' if redirect_has_ssl else 'http', redirect_hostname)), e)
 
+
+def _autodiscover_hostname(hostname, credentials, email, has_ssl):
+    # Tries to get autodiscover data on a specific host. If we are HTTP redirected, we restart the autodiscover dance on
+    # the new host.
+    url = '%s://%s/Autodiscover/Autodiscover.xml' % ('https' if has_ssl else 'http', hostname)
+    log.debug('Trying autodiscover on %s', url)
+    auth_type = _get_auth_type_or_raise(url=url, email=email, hostname=hostname)
     autodiscover_protocol = AutodiscoverProtocol(service_endpoint=url, credentials=credentials, auth_type=auth_type)
     r = _get_autodiscover_response(protocol=autodiscover_protocol, email=email)
     domain = get_domain(email)
