@@ -579,14 +579,14 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
             if f.name in fieldnames:
                 yield f.name
 
-    def _add_timezone_fieldnames(self, item, fieldnames_set):
+    def _get_timezone_fieldnames(self, item, fieldnames):
         # For CalendarItem items where we update 'start' or 'end', we want to update internal timezone fields
         from .items import CalendarItem
         timezone_fieldnames = set()
 
         if item.__class__ == CalendarItem:
-            has_start = 'start' in fieldnames_set
-            has_end = 'end' in fieldnames_set
+            has_start = 'start' in fieldnames
+            has_end = 'end' in fieldnames
             item.clean_timezone_fields(version=self.account.version)
             meeting_tz_field, start_tz_field, end_tz_field = CalendarItem.timezone_fields()
             if self.account.version.build < EXCHANGE_2010:
@@ -604,8 +604,9 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
         from .indexed_properties import MultiFieldIndexedElement
         item_model = item.__class__
         fieldnames_set = set(fieldnames)
-        timezone_fieldnames = self._add_timezone_fieldnames(item=item, fieldnames_set=fieldnames_set)
-
+        timezone_fieldnames = self._get_timezone_fieldnames(item=item, fieldnames=fieldnames_set)
+        fieldnames_set.update(timezone_fieldnames)
+        
         for fieldname in self._sort_fieldnames(item_model=item_model, fieldnames=fieldnames_set):
             field = item_model.get_field_by_fieldname(fieldname)
             if field.is_read_only and field.name not in timezone_fieldnames:
@@ -630,14 +631,19 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
                         # have the one value set that we want to change. Create a new IndexedField object that has
                         # only that value set.
                         for subfield in field.value_cls.supported_fields(version=self.account.version):
-                            field_path = FieldPath(field=field, label=v.label, subfield=subfield)
-                            simple_item = field.value_cls(**{'label': v.label, subfield.name: getattr(v, subfield.name)})
-                            yield self._set_item_elem(item_model=item_model, field_path=field_path, value=simple_item)
+                            yield self._set_item_elem(
+                                item_model=item_model, 
+                                field_path=FieldPath(field=field, label=v.label, subfield=subfield), 
+                                value=field.value_cls(**{'label': v.label, subfield.name: getattr(v, subfield.name)}),
+                            )
                     else:
                         # The simpler IndexedFields with only one subfield
                         subfield = field.value_cls.value_field(version=self.account.version)
-                        field_path = FieldPath(field=field, label=v.label, subfield=subfield)
-                        yield self._set_item_elem(item_model=item_model, field_path=field_path, value=v)
+                        yield self._set_item_elem(
+                            item_model=item_model, 
+                            field_path=FieldPath(field=field, label=v.label, subfield=subfield),
+                            value=v,
+                        )
                 continue
 
             yield self._set_item_elem(item_model=item_model, field_path=FieldPath(field=field), value=value)
