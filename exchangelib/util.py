@@ -369,7 +369,7 @@ Response data: %(response_data)s
         while True:
             log.debug('Session %s thread %s: retry %s timeout %s POST\'ing to %s after %ss wait', session.session_id,
                       thread_id, retry, protocol.TIMEOUT, url, wait)
-            d1 = time_func()
+            d_start = time_func()
             try:
                 r = session.post(url=url, headers=headers, data=data, allow_redirects=False, timeout=protocol.TIMEOUT)
             except CONNECTION_ERRORS as e:
@@ -377,11 +377,10 @@ Response data: %(response_data)s
                 r = DummyResponse()
                 r.request.headers = headers
                 r.headers = {'TimeoutException': e}
-            d2 = time_func()
             log_vals = dict(
                 retry=retry, wait=wait, timeout=protocol.TIMEOUT, session_id=session.session_id, thread_id=thread_id,
                 auth=session.auth, url=url, adapter=session.get_adapter(url), allow_redirects=allow_redirects,
-                response_time=d2 - d1, status_code=r.status_code, request_headers=r.request.headers,
+                response_time=d_start - time_func(), status_code=r.status_code, request_headers=r.request.headers,
                 response_headers=r.headers, request_data=data, response_data=getattr(r, 'text', '')
             )
             log.debug(log_msg, log_vals)
