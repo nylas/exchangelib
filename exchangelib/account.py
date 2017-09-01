@@ -20,12 +20,11 @@ from .items import Item, BulkCreateResult, HARD_DELETE, \
     AUTO_RESOLVE, SEND_TO_NONE, SAVE_ONLY, SEND_AND_SAVE_COPY, SEND_ONLY, ALL_OCCURRENCIES, \
     DELETE_TYPE_CHOICES, MESSAGE_DISPOSITION_CHOICES, CONFLICT_RESOLUTION_CHOICES, AFFECTED_TASK_OCCURRENCES_CHOICES, \
     SEND_MEETING_INVITATIONS_CHOICES, SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES, \
-    SEND_MEETING_CANCELLATIONS_CHOICES, CalendarItem
+    SEND_MEETING_CANCELLATIONS_CHOICES
 from .protocol import Protocol
 from .queryset import QuerySet
 from .services import ExportItems, UploadItems, GetItem, CreateItem, UpdateItem, DeleteItem, MoveItem, SendItem
 from .util import get_domain, peek
-from .version import EXCHANGE_2010
 
 log = getLogger(__name__)
 
