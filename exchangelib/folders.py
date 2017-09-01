@@ -186,7 +186,7 @@ class Folder(EWSElement):
                 fields[i] = field_path
             if not isinstance(field_path, FieldPath):
                 raise ValueError("Field '%s' must be a string or FieldPath object" % field_path)
-            if not field_path.field in allowed_fields:
+            if field_path.field not in allowed_fields:
                 raise ValueError("'%s' is not a valid field on %s" % (field_path.field, self.supported_item_models))
             if field_path.field.name == 'start':
                 has_start = True
