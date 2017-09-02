@@ -50,7 +50,8 @@ from exchangelib.protocol import BaseProtocol, Protocol, NoVerifyHTTPAdapter
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.recurrence import Recurrence, AbsoluteYearlyPattern, RelativeYearlyPattern, AbsoluteMonthlyPattern, \
     RelativeMonthlyPattern, WeeklyPattern, DailyPattern, FirstOccurrence, LastOccurrence, Occurrence, \
-    DeletedOccurrence, NoEndPattern, EndDatePattern, NumberedPattern, MONDAY, WEDNESDAY
+    DeletedOccurrence, NoEndPattern, EndDatePattern, NumberedPattern, ExtraWeekdaysField, DAY, WEEK_DAY, WEEKEND_DAY, \
+    MONDAY, WEDNESDAY
 from exchangelib.restriction import Restriction, Q
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, GetAttachment, ResolveNames, TNS
 from exchangelib.transport import NOAUTH, BASIC, DIGEST, NTLM, wrap, _get_auth_method_from_response
@@ -584,6 +585,15 @@ class FieldTest(unittest.TestCase):
             field.clean([1, 1])  # Values must be unique
         with self.assertRaises(ValueError):
             field.clean(['d'])
+
+        # Test ExtraWeekdaysField. Normal weedays are passed as lists, extra options as strings
+        field = ExtraWeekdaysField('foo', field_uri='bar')
+        for val in (DAY, WEEK_DAY, WEEKEND_DAY, (MONDAY, WEDNESDAY), 3, 10, (5, 7)):
+            field.clean(val)
+        for val in ('foo', ('foo', 'bar'), (3, 3), 0, 11, (1, 11)):
+            with self.assertRaises(ValueError):
+                field.clean(val)
+
 
     def test_garbage_input(self):
         # Test that we can survive garbage input for common field types
