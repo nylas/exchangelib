@@ -2616,6 +2616,8 @@ class BaseItemTest(EWSTest):
             [i for i in qs.order_by('subject').values('subject')],
             [{'subject': 'Item 0'}, {'subject': 'Item 1'}, {'subject': 'Item 2'}, {'subject': 'Item 3'}]
         )
+
+        # Test .values() in combinations of 'item_id' and 'changekey', which are handled specially
         self.assertEqual(
             list(qs.order_by('subject').values('item_id')),
             [{'item_id': i.item_id} for i in test_items]
@@ -2628,10 +2630,13 @@ class BaseItemTest(EWSTest):
             list(qs.order_by('subject').values('item_id', 'changekey')),
             [{k: getattr(i, k) for k in ('item_id', 'changekey')} for i in test_items]
         )
+
         self.assertEqual(
             set(i for i in qs.values_list('subject')),
             {('Item 0',), ('Item 1',), ('Item 2',), ('Item 3',)}
         )
+
+        # Test .values_list() in combinations of 'item_id' and 'changekey', which are handled specially
         self.assertEqual(
             list(qs.order_by('subject').values_list('item_id')),
             [(i.item_id,) for i in test_items]
@@ -2644,6 +2649,26 @@ class BaseItemTest(EWSTest):
             list(qs.order_by('subject').values_list('item_id', 'changekey')),
             [(i.item_id, i.changekey) for i in test_items]
         )
+
+        self.assertEqual(
+            set(i.subject for i in qs.only('subject')),
+            {'Item 0', 'Item 1', 'Item 2', 'Item 3'}
+        )
+
+        # Test .only() in combinations of 'item_id' and 'changekey', which are handled specially
+        self.assertEqual(
+            list((i.item_id,) for i in qs.order_by('subject').only('item_id')),
+            [(i.item_id,) for i in test_items]
+        )
+        self.assertEqual(
+            list((i.changekey,) for i in qs.order_by('subject').only('changekey')),
+            [(i.changekey,) for i in test_items]
+        )
+        self.assertEqual(
+            list((i.item_id, i.changekey) for i in qs.order_by('subject').only('item_id', 'changekey')),
+            [(i.item_id, i.changekey) for i in test_items]
+        )
+
         with self.assertRaises(ValueError):
             list(qs.values_list('item_id', 'changekey', flat=True))
         with self.assertRaises(AttributeError):
