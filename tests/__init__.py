@@ -37,7 +37,7 @@ from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalid
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.extended_properties import ExtendedProperty, ExternId
 from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextField, EmailField, URIField, ChoiceField, \
-    BodyField, DateTimeField, Base64Field, PhoneNumberField, EmailAddressField, \
+    BodyField, DateTimeField, Base64Field, PhoneNumberField, EmailAddressField, TimeZoneField, \
     PhysicalAddressField, ExtendedPropertyField, MailboxField, AttendeesField, AttachmentField, TextListField, \
     MailboxListField, Choice, FieldPath, EWSElementField, CultureField, DateField, EnumField, EnumListField
 from exchangelib.folders import Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Messages, Tasks, \
@@ -599,6 +599,18 @@ class FieldTest(unittest.TestCase):
         for field_cls in (Base64Field, BooleanField, IntegerField, DateField, DateTimeField, DecimalField):
             field = field_cls('foo', field_uri='item:Foo', is_required=True, default='DUMMY')
             self.assertEqual(field.from_xml(elem=elem, account=account), None)
+
+        # Test MS timezones
+        payload = '''\
+<?xml version="1.0" encoding="utf-8"?>
+<Envelope xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
+    <t:Item>
+        <t:Foo Id="THIS_IS_GARBAGE"></t:Foo>
+    </t:Item>
+</Envelope>'''
+        elem = to_xml(payload).find('{%s}Item' % TNS)
+        field = TimeZoneField('foo', field_uri='item:Foo', default='DUMMY')
+        self.assertEqual(field.from_xml(elem=elem, account=account), None)
 
     def test_versioned_field(self):
         field = TextField('foo', field_uri='bar', supported_from=EXCHANGE_2010)

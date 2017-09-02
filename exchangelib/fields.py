@@ -8,7 +8,7 @@ import logging
 from six import string_types
 
 from .errors import ErrorInvalidServerVersion
-from .ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, NaiveDateTimeNotAllowed
+from .ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, NaiveDateTimeNotAllowed, UnknownTimeZone
 from .services import TNS
 from .util import create_element, get_xml_attrs, set_xml_value, value_to_xml_text, is_iterable
 from .version import Build
@@ -488,7 +488,12 @@ class TimeZoneField(FieldURIField):
         field_elem = elem.find(self.response_tag())
         if field_elem is not None:
             ms_id = field_elem.get('Id')
-            return self.value_cls.from_ms_id(ms_id)
+            try:
+                return self.value_cls.from_ms_id(ms_id)
+            except UnknownTimeZone:
+                log.warning("Cannot convert value '%s' on field '%s' to type %s (unknown timezone ID)", ms_id,
+                            self.name, self.value_cls)
+                return None
         return self.default
 
     def to_xml(self, value, version):
