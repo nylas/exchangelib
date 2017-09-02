@@ -4432,6 +4432,23 @@ class CalendarTest(BaseItemTest):
             [{'subject': s} for s in sorted([item1.subject, item2.subject])]
         )
 
+    def recurrence_validation(self):
+        p = DailyPattern(interval=3)
+        d_start = EWSDate(2017, 9, 1)
+        d_end = EWSDate(2017, 9, 7)
+        with self.assertRaises(ValueError):
+            Recurrence(pattern=p, boundary='foo', start='bar')  # Specify *either* boundary *or* start, end and number
+        with self.assertRaises(ValueError):
+            Recurrence(pattern=p, start='foo', end='bar', number='baz')  # number is invalid when end is present
+        with self.assertRaises(ValueError):
+            Recurrence(pattern=p, end='bar', number='baz')  # Must have start
+        r = Recurrence(pattern=p, start=d_start)
+        self.assertEqual(r.boundary, NoEndPattern(start=d_start))
+        r = Recurrence(pattern=p, start=d_start, end=d_end)
+        self.assertEqual(r.boundary, EndDatePattern(start=d_start, end=d_end))
+        r = Recurrence(pattern=p, start=d_start, number=1)
+        self.assertEqual(r.boundary, NumberedPattern(start=d_start, number=1))
+
     def test_recurring_items(self):
         item = CalendarItem(
             folder=self.test_folder,

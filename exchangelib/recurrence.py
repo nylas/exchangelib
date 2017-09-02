@@ -231,8 +231,8 @@ class NumberedPattern(Boundary):
     FIELDS = [
         # Start date, as EWSDate
         DateField('start', field_uri='t:StartDate', is_required=True),
-        # The number of occurrences in this pattern
-        IntegerField('number', field_uri='t:NumberOfOccurrences', min=0, is_required=True),
+        # The number of occurrences in this pattern, in range 1 -> 999
+        IntegerField('number', field_uri='t:NumberOfOccurrences', min=1, max=999, is_required=True),
     ]
     __slots__ = ('start', 'number',)
 
