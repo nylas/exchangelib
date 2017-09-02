@@ -424,7 +424,8 @@ class EWSDateTimeTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             EWSDateTime(2000, 1, 1, tzinfo=tz)
         # Test normalize, for completeness
-        self.assertEqual(tz.normalize(tz.localize(EWSDateTime(2000, 1, 1))).ewsformat(), '2000-01-01T00:00:00+01:00')
+        self.assertEqual(tz.normalize(dt).ewsformat(), '2000-08-02T03:04:05+02:00')
+        self.assertEqual(utc_tz.normalize(dt, is_dst=True).ewsformat(), '2000-08-02T01:04:05Z')
 
     def test_generate(self):
         try:
