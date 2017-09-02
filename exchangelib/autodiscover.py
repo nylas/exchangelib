@@ -22,7 +22,6 @@ from threading import Lock
 
 import dns.resolver
 from future.moves.queue import LifoQueue
-import requests.exceptions
 from future.utils import raise_from, PY2, python_2_unicode_compatible
 from six import text_type
 
@@ -33,7 +32,7 @@ from .errors import AutoDiscoverFailed, AutoDiscoverRedirect, AutoDiscoverCircul
 from .protocol import BaseProtocol, Protocol
 from .transport import DEFAULT_ENCODING, DEFAULT_HEADERS
 from .util import create_element, get_xml_attr, add_xml_child, to_xml, is_xml, post_ratelimited, xml_to_str, \
-    get_domain, CONNECTION_ERRORS
+    get_domain, CONNECTION_ERRORS, SSL_ERRORS
 
 
 log = logging.getLogger(__name__)
@@ -328,7 +327,7 @@ def _get_autodiscover_auth_type(url, email):
         if isinstance(e, RedirectError):
             raise
         raise_from(AutoDiscoverFailed('Error guessing auth type: %s' % e), e)
-    except requests.exceptions.SSLError as e:
+    except SSL_ERRORS as e:
         raise_from(AutoDiscoverFailed('Error guessing auth type: %s' % e), e)
     except CONNECTION_ERRORS as e:
         raise_from(AutoDiscoverFailed('Error guessing auth type: %s' % e), e)

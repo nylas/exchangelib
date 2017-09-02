@@ -320,6 +320,15 @@ if not PY2:
     # Python2 does not have ConnectionResetError
     CONNECTION_ERRORS += (ConnectionResetError,)
 
+# A collection of error classes we want to handle as SSL verification errors
+SSL_ERRORS = (requests.exceptions.SSLError,)
+try:
+    # If pyOpenSSL is installed, requests will use it and throw this class on SSL errors
+    import OpenSSL.SSL
+    SSL_ERRORS += (OpenSSL.SSL.Error,)
+except ImportError:
+    pass
+
 
 def post_ratelimited(protocol, session, url, headers, data, allow_redirects=False):
     """
