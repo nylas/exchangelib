@@ -4434,7 +4434,7 @@ class CalendarTest(BaseItemTest):
             [{'subject': s} for s in sorted([item1.subject, item2.subject])]
         )
 
-    def recurrence_validation(self):
+    def test_recurrence_validation(self):
         p = DailyPattern(interval=3)
         d_start = EWSDate(2017, 9, 1)
         d_end = EWSDate(2017, 9, 7)
