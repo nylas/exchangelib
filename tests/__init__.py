@@ -594,7 +594,6 @@ class FieldTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 field.clean(val)
 
-
     def test_garbage_input(self):
         # Test that we can survive garbage input for common field types
         tz = EWSTimeZone.timezone('Europe/Copenhagen')

@@ -68,7 +68,7 @@ class ExtraWeekdaysField(EnumListField):
         else:
             value = list(value)  # Convert to something we can index
             for i, v in enumerate(value):
-                if isinstance(value, string_types):
+                if isinstance(v, string_types):
                     if v not in WEEKDAY_NAMES:
                         raise ValueError(
                             "List value '%s' on field '%s' must be one of %s" % (v, self.name, WEEKDAY_NAMES))
