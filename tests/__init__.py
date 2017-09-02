@@ -539,6 +539,8 @@ class FieldTest(unittest.TestCase):
         field = TextField('foo', field_uri='bar')
         with self.assertRaises(TypeError):
             field.clean(1)  # Value must be correct type
+        with self.assertRaises(ValueError):
+            field.clean('X' * 256)  # Value length must be within max_length
 
         field = DateTimeField('foo', field_uri='bar')
         with self.assertRaises(ValueError):
@@ -565,11 +567,11 @@ class FieldTest(unittest.TestCase):
         # Test enum validation
         field = EnumField('foo', field_uri='bar', enum=['a', 'b', 'c'])
         with self.assertRaises(ValueError):
-            field.clean(0)
+            field.clean(0)  # Enums start at 1
         with self.assertRaises(ValueError):
-            field.clean(4)
+            field.clean(4)  # Spills over list
         with self.assertRaises(ValueError):
-            field.clean('d')
+            field.clean('d')  # Value not in enum
 
         # Test enum list validation
         field = EnumListField('foo', field_uri='bar', enum=['a', 'b', 'c'])
@@ -578,7 +580,7 @@ class FieldTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             field.clean([0])
         with self.assertRaises(ValueError):
-            field.clean([1, 1])
+            field.clean([1, 1])  # Values must be unique
         with self.assertRaises(ValueError):
             field.clean(['d'])
 
