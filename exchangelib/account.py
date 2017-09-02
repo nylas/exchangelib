@@ -268,20 +268,17 @@ class Account(object):
     def bulk_update(self, items, conflict_resolution=AUTO_RESOLVE, message_disposition=SAVE_ONLY,
                     send_meeting_invitations_or_cancellations=SEND_TO_NONE, suppress_read_receipts=True):
         """
-        Updates items in the folder
+        Bulk updates existing items
 
-        :param items: a dict containing:
-
-            Key: An Item object (calendar item, message, task or contact)
-            Value: a list of attributes that have changed on this object
-
+        :param items: a list of (Item, fieldnames) tuples, where 'Item' is an Item object, and 'fieldnames' is a list
+                      containing the attributes on this Item object that we want to be updated.
         :param conflict_resolution: Possible values are specified in CONFLICT_RESOLUTION_CHOICES
         :param message_disposition: only applicable to Message items. Possible values are specified in
                MESSAGE_DISPOSITION_CHOICES
         :param send_meeting_invitations_or_cancellations: only applicable to CalendarItem items. Possible values are
                specified in SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES
         :param suppress_read_receipts: nly supported from Exchange 2013. True or False
-        :return: a list of either ItemId or exception instances in the same order as the input.
+        :return: a list of either (item_id, changekey) tuples or exception instances in the same order as the input.
         """
         assert conflict_resolution in CONFLICT_RESOLUTION_CHOICES
         assert message_disposition in MESSAGE_DISPOSITION_CHOICES

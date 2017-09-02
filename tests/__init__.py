@@ -3700,7 +3700,7 @@ class BaseItemTest(EWSTest):
         items = [self.get_test_item().save() for _ in range(15)]
         ids = [(i.item_id, i.changekey) for i in items]
         # re-fetch items because there will be some extra fields added by the server
-        items = list(self.test_folder.fetch(items))
+        items = list(self.account.fetch(items))
 
         # Try exporting and making sure we get the right response
         export_results = self.account.export(items)
@@ -3733,7 +3733,7 @@ class BaseItemTest(EWSTest):
                         a.attachment_id = None
             return dict_item
 
-        uploaded_items = sorted([to_dict(item) for item in self.test_folder.fetch(upload_results)],
+        uploaded_items = sorted([to_dict(item) for item in self.account.fetch(upload_results)],
                                 key=lambda i: i['subject'])
         original_items = sorted([to_dict(item) for item in items], key=lambda i: i['subject'])
         self.assertListEqual(original_items, uploaded_items)

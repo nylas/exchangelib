@@ -210,13 +210,29 @@ Bulk operations
             )]
         ))
 
-    # bulk_update(), bulk_delete(), bulk_move() and bulk_send() methods are also supported.
-    res = account.calendar.bulk_create(items=calendar_items)
-    print(res)
+    # Create all items at once
+    return_ids = account.bulk_create(folder=account.calendar, items=calendar_items)
 
-    # Buk delete items found as a queryset
-    res = account.inbox.filter(subject__startswith='Invoice').delete()
-    print(res)
+    # Bulk fetch, when you have a list of item IDs and want the full objects. Returns a generator.
+    calendar_ids = [(i.item_id, i.changekey) for i in calendar_items]
+    items_iter = account.fetch(ids=calendar_ids)
+    # If you only want some fields, use the 'only_fields' attribute
+    items_iter = account.fetch(ids=calendar_ids, only_fields=['start', 'subject'])
+
+    # Bulk update items. Each item must be accompanied by a list of attributes to update
+    updated_ids = account.bulk_create(items=[(i, ('start', 'subject')) for i in calendar_items])
+
+    # Move many items to a new folder
+    new_ids = account.bulk_move(ids=calendar_ids, to_folder=account.other_calendar)
+
+    # Send draft messages in bulk
+    new_ids = account.bulk_send(ids=message_ids, save_copy=False)
+
+    # Delete in bulk
+    delete_results = account.bulk_delete(ids=calendar_ids)
+
+    # Bulk delete items found as a queryset
+    account.inbox.filter(subject__startswith='Invoice').delete()
 
 
 
