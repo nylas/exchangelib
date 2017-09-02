@@ -73,6 +73,10 @@ class QuerySet(object):
         new_qs.calendar_view = self.calendar_view
         return new_qs
 
+    @property
+    def is_cached(self):
+        return self._cache is not None
+
     def _additional_fields(self):
         if self.only_fields is None:
             # The list of field paths was not restricted. Get all field paths we support, as a set, but remove item_id
@@ -163,7 +167,7 @@ class QuerySet(object):
         #
         # We don't set self._cache until the iterator is finished. Otherwise an interrupted iterator would leave the
         # cache in an inconsistent state.
-        if self._cache is not None:
+        if self.is_cached:
             for val in self._cache:
                 yield val
             return
@@ -186,7 +190,7 @@ class QuerySet(object):
         self._cache = _cache
 
     def __len__(self):
-        if self._cache is not None:
+        if self.is_cached:
             return len(self._cache)
         # This queryset has no cache yet. Call the optimized counting implementation
         return self.count()
@@ -204,14 +208,14 @@ class QuerySet(object):
     def _getitem_idx(self, idx):
         from .services import FindItem
         assert isinstance(idx, int)
-        if self._cache is not None:
+        if self.is_cached:
             return self._cache[idx]
         if idx < 0:
             # Support negative indexes by reversing the queryset and negating the index value
             reverse_idx = -(idx+1)
             return self.reverse()[reverse_idx]
         else:
-            if self._cache is None and idx < FindItem.CHUNKSIZE:
+            if not self.is_cached and idx < FindItem.CHUNKSIZE:
                 # If idx is small, optimize a bit by setting self.page_size to only get as many items as strictly needed
                 if idx < 100:
                     self.page_size = idx + 1
@@ -230,7 +234,7 @@ class QuerySet(object):
             # query result, and then slice on the cache.
             list(self.__iter__())
             return self._cache[s]
-        if self._cache is None and s.stop is not None and s.stop < FindItem.CHUNKSIZE:
+        if not self.is_cached and s.stop is not None and s.stop < FindItem.CHUNKSIZE:
             # If the range is small, optimize a bit by setting self.page_size to only get as many items as strictly
             # needed.
             if s.stop < 100:
@@ -420,7 +424,7 @@ class QuerySet(object):
         fetch from the server per request. """
         if self.q is None:
             return []
-        if self._cache is not None:
+        if self.is_cached:
             return self._cache
         # Return an iterator that doesn't bother with caching
         self.page_size = page_size
@@ -428,7 +432,7 @@ class QuerySet(object):
 
     def get(self, *args, **kwargs):
         """ Assume the query will return exactly one item. Return that item """
-        if self._cache is not None and not args and not kwargs:
+        if self.is_cached and not args and not kwargs:
             # We can only safely use the cache if get() is called without args
             items = self._cache
         elif not args and set(kwargs.keys()) == {'item_id', 'changekey'}:
@@ -452,7 +456,7 @@ class QuerySet(object):
     def count(self, page_size=1000):
         """ Get the query count, with as little effort as possible 'page_size' is the number of items to
         fetch from the server per request. We're only fetching the IDs, so keep it high"""
-        if self._cache is not None:
+        if self.is_cached:
             return len(self._cache)
         new_qs = self.copy()
         new_qs.only_fields = tuple()
@@ -469,7 +473,7 @@ class QuerySet(object):
         """ Delete the items matching the query, with as little effort as possible. 'page_size' is the number of items
         to fetch from the server per request. We're only fetching the IDs, so keep it high"""
         from .items import ALL_OCCURRENCIES
-        if self._cache is not None:
+        if self.is_cached:
             res = self.folder.account.bulk_delete(ids=self._cache, affected_task_occurrences=ALL_OCCURRENCIES)
             self._cache = None  # Invalidate the cache after delete, regardless of the results
             return res
