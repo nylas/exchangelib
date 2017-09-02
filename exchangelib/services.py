@@ -277,17 +277,6 @@ class EWSAccountService(EWSService):
         self.account = account
         super(EWSAccountService, self).__init__(protocol=account.protocol)
 
-    def _folder_elem(self, folder):
-        from .account import DELEGATE
-        from .properties import Mailbox
-        folder_elem = folder.to_xml(version=self.account.version)
-        if not folder.folder_id:
-            # Folder is referenced by distinguished name
-            if self.account.access_type == DELEGATE:
-                mailbox = Mailbox(email_address=self.account.primary_smtp_address)
-                set_xml_value(folder_elem, mailbox, self.account.version)
-        return folder_elem
-
 
 class EWSFolderService(EWSAccountService):
 
@@ -528,7 +517,7 @@ class CreateItem(EWSAccountService, EWSPooledMixIn):
         )
         if folder:
             saveditemfolderid = create_element('m:SavedItemFolderId')
-            saveditemfolderid.append(self._folder_elem(folder))
+            set_xml_value(saveditemfolderid, folder, version=self.account.version)
             createitem.append(saveditemfolderid)
         item_elems = create_element('m:Items')
         is_empty = True
@@ -802,8 +791,7 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
             set_xml_value(sort_order, order_fields, self.account.version)
             finditem.append(sort_order)
         parentfolderids = create_element('m:ParentFolderIds')
-        for folder in self.folders:
-            parentfolderids.append(self._folder_elem(folder))
+        set_xml_value(parentfolderids, self.folders, version=self.account.version)
         finditem.append(parentfolderids)
         if query_string:
             finditem.append(query_string.to_xml(version=self.account.version))
@@ -851,8 +839,7 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
         else:
             assert offset == 0, 'Offset is %s' % offset
         parentfolderids = create_element('m:ParentFolderIds')
-        for folder in self.folders:
-            parentfolderids.append(self._folder_elem(folder))
+        set_xml_value(parentfolderids, self.folders, version=self.account.version)
         findfolder.append(parentfolderids)
         return findfolder
 
@@ -898,7 +885,7 @@ class GetFolder(EWSAccountService):
             if isinstance(folder, tuple):
                 set_xml_value(folder_ids, FolderId(*folder), self.account.version)
                 continue
-            folder_ids.append(self._folder_elem(folder))
+            set_xml_value(folder_ids, folder, version=self.account.version)
         assert not is_empty, '"folders" must not be empty'
         getfolder.append(folder_ids)
         return getfolder
@@ -931,7 +918,7 @@ class SendItem(EWSAccountService):
         senditem.append(item_ids)
         if saved_item_folder:
             saveditemfolderid = create_element('m:SavedItemFolderId')
-            saveditemfolderid.append(self._folder_elem(saved_item_folder))
+            set_xml_value(saveditemfolderid, saved_item_folder, version=self.account.version)
             senditem.append(saveditemfolderid)
         return senditem
 
@@ -955,7 +942,7 @@ class MoveItem(EWSAccountService):
         moveeitem = create_element('m:%s' % self.SERVICE_NAME)
 
         tofolderid = create_element('m:ToFolderId')
-        tofolderid.append(self._folder_elem(to_folder))
+        set_xml_value(tofolderid, to_folder, version=self.account.version)
         moveeitem.append(tofolderid)
         item_ids = create_element('m:ItemIds')
         is_empty = True
