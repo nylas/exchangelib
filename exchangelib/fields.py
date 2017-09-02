@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 
 import abc
 import base64
+import binascii
 from decimal import Decimal, InvalidOperation
 import logging
 
@@ -429,7 +430,7 @@ class Base64Field(FieldURIField):
         if val is not None:
             try:
                 return base64.b64decode(val)
-            except TypeError:
+            except (TypeError, binascii.Error):
                 log.warning("Cannot convert value '%s' on field '%s' to type %s", val, self.name, self.value_cls)
                 return None
         return self.default
