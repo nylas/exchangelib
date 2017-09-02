@@ -39,7 +39,7 @@ from exchangelib.extended_properties import ExtendedProperty, ExternId
 from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextField, EmailField, URIField, ChoiceField, \
     BodyField, DateTimeField, Base64Field, PhoneNumberField, EmailAddressField, \
     PhysicalAddressField, ExtendedPropertyField, MailboxField, AttendeesField, AttachmentField, TextListField, \
-    MailboxListField, Choice, FieldPath, EWSElementField, CultureField, DateField
+    MailboxListField, Choice, FieldPath, EWSElementField, CultureField, DateField, EnumField, EnumListField
 from exchangelib.folders import Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Messages, Tasks, \
     Contacts, Folder
 from exchangelib.indexed_properties import IndexedElement, EmailAddress, PhysicalAddress, PhoneNumber, \
@@ -554,6 +554,33 @@ class FieldTest(unittest.TestCase):
             field.clean(None)  # Value is required
         self.assertEqual(field.clean('XXX'), 'XXX')  # We can clean a simple value and keep it as a simple value
         self.assertEqual(field.clean(ExternId('XXX')), ExternId('XXX'))  # We can clean an ExternId instance as well
+
+        # Test min/max on IntegerField
+        field = IntegerField('foo', field_uri='bar', min=5, max=10)
+        with self.assertRaises(ValueError):
+            field.clean(2)
+        with self.assertRaises(ValueError):
+            field.clean(12)
+
+        # Test enum validation
+        field = EnumField('foo', field_uri='bar', enum=['a', 'b', 'c'])
+        with self.assertRaises(ValueError):
+            field.clean(0)
+        with self.assertRaises(ValueError):
+            field.clean(4)
+        with self.assertRaises(ValueError):
+            field.clean('d')
+
+        # Test enum list validation
+        field = EnumListField('foo', field_uri='bar', enum=['a', 'b', 'c'])
+        with self.assertRaises(ValueError):
+            field.clean([])
+        with self.assertRaises(ValueError):
+            field.clean([0])
+        with self.assertRaises(ValueError):
+            field.clean([1, 1])
+        with self.assertRaises(ValueError):
+            field.clean(['d'])
 
     def test_garbage_input(self):
         # Test that we can survive garbage input for common field types
