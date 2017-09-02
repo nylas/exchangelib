@@ -39,7 +39,7 @@ from exchangelib.extended_properties import ExtendedProperty, ExternId
 from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextField, EmailField, URIField, ChoiceField, \
     BodyField, DateTimeField, Base64Field, PhoneNumberField, EmailAddressField, \
     PhysicalAddressField, ExtendedPropertyField, MailboxField, AttendeesField, AttachmentField, TextListField, \
-    MailboxListField, Choice, FieldPath, EWSElementField, CultureField
+    MailboxListField, Choice, FieldPath, EWSElementField, CultureField, DateField
 from exchangelib.folders import Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Messages, Tasks, \
     Contacts, Folder
 from exchangelib.indexed_properties import IndexedElement, EmailAddress, PhysicalAddress, PhoneNumber, \
@@ -554,6 +554,22 @@ class FieldTest(unittest.TestCase):
             field.clean(None)  # Value is required
         self.assertEqual(field.clean('XXX'), 'XXX')  # We can clean a simple value and keep it as a simple value
         self.assertEqual(field.clean(ExternId('XXX')), ExternId('XXX'))  # We can clean an ExternId instance as well
+
+    def test_garbage_input(self):
+        # Test that we can survive garbage input for common field types
+        tz = EWSTimeZone.timezone('Europe/Copenhagen')
+        account = namedtuple('Account', ['default_timezone'])(default_timezone=tz)
+        payload = '''\
+<?xml version="1.0" encoding="utf-8"?>
+<Envelope xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
+    <t:Item>
+        <t:Foo>THIS_IS_GARBAGE</t:Foo>
+    </t:Item>
+</Envelope>'''
+        elem = to_xml(payload).find('{%s}Item' % TNS)
+        for field_cls in (Base64Field, BooleanField, IntegerField, DateField, DateTimeField, DecimalField):
+            field = field_cls('foo', field_uri='item:Foo', is_required=True, default='DUMMY')
+            self.assertEqual(field.from_xml(elem=elem, account=account), None)
 
     def test_versioned_field(self):
         field = TextField('foo', field_uri='bar', supported_from=EXCHANGE_2010)

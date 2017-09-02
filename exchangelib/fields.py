@@ -2,7 +2,7 @@ from __future__ import unicode_literals
 
 import abc
 import base64
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 import logging
 
 from six import string_types
@@ -353,7 +353,7 @@ class IntegerField(FieldURIField):
         if val is not None:
             try:
                 return self.value_cls(val)
-            except ValueError:
+            except (ValueError, InvalidOperation):
                 log.warning("Cannot convert value '%s' on field '%s' to type %s", val, self.name, self.value_cls)
                 return None
         return self.default
@@ -427,7 +427,11 @@ class Base64Field(FieldURIField):
         field_elem = elem.find(self.response_tag())
         val = None if field_elem is None else field_elem.text or None
         if val is not None:
-            return base64.b64decode(val)
+            try:
+                return base64.b64decode(val)
+            except TypeError:
+                log.warning("Cannot convert value '%s' on field '%s' to type %s", val, self.name, self.value_cls)
+                return None
         return self.default
 
     def to_xml(self, value, version):
