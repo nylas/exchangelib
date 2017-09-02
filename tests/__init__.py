@@ -1108,6 +1108,9 @@ class EWSTest(unittest.TestCase):
         if not self.verify_ssl:
             BaseProtocol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
 
+        # Speed up tests a bit. We don't need to wait 10 seconds for every nonexisting server in the discover dance
+        AutodiscoverProtocol.TIMEOUT = 2
+
         self.tz = EWSTimeZone.timezone('Europe/Copenhagen')
         self.categories = [get_random_string(length=10, spaces=False, special=False)]
         self.config = Configuration(
