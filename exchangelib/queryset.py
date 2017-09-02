@@ -485,14 +485,7 @@ class QuerySet(object):
         return self.folder.account.bulk_delete(ids=new_qs, affected_task_occurrences=ALL_OCCURRENCIES)
 
     def __str__(self):
-        """Return a human-readable string representation of a QuerySet."""
-        query = "'{}'".format(self.q)
-        if hasattr(self, 'cache') and self.cache is not None:
-            return ("QuerySet(q={q}, folder='{folder}', len={len})"
-                    .format(q=query,
-                            len=len(self),
-                            folder=self.folder))
-        else:
-            return ("QuerySet(q={q}, folder='{folder}')"
-                    .format(q=query,
-                            folder=self.folder))
+        fmt_args = [('q', self.q), ('folder', self.folder)]
+        if self.is_cached:
+            fmt_args.append(('len', len(self)))
+        return self.__class__.__name__ + '(%s)' % ', '.join('%s=%s' % (k, v) for k, v in fmt_args)

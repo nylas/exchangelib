@@ -423,7 +423,7 @@ class Q(object):
         return repr(self) == repr(other)
 
     def __str__(self):
-        return self.expr()
+        return self.expr() or 'Q()'
 
     def __repr__(self):
         if self.is_leaf():

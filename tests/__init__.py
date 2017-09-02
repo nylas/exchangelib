@@ -719,6 +719,9 @@ class RestrictionTest(unittest.TestCase):
     def setUp(self):
         self.maxDiff = None
 
+    def test_magic(self):
+        self.assertEqual(str(Q()), 'Q()')
+
     def test_q(self):
         tz = EWSTimeZone.timezone('Europe/Copenhagen')
         start = tz.localize(EWSDateTime(1950, 9, 26, 8, 0, 0))
@@ -815,6 +818,9 @@ class RestrictionTest(unittest.TestCase):
 
 
 class QuerySetTest(unittest.TestCase):
+    def test_magic(self):
+        self.assertEqual(str(QuerySet(folder=Inbox(account='XXX'))), 'QuerySet(q=Q(), folder=Inbox (inbox))')
+
     def test_from_folder(self):
         folder = Inbox(account='XXX')
         self.assertIsInstance(folder.all(), QuerySet)
