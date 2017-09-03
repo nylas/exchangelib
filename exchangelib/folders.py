@@ -369,9 +369,10 @@ class Folder(EWSElement):
     def to_xml(self, version):
         self.clean(version=version)
         if self.is_distinguished:
+            # Don't add the changekey here. When modifying folder content, we usually don't care if others have changed
+            # the folder content since we fetched the changekey.
             return DistinguishedFolderId(
                 id=self.DISTINGUISHED_FOLDER_ID,
-                changekey=self.changekey,
                 mailbox=Mailbox(email_address=self.account.primary_smtp_address)
             ).to_xml(version=version)
         return FolderId(id=self.folder_id, changekey=self.changekey).to_xml(version=version)
