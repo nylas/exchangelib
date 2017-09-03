@@ -96,7 +96,8 @@ class AbsoluteYearlyPattern(Pattern):
     __slots__ = ('month', 'day_of_month')
 
     def __str__(self):
-        return 'Occurs on day %s of %s' % (self.day_of_month, MONTHS[self.month-1])
+        month = MONTHS[self.month-1] if isinstance(self.month, int) else self.month
+        return 'Occurs on day %s of %s' % (self.day_of_month, month)
 
 
 class RelativeYearlyPattern(Pattern):
@@ -117,9 +118,10 @@ class RelativeYearlyPattern(Pattern):
     __slots__ = ('month', 'week_number', 'weekdays')
 
     def __str__(self):
-        return 'Occurs on weekdays %s in the %s week of %s' % (
-            ', '.join(WEEKDAYS[i - 1] for i in self.weekdays), WEEK_NUMBERS[self.week_number-1], MONTHS[self.month-1]
-        )
+        weekdays = [WEEKDAYS[i - 1] if isinstance(i, int) else i for i in self.weekdays]
+        week_number = WEEK_NUMBERS[self.week_number-1] if isinstance(self.week_number, int) else self.week_number
+        month = MONTHS[self.month-1] if isinstance(self.month, int) else self.month
+        return 'Occurs on weekdays %s in the %s week of %s' % (', '.join(weekdays), week_number, month)
 
 
 class AbsoluteMonthlyPattern(Pattern):
@@ -157,8 +159,10 @@ class RelativeMonthlyPattern(Pattern):
     __slots__ = ('interval', 'week_number', 'weekdays')
 
     def __str__(self):
+        weekdays = [WEEKDAYS[i - 1] if isinstance(i, int) else i for i in self.weekdays]
+        week_number = WEEK_NUMBERS[self.week_number-1] if isinstance(self.week_number, int) else self.week_number
         return 'Occurs on weekdays %s in the %s week of every %s month(s)' % (
-            ', '.join(WEEKDAYS[i - 1] for i in self.weekdays), WEEK_NUMBERS[self.week_number-1], self.interval
+            ', '.join(weekdays), week_number, self.interval
         )
 
 
@@ -177,8 +181,16 @@ class WeeklyPattern(Pattern):
     __slots__ = ('interval', 'weekdays', 'first_day_of_week')
 
     def __str__(self):
+        if isinstance(self.weekdays, string_types):
+            weekdays = [self.weekdays]
+        elif isinstance(self.weekdays, int):
+            weekdays = [WEEKDAYS[self.weekdays - 1]]
+        else:
+            weekdays = [WEEKDAYS[i - 1] if isinstance(i, int) else i for i in self.weekdays]
+        first_day_of_week = WEEKDAYS[self.first_day_of_week - 1] if isinstance(self.first_day_of_week, int) \
+            else self.first_day_of_week
         return 'Occurs on weekdays %s of every %s week(s) where the first day of the week is %s' % (
-            ', '.join(WEEKDAYS[i - 1] for i in self.weekdays), self.interval, WEEKDAYS[self.first_day_of_week-1]
+            ', '.join(weekdays), self.interval, first_day_of_week
         )
 
 

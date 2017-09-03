@@ -51,7 +51,7 @@ from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.recurrence import Recurrence, AbsoluteYearlyPattern, RelativeYearlyPattern, AbsoluteMonthlyPattern, \
     RelativeMonthlyPattern, WeeklyPattern, DailyPattern, FirstOccurrence, LastOccurrence, Occurrence, \
     DeletedOccurrence, NoEndPattern, EndDatePattern, NumberedPattern, ExtraWeekdaysField, DAY, WEEK_DAY, WEEKEND_DAY, \
-    MONDAY, WEDNESDAY
+    MONDAY, WEDNESDAY, FEBRUARY, AUGUST, SECOND, LAST
 from exchangelib.restriction import Restriction, Q
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, GetAttachment, ResolveNames, TNS
 from exchangelib.transport import NOAUTH, BASIC, DIGEST, NTLM, wrap, _get_auth_method_from_response
@@ -722,6 +722,39 @@ class ItemTest(unittest.TestCase):
         task.clean()
         # We reset percent_complete to 0.0 if state is not_started
         self.assertEqual(task.percent_complete, Decimal(0))
+
+
+class RecurrenceTest(unittest.TestCase):
+    def test_magic(self):
+        pattern = AbsoluteYearlyPattern(month=FEBRUARY, day_of_month=28)
+        self.assertEqual(str(pattern), 'Occurs on day 28 of February')
+        pattern = RelativeYearlyPattern(month=AUGUST, week_number=SECOND, weekdays=[MONDAY, WEDNESDAY])
+        self.assertEqual(str(pattern), 'Occurs on weekdays Monday, Wednesday in the Second week of August')
+        pattern = AbsoluteMonthlyPattern(interval=3, day_of_month=31)
+        self.assertEqual(str(pattern), 'Occurs on day 31 of every 3 month(s)')
+        pattern = RelativeMonthlyPattern(interval=2, week_number=LAST, weekdays=[5, 7])
+        self.assertEqual(str(pattern), 'Occurs on weekdays Friday, Sunday in the Last week of every 2 month(s)')
+        pattern = WeeklyPattern(interval=4, weekdays=WEEKEND_DAY, first_day_of_week=7)
+        self.assertEqual(str(pattern), 'Occurs on weekdays WeekendDay of every 4 week(s) where the first day of the week is Sunday')
+        pattern = DailyPattern(interval=6)
+        self.assertEqual(str(pattern), 'Occurs every 6 day(s)')
+
+    def test_validation(self):
+        p = DailyPattern(interval=3)
+        d_start = EWSDate(2017, 9, 1)
+        d_end = EWSDate(2017, 9, 7)
+        with self.assertRaises(ValueError):
+            Recurrence(pattern=p, boundary='foo', start='bar')  # Specify *either* boundary *or* start, end and number
+        with self.assertRaises(ValueError):
+            Recurrence(pattern=p, start='foo', end='bar', number='baz')  # number is invalid when end is present
+        with self.assertRaises(ValueError):
+            Recurrence(pattern=p, end='bar', number='baz')  # Must have start
+        r = Recurrence(pattern=p, start=d_start)
+        self.assertEqual(r.boundary, NoEndPattern(start=d_start))
+        r = Recurrence(pattern=p, start=d_start, end=d_end)
+        self.assertEqual(r.boundary, EndDatePattern(start=d_start, end=d_end))
+        r = Recurrence(pattern=p, start=d_start, number=1)
+        self.assertEqual(r.boundary, NumberedPattern(start=d_start, number=1))
 
 
 class RestrictionTest(unittest.TestCase):
@@ -4434,23 +4467,6 @@ class CalendarTest(BaseItemTest):
             [{'subject': s} for s in sorted([item1.subject, item2.subject])]
         )
 
-    def test_recurrence_validation(self):
-        p = DailyPattern(interval=3)
-        d_start = EWSDate(2017, 9, 1)
-        d_end = EWSDate(2017, 9, 7)
-        with self.assertRaises(ValueError):
-            Recurrence(pattern=p, boundary='foo', start='bar')  # Specify *either* boundary *or* start, end and number
-        with self.assertRaises(ValueError):
-            Recurrence(pattern=p, start='foo', end='bar', number='baz')  # number is invalid when end is present
-        with self.assertRaises(ValueError):
-            Recurrence(pattern=p, end='bar', number='baz')  # Must have start
-        r = Recurrence(pattern=p, start=d_start)
-        self.assertEqual(r.boundary, NoEndPattern(start=d_start))
-        r = Recurrence(pattern=p, start=d_start, end=d_end)
-        self.assertEqual(r.boundary, EndDatePattern(start=d_start, end=d_end))
-        r = Recurrence(pattern=p, start=d_start, number=1)
-        self.assertEqual(r.boundary, NumberedPattern(start=d_start, number=1))
-
     def test_recurring_items(self):
         item = CalendarItem(
             folder=self.test_folder,
@@ -4472,8 +4488,10 @@ class CalendarTest(BaseItemTest):
             'Pattern: Occurs on weekdays Monday, Wednesday of every 3 week(s) where the first day of the week is '
             'Monday, Boundary: NumberedPattern(EWSDate(2017, 9, 4), 7)'
         )
+        self.assertIsInstance(fresh_item.first_occurrence, FirstOccurrence)
         self.assertEqual(fresh_item.first_occurrence.start, self.tz.localize(EWSDateTime(2017, 9, 4, 11)))
         self.assertEqual(fresh_item.first_occurrence.end, self.tz.localize(EWSDateTime(2017, 9, 4, 13)))
+        self.assertIsInstance(fresh_item.last_occurrence, LastOccurrence)
         self.assertEqual(fresh_item.last_occurrence.start, self.tz.localize(EWSDateTime(2017, 11, 6, 11)))
         self.assertEqual(fresh_item.last_occurrence.end, self.tz.localize(EWSDateTime(2017, 11, 6, 13)))
         self.assertEqual(fresh_item.modified_occurrences, None)
