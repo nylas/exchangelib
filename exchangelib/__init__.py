@@ -39,7 +39,9 @@ def close_connections():
     close_protocol_connections()
 
 
-# Pre-register these extended properties
+# Pre-register these extended properties. They are not part of the standard EWS fields but are useful for identification
+# when item originates in an external system.
+
 CalendarItem.register('extern_id', ExternId)
 Message.register('extern_id', ExternId)
 Contact.register('extern_id', ExternId)

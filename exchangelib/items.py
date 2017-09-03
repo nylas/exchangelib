@@ -73,19 +73,19 @@ SHAPE_CHOICES = (IdOnly, AllProperties)
 
 
 class Item(EWSElement):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa580790(v=exchg.150).aspx
+    """
     ELEMENT_NAME = 'Item'
 
-    # FIELDS is an ordered list of attributes supported by this item class. Not all possible attributes are
-    # supported. See full list at
-    # https://msdn.microsoft.com/en-us/library/office/aa580790(v=exchg.150).aspx
-
-    # 'extern_id' is not a native EWS Item field. We use it for identification when item originates in an external
-    # system. The field is implemented as an extended property on the Item.
+    # FIELDS is an ordered list of attributes supported by this item class
     FIELDS = [
-        TextField('item_id', is_read_only=True, is_searchable=False),
-        TextField('changekey', is_read_only=True, is_searchable=False),
         # TODO: MimeContent actually supports writing, but is still untested
         Base64Field('mime_content', field_uri='item:MimeContent', is_read_only=True),
+        TextField('item_id', is_read_only=True, is_searchable=False),
+        TextField('changekey', is_read_only=True, is_searchable=False),
+        # Placeholder for ParentFolderId
+        # Placeholder for ItemClass
         TextField('subject', field_uri='item:Subject', max_length=255),
         ChoiceField('sensitivity', field_uri='item:Sensitivity', choices={
             Choice('Normal'), Choice('Personal'), Choice('Private'), Choice('Confidential')
@@ -108,7 +108,7 @@ class Item(EWSElement):
         MessageHeaderField('headers', field_uri='item:InternetMessageHeaders', is_read_only=True),
         DateTimeField('datetime_sent', field_uri='item:DateTimeSent', is_read_only=True),
         DateTimeField('datetime_created', field_uri='item:DateTimeCreated', is_read_only=True),
-        # Reminder related fields
+        # Placeholder for ResponseObjects
         DateTimeField('reminder_due_by', field_uri='item:ReminderDueBy', is_required_after_save=True,
                       is_searchable=False),
         BooleanField('reminder_is_set', field_uri='item:ReminderIsSet', is_required=True, default=False),
@@ -116,15 +116,18 @@ class Item(EWSElement):
                      is_required_after_save=True, min=0, default=0),
         TextField('display_cc', field_uri='item:DisplayCc', is_read_only=True),
         TextField('display_to', field_uri='item:DisplayTo', is_read_only=True),
-        CultureField('culture', field_uri='item:Culture', is_required_after_save=True, is_searchable=False),
         BooleanField('has_attachments', field_uri='item:HasAttachments', is_read_only=True),
         # ExtendedProperty fields go here
+        CultureField('culture', field_uri='item:Culture', is_required_after_save=True, is_searchable=False),
         EffectiveRightsField('effective_rights', field_uri='item:EffectiveRights', is_read_only=True),
         TextField('last_modified_name', field_uri='item:LastModifiedName', is_read_only=True),
         DateTimeField('last_modified_time', field_uri='item:LastModifiedTime', is_read_only=True),
         BooleanField('is_associated', field_uri='item:IsAssociated', is_read_only=True),
+        # Placeholder for WebClientReadFormQueryString
+        # Placeholder for WebClientEditFormQueryString
         EWSElementField('conversation_id', field_uri='item:ConversationId', value_cls=ConversationId,
                         is_read_only=True),
+        # Placeholder for UniqueBody
     ]
 
     # We can't use __slots__ because we need to add extended properties dynamically
@@ -406,6 +409,9 @@ class Item(EWSElement):
 
 @python_2_unicode_compatible
 class BulkCreateResult(Item):
+    """
+    A dummy class to store return values from a CreateItem service call
+    """
     FIELDS = [
         TextField('item_id', is_read_only=True, is_required=True),
         TextField('changekey', is_read_only=True, is_required=True),
@@ -425,28 +431,42 @@ class BulkCreateResult(Item):
 @python_2_unicode_compatible
 class CalendarItem(Item):
     """
-    Models a calendar item. Not all attributes are supported. See full list at
-    https://msdn.microsoft.com/en-us/library/office/aa564765(v=exchg.150).aspx
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa564765(v=exchg.150).aspx
     """
     ELEMENT_NAME = 'CalendarItem'
     FIELDS = Item.FIELDS + [
         TextField('uid', field_uri='calendar:UID', is_required_after_save=True, is_searchable=False),
         DateTimeField('start', field_uri='calendar:Start', is_required=True),
         DateTimeField('end', field_uri='calendar:End', is_required=True),
+        # Placeholder for OriginalStart
         BooleanField('is_all_day', field_uri='calendar:IsAllDayEvent', is_required=True, default=False),
         ChoiceField('legacy_free_busy_status', field_uri='calendar:LegacyFreeBusyStatus', choices={
             Choice('Free'), Choice('Tentative'), Choice('Busy'), Choice('OOF'), Choice('NoData'),
             Choice('WorkingElsewhere', supported_from=EXCHANGE_2013)
         }, is_required=True, default='Busy'),
         TextField('location', field_uri='calendar:Location', max_length=255),
+        # Placeholder for When
+        # Placeholder for IsMeeting
         BooleanField('is_cancelled', field_uri='calendar:IsCancelled', is_read_only=True),
+        # Placeholder for IsRecurring
+        # Placeholder for MeetingRequestWasSent
+        # Placeholder for IsResponseRequested
         ChoiceField('type', field_uri='calendar:CalendarItemType', choices={
             Choice('Single'), Choice('Occurrence'), Choice('Exception'), Choice('RecurringMaster'),
         }, is_read_only=True),
+        # Placeholder for MyResponseType
         MailboxField('organizer', field_uri='calendar:Organizer', is_read_only=True),
         AttendeesField('required_attendees', field_uri='calendar:RequiredAttendees', is_searchable=False),
         AttendeesField('optional_attendees', field_uri='calendar:OptionalAttendees', is_searchable=False),
         AttendeesField('resources', field_uri='calendar:Resources', is_searchable=False),
+        # Placeholder for ConflictingMeetingCount
+        # Placeholder for AdjacentMeetingCount
+        # Placeholder for ConflictingMeetings
+        # Placeholder for AdjacentMeetings
+        # Placeholder for Duration
+        # Placeholder for AppointmentReplyTime
+        # Placeholder for AppointmentSequenceNumber
+        # Placeholder for AppointmentState
         RecurrenceField('recurrence', field_uri='calendar:Recurrence', is_searchable=False),
         OccurrenceField('first_occurrence', field_uri='calendar:FirstOccurrence', value_cls=FirstOccurrence,
                         is_read_only=True),
@@ -462,6 +482,11 @@ class CalendarItem(Item):
                       is_read_only=True, is_searchable=False),
         TimeZoneField('_end_timezone', field_uri='calendar:EndTimeZone', supported_from=EXCHANGE_2010,
                       is_read_only=True, is_searchable=False),
+        # Placeholder for ConferenceType
+        # Placeholder for AllowNewTimeProposal
+        # Placeholder for IsOnlineMeeting
+        # Placeholder for MeetingWorkspaceUrl
+        # Placeholder for NetShowUrl
     ]
 
     @classmethod
@@ -489,10 +514,12 @@ class CalendarItem(Item):
 
 
 class Message(Item):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa494306(v=exchg.150).aspx
+    """
     ELEMENT_NAME = 'Message'
-    # Supported attrs: see https://msdn.microsoft.com/en-us/library/office/aa494306(v=exchg.150).aspx
-    # TODO: This list is incomplete
     FIELDS = Item.FIELDS + [
+        MailboxField('sender', field_uri='message:Sender', is_read_only=True, is_read_only_after_send=True),
         MailboxListField('to_recipients', field_uri='message:ToRecipients', is_read_only_after_send=True,
                          is_searchable=False),
         MailboxListField('cc_recipients', field_uri='message:CcRecipients', is_read_only_after_send=True,
@@ -503,14 +530,18 @@ class Message(Item):
                      is_required=True, default=False, is_read_only_after_send=True),
         BooleanField('is_delivery_receipt_requested', field_uri='message:IsDeliveryReceiptRequested',
                      is_required=True, default=False, is_read_only_after_send=True),
-        MailboxField('sender', field_uri='message:Sender', is_read_only=True, is_read_only_after_send=True),
+        # Placeholder for ConversationIndex
+        # Placeholder for ConversationTopic
         # We can't use fieldname 'from' since it's a Python keyword
         MailboxField('author', field_uri='message:From', is_read_only_after_send=True),
+        TextField('message_id', field_uri='message:InternetMessageId', is_read_only=True, is_read_only_after_send=True),
         BooleanField('is_read', field_uri='message:IsRead', is_required=True, default=False),
         BooleanField('is_response_requested', field_uri='message:IsResponseRequested', default=False, is_required=True),
         TextField('references', field_uri='message:References'),
         MailboxField('reply_to', field_uri='message:ReplyTo', is_read_only_after_send=True, is_searchable=False),
-        TextField('message_id', field_uri='message:InternetMessageId', is_read_only=True, is_read_only_after_send=True),
+        # Placeholder for ReceivedBy
+        # Placeholder for ReceivedRepresenting
+        # Placeholder for ReminderMessageData
     ]
 
     def send(self, save_copy=True, copy_to_folder=None, conflict_resolution=AUTO_RESOLVE,
@@ -559,25 +590,27 @@ class Message(Item):
 
 
 class Task(Item):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa563930(v=exchg.150).aspx
+    """
     ELEMENT_NAME = 'Task'
     NOT_STARTED = 'NotStarted'
     COMPLETED = 'Completed'
-    # Supported attrs: see https://msdn.microsoft.com/en-us/library/office/aa563930(v=exchg.150).aspx
-    # TODO: This list is incomplete
     FIELDS = Item.FIELDS + [
         IntegerField('actual_work', field_uri='task:ActualWork', min=0),
         DateTimeField('assigned_time', field_uri='task:AssignedTime', is_read_only=True),
         TextField('billing_information', field_uri='task:BillingInformation'),
         IntegerField('change_count', field_uri='task:ChangeCount', is_read_only=True, min=0),
         TextListField('companies', field_uri='task:Companies'),
+        # 'complete_date' can be set, but is ignored by the server, which sets it to now()
+        DateTimeField('complete_date', field_uri='task:CompleteDate', is_read_only=True),
         TextListField('contacts', field_uri='task:Contacts'),
         ChoiceField('delegation_state', field_uri='task:DelegationState', choices={
             Choice('NoMatch'), Choice('OwnNew'), Choice('Owned'), Choice('Accepted'), Choice('Declined'), Choice('Max')
         }, is_read_only=True),
         TextField('delegator', field_uri='task:Delegator', is_read_only=True),
-        # 'complete_date' can be set, but is ignored by the server, which sets it to now()
-        DateTimeField('complete_date', field_uri='task:CompleteDate', is_read_only=True),
         DateTimeField('due_date', field_uri='task:DueDate'),
+        # Placeholder for IsAssignmentEditable
         BooleanField('is_complete', field_uri='task:IsComplete', is_read_only=True),
         BooleanField('is_recurring', field_uri='task:IsRecurring', is_read_only=True),
         BooleanField('is_team_task', field_uri='task:IsTeamTask', is_read_only=True),
@@ -585,6 +618,7 @@ class Task(Item):
         TextField('owner', field_uri='task:Owner', is_read_only=True),
         DecimalField('percent_complete', field_uri='task:PercentComplete', is_required=True, is_searchable=False,
                      default=Decimal(0.0)),
+        # Placeholder for Recurrence
         DateTimeField('start_date', field_uri='task:StartDate'),
         ChoiceField('status', field_uri='task:Status', choices={
             Choice(NOT_STARTED), Choice('InProgress'), Choice(COMPLETED), Choice('WaitingOnOthers'), Choice('Deferred')
@@ -637,9 +671,10 @@ class Task(Item):
 
 
 class Contact(Item):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa581315(v=exchg.150).aspx
+    """
     ELEMENT_NAME = 'Contact'
-    # Supported attrs: see https://msdn.microsoft.com/en-us/library/office/aa581315(v=exchg.150).aspx
-    # TODO: This list is incomplete
     FIELDS = Item.FIELDS + [
         TextField('file_as', field_uri='contacts:FileAs'),
         ChoiceField('file_as_mapping', field_uri='contacts:FileAsMapping', choices={
@@ -655,6 +690,7 @@ class Contact(Item):
         TextField('initials', field_uri='contacts:Initials'),
         TextField('middle_name', field_uri='contacts:MiddleName'),
         TextField('nickname', field_uri='contacts:Nickname'),
+        # Placeholder for CompleteName
         TextField('company_name', field_uri='contacts:CompanyName'),
         EmailAddressField('email_addresses', field_uri='contacts:EmailAddress'),
         PhysicalAddressField('physical_addresses', field_uri='contacts:PhysicalAddress'),
@@ -662,7 +698,9 @@ class Contact(Item):
         TextField('assistant_name', field_uri='contacts:AssistantName'),
         DateTimeField('birthday', field_uri='contacts:Birthday'),
         URIField('business_homepage', field_uri='contacts:BusinessHomePage'),
+        # Placeholder for Children
         TextListField('companies', field_uri='contacts:Companies', is_searchable=False),
+        # Placeholder for ContactSource
         TextField('department', field_uri='contacts:Department'),
         TextField('generation', field_uri='contacts:Generation'),
         # IMAddressField('im_addresses', field_uri='contacts:ImAddresses'),
@@ -670,28 +708,47 @@ class Contact(Item):
         TextField('manager', field_uri='contacts:Manager'),
         TextField('mileage', field_uri='contacts:Mileage'),
         TextField('office', field_uri='contacts:OfficeLocation'),
+        # Placeholder for PostalAddressIndex
         TextField('profession', field_uri='contacts:Profession'),
+        # Placeholder for SpouseName
         TextField('surname', field_uri='contacts:Surname'),
+        # Placeholder for WeddingAnniversary
+        # Placeholder for HasPicture
+        # Placeholder for PhoneticFullName
+        # Placeholder for PhoneticFirstName
+        # Placeholder for PhoneticLastName
         # EmailField('email_alias', field_uri='contacts:Alias'),
-        # TextField('notes', field_uri='contacts:Notes'),  # Only available from Exchange 2010 SP2
+        # TextField('notes', field_uri='contacts:Notes', supported_from=EXCHANGE_2010_SP2),  # TODO: throws errors
+        # Placeholder for Photo
+        # Placeholder for UserSMIMECertificate
+        # Placeholder for MSExchangeCertificate
+        # Placeholder for DirectoryId
+        # Placeholder for ManagerMailbox
+        # Placeholder for DirectReports
     ]
 
 
 class DistributionList(Item):
-    # Supported attrs: https://msdn.microsoft.com/en-us/library/office/aa566353(v=exchg.150).aspx
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa566353(v=exchg.150).aspx
+    """
     ELEMENT_NAME = 'DistributionList'
     FIELDS = Item.FIELDS + [
         TextField('display_name', field_uri='contacts:DisplayName', is_required=True),
         TextField('file_as', field_uri='contacts:FileAs', is_read_only=True),
+        # Placeholder for ContactSource
         MemberListField('members', field_uri='distributionlist:Members'),
     ]
 
 
 class PostItem(Item):
-    # Supported attrs: https://msdn.microsoft.com/en-us/library/office/bb891851(v=exchg.150).aspx
-    # TODO: Untested. Added here to at least be able to parse folders containing PostItem
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/bb891851(v=exchg.150).aspx
+    """
     ELEMENT_NAME = 'PostItem'
     FIELDS = Item.FIELDS + [
+        # Placeholder for ConversationIndex
+        # Placeholder for ConversationTopic
         MailboxField('author', field_uri='message:From', is_read_only_after_send=True),
         TextField('message_id', field_uri='message:InternetMessageId', is_read_only=True, is_read_only_after_send=True),
         BooleanField('is_read', field_uri='message:IsRead', is_required=True, default=False),
@@ -701,13 +758,11 @@ class PostItem(Item):
 
 
 class MeetingRequest(Message):
-    # Supported attrs: https://msdn.microsoft.com/en-us/library/office/aa565229(v=exchg.150).aspx
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa565229(v=exchg.150).aspx
+    """
     # TODO: Untested and unfinished. Only the bare minimum supported to allow reading a folder that contains meeting
     # requests.
-    # BUGFIX: To ensure query-set compatibility with mailboxes, this now has a
-    # class inheritance from Message and expressly adds to its fields.
-    # Overlapping fields have also been deleted. Fix is temporary pending the
-    # addition of a specific MeetingMessage class
     ELEMENT_NAME = 'MeetingRequest'
     FIELDS = Message.FIELDS + [
         DateTimeField('start', field_uri='calendar:Start', is_read_only=True, supported_from=EXCHANGE_2010),
@@ -716,13 +771,11 @@ class MeetingRequest(Message):
 
 
 class MeetingResponse(Message):
-    # Supported attrs: https://msdn.microsoft.com/en-us/library/office/aa564337(v=exchg.150).aspx
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa564337(v=exchg.150).aspx
+    """
     # TODO: Untested and unfinished. Only the bare minimum supported to allow reading a folder that contains meeting
     # responses.
-    # BUGFIX: To ensure query-set compatibility with mailboxes, this now has a
-    # class inheritance from Message and expressly adds to its fields.
-    # Overlapping fields have also been deleted. Fix is temporary pending the
-    # addition of a specific MeetingMessage class
     ELEMENT_NAME = 'MeetingResponse'
     FIELDS = Message.FIELDS + [
         DateTimeField('start', field_uri='calendar:Start', is_read_only=True, supported_from=EXCHANGE_2010),
@@ -731,13 +784,11 @@ class MeetingResponse(Message):
 
 
 class MeetingCancellation(Message):
-    # Supported attrs: https://msdn.microsoft.com/en-us/library/office/aa564685(v=exchg.150).aspx
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa564337(v=exchg.150).aspx
+    """
     # TODO: Untested and unfinished. Only the bare minimum supported to allow reading a folder that contains meeting
     # cancellations.
-    # BUGFIX: To ensure query-set compatibility with mailboxes, this now has a
-    # class inheritance from Message and expressly adds to its fields.
-    # Overlapping fields have also been deleted. Fix is temporary pending the
-    # addition of a specific MeetingMessage class
     ELEMENT_NAME = 'MeetingCancellation'
     FIELDS = Message.FIELDS + [
         DateTimeField('start', field_uri='calendar:Start', is_read_only=True, supported_from=EXCHANGE_2010),

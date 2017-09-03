@@ -147,6 +147,7 @@ class Build(object):
 # Helpers for comparison operations elsewhere in this package
 EXCHANGE_2007 = Build(8, 0)
 EXCHANGE_2010 = Build(14, 0)
+EXCHANGE_2010_SP2 = Build(14, 2)
 EXCHANGE_2013 = Build(15, 0)
 EXCHANGE_2016 = Build(15, 1)
 
