@@ -200,7 +200,10 @@ class EWSTimeZone(object):
 
     @classmethod
     def localzone(cls):
-        tz = tzlocal.get_localzone()
+        try:
+            tz = tzlocal.get_localzone()
+        except pytz.exceptions.UnknownTimeZoneError:
+            raise UnknownTimeZone("Failed to guess local timezone")
         return cls.from_pytz(tz)
 
     @classmethod
