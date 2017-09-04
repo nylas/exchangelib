@@ -391,7 +391,7 @@ Response data: %(response_data)s
                 retry=retry, wait=wait, timeout=protocol.TIMEOUT, session_id=session.session_id, thread_id=thread_id,
                 auth=session.auth, url=r.url, adapter=session.get_adapter(url), allow_redirects=allow_redirects,
                 response_time=d_start - time_func(), status_code=r.status_code, request_headers=r.request.headers,
-                response_headers=r.headers, request_data=data, response_data=r.text)
+                response_headers=r.headers, request_data=data, response_data=r.text,
             )
             log.debug(log_msg, log_vals)
             if _may_retry_on_error(r, protocol, wait):
