@@ -11,7 +11,7 @@ from six import text_type, string_types
 
 from .autodiscover import discover
 from .credentials import DELEGATE, IMPERSONATION
-from .errors import ErrorFolderNotFound, ErrorAccessDenied
+from .errors import ErrorFolderNotFound, ErrorAccessDenied, UnknownTimeZone
 from .ewsdatetime import EWSTimeZone, UTC
 from .fields import FieldPath
 from .folders import Root, Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Tasks, Contacts, \
@@ -70,8 +70,9 @@ class Account(object):
             self.protocol = config.protocol
         try:
             self.default_timezone = default_timezone or EWSTimeZone.localzone()
-        except ValueError as e:
-            # There is no translation from local timezone name to Windows timezone name
+        except (ValueError, UnknownTimeZone) as e:
+            # There is no translation from local timezone name to Windows timezone name, or e failed to find the 
+            # local timezone.
             log.warning(e.args[0] + '. Fallback to UTC')
             self.default_timezone = UTC
         assert isinstance(self.default_timezone, EWSTimeZone)
