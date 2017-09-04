@@ -257,14 +257,17 @@ def is_xml(text):
 
 
 class DummyRequest(object):
-    headers = {}
+    def __init__(self, headers):
+        self.headers = headers
 
 
 class DummyResponse(object):
-    status_code = 503
-    headers = {}
-    text = ''
-    request = DummyRequest()
+    def __init__(self, url, headers, request_headers):
+        self.status_code = 503
+        self.url = url
+        self.headers = headers
+        self.text = ''
+        self.request = DummyRequest(headers=request_headers)
 
 
 def get_domain(email):
@@ -383,19 +386,17 @@ Response data: %(response_data)s
                 r = session.post(url=url, headers=headers, data=data, allow_redirects=False, timeout=protocol.TIMEOUT)
             except CONNECTION_ERRORS as e:
                 log.debug('Session %s thread %s: connection error POST\'ing to %s', session.session_id, thread_id, url)
-                r = DummyResponse()
-                r.request.headers = headers
-                r.headers = {'TimeoutException': e}
+                r = DummyResponse(url=url, headers={'TimeoutException': e}, request_headers=headers)
             log_vals = dict(
                 retry=retry, wait=wait, timeout=protocol.TIMEOUT, session_id=session.session_id, thread_id=thread_id,
-                auth=session.auth, url=url, adapter=session.get_adapter(url), allow_redirects=allow_redirects,
+                auth=session.auth, url=r.url, adapter=session.get_adapter(url), allow_redirects=allow_redirects,
                 response_time=d_start - time_func(), status_code=r.status_code, request_headers=r.request.headers,
-                response_headers=r.headers, request_data=data, response_data=getattr(r, 'text', '')
+                response_headers=r.headers, request_data=data, response_data=r.text)
             )
             log.debug(log_msg, log_vals)
             if _may_retry_on_error(r, protocol, wait):
                 log.info("Session %s thread %s: Connection error on URL %s (code %s). Cool down %s secs",
-                         session.session_id, thread_id, url, r.status_code, wait)
+                         session.session_id, thread_id, r.url, r.status_code, wait)
                 time.sleep(wait)  # Increase delay for every retry
                 retry += 1
                 wait *= 2
