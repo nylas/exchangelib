@@ -1410,9 +1410,7 @@ class CommonTest(EWSTest):
     <s:Body>
         <m:GetRoomsResponse ResponseClass="Success"
                 xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"
-                xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types"
-                xmlns:xsd="http://www.w3.org/2001/XMLSchema"
-                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
             <m:ResponseCode>NoError</m:ResponseCode>
             <m:Rooms>
                 <t:Room>
@@ -1439,6 +1437,57 @@ class CommonTest(EWSTest):
         self.assertSetEqual(
             {Room.from_xml(elem=elem, account=None).email_address for elem in res},
             {'room1@example.com', 'room2@example.com'}
+        )
+
+    def test_resolvenames_parsing(self):
+        # Test static XML since server has no roomlists
+        ws = ResolveNames(self.config.protocol)
+        xml = '''\
+<?xml version="1.0" encoding="utf-8"?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+  <s:Header>
+    <h:ServerVersionInfo
+        MajorVersion="15" MinorVersion="0" MajorBuildNumber="1293" MinorBuildNumber="4" Version="V2_23"
+        xmlns:h="http://schemas.microsoft.com/exchange/services/2006/types"
+        xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"/>
+  </s:Header>
+  <s:Body>
+    <m:ResolveNamesResponse
+            xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"
+            xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
+      <m:ResponseMessages>
+        <m:ResolveNamesResponseMessage ResponseClass="Warning">
+          <m:MessageText>Multiple results were found.</m:MessageText>
+          <m:ResponseCode>ErrorNameResolutionMultipleResults</m:ResponseCode>
+          <m:DescriptiveLinkKey>0</m:DescriptiveLinkKey>
+          <m:ResolutionSet TotalItemsInView="2" IncludesLastItemInRange="true">
+            <t:Resolution>
+              <t:Mailbox>
+                <t:Name>John Doe</t:Name>
+                <t:EmailAddress>anne@example.com</t:EmailAddress>
+                <t:RoutingType>SMTP</t:RoutingType>
+                <t:MailboxType>Mailbox</t:MailboxType>
+              </t:Mailbox>
+            </t:Resolution>
+            <t:Resolution>
+              <t:Mailbox>
+                <t:Name>John Deer</t:Name>
+                <t:EmailAddress>john@example.com</t:EmailAddress>
+                <t:RoutingType>SMTP</t:RoutingType>
+                <t:MailboxType>Mailbox</t:MailboxType>
+              </t:Mailbox>
+            </t:Resolution>
+          </m:ResolutionSet>
+        </m:ResolveNamesResponseMessage>
+      </m:ResponseMessages>
+    </m:ResolveNamesResponse>
+  </s:Body>
+</s:Envelope>'''
+        res = ws._get_elements_in_response(response=ws._get_soap_payload(soap_response=to_xml(xml)))
+        self.assertSetEqual(
+            {Mailbox.from_xml(elem=elem.find(Mailbox.response_tag()), account=None).email_address for elem in res},
+            {'anne@example.com', 'john@example.com'}
         )
 
     def test_sessionpool(self):

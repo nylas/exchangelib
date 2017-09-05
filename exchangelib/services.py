@@ -29,11 +29,11 @@ from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, 
     ErrorTooManyObjectsOpened, ErrorInvalidLicense, ErrorInvalidSchemaVersionForMailboxVersion, \
     ErrorInvalidServerVersion, ErrorItemNotFound, ErrorADUnavailable, ResponseMessageError, ErrorInvalidChangeKey, \
     ErrorItemSave, ErrorInvalidIdMalformed, ErrorMessageSizeExceeded, UnauthorizedError, ErrorCannotDeleteTaskOccurrence, \
-    ErrorMimeContentConversionFailed, ErrorRecurrenceHasNoOccurrence
+    ErrorMimeContentConversionFailed, ErrorRecurrenceHasNoOccurrence, ErrorNameResolutionMultipleResults
 from .transport import wrap, SOAPNS, TNS, MNS, ENS
 from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, ElementType, \
     xml_to_str, set_xml_value
-from .version import EXCHANGE_2010, EXCHANGE_2013
+from .version import EXCHANGE_2010, EXCHANGE_2010_SP2, EXCHANGE_2013
 
 log = logging.getLogger(__name__)
 
@@ -49,8 +49,10 @@ class EWSService(object):
         ErrorInvalidIdMalformed, ErrorMessageSizeExceeded, ErrorCannotDeleteTaskOccurrence,
         ErrorMimeContentConversionFailed, ErrorRecurrenceHasNoOccurrence,
     )
-    # Similarly, define the erors we want to return unraised
+    # Similarly, define the warnings we want to return unraised
     WARNINGS_TO_CATCH_IN_RESPONSE = ErrorBatchProcessingStopped
+    # Define the warnings we want to ignore, to let response processing proceed
+    WARNINGS_TO_IGNORE_IN_RESPONSE = ()
 
     def __init__(self, protocol):
         self.protocol = protocol
@@ -228,12 +230,18 @@ class EWSService(object):
         # Raise any non-acceptable errors in the container, or return the container or the acceptable exception instance
         if response_class == 'Warning':
             try:
-                return self._raise_errors(code=response_code, text=msg_text, msg_xml=msg_xml)
+                self._raise_errors(code=response_code, text=msg_text, msg_xml=msg_xml)
             except self.WARNINGS_TO_CATCH_IN_RESPONSE as e:
                 return e
+            except self.WARNINGS_TO_IGNORE_IN_RESPONSE as e:
+                log.warning(str(e))
+                container = message.find(name)
+                if container is None:
+                    raise TransportError('No %s elements in ResponseMessage (%s)' % (name, xml_to_str(message)))
+                return container
         # rspclass == 'Error', or 'Success' and not 'NoError'
         try:
-            return self._raise_errors(code=response_code, text=msg_text, msg_xml=msg_xml)
+            self._raise_errors(code=response_code, text=msg_text, msg_xml=msg_xml)
         except self.ERRORS_TO_CATCH_IN_RESPONSE as e:
             return e
 
@@ -595,7 +603,7 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
         fieldnames_set = set(fieldnames)
         timezone_fieldnames = self._get_timezone_fieldnames(item=item, fieldnames=fieldnames_set)
         fieldnames_set.update(timezone_fieldnames)
-        
+
         for fieldname in self._sort_fieldnames(item_model=item_model, fieldnames=fieldnames_set):
             field = item_model.get_field_by_fieldname(fieldname)
             if field.is_read_only and field.name not in timezone_fieldnames:
@@ -621,15 +629,15 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
                         # only that value set.
                         for subfield in field.value_cls.supported_fields(version=self.account.version):
                             yield self._set_item_elem(
-                                item_model=item_model, 
-                                field_path=FieldPath(field=field, label=v.label, subfield=subfield), 
+                                item_model=item_model,
+                                field_path=FieldPath(field=field, label=v.label, subfield=subfield),
                                 value=field.value_cls(**{'label': v.label, subfield.name: getattr(v, subfield.name)}),
                             )
                     else:
                         # The simpler IndexedFields with only one subfield
                         subfield = field.value_cls.value_field(version=self.account.version)
                         yield self._set_item_elem(
-                            item_model=item_model, 
+                            item_model=item_model,
                             field_path=FieldPath(field=field, label=v.label, subfield=subfield),
                             value=v,
                         )
@@ -960,20 +968,33 @@ class ResolveNames(EWSService):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa565329(v=exchg.150).aspx
     """
+    # TODO: Does not support paged responses yet. See example in issue #205
     SERVICE_NAME = 'ResolveNames'
     element_container_name = '{%s}ResolutionSet' % MNS
+    WARNINGS_TO_IGNORE_IN_RESPONSE = ErrorNameResolutionMultipleResults
 
-    def call(self, unresolved_entries, return_full_contact_data=False):
-        return self._get_elements(payload=self.get_payload(
+    def call(self, unresolved_entries, return_full_contact_data=False, search_scope=None, contact_data_shape=None):
+        elements = self._get_elements(payload=self.get_payload(
             unresolved_entries=unresolved_entries,
             return_full_contact_data=return_full_contact_data,
+            search_scope=search_scope,
+            contact_data_shape=contact_data_shape,
         ))
+        from .properties import Mailbox
+        return [Mailbox.from_xml(elem=elem.find(Mailbox.response_tag()), account=None) for elem in elements]
 
-    def get_payload(self, unresolved_entries, return_full_contact_data):
+    def get_payload(self, unresolved_entries, return_full_contact_data, search_scope, contact_data_shape):
         payload = create_element(
             'm:%s' % self.SERVICE_NAME,
             ReturnFullContactData='true' if return_full_contact_data else 'false',
         )
+        if search_scope:
+            payload.set('SearchScope', search_scope)
+        if contact_data_shape:
+            if self.protocol.version.build < EXCHANGE_2010_SP2:
+                raise NotImplementedError(
+                    "'contact_data_shape' is only supported for Exchange 2010 SP2 servers and later")
+            payload.set('ContactDataShape', contact_data_shape)
         is_empty = True
         for entry in unresolved_entries:
             is_empty = False

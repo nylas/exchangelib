@@ -19,7 +19,7 @@ from future.moves.queue import LifoQueue, Empty, Full
 
 from .credentials import Credentials
 from .errors import TransportError
-from .services import GetServerTimeZones, GetRoomLists, GetRooms
+from .services import GetServerTimeZones, GetRoomLists, GetRooms, ResolveNames
 from .transport import get_auth_instance, get_service_authtype, get_docs_authtype, AUTH_TYPE_MAP, DEFAULT_HEADERS
 from .util import split_url
 from .version import Version, API_VERSIONS
@@ -240,6 +240,17 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
     def get_rooms(self, roomlist):
         from .properties import RoomList
         return GetRooms(protocol=self).call(roomlist=RoomList(email_address=roomlist))
+
+    def resolve_names(self, names, return_full_contact_data=False, search_scope=None, shape=None):
+        from .items import SHAPE_CHOICES, SEARCH_SCOPE_CHOICES
+        if search_scope:
+            assert search_scope in SEARCH_SCOPE_CHOICES
+        if shape:
+            assert shape in SHAPE_CHOICES
+        return ResolveNames(protocol=self).call(
+            unresolved_entries=names, return_full_contact_data=return_full_contact_data, search_scope=search_scope,
+            contact_data_shape=shape,
+        )
 
     def __str__(self):
         return '''\

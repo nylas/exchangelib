@@ -69,7 +69,14 @@ IdOnly = 'IdOnly'
 # AllProperties doesn't actually get all properties in FindItem, just the "first-class" ones. See
 #    http://msdn.microsoft.com/en-us/library/office/dn600367(v=exchg.150).aspx
 AllProperties = 'AllProperties'
-SHAPE_CHOICES = (IdOnly, AllProperties)
+SHAPE_CHOICES = (IdOnly, 'Default', AllProperties)
+
+# Contacts search (ResolveNames) scope enums
+ActiveDirectory = 'ActiveDirectory'
+ActiveDirectoryContacts = 'ActiveDirectoryContacts'
+Contacts = 'Contacts'
+ContactsActiveDirectory = 'ContactsActiveDirectory'
+SEARCH_SCOPE_CHOICES = (ActiveDirectory, ActiveDirectoryContacts, Contacts, ContactsActiveDirectory)
 
 
 class Item(EWSElement):
