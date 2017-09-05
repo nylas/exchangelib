@@ -2,7 +2,7 @@ import logging
 
 from six import string_types
 
-from .fields import IntegerField, TextField, EnumField, EnumListField, DateField, DateTimeField, EWSElementField
+from .fields import IntegerField, IdField, EnumField, EnumListField, DateField, DateTimeField, EWSElementField
 from .properties import EWSElement, ItemId
 
 log = logging.getLogger(__name__)
@@ -254,8 +254,8 @@ class Occurrence(EWSElement):
     ELEMENT_NAME = 'Occurrence'
 
     FIELDS = [
-        TextField('item_id', is_read_only=True, is_searchable=False),
-        TextField('changekey', is_read_only=True, is_searchable=False),
+        IdField('item_id', is_read_only=True, is_searchable=False),
+        IdField('changekey', is_read_only=True, is_searchable=False),
         # The modified start time of the item, as EWSDateTime
         DateTimeField('start', field_uri='t:Start'),
         # The modified end time of the item, as EWSDateTime

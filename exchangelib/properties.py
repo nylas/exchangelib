@@ -6,7 +6,7 @@ import logging
 from six import text_type, string_types
 
 from .fields import SubField, TextField, EmailField, ChoiceField, DateTimeField, EWSElementField, MailboxField, Choice, \
-    BooleanField
+    BooleanField, IdField
 from .services import MNS, TNS
 from .util import get_xml_attr, create_element
 
@@ -157,8 +157,8 @@ class ItemId(EWSElement):
     ID_ATTR = 'Id'
     CHANGEKEY_ATTR = 'ChangeKey'
     FIELDS = [
-        TextField('id', field_uri=ID_ATTR, is_required=True),
-        TextField('changekey', field_uri=CHANGEKEY_ATTR, is_required=True),
+        IdField('id', field_uri=ID_ATTR, is_required=True),
+        IdField('changekey', field_uri=CHANGEKEY_ATTR, is_required=True),
     ]
 
     __slots__ = ('id', 'changekey')
@@ -217,8 +217,9 @@ class ConversationId(ItemId):
     ELEMENT_NAME = 'ConversationId'
 
     FIELDS = [
-        TextField('id', field_uri=ItemId.ID_ATTR, is_required=True),
-        TextField('changekey', field_uri=ItemId.CHANGEKEY_ATTR, is_required=False),  # Sometimes required, see MSDN link
+        IdField('id', field_uri=ItemId.ID_ATTR, is_required=True),
+        # Sometimes required, see MSDN link
+        IdField('changekey', field_uri=ItemId.CHANGEKEY_ATTR, is_required=False),
     ]
 
     __slots__ = ItemId.__slots__

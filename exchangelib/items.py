@@ -12,7 +12,7 @@ from .fields import BooleanField, IntegerField, DecimalField, Base64Field, TextF
     URIField, BodyField, DateTimeField, MessageHeaderField, PhoneNumberField, EmailAddressField, PhysicalAddressField, \
     ExtendedPropertyField, AttachmentField, RecurrenceField, MailboxField,  MailboxListField, AttendeesField, Choice, \
     OccurrenceField, OccurrenceListField, MemberListField, EWSElementField, EffectiveRightsField, TimeZoneField, \
-    CultureField, TextBodyField
+    CultureField, TextBodyField, IdField
 from .properties import EWSElement, ItemId, ConversationId
 from .recurrence import FirstOccurrence, LastOccurrence, Occurrence, DeletedOccurrence
 from .util import is_iterable
@@ -82,8 +82,8 @@ class Item(EWSElement):
     FIELDS = [
         # TODO: MimeContent actually supports writing, but is still untested
         Base64Field('mime_content', field_uri='item:MimeContent', is_read_only=True),
-        TextField('item_id', is_read_only=True, is_searchable=False),
-        TextField('changekey', is_read_only=True, is_searchable=False),
+        IdField('item_id', is_read_only=True, is_searchable=False),
+        IdField('changekey', is_read_only=True, is_searchable=False),
         # Placeholder for ParentFolderId
         # Placeholder for ItemClass
         TextField('subject', field_uri='item:Subject', max_length=255),
@@ -413,8 +413,8 @@ class BulkCreateResult(Item):
     A dummy class to store return values from a CreateItem service call
     """
     FIELDS = [
-        TextField('item_id', is_read_only=True, is_required=True),
-        TextField('changekey', is_read_only=True, is_required=True),
+        IdField('item_id', is_read_only=True, is_required=True),
+        IdField('changekey', is_read_only=True, is_required=True),
         AttachmentField('attachments', field_uri='item:Attachments'),  # ItemAttachment or FileAttachment
     ]
 

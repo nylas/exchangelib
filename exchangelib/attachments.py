@@ -7,7 +7,7 @@ import mimetypes
 from six import string_types
 
 from .fields import BooleanField, TextField, IntegerField, URIField, DateTimeField, EWSElementField, Base64Field, \
-    ItemField
+    ItemField, IdField
 from .properties import RootItemId, EWSElement
 from .services import TNS, GetAttachment, CreateAttachment, DeleteAttachment
 from .util import create_element
@@ -25,9 +25,9 @@ class AttachmentId(EWSElement):
     ROOT_ID_ATTR = 'RootItemId'
     ROOT_CHANGEKEY_ATTR = 'RootItemChangeKey'
     FIELDS = [
-        TextField('id', field_uri=ID_ATTR, is_required=True),
-        TextField('root_id', field_uri=ROOT_ID_ATTR),
-        TextField('root_changekey', field_uri=ROOT_CHANGEKEY_ATTR),
+        IdField('id', field_uri=ID_ATTR, is_required=True),
+        IdField('root_id', field_uri=ROOT_ID_ATTR),
+        IdField('root_changekey', field_uri=ROOT_CHANGEKEY_ATTR),
     ]
 
     __slots__ = ('id', 'root_id', 'root_changekey')

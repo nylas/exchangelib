@@ -6,7 +6,7 @@ import logging
 from future.utils import python_2_unicode_compatible
 from six import string_types
 
-from .fields import IntegerField, TextField, DateTimeField, FieldPath, EffectiveRightsField, MailboxField
+from .fields import IntegerField, TextField, DateTimeField, FieldPath, EffectiveRightsField, MailboxField, IdField
 from .items import Item, CalendarItem, Contact, Message, Task, MeetingRequest, MeetingResponse, MeetingCancellation, \
     DistributionList, ITEM_CLASSES, ITEM_TRAVERSAL_CHOICES, SHAPE_CHOICES, IdOnly
 from .properties import ItemId, Mailbox, EWSElement
@@ -38,8 +38,8 @@ class DistinguishedFolderId(ItemId):
     ELEMENT_NAME = 'DistinguishedFolderId'
 
     FIELDS = [
-        TextField('id', field_uri=ItemId.ID_ATTR, is_required=True),
-        TextField('changekey', field_uri=ItemId.CHANGEKEY_ATTR, is_required=False),
+        IdField('id', field_uri=ItemId.ID_ATTR, is_required=True),
+        IdField('changekey', field_uri=ItemId.CHANGEKEY_ATTR, is_required=False),
         MailboxField('mailbox', is_required=False)
     ]
 
@@ -97,8 +97,8 @@ class Folder(EWSElement):
     LOCALIZED_NAMES = dict()  # A map of (str)locale: (tuple)localized_folder_names
     ITEM_MODEL_MAP = {cls.response_tag(): cls for cls in ITEM_CLASSES}
     FIELDS = [
-        TextField('folder_id', field_uri='folder:FolderId', is_searchable=False),
-        TextField('changekey', field_uri='folder:Changekey', is_searchable=False),
+        IdField('folder_id', field_uri='folder:FolderId', is_searchable=False),
+        IdField('changekey', field_uri='folder:Changekey', is_searchable=False),
         TextField('folder_class', field_uri='folder:FolderClass'),
         TextField('name', field_uri='folder:DisplayName'),
         IntegerField('total_count', field_uri='folder:TotalCount', is_read_only=True),
