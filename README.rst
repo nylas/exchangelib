@@ -392,6 +392,14 @@ description of the possibilities, but we do intend to support all the possibilit
         property_type = 'BinaryArray'
         property_id = 32852
 
+    # Or using distinguished property sets combined with property ID (here as a hex value to align with 
+    # the format usually mentioned in Microsoft docs). This is the definition for a response to an Outlook 
+    # Vote request (see issue #198):
+    class VoteResponse(ExtendedProperty):
+        distinguished_property_set_id = 'Common'
+        property_id = 0x00008524
+        property_type = 'String'
+
 
 Attachments
 ^^^^^^^^^^^
