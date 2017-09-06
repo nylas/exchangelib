@@ -693,7 +693,7 @@ class DeleteItem(EWSAccountService, EWSPooledMixIn):
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa562961(v=exchg.150).aspx
 
     """
-    CHUNKSIZE = 25
+    CHUNKSIZE = 100
     SERVICE_NAME = 'DeleteItem'
     element_container_name = None  # DeleteItem doesn't return a response object, just status in XML attrs
 
