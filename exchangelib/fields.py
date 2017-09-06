@@ -532,7 +532,7 @@ class IdField(TextField):
     # A field to hold the 'Id' and 'Changekey' attributes on 'ItemId' type items. There is no guaranteed max length,
     # but we can assume 512 bytes in practice. See https://msdn.microsoft.com/en-us/library/office/dn605828(v=exchg.150)
     def __init__(self, *args, **kwargs):
-        super(TextField, self).__init__(*args, **kwargs)
+        super(IdField, self).__init__(*args, **kwargs)
         self.max_length = 512
 
 
