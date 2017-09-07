@@ -6,6 +6,7 @@ import logging
 from future.utils import python_2_unicode_compatible
 from six import string_types
 
+from .errors import ErrorAccessDenied, ErrorCannotDeleteObject
 from .fields import IntegerField, TextField, DateTimeField, FieldPath, EffectiveRightsField, MailboxField, IdField
 from .items import Item, CalendarItem, Contact, Message, Task, MeetingRequest, MeetingResponse, MeetingCancellation, \
     DistributionList, ITEM_CLASSES, ITEM_TRAVERSAL_CHOICES, SHAPE_CHOICES, IdOnly
@@ -341,11 +342,16 @@ class Folder(EWSElement):
     def wipe(self):
         # Recursively deletes all items in this folder and all subfolders. Use with caution!
         for f in self.get_folders():
-            f.wipe()
+            try:
+                f.wipe()
+            except ErrorAccessDenied:
+                log.warning('Not allowed to wipe %s', f)
             # TODO: Also delete non-distinguished folders here when we support folder deletion
         log.debug('Wiping folder %s', self)
         for i in self.all().delete():
-            if isinstance(i, Exception):
+            if isinstance(i, ErrorCannotDeleteObject):
+                log.warning('Not allowed to delete item (%s)', i)
+            elif isinstance(i, Exception):
                 raise i
 
     def test_access(self):
