@@ -17,6 +17,7 @@ import time
 import unittest
 from xml.etree.ElementTree import ParseError
 
+import pytz
 import requests
 import requests_mock
 from six import PY2, string_types
@@ -55,7 +56,7 @@ from exchangelib.recurrence import Recurrence, AbsoluteYearlyPattern, RelativeYe
 from exchangelib.restriction import Restriction, Q
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, GetAttachment, ResolveNames, TNS
 from exchangelib.transport import NOAUTH, BASIC, DIGEST, NTLM, wrap, _get_auth_method_from_response
-from exchangelib.util import chunkify, peek, get_redirect_url, to_xml, BOM, get_domain, \
+from exchangelib.util import chunkify, peek, get_redirect_url, to_xml, BOM, get_domain, value_to_xml_text, \
     post_ratelimited, create_element, CONNECTION_ERRORS
 from exchangelib.version import Build, Version, EXCHANGE_2007, EXCHANGE_2010, EXCHANGE_2013, EXCHANGE_2016
 from exchangelib.winzone import generate_map, CLDR_TO_MS_TIMEZONE_MAP
@@ -341,7 +342,7 @@ class EWSDateTimeTest(unittest.TestCase):
         tz = pytz.timezone('Africa/Tripoli')
         # This hack smashes the pytz timezone cache. Don't reuse the original timezone name for other tests
         tz.zone = 'UNKNOWN'
-        with self.assertRaises(ValueError):
+        with self.assertRaises(UnknownTimeZone):
             EWSTimeZone.from_pytz(tz)
 
     def test_localize(self):

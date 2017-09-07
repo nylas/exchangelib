@@ -127,7 +127,7 @@ def get_xml_attrs(tree, name):
 
 def value_to_xml_text(value):
     # We can't handle bytes in this function because str == bytes on Python2
-    from .ewsdatetime import EWSDateTime, EWSDate
+    from .ewsdatetime import EWSTimeZone, EWSDateTime, EWSDate
     from .indexed_properties import PhoneNumber, EmailAddress
     from .properties import Mailbox, Attendee
     if isinstance(value, string_types):
@@ -136,6 +136,8 @@ def value_to_xml_text(value):
         return '1' if value else '0'
     if isinstance(value, (int, Decimal)):
         return text_type(value)
+    if isinstance(value, EWSTimeZone):
+        return value.ms_id
     if isinstance(value, EWSDateTime):
         return value.ewsformat()
     if isinstance(value, EWSDate):

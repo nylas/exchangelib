@@ -186,7 +186,7 @@ class EWSTimeZone(object):
         try:
             self_cls.ms_id = cls.PYTZ_TO_MS_MAP[tz.zone]
         except KeyError:
-            raise ValueError('No Windows timezone name found for timezone "%s"' % tz.zone)
+            raise UnknownTimeZone('No Windows timezone name found for timezone "%s"' % tz.zone)
 
         # We don't need the Windows long-format timezone name in long format. It's used in timezone XML elements, but
         # EWS happily accepts empty strings. For a full list of timezones supported by the target server, including
