@@ -3541,8 +3541,73 @@ class BaseItemTest(EWSTest):
 
         self.bulk_delete(ids)
 
+    def test_text_field_settings(self):
+        # Test that the max_length and is_complex field settings are correctly set for text fields
+        item = self.get_test_item().save()
+        for f in self.ITEM_CLASS.FIELDS:
+            if not f.supports_version(self.account.version):
+                # Cannot be used with this EWS version
+                continue
+            if not isinstance(f, TextField):
+                continue
+            if isinstance(f, ChoiceField):
+                # This one can't contain random values
+                continue
+            if isinstance(f, CultureField):
+                # This one can't contain random values
+                continue
+            if f.is_read_only:
+                continue
+            if f.name == 'categories':
+                # We're filtering on this one, so leave it alone
+                continue
+            old_max_length = getattr(f, 'max_length', None)
+            old_is_complex = f.is_complex
+            try:
+                # Set a string long enough to not be handled by FindItems
+                f.max_length = 4000
+                if f.is_list:
+                    setattr(item, f.name, [get_random_string(f.max_length) for _ in range(len(getattr(item, f.name)))])
+                else:
+                    setattr(item, f.name, get_random_string(f.max_length))
+                try:
+                    item.save(update_fields=[f.name])
+                except ErrorPropertyUpdate:
+                    # Some fields throw this error when updated to a huge value
+                    self.assertIn(f.name, ['given_name', 'middle_name', 'surname'])
+                    continue
+                continue
+                # is_complex=True forces the query to use GetItems which will always get the full value
+                f.is_complex = True
+                new_full_item = self.test_folder.all().only(f.name).get(categories__contains=self.categories)
+                old, new_full = getattr(item, f.name), getattr(new_full_item, f.name)
+                if old_max_length:
+                    if f.is_list:
+                        for s in new_full:
+                            self.assertLessEqual(len(s), old_max_length, (f.name, len(s), old_max_length))
+                    else:
+                        self.assertLessEqual(len(new_full), old_max_length, (f.name, len(new_full), old_max_length))
+
+                # is_complex=False forces the query to use FindItems which will only get the short value
+                f.is_complex = False
+                if isinstance(f, BodyField):
+                    with self.assertRaises(ErrorInvalidPropertyForOperation):
+                        self.test_folder.all().only(f.name).get(categories__contains=self.categories)
+                    continue
+                new_short_item = self.test_folder.all().only(f.name).get(categories__contains=self.categories)
+                old, new_short = getattr(item, f.name), getattr(new_short_item, f.name)
+
+                if not old_is_complex:
+                    self.assertEqual(new_short, new_full, (f.name, new_short, new_full))
+            finally:
+                if old_max_length:
+                    f.max_length = old_max_length
+                else:
+                    delattr(f, 'max_length')
+                f.is_complex = old_is_complex
+
     def test_complex_fields(self):
-        # Test that complex fields can be fetched using only(). This is a test for #141
+        # Test that complex fields can be fetched using only(). This is a test for #141.
         insert_kwargs = self.get_random_insert_kwargs()
         if 'is_all_day' in insert_kwargs:
             insert_kwargs['is_all_day'] = False
