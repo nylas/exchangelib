@@ -190,7 +190,7 @@ def discover(email, credentials):
         except AutoDiscoverRedirect as e:
             log.debug('%s redirects to %s', email, e.redirect_email)
             if email.lower() == e.redirect_email.lower():
-                raise_from(AutoDiscoverCircularRedirect('Redirect to same email address: %s' % email), e)
+                raise_from(AutoDiscoverCircularRedirect('Redirect to same email address: %s' % email), None)
             # Start over with the new email address
             return discover(email=e.redirect_email, credentials=credentials)
 
@@ -213,7 +213,7 @@ def discover(email, credentials):
                 return primary_smtp_address, protocol
             except AutoDiscoverRedirect as e:
                 if email.lower() == e.redirect_email.lower():
-                    raise_from(AutoDiscoverCircularRedirect('Redirect to same email address: %s' % email), e)
+                    raise_from(AutoDiscoverCircularRedirect('Redirect to same email address: %s' % email), None)
                 log.debug('%s redirects to %s', email, e.redirect_email)
                 email = e.redirect_email
             finally:
@@ -255,7 +255,7 @@ def _try_autodiscover(hostname, credentials, email):
                         hostname_from_dns = _get_hostname_from_srv(hostname='_autodiscover._tcp.%s' % hostname)
                         return _try_autodiscover(hostname=hostname_from_dns, credentials=credentials, email=email)
                     except AutoDiscoverFailed:
-                        raise AutoDiscoverFailed('All steps in the autodiscover protocol failed')
+                        raise_from(AutoDiscoverFailed('All steps in the autodiscover protocol failed'), None)
 
 
 def _get_auth_type_or_raise(url, email, hostname):
@@ -276,8 +276,8 @@ def _get_auth_type_or_raise(url, email, hostname):
             redirect_hostname = redirect_hostname[4:]
         if redirect_hostname == hostname:
             log.debug('We were redirected to the same host')
-            raise_from(AutoDiscoverFailed('We were redirected to the same host'), e)
-        raise_from(RedirectError(url='%s://%s' % ('https' if redirect_has_ssl else 'http', redirect_hostname)), e)
+            raise_from(AutoDiscoverFailed('We were redirected to the same host'), None)
+        raise_from(RedirectError(url='%s://%s' % ('https' if redirect_has_ssl else 'http', redirect_hostname)), None)
 
 
 def _autodiscover_hostname(hostname, credentials, email, has_ssl):
@@ -326,11 +326,11 @@ def _get_autodiscover_auth_type(url, email):
     except TransportError as e:
         if isinstance(e, RedirectError):
             raise
-        raise_from(AutoDiscoverFailed('Error guessing auth type: %s' % e), e)
+        raise_from(AutoDiscoverFailed('Error guessing auth type: %s' % e), None)
     except SSL_ERRORS as e:
-        raise_from(AutoDiscoverFailed('Error guessing auth type: %s' % e), e)
+        raise_from(AutoDiscoverFailed('Error guessing auth type: %s' % e), None)
     except CONNECTION_ERRORS as e:
-        raise_from(AutoDiscoverFailed('Error guessing auth type: %s' % e), e)
+        raise_from(AutoDiscoverFailed('Error guessing auth type: %s' % e), None)
 
 
 def _get_autodiscover_payload(email):
@@ -358,7 +358,9 @@ def _get_autodiscover_response(protocol, email):
         raise
     except (TransportError, UnauthorizedError):
         log.debug('No access to %s using %s', protocol.service_endpoint, protocol.auth_type)
-        raise AutoDiscoverFailed('No access to %s using %s' % (protocol.service_endpoint, protocol.auth_type))
+        raise_from(
+            AutoDiscoverFailed('No access to %s using %s' % (protocol.service_endpoint, protocol.auth_type)), None
+        )
     if not is_xml(r.text):
         # This is normal - e.g. a greedy webserver serving custom HTTP 404's as 200 OK
         log.debug('URL %s: This is not XML: %s', protocol.service_endpoint, r.text[:1000])
@@ -377,7 +379,7 @@ def _raise_response_errors(elem):
             raise ErrorNonExistentMailbox('The SMTP address has no mailbox associated with it')
         raise AutoDiscoverFailed('Unknown error %s: %s' % (errorcode, message))
     except AttributeError:
-        raise AutoDiscoverFailed('Unknown autodiscover response: %s' % xml_to_str(elem))
+        raise_from(AutoDiscoverFailed('Unknown autodiscover response: %s' % xml_to_str(elem)), None)
 
 
 def _parse_response(response):
@@ -411,7 +413,7 @@ def _parse_response(response):
             protocol = protocols['EXCH']
         except KeyError:
             # Neither type was found. Give up
-            raise AutoDiscoverFailed('Invalid AutoDiscover response: %s' % xml_to_str(autodiscover))
+            raise_from(AutoDiscoverFailed('Invalid AutoDiscover response: %s' % xml_to_str(autodiscover)), None)
 
     ews_url = get_xml_attr(protocol, '{%s}EwsUrl' % RESPONSE_NS)
     log.debug('Primary SMTP: %s, EWS endpoint: %s', primary_smtp_address, ews_url)
@@ -451,16 +453,18 @@ def _get_hostname_from_srv(hostname):
                 # pylint: disable=expression-not-assigned
                 int(vals[0]), int(vals[1]), int(vals[2])  # Just to raise errors if these are not ints
                 svr = vals[3]
-            except (ValueError, KeyError) as e:
-                raise_from(AutoDiscoverFailed('Incompatible SRV record for %s (%s)' % (hostname, rdata.to_text())), e)
+            except (ValueError, KeyError):
+                raise_from(
+                    AutoDiscoverFailed('Incompatible SRV record for %s (%s)' % (hostname, rdata.to_text())), None
+                )
             else:
                 return svr
-    except dns.resolver.NoNameservers as e:
-        raise_from(AutoDiscoverFailed('No name servers for %s' % hostname), e)
-    except dns.resolver.NoAnswer as e:
-        raise_from(AutoDiscoverFailed('No SRV record for %s' % hostname), e)
-    except dns.resolver.NXDOMAIN as e:
-        raise_from(AutoDiscoverFailed('Nonexistent domain %s' % hostname), e)
+    except dns.resolver.NoNameservers:
+        raise_from(AutoDiscoverFailed('No name servers for %s' % hostname), None)
+    except dns.resolver.NoAnswer:
+        raise_from(AutoDiscoverFailed('No SRV record for %s' % hostname), None)
+    except dns.resolver.NXDOMAIN:
+        raise_from(AutoDiscoverFailed('Nonexistent domain %s' % hostname), None)
 
 
 @python_2_unicode_compatible
