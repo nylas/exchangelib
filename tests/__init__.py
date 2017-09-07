@@ -1,7 +1,6 @@
 # coding=utf-8
 from collections import namedtuple
 import datetime
-from dateutil.relativedelta import relativedelta
 from decimal import Decimal
 import glob
 from itertools import chain
@@ -16,6 +15,7 @@ import time
 import unittest
 from xml.etree.ElementTree import ParseError
 
+from dateutil.relativedelta import relativedelta
 import pytz
 import psutil
 import requests
@@ -1158,7 +1158,6 @@ class EWSTest(unittest.TestCase):
 
     def wipe_test_account(self):
         # Deletes up all deleteable items in the test account. Not run in a normal test run
-        logging.basicConfig(level=logging.WARNING)
         self.account.root.wipe()
 
     def bulk_delete(self, ids):
@@ -4863,9 +4862,15 @@ def get_random_datetime_range(start_date=EWSDate(1990, 1, 1), end_date=EWSDate(2
 
 if __name__ == '__main__':
     import logging
+    import sys
 
     loglevel = logging.DEBUG
-    # loglevel = logging.WARNING
+    try:
+        if '-q' in sys.argv:
+            sys.argv.remove('-q')
+            loglevel = logging.WARNING
+    except IndexError:
+        pass
     logging.basicConfig(level=loglevel)
     logging.getLogger('exchangelib').setLevel(loglevel)
     unittest.main()
