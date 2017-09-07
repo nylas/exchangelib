@@ -1156,6 +1156,10 @@ class EWSTest(unittest.TestCase):
                                locale='da_DK', default_timezone=self.tz)
         self.maxDiff = None
 
+    def wipe_test_account(self):
+        # Deletes up all deleteable items in the test account. Not run in a normal test run
+        self.account.root.wipe()
+
     def bulk_delete(self, ids):
         # Clean up items and check return values
         for res in self.account.bulk_delete(ids):
