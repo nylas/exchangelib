@@ -34,13 +34,15 @@ from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalid
     ErrorNameResolutionNoResults, TransportError, RedirectError, CASError, RateLimitError, UnauthorizedError, \
     ErrorInvalidChangeKey, ErrorInvalidIdMalformed, ErrorContainsFilterWrongType, ErrorAccessDenied, \
     ErrorFolderNotFound, ErrorInvalidRequest, SOAPError, ErrorInvalidServerVersion, NaiveDateTimeNotAllowed, \
-    AmbiguousTimeError, NonExistentTimeError
+    AmbiguousTimeError, NonExistentTimeError, ErrorUnsupportedPathForQuery, ErrorInvalidPropertyForOperation, \
+    ErrorInvalidValueForProperty, ErrorPropertyUpdate
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.extended_properties import ExtendedProperty, ExternId
 from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextField, EmailField, URIField, ChoiceField, \
     BodyField, DateTimeField, Base64Field, PhoneNumberField, EmailAddressField, TimeZoneField, \
-    PhysicalAddressField, ExtendedPropertyField, MailboxField, AttendeesField, AttachmentField, TextListField, \
-    MailboxListField, Choice, FieldPath, EWSElementField, CultureField, DateField, EnumField, EnumListField
+    PhysicalAddressField, ExtendedPropertyField, MailboxField, AttendeesField, AttachmentField, CharListField, \
+    MailboxListField, Choice, FieldPath, EWSElementField, CultureField, DateField, EnumField, EnumListField, IdField, \
+    CharField, TextListField
 from exchangelib.folders import Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Messages, Tasks, \
     Contacts, Folder
 from exchangelib.indexed_properties import IndexedElement, EmailAddress, PhysicalAddress, PhoneNumber, \
@@ -531,15 +533,15 @@ class FieldTest(unittest.TestCase):
         field = TextField('foo', field_uri='bar', is_required=True, default='XXX')
         self.assertEqual(field.clean(None), 'XXX')
 
-        field = TextListField('foo', field_uri='bar')
+        field = CharListField('foo', field_uri='bar')
         with self.assertRaises(ValueError):
             field.clean('XXX')  # Must be a list type
 
-        field = TextListField('foo', field_uri='bar')
+        field = CharListField('foo', field_uri='bar')
         with self.assertRaises(TypeError):
             field.clean([1, 2, 3])  # List items must be correct type
 
-        field = TextField('foo', field_uri='bar')
+        field = CharField('foo', field_uri='bar')
         with self.assertRaises(TypeError):
             field.clean(1)  # Value must be correct type
         with self.assertRaises(ValueError):
@@ -1185,19 +1187,23 @@ class EWSTest(unittest.TestCase):
         if isinstance(field, CultureField):
             return get_random_choice(['da-DK', 'de-DE', 'en-US', 'es-ES', 'fr-CA', 'nl-NL', 'ru-RU', 'sv-SE'])
         if isinstance(field, BodyField):
-            return get_random_string(255)
-        if isinstance(field, TextListField):
+            return get_random_string(512)
+        if isinstance(field, CharListField):
             return [get_random_string(16) for _ in range(random.randint(1, 4))]
+        if isinstance(field, TextListField):
+            return [get_random_string(4000) for _ in range(random.randint(1, 4))]
+        if isinstance(field, CharField):
+            return get_random_string(field.max_length)
         if isinstance(field, TextField):
-            return get_random_string(field.max_length or 255)
+            return get_random_string(4000)
         if isinstance(field, Base64Field):
-            return get_random_string(255)
+            return get_random_string(512)
         if isinstance(field, BooleanField):
             return get_random_bool()
-        if isinstance(field, IntegerField):
-            return get_random_int(field.min or 0, field.max or 256)
         if isinstance(field, DecimalField):
             return get_random_decimal(field.min or 1, field.max or 99)
+        if isinstance(field, IntegerField):
+            return get_random_int(field.min or 0, field.max or 256)
         if isinstance(field, DateTimeField):
             return get_random_datetime(tz=self.tz)
         if isinstance(field, AttachmentField):
@@ -1258,6 +1264,12 @@ class EWSTest(unittest.TestCase):
         if isinstance(field, EWSElementField):
             if field.value_cls == Recurrence:
                 return Recurrence(pattern=DailyPattern(interval=5), start=get_random_date(), number=7)
+        if isinstance(field, TimeZoneField):
+            while True:
+                try:
+                    return EWSTimeZone.timezone(random.choice(pytz.all_timezones))
+                except UnknownTimeZone:
+                    pass
         assert False, 'Unknown field %s' % field
 
 
@@ -2495,8 +2507,8 @@ class BaseItemTest(EWSTest):
         item = self.get_test_item()
         item.clean()
         for f in self.ITEM_CLASS.FIELDS:
-            # Test field maxlength
-            if isinstance(f, TextField) and f.max_length:
+            # Test field max_length
+            if isinstance(f, CharField) and f.max_length:
                 with self.assertRaises(ValueError):
                     setattr(item, f.name, 'a' * (f.max_length + 1))
                     item.clean()
@@ -3361,7 +3373,7 @@ class BaseItemTest(EWSTest):
         item.delete()
 
     def test_filter_on_all_fields(self):
-        # Test that we can filter on all field names that we support filtering on
+        # Test that we can filter on all field names
         # TODO: Test filtering on subfields of IndexedField
         item = self.get_test_item()
         if hasattr(item, 'is_all_day'):

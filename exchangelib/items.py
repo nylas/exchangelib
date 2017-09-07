@@ -8,11 +8,11 @@ from six import string_types
 
 from .ewsdatetime import UTC_NOW
 from .extended_properties import ExtendedProperty
-from .fields import BooleanField, IntegerField, DecimalField, Base64Field, TextField, TextListField, ChoiceField, \
+from .fields import BooleanField, IntegerField, DecimalField, Base64Field, TextField, CharListField, ChoiceField, \
     URIField, BodyField, DateTimeField, MessageHeaderField, PhoneNumberField, EmailAddressField, PhysicalAddressField, \
     ExtendedPropertyField, AttachmentField, RecurrenceField, MailboxField,  MailboxListField, AttendeesField, Choice, \
     OccurrenceField, OccurrenceListField, MemberListField, EWSElementField, EffectiveRightsField, TimeZoneField, \
-    CultureField, TextBodyField, IdField
+    CultureField, TextBodyField, IdField, CharField, TextListField
 from .properties import EWSElement, ItemId, ConversationId
 from .recurrence import FirstOccurrence, LastOccurrence, Occurrence, DeletedOccurrence
 from .util import is_iterable
@@ -93,7 +93,7 @@ class Item(EWSElement):
         IdField('changekey', is_read_only=True, is_searchable=False),
         # Placeholder for ParentFolderId
         # Placeholder for ItemClass
-        TextField('subject', field_uri='item:Subject', max_length=255),
+        CharField('subject', field_uri='item:Subject'),
         ChoiceField('sensitivity', field_uri='item:Sensitivity', choices={
             Choice('Normal'), Choice('Personal'), Choice('Private'), Choice('Confidential')
         }, is_required=True, default='Normal'),
@@ -102,7 +102,7 @@ class Item(EWSElement):
         AttachmentField('attachments', field_uri='item:Attachments'),  # ItemAttachment or FileAttachment
         DateTimeField('datetime_received', field_uri='item:DateTimeReceived', is_read_only=True),
         IntegerField('size', field_uri='item:Size', is_read_only=True),  # Item size in bytes
-        TextListField('categories', field_uri='item:Categories'),
+        CharListField('categories', field_uri='item:Categories'),
         ChoiceField('importance', field_uri='item:Importance', choices={
             Choice('Low'), Choice('Normal'), Choice('High')
         }, is_required=True, default='Normal'),
@@ -121,13 +121,13 @@ class Item(EWSElement):
         BooleanField('reminder_is_set', field_uri='item:ReminderIsSet', is_required=True, default=False),
         IntegerField('reminder_minutes_before_start', field_uri='item:ReminderMinutesBeforeStart',
                      is_required_after_save=True, min=0, default=0),
-        TextField('display_cc', field_uri='item:DisplayCc', is_read_only=True),
-        TextField('display_to', field_uri='item:DisplayTo', is_read_only=True),
+        CharField('display_cc', field_uri='item:DisplayCc', is_read_only=True),
+        CharField('display_to', field_uri='item:DisplayTo', is_read_only=True),
         BooleanField('has_attachments', field_uri='item:HasAttachments', is_read_only=True),
         # ExtendedProperty fields go here
         CultureField('culture', field_uri='item:Culture', is_required_after_save=True, is_searchable=False),
         EffectiveRightsField('effective_rights', field_uri='item:EffectiveRights', is_read_only=True),
-        TextField('last_modified_name', field_uri='item:LastModifiedName', is_read_only=True),
+        CharField('last_modified_name', field_uri='item:LastModifiedName', is_read_only=True),
         DateTimeField('last_modified_time', field_uri='item:LastModifiedTime', is_read_only=True),
         BooleanField('is_associated', field_uri='item:IsAssociated', is_read_only=True),
         # Placeholder for WebClientReadFormQueryString
@@ -451,7 +451,7 @@ class CalendarItem(Item):
             Choice('Free'), Choice('Tentative'), Choice('Busy'), Choice('OOF'), Choice('NoData'),
             Choice('WorkingElsewhere', supported_from=EXCHANGE_2013)
         }, is_required=True, default='Busy'),
-        TextField('location', field_uri='calendar:Location', max_length=255),
+        TextField('location', field_uri='calendar:Location'),
         # Placeholder for When
         # Placeholder for IsMeeting
         BooleanField('is_cancelled', field_uri='calendar:IsCancelled', is_read_only=True),
@@ -541,7 +541,7 @@ class Message(Item):
         # Placeholder for ConversationTopic
         # We can't use fieldname 'from' since it's a Python keyword
         MailboxField('author', field_uri='message:From', is_read_only_after_send=True),
-        TextField('message_id', field_uri='message:InternetMessageId', is_read_only=True, is_read_only_after_send=True),
+        CharField('message_id', field_uri='message:InternetMessageId', is_read_only=True, is_read_only_after_send=True),
         BooleanField('is_read', field_uri='message:IsRead', is_required=True, default=False),
         BooleanField('is_response_requested', field_uri='message:IsResponseRequested', default=False, is_required=True),
         TextField('references', field_uri='message:References'),
@@ -615,22 +615,22 @@ class Task(Item):
         ChoiceField('delegation_state', field_uri='task:DelegationState', choices={
             Choice('NoMatch'), Choice('OwnNew'), Choice('Owned'), Choice('Accepted'), Choice('Declined'), Choice('Max')
         }, is_read_only=True),
-        TextField('delegator', field_uri='task:Delegator', is_read_only=True),
+        CharField('delegator', field_uri='task:Delegator', is_read_only=True),
         DateTimeField('due_date', field_uri='task:DueDate'),
         # Placeholder for IsAssignmentEditable
         BooleanField('is_complete', field_uri='task:IsComplete', is_read_only=True),
         BooleanField('is_recurring', field_uri='task:IsRecurring', is_read_only=True),
         BooleanField('is_team_task', field_uri='task:IsTeamTask', is_read_only=True),
         TextField('mileage', field_uri='task:Mileage'),
-        TextField('owner', field_uri='task:Owner', is_read_only=True),
-        DecimalField('percent_complete', field_uri='task:PercentComplete', is_required=True, is_searchable=False,
-                     default=Decimal(0.0)),
+        CharField('owner', field_uri='task:Owner', is_read_only=True),
+        DecimalField('percent_complete', field_uri='task:PercentComplete', is_required=True, default=Decimal(0.0),
+                     is_searchable=False),
         # Placeholder for Recurrence
         DateTimeField('start_date', field_uri='task:StartDate'),
         ChoiceField('status', field_uri='task:Status', choices={
             Choice(NOT_STARTED), Choice('InProgress'), Choice(COMPLETED), Choice('WaitingOnOthers'), Choice('Deferred')
         }, is_required=True, is_searchable=False, default=NOT_STARTED),
-        TextField('status_description', field_uri='task:StatusDescription', is_read_only=True),
+        CharField('status_description', field_uri='task:StatusDescription', is_read_only=True),
         IntegerField('total_work', field_uri='task:TotalWork', min=0),
     ]
 
@@ -693,9 +693,9 @@ class Contact(Item):
             Choice('Empty'),
         }),
         TextField('display_name', field_uri='contacts:DisplayName', is_required=True),
-        TextField('given_name', field_uri='contacts:GivenName'),
+        CharField('given_name', field_uri='contacts:GivenName'),
         TextField('initials', field_uri='contacts:Initials'),
-        TextField('middle_name', field_uri='contacts:MiddleName'),
+        CharField('middle_name', field_uri='contacts:MiddleName'),
         TextField('nickname', field_uri='contacts:Nickname'),
         # Placeholder for CompleteName
         TextField('company_name', field_uri='contacts:CompanyName'),
@@ -714,18 +714,18 @@ class Contact(Item):
         TextField('job_title', field_uri='contacts:JobTitle'),
         TextField('manager', field_uri='contacts:Manager'),
         TextField('mileage', field_uri='contacts:Mileage'),
-        TextField('office', field_uri='contacts:OfficeLocation'),
+        CharField('office', field_uri='contacts:OfficeLocation'),
         # Placeholder for PostalAddressIndex
-        TextField('profession', field_uri='contacts:Profession'),
+        CharField('profession', field_uri='contacts:Profession'),
         # Placeholder for SpouseName
-        TextField('surname', field_uri='contacts:Surname'),
+        CharField('surname', field_uri='contacts:Surname'),
         # Placeholder for WeddingAnniversary
         # Placeholder for HasPicture
         # Placeholder for PhoneticFullName
         # Placeholder for PhoneticFirstName
         # Placeholder for PhoneticLastName
         # EmailField('email_alias', field_uri='contacts:Alias'),
-        # TextField('notes', field_uri='contacts:Notes', supported_from=EXCHANGE_2010_SP2),  # TODO: throws errors
+        # CharField('notes', field_uri='contacts:Notes', supported_from=EXCHANGE_2010_SP2),  # TODO: throws errors
         # Placeholder for Photo
         # Placeholder for UserSMIMECertificate
         # Placeholder for MSExchangeCertificate
@@ -741,8 +741,8 @@ class DistributionList(Item):
     """
     ELEMENT_NAME = 'DistributionList'
     FIELDS = Item.FIELDS + [
-        TextField('display_name', field_uri='contacts:DisplayName', is_required=True),
-        TextField('file_as', field_uri='contacts:FileAs', is_read_only=True),
+        CharField('display_name', field_uri='contacts:DisplayName', is_required=True),
+        CharField('file_as', field_uri='contacts:FileAs', is_read_only=True),
         # Placeholder for ContactSource
         MemberListField('members', field_uri='distributionlist:Members'),
     ]
@@ -757,7 +757,7 @@ class PostItem(Item):
         # Placeholder for ConversationIndex
         # Placeholder for ConversationTopic
         MailboxField('author', field_uri='message:From', is_read_only_after_send=True),
-        TextField('message_id', field_uri='message:InternetMessageId', is_read_only=True, is_read_only_after_send=True),
+        CharField('message_id', field_uri='message:InternetMessageId', is_read_only=True, is_read_only_after_send=True),
         BooleanField('is_read', field_uri='message:IsRead', is_required=True, default=False),
         DateTimeField('posted_time', field_uri='postitem:PostedTime', is_read_only=True),
         MailboxField('sender', field_uri='message:Sender', is_read_only=True, is_read_only_after_send=True),

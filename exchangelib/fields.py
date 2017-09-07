@@ -502,23 +502,9 @@ class TimeZoneField(FieldURIField):
 
 
 class TextField(FieldURIField):
+    # A field that stores a string value with no length limit
     value_cls = string_type
-
-    def __init__(self, *args, **kwargs):
-        self.max_length = kwargs.pop('max_length', 255)  # Fields supporting longer messages are complex fields
-        super(TextField, self).__init__(*args, **kwargs)
-
-    def clean(self, value, version=None):
-        value = super(TextField, self).clean(value, version=version)
-        if self.max_length and value is not None:
-            if self.is_list:
-                for v in value:
-                    if len(v) > self.max_length:
-                        raise ValueError("'%s' value '%s' exceeds length %s" % (self.name, v, self.max_length))
-            else:
-                if len(value) > self.max_length:
-                    raise ValueError("'%s' value '%s' exceeds length %s" % (self.name, value, self.max_length))
-        return value
+    is_complex = True
 
     def from_xml(self, elem, account):
         field_elem = elem.find(self.response_tag())
@@ -528,15 +514,47 @@ class TextField(FieldURIField):
         return self.default
 
 
-class IdField(TextField):
+class TextListField(TextField):
+    is_list = True
+
+    def from_xml(self, elem, account):
+        iter_elem = elem.find(self.response_tag())
+        if iter_elem is not None:
+            return get_xml_attrs(iter_elem, '{%s}String' % TNS)
+        return self.default
+
+
+class CharField(TextField):
+    # A field that stores a string value with a limited length
+    is_complex = False
+
+    def __init__(self, *args, **kwargs):
+        self.max_length = kwargs.pop('max_length', 255)
+        assert 0 < self.max_length < 256  # A field supporting messages longer than 255 chars should be TextField
+        super(CharField, self).__init__(*args, **kwargs)
+
+    def clean(self, value, version=None):
+        value = super(CharField, self).clean(value, version=version)
+        if value is not None:
+            if self.is_list:
+                for v in value:
+                    if len(v) > self.max_length:
+                        raise ValueError("'%s' value '%s' exceeds length %s" % (self.name, v, self.max_length))
+            else:
+                if len(value) > self.max_length:
+                    raise ValueError("'%s' value '%s' exceeds length %s" % (self.name, value, self.max_length))
+        return value
+
+
+class IdField(CharField):
     # A field to hold the 'Id' and 'Changekey' attributes on 'ItemId' type items. There is no guaranteed max length,
     # but we can assume 512 bytes in practice. See https://msdn.microsoft.com/en-us/library/office/dn605828(v=exchg.150)
     def __init__(self, *args, **kwargs):
         super(IdField, self).__init__(*args, **kwargs)
-        self.max_length = 512
+        self.max_length = 512  # This is above the normal 255 limit, but this is actually an attribute, not a field
 
 
-class TextListField(TextField):
+class CharListField(CharField):
     is_list = True
 
     def from_xml(self, elem, account):
@@ -552,12 +570,12 @@ class URIField(TextField):
     pass
 
 
-class EmailField(TextField):
+class EmailField(CharField):
     # A helper class used for email address string that we can use for email validation
     pass
 
 
-class CultureField(TextField):
+class CultureField(CharField):
     # Helper to mark strings that are # RFC 1766 culture values.
     pass
 
@@ -575,7 +593,7 @@ class Choice(object):
         return version.build >= self.supported_from
 
 
-class ChoiceField(TextField):
+class ChoiceField(CharField):
     def __init__(self, *args, **kwargs):
         self.choices = kwargs.pop('choices')
         super(ChoiceField, self).__init__(*args, **kwargs)
@@ -599,21 +617,15 @@ class ChoiceField(TextField):
 
 
 class TextBodyField(TextField):
-    is_complex = True
-
     def __init__(self, *args, **kwargs):
         super(TextBodyField, self).__init__(*args, **kwargs)
-        self.max_length = None
 
 
 class BodyField(TextField):
-    is_complex = True
-
     def __init__(self, *args, **kwargs):
         from .properties import Body
         self.value_cls = Body
         super(BodyField, self).__init__(*args, **kwargs)
-        self.max_length = None
 
     def clean(self, value, version=None):
         if value is not None and not isinstance(value, self.value_cls):

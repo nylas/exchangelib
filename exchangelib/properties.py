@@ -5,8 +5,8 @@ import logging
 
 from six import text_type, string_types
 
-from .fields import SubField, TextField, EmailField, ChoiceField, DateTimeField, EWSElementField, MailboxField, Choice, \
-    BooleanField, IdField
+from .fields import SubField, TextField, EmailField, ChoiceField, DateTimeField, EWSElementField, MailboxField, \
+    Choice, BooleanField, IdField
 from .services import MNS, TNS
 from .util import get_xml_attr, create_element
 
