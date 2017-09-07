@@ -8,7 +8,6 @@ from itertools import chain
 import io
 from keyword import kwlist
 import os
-import psutil
 import random
 import socket
 import string
@@ -18,6 +17,7 @@ import unittest
 from xml.etree.ElementTree import ParseError
 
 import pytz
+import psutil
 import requests
 import requests_mock
 from six import PY2, string_types
@@ -1158,6 +1158,7 @@ class EWSTest(unittest.TestCase):
 
     def wipe_test_account(self):
         # Deletes up all deleteable items in the test account. Not run in a normal test run
+        logging.basicConfig(level=logging.WARNING)
         self.account.root.wipe()
 
     def bulk_delete(self, ids):
