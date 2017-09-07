@@ -133,6 +133,32 @@ Folders
     account.inbox.refresh()
 
 
+Dates, datetimes and timezones
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+EWS has some special requirements on datetimes and timezones. You need to use the special ``EWSDate``, 
+``EWSDateTime`` and ``EWSTimeZone`` classes when working with dates.
+
+.. code-block:: python
+
+    # EWSTimeZone works just like pytz.timezone()
+    tz = EWSTimeZone.timezone('Europe/Copenhagen')
+    # You can also get the local timezone defined in your operating system
+    tz = EWSTimeZone.localzone()
+
+    # EWSDate and EWSDateTime work just like datetime.datetime and datetime.date. Always create timezone-aware 
+    # datetimes with EWSTimeZone.localize():
+    localized_dt = tz.localize(EWSDateTime(2017, 9, 5, 8, 30))
+
+    # Datetime math works transparently
+    two_hours_later = localized_dt + datetime.timedelta(hours=2)
+    two_hours = two_hours_later - localized_dt
+
+    # Dates
+    my_date = EWSDate(2017, 9, 5)
+    today = EWSDate.today()
+
+
 Creating, updating, deleting, sending and moving
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -185,8 +211,6 @@ Creating, updating, deleting, sending and moving
     # EWS distinquishes between plain text and HTML body contents. If you want to send HTML body content, use
     # the HTMLBody helper. Clients will see this as HTML and display the body correctly:
     item.body = HTMLBody('<html><body>Hello happy <blink>OWA user!</blink></body></html>')
-    year, month, day = 2016, 3, 20
-    tz = EWSTimeZone.timezone('Europe/Copenhagen')
 
 
 Bulk operations
@@ -195,6 +219,8 @@ Bulk operations
 .. code-block:: python
 
     # Build a list of calendar items
+    tz = EWSTimeZone.timezone('Europe/Copenhagen')
+    year, month, day = 2016, 3, 20
     calendar_items = []
     for hour in range(7, 17):
         calendar_items.append(CalendarItem(
