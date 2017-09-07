@@ -2887,9 +2887,32 @@ class BaseItemTest(EWSTest):
 
     def test_queryset_nonsearchable_fields(self):
         for f in self.ITEM_CLASS.FIELDS:
-            if not f.is_searchable:
+            if f.is_searchable or isinstance(f, IdField) or not f.supports_version(self.account.version):
+                continue
+            if f.name == 'percent_complete':
+                # This field doesn't raise an error when used in a filter, but also doesn't match anything
+                continue
+            try:
+                filter_val = f.clean(self.random_val(f))
+                filter_kwargs = {'%s__in' % f.name: filter_val} if f.is_list else {f.name: filter_val}
+
+                # We raise ValueError when searching on an is_searchable=False field
                 with self.assertRaises(ValueError):
-                    list(self.test_folder.filter(**{f.name: 'XXX'}))
+                    list(self.test_folder.filter(**filter_kwargs))
+
+                # Make sure the is_searchable=False setting is correct by searching anyway and testing that this
+                # fails server-side. This only works for values that we are actually able to convert to a search
+                # string.
+                try:
+                    value_to_xml_text(filter_val)
+                except NotImplementedError:
+                    continue
+
+                f.is_searchable = True
+                with self.assertRaises((ErrorUnsupportedPathForQuery, ErrorInvalidValueForProperty)):
+                    list(self.test_folder.filter(**filter_kwargs))
+            finally:
+                f.is_searchable = False
 
     def test_queryset_failure(self):
         qs = QuerySet(self.test_folder).filter(categories__contains=self.categories)
