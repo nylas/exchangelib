@@ -367,8 +367,8 @@ Here are some examples of using the API:
     # By default, EWS returns only the master recurring item. If you want recurring calendar
     # items to be expanded, use calendar.view(start=..., end=...) instead.
     items = account.calendar.view(
-        start=tz.localize(EWSDateTime(year, month, day + 1)),
-        end=tz.localize(EWSDateTime(year, month, day)),
+        start=tz.localize(EWSDateTime(year, month, day)),
+        end=tz.localize(EWSDateTime(year, month, day)) + timedelta(days=1),
     )
     for item in items:
         print(item.start, item.end, item.subject, item.body, item.location)
