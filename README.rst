@@ -32,6 +32,7 @@ Setup and connecting
 
 .. code-block:: python
 
+    from datetime import timedelta
     from exchangelib import DELEGATE, IMPERSONATION, Account, Credentials, ServiceAccount, \
         EWSDateTime, EWSTimeZone, Configuration, NTLM, CalendarItem, Message, \
         Mailbox, Attendee, Q, ExtendedProperty, FileAttachment, ItemAttachment, \
@@ -149,15 +150,24 @@ EWS has some special requirements on datetimes and timezones. You need to use th
     # EWSDate and EWSDateTime work just like datetime.datetime and datetime.date. Always create timezone-aware 
     # datetimes with EWSTimeZone.localize():
     localized_dt = tz.localize(EWSDateTime(2017, 9, 5, 8, 30))
+    right_now = tz.localize(EWSDateTime.now())
 
     # Datetime math works transparently
-    two_hours_later = localized_dt + datetime.timedelta(hours=2)
+    two_hours_later = localized_dt + timedelta(hours=2)
     two_hours = two_hours_later - localized_dt
 
     # Dates
     my_date = EWSDate(2017, 9, 5)
     today = EWSDate.today()
+    also_today = right_now.date()
 
+    # UTC helpers. 'UTC' is the UTC timezone as an EWSTimeZone instance.
+    # 'UTC_NOW' returns a timezone-aware UTC timestamp of current time.
+    from exchangelib import UTC, UTC_NOW
+
+    right_now_in_utc = UTC.localize(EWSDateTime.now())
+    right_now_in_utc = UTC_NOW()
+    
 
 Creating, updating, deleting, sending and moving
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -482,14 +492,15 @@ Here's an example of creating 7 occurrences on Mondays and Wednesdays of every t
 
     from exchangelib.recurrence import Recurrence, WeeklyPattern, MONDAY, WEDNESDAY
 
+    start = tz.localize(EWSDateTime(2017, 9, 1, 11))
     item = CalendarItem(
         folder=a.calendar,
-        start=tz.localize(EWSDateTime(2017, 9, 1, 11)),
-        end=tz.localize(EWSDateTime(2017, 9, 1, 13)),
+        start=start,
+        end=start + timedelta(hours=2),
         subject='Hello Recurrence',
         recurrence=Recurrence(
             pattern=WeeklyPattern(interval=3, weekdays=[MONDAY, WEDNESDAY]),
-            start=EWSDate(2017, 9, 1),
+            start=start.date(),
             number=7
         ),
     )
@@ -505,26 +516,25 @@ Here's an example of creating 7 occurrences on Mondays and Wednesdays of every t
         for o in i.deleted_occurrences:
             print(o)
 
-    # All occurrences expanded
-    for i in a.calendar.view(start=end, end=start):
+    # All occurrences expanded. The recurrence will span over 4 iterations of a 3-week period
+    for i in a.calendar.view(start=start, end=start + timedelta(days=4*3*7)):
         print(i.subject, i.start, i.end)
 
 
-Timestamps
-^^^^^^^^^^
+Message timestamp fields
+^^^^^^^^^^^^^^^^^^^^^^^^
 
-Each email has four timestamps associated with it:
+Each ``Message`` item has four timestamp fields:
 
-* `datetime_created`
-* `datetime_sent`
-* `datetime_received`
-* `last_modified_time`
+* ``datetime_created``
+* ``datetime_sent``
+* ``datetime_received``
+* ``last_modified_time``
 
-All these fields are read-only in exchangelib. These fields are not modifiable
-via EWS. All of those fields are of the type
-`exchangelib.ewsdatetime.EWSDateTime`.
+The values for these fields are set by the Exchange server and are not modifiable via EWS. All 
+values are timezone-aware ``EWSDateTime`` instances.
 
-The `datetime_sent` can be before `datetime_created`.
+The ``datetime_sent`` value may be earlier than ``datetime_created``.
 
 
 Troubleshooting
