@@ -232,6 +232,18 @@ class VersionTest(unittest.TestCase):
 
 
 class ConfigurationTest(unittest.TestCase):
+    def test_magic(self):
+        config = Configuration(
+            server='example.com',
+            has_ssl=True,
+            credentials=Credentials('foo', 'bar'),
+            auth_type=NTLM,
+            version=Version(build=Build(15, 1, 2, 3), api_version='foo'),
+        )
+        # Just test that these work
+        str(config)
+        repr(config)
+
     @requests_mock.mock()  # Just to make sure we don't make any requests
     def test_hardcode_all(self, m):
         # Test that we can hardcode everything without having a working server. This is useful if neither tasting or
@@ -1125,7 +1137,8 @@ class UtilTest(unittest.TestCase):
 
 
 class EWSTest(unittest.TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpClass(cls):
         # There's no official Exchange server we can test against, and we can't really provide credentials for our
         # own test server to everyone on the Internet. Travis-CI uses the encrypted settings.yml.enc for testing.
         #
@@ -1135,25 +1148,30 @@ class EWSTest(unittest.TestCase):
             with open(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'settings.yml')) as f:
                 settings = load(f)
         except FileNotFoundError:
-            print('Skipping %s - no settings.yml file found' % self.__class__.__name__)
+            print('Skipping %s - no settings.yml file found' % cls.__name__)
             print('Copy settings.yml.sample to settings.yml and enter values for your test server')
-            raise unittest.SkipTest('Skipping %s - no settings.yml file found' % self.__class__.__name__)
+            raise unittest.SkipTest('Skipping %s - no settings.yml file found' % cls.__name__)
 
-        self.verify_ssl = settings.get('verify_ssl', True)
-        if not self.verify_ssl:
+        cls.verify_ssl = settings.get('verify_ssl', True)
+        if not cls.verify_ssl:
+            # Allow unverified SSL if requested in settings file
             BaseProtocol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
 
         # Speed up tests a bit. We don't need to wait 10 seconds for every nonexisting server in the discover dance
         AutodiscoverProtocol.TIMEOUT = 2
 
-        self.tz = EWSTimeZone.timezone('Europe/Copenhagen')
-        self.categories = [get_random_string(length=10, spaces=False, special=False)]
-        self.config = Configuration(
+        # Create an account shared by all tests
+        tz = EWSTimeZone.timezone('Europe/Copenhagen')
+        config = Configuration(
             server=settings['server'],
             credentials=Credentials(settings['username'], settings['password'])
         )
-        self.account = Account(primary_smtp_address=settings['account'], access_type=DELEGATE, config=self.config,
-                               locale='da_DK', default_timezone=self.tz)
+        cls.account = Account(primary_smtp_address=settings['account'], access_type=DELEGATE, config=config,
+                              locale='da_DK', default_timezone=tz)
+
+    def setUp(self):
+        # Create a random category for each test to avoid crosstalk
+        self.categories = [get_random_string(length=10, spaces=False, special=False)]
         self.maxDiff = None
 
     def wipe_test_account(self):
@@ -1209,7 +1227,7 @@ class EWSTest(unittest.TestCase):
         if isinstance(field, IntegerField):
             return get_random_int(field.min or 0, field.max or 256)
         if isinstance(field, DateTimeField):
-            return get_random_datetime(tz=self.tz)
+            return get_random_datetime(tz=self.account.default_timezone)
         if isinstance(field, AttachmentField):
             return [FileAttachment(name='my_file.txt', content=b'test_content')]
         if isinstance(field, MailboxListField):
@@ -1235,7 +1253,8 @@ class EWSTest(unittest.TestCase):
             with_last_response_time = get_random_bool()
             if with_last_response_time:
                 return [
-                    Attendee(mailbox=mbx, response_type='Accept', last_response_time=get_random_datetime(tz=self.tz))
+                    Attendee(mailbox=mbx, response_type='Accept',
+                             last_response_time=get_random_datetime(tz=self.account.default_timezone))
                 ]
             else:
                 if get_random_bool():
@@ -1341,26 +1360,26 @@ class CommonTest(EWSTest):
 ''')
 
     def test_poolsize(self):
-        self.assertEqual(self.config.protocol.SESSION_POOLSIZE, 4)
+        self.assertEqual(self.account.protocol.SESSION_POOLSIZE, 4)
 
     def test_get_timezones(self):
-        ws = GetServerTimeZones(self.config.protocol)
+        ws = GetServerTimeZones(self.account.protocol)
         data = ws.call()
         self.assertAlmostEqual(len(list(data)), 130, delta=30, msg=data)
         # Test shortcut
-        self.assertAlmostEqual(len(list(self.config.protocol.get_timezones())), 130, delta=30, msg=data)
+        self.assertAlmostEqual(len(list(self.account.protocol.get_timezones())), 130, delta=30, msg=data)
 
     def test_get_roomlists(self):
         # The test server is not guaranteed to have any room lists which makes this test less useful
-        ws = GetRoomLists(self.config.protocol)
+        ws = GetRoomLists(self.account.protocol)
         roomlists = ws.call()
         self.assertEqual(roomlists, [])
         # Test shortcut
-        self.assertEqual(self.config.protocol.get_roomlists(), [])
+        self.assertEqual(self.account.protocol.get_roomlists(), [])
 
     def test_get_roomlists_parsing(self):
         # Test static XML since server has no roomlists
-        ws = GetRoomLists(self.config.protocol)
+        ws = GetRoomLists(self.account.protocol)
         xml = '''\
 <?xml version="1.0" ?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
@@ -1404,16 +1423,16 @@ class CommonTest(EWSTest):
     def test_get_rooms(self):
         # The test server is not guaranteed to have any rooms or room lists which makes this test less useful
         roomlist = RoomList(email_address='my.roomlist@example.com')
-        ws = GetRooms(self.config.protocol)
+        ws = GetRooms(self.account.protocol)
         with self.assertRaises(ErrorNameResolutionNoResults):
             ws.call(roomlist=roomlist)
         # Test shortcut
         with self.assertRaises(ErrorNameResolutionNoResults):
-            self.config.protocol.get_rooms('my.roomlist@example.com')
+            self.account.protocol.get_rooms('my.roomlist@example.com')
 
     def test_get_rooms_parsing(self):
         # Test static XML since server has no rooms
-        ws = GetRooms(self.config.protocol)
+        ws = GetRooms(self.account.protocol)
         xml = '''\
 <?xml version="1.0" ?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
@@ -1458,7 +1477,7 @@ class CommonTest(EWSTest):
 
     def test_resolvenames_parsing(self):
         # Test static XML since server has no roomlists
-        ws = ResolveNames(self.config.protocol)
+        ws = ResolveNames(self.account.protocol)
         xml = '''\
 <?xml version="1.0" encoding="utf-8"?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
@@ -1509,8 +1528,8 @@ class CommonTest(EWSTest):
 
     def test_sessionpool(self):
         # First, empty the calendar
-        start = self.tz.localize(EWSDateTime(2011, 10, 12, 8))
-        end = self.tz.localize(EWSDateTime(2011, 10, 12, 10))
+        start = self.account.default_timezone.localize(EWSDateTime(2011, 10, 12, 8))
+        end = self.account.default_timezone.localize(EWSDateTime(2011, 10, 12, 10))
         self.account.calendar.filter(start__lt=end, end__gt=start, categories__contains=self.categories).delete()
         items = []
         for i in range(75):
@@ -1531,13 +1550,12 @@ class CommonTest(EWSTest):
         self.bulk_delete(return_items)
 
     def test_magic(self):
-        self.assertIn(self.config.protocol.version.api_version, str(self.config.protocol))
-        self.assertIn(self.config.credentials.username, str(self.config.credentials))
+        self.assertIn(self.account.protocol.version.api_version, str(self.account.protocol))
+        self.assertIn(self.account.protocol.credentials.username, str(self.account.protocol.credentials))
         self.assertIn(self.account.primary_smtp_address, str(self.account))
         self.assertIn(str(self.account.version.build.major_version), repr(self.account.version))
         for item in (
-                self.config,
-                self.config.protocol,
+                self.account.protocol,
                 self.account.version,
                 self.account.trash,
                 self.account.drafts,
@@ -1566,20 +1584,20 @@ class CommonTest(EWSTest):
     def test_failed_login(self):
         with self.assertRaises(UnauthorizedError):
             Configuration(
-                service_endpoint=self.config.protocol.service_endpoint,
-                credentials=Credentials(self.config.protocol.credentials.username, 'WRONG_PASSWORD'))
+                service_endpoint=self.account.protocol.service_endpoint,
+                credentials=Credentials(self.account.protocol.credentials.username, 'WRONG_PASSWORD'))
         with self.assertRaises(AutoDiscoverFailed):
             Account(
                 primary_smtp_address=self.account.primary_smtp_address,
                 access_type=DELEGATE,
-                credentials=Credentials(self.config.protocol.credentials.username, 'WRONG_PASSWORD'),
+                credentials=Credentials(self.account.protocol.credentials.username, 'WRONG_PASSWORD'),
                 autodiscover=True,
                 locale='da_DK')
 
     def test_post_ratelimited(self):
         url = 'https://example.com'
 
-        protocol = self.config.protocol
+        protocol = self.account.protocol
         credentials = protocol.credentials
         # Make sure we fail fast in error cases
         protocol.credentials = Credentials(username=credentials.username, password=credentials.password)
@@ -1771,7 +1789,7 @@ class CommonTest(EWSTest):
 
     @requests_mock.mock()
     def test_invalid_soap_response(self, m):
-        m.post(self.config.protocol.service_endpoint, text='XXX')
+        m.post(self.account.protocol.service_endpoint, text='XXX')
         with self.assertRaises(SOAPError):
             self.account.inbox.all().count()
 
@@ -1856,7 +1874,7 @@ class AutodiscoverTest(EWSTest):
     def test_magic(self):
         from exchangelib.autodiscover import _autodiscover_cache
         # Just test we don't fail
-        discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
+        discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
         str(_autodiscover_cache)
         repr(_autodiscover_cache)
         for protocol in _autodiscover_cache._protocols.values():
@@ -1865,10 +1883,10 @@ class AutodiscoverTest(EWSTest):
 
     def test_autodiscover(self):
         primary_smtp_address, protocol = discover(email=self.account.primary_smtp_address,
-                                                  credentials=self.config.credentials)
+                                                  credentials=self.account.protocol.credentials)
         self.assertEqual(primary_smtp_address, self.account.primary_smtp_address)
-        self.assertEqual(protocol.service_endpoint.lower(), self.config.protocol.service_endpoint.lower())
-        self.assertEqual(protocol.version.build, self.config.protocol.version.build)
+        self.assertEqual(protocol.service_endpoint.lower(), self.account.protocol.service_endpoint.lower())
+        self.assertEqual(protocol.version.build, self.account.protocol.version.build)
 
     def test_autodiscover_failure(self):
         from exchangelib.autodiscover import _autodiscover_cache
@@ -1876,25 +1894,25 @@ class AutodiscoverTest(EWSTest):
         _autodiscover_cache.clear()
         with self.assertRaises(ErrorNonExistentMailbox):
             # Test that error is raised with an empty cache
-            discover(email='XXX.' + self.account.primary_smtp_address, credentials=self.config.credentials)
+            discover(email='XXX.' + self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
         with self.assertRaises(ErrorNonExistentMailbox):
             # Test that error is raised with a full cache
-            discover(email='XXX.' + self.account.primary_smtp_address, credentials=self.config.credentials)
+            discover(email='XXX.' + self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
 
     def test_close_autodiscover_connections(self):
-        discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
+        discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
         close_connections()
 
     def test_autodiscover_gc(self):
         from exchangelib.autodiscover import _autodiscover_cache
         # This is what Python garbage collection does
-        discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
+        discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
         del _autodiscover_cache
 
     def test_autodiscover_direct_gc(self):
         from exchangelib.autodiscover import _autodiscover_cache
         # This is what Python garbage collection does
-        discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
+        discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
         _autodiscover_cache.__del__()
 
     @requests_mock.mock(real_http=True)
@@ -1904,16 +1922,16 @@ class AutodiscoverTest(EWSTest):
 
         # Empty the cache
         _autodiscover_cache.clear()
-        cache_key = (self.account.domain, self.config.credentials)
+        cache_key = (self.account.domain, self.account.protocol.credentials)
         # Not cached
         self.assertNotIn(cache_key, _autodiscover_cache)
-        discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
+        discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
         # Now it's cached
         self.assertIn(cache_key, _autodiscover_cache)
         # Make sure the cache can be looked by value, not by id(). This is important for multi-threading/processing
         self.assertIn((
             self.account.primary_smtp_address.split('@')[1],
-            Credentials(self.config.credentials.username, self.config.credentials.password),
+            Credentials(self.account.protocol.credentials.username, self.account.protocol.credentials.password),
             True
         ), _autodiscover_cache)
         # Poison the cache. discover() must survive and rebuild the cache
@@ -1923,7 +1941,7 @@ class AutodiscoverTest(EWSTest):
             auth_type=NTLM
         )
         m.post('https://example.com/blackhole.asmx', status_code=404)
-        discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
+        discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
         self.assertIn(cache_key, _autodiscover_cache)
 
         # Make sure that the cache is actually used on the second call to discover()
@@ -1932,11 +1950,11 @@ class AutodiscoverTest(EWSTest):
         def _mock(*args, **kwargs):
             raise NotImplementedError()
         exchangelib.autodiscover._try_autodiscover = _mock
-        discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
+        discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
         # Fake that another thread added the cache entry into the persistent storage but we don't have it in our
         # in-memory cache. The cache should work anyway.
         _autodiscover_cache._protocols.clear()
-        discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
+        discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
         exchangelib.autodiscover._try_autodiscover = _orig
         # Make sure we can delete cache entries even though we don't have it in our in-memory cache
         _autodiscover_cache._protocols.clear()
@@ -1961,19 +1979,21 @@ class AutodiscoverTest(EWSTest):
     def test_autodiscover_from_account(self):
         from exchangelib.autodiscover import _autodiscover_cache
         _autodiscover_cache.clear()
-        account = Account(primary_smtp_address=self.account.primary_smtp_address, credentials=self.config.credentials,
+        account = Account(primary_smtp_address=self.account.primary_smtp_address,
+                          credentials=self.account.protocol.credentials,
                           autodiscover=True, locale='da_DK')
         self.assertEqual(account.primary_smtp_address, self.account.primary_smtp_address)
-        self.assertEqual(account.protocol.service_endpoint.lower(), self.config.protocol.service_endpoint.lower())
-        self.assertEqual(account.protocol.version.build, self.config.protocol.version.build)
+        self.assertEqual(account.protocol.service_endpoint.lower(), self.account.protocol.service_endpoint.lower())
+        self.assertEqual(account.protocol.version.build, self.account.protocol.version.build)
         # Make sure cache is full
-        self.assertTrue((account.domain, self.config.credentials, True) in _autodiscover_cache)
+        self.assertTrue((account.domain, self.account.protocol.credentials, True) in _autodiscover_cache)
         # Test that autodiscover works with a full cache
-        account = Account(primary_smtp_address=self.account.primary_smtp_address, credentials=self.config.credentials,
+        account = Account(primary_smtp_address=self.account.primary_smtp_address,
+                          credentials=self.account.protocol.credentials,
                           autodiscover=True, locale='da_DK')
         self.assertEqual(account.primary_smtp_address, self.account.primary_smtp_address)
         # Test cache manipulation
-        key = (account.domain, self.config.credentials, True)
+        key = (account.domain, self.account.protocol.credentials, True)
         self.assertTrue(key in _autodiscover_cache)
         del _autodiscover_cache[key]
         self.assertFalse(key in _autodiscover_cache)
@@ -1982,14 +2002,14 @@ class AutodiscoverTest(EWSTest):
     def test_autodiscover_redirect(self):
         import exchangelib.autodiscover
         # Prime the cache
-        email, p = discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
+        email, p = discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
         _orig = exchangelib.autodiscover._autodiscover_quick
 
         # Test that we can get another address back than the address we're looking up
         def _mock1(credentials, email, protocol):
             return 'john@example.com', p
         exchangelib.autodiscover._autodiscover_quick = _mock1
-        test_email, p = discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
+        test_email, p = discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
         self.assertEqual(test_email, 'john@example.com')
 
         # Test that we can survive being asked to lookup with another address
@@ -1999,14 +2019,14 @@ class AutodiscoverTest(EWSTest):
             raise AutoDiscoverRedirect(redirect_email='xxxxxx@'+self.account.domain)
         exchangelib.autodiscover._autodiscover_quick = _mock2
         with self.assertRaises(ErrorNonExistentMailbox):
-            discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
+            discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
 
         # Test that we catch circular redirects
         def _mock3(credentials, email, protocol):
             raise AutoDiscoverRedirect(redirect_email=self.account.primary_smtp_address)
         exchangelib.autodiscover._autodiscover_quick = _mock3
         with self.assertRaises(AutoDiscoverCircularRedirect):
-            discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
+            discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
         exchangelib.autodiscover._autodiscover_quick = _orig
 
         # Test that we catch circular redirects when cache is empty. This is a different code path
@@ -2016,7 +2036,7 @@ class AutodiscoverTest(EWSTest):
         exchangelib.autodiscover._try_autodiscover = _mock4
         exchangelib.autodiscover._autodiscover_cache.clear()
         with self.assertRaises(AutoDiscoverCircularRedirect):
-            discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
+            discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
         exchangelib.autodiscover._try_autodiscover = _orig
 
         # Test that we can survive being asked to lookup with another address, when cache is empty
@@ -2027,7 +2047,7 @@ class AutodiscoverTest(EWSTest):
         exchangelib.autodiscover._try_autodiscover = _mock5
         exchangelib.autodiscover._autodiscover_cache.clear()
         with self.assertRaises(ErrorNonExistentMailbox):
-            discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
+            discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
         exchangelib.autodiscover._try_autodiscover = _orig
 
     def test_canonical_lookup(self):
@@ -2175,7 +2195,7 @@ class AutodiscoverTest(EWSTest):
 
         # A normal discover should succeed
         exchangelib.autodiscover._autodiscover_cache.clear()
-        discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
+        discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
 
         # Smash SSL verification using an untrusted certificate
         with tempfile.NamedTemporaryFile() as f:
@@ -2211,17 +2231,17 @@ r5p9FrBgavAw5bKO54C0oQKpN/5fta5l6Ws0
                 # Now discover should fail. SSL errors mean we exhaust all autodiscover attempts
                 with self.assertRaises(AutoDiscoverFailed):
                     exchangelib.autodiscover._autodiscover_cache.clear()
-                    discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
+                    discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
 
                 # Make sure we can survive SSL validation errors when using the custom adapter
                 exchangelib.autodiscover._autodiscover_cache.clear()
                 BaseProtocol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
-                discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
+                discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
 
                 # Test that the custom adapter also works when validation is OK again
                 del os.environ['REQUESTS_CA_BUNDLE']
                 exchangelib.autodiscover._autodiscover_cache.clear()
-                discover(email=self.account.primary_smtp_address, credentials=self.config.credentials)
+                discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
             finally:
                 # Reset environment
                 os.environ.pop('REQUESTS_CA_BUNDLE', None)  # May already have been deleted
@@ -2388,7 +2408,7 @@ class BaseItemTest(EWSTest):
             if f.name == 'start':
                 start = get_random_date()
                 insert_kwargs[f.name], insert_kwargs['end'] = \
-                    get_random_datetime_range(start_date=start, end_date=start, tz=self.tz)
+                    get_random_datetime_range(start_date=start, end_date=start, tz=self.account.default_timezone)
                 insert_kwargs['recurrence'] = self.random_val(self.ITEM_CLASS.get_field_by_fieldname('recurrence'))
                 insert_kwargs['recurrence'].boundary.start = insert_kwargs[f.name].date()
                 continue
@@ -2398,7 +2418,7 @@ class BaseItemTest(EWSTest):
                 continue
             if f.name == 'due_date':
                 # start_date must be before due_date
-                insert_kwargs['start_date'], insert_kwargs[f.name] = get_random_datetime_range(tz=self.tz)
+                insert_kwargs['start_date'], insert_kwargs[f.name] = get_random_datetime_range(tz=self.account.default_timezone)
                 continue
             if f.name == 'start_date':
                 continue
@@ -2443,7 +2463,7 @@ class BaseItemTest(EWSTest):
             if f.name == 'start':
                 start = get_random_date(start_date=insert_kwargs['end'].date())
                 update_kwargs[f.name], update_kwargs['end'] = \
-                    get_random_datetime_range(start_date=start, end_date=start, tz=self.tz)
+                    get_random_datetime_range(start_date=start, end_date=start, tz=self.account.default_timezone)
                 update_kwargs['recurrence'] = self.random_val(self.ITEM_CLASS.get_field_by_fieldname('recurrence'))
                 update_kwargs['recurrence'].boundary.start = update_kwargs[f.name].date()
                 continue
@@ -2454,7 +2474,7 @@ class BaseItemTest(EWSTest):
             if f.name == 'due_date':
                 # start_date must be before due_date, and before complete_date which must be in the past
                 update_kwargs['start_date'], update_kwargs[f.name] = \
-                    get_random_datetime_range(end_date=now.date(), tz=self.tz)
+                    get_random_datetime_range(end_date=now.date(), tz=self.account.default_timezone)
                 continue
             if f.name == 'start_date':
                 continue
@@ -3922,8 +3942,8 @@ class BaseItemTest(EWSTest):
                 elif old is not None and new is not None:
                     # EWS sometimes randomly sets the new reminder due date to one month before we wanted it, and
                     # sometimes 30 days before. But only sometimes...
-                    old_date = old.astimezone(self.tz).date()
-                    new_date = new.astimezone(self.tz).date()
+                    old_date = old.astimezone(self.account.default_timezone).date()
+                    new_date = new.astimezone(self.account.default_timezone).date()
                     if relativedelta(month=1) + new_date == old_date:
                         item.reminder_due_by = new
                         continue
@@ -4521,8 +4541,8 @@ class CalendarTest(BaseItemTest):
         # Update start, end and recurrence with timezoned datetimes. For some reason, EWS throws
         # 'ErrorOccurrenceTimeSpanTooBig' is we go back in time.
         start = get_random_date(start_date=item.start.date() + datetime.timedelta(days=1))
-        dt_start, dt_end = [dt.astimezone(self.tz) for dt in
-                            get_random_datetime_range(start_date=start, end_date=start, tz=self.tz)]
+        dt_start, dt_end = [dt.astimezone(self.account.default_timezone) for dt in
+                            get_random_datetime_range(start_date=start, end_date=start, tz=self.account.default_timezone)]
         item.start, item.end = dt_start, dt_end
         item.recurrence.boundary.start = dt_start.date()
         item.save()
@@ -4538,14 +4558,14 @@ class CalendarTest(BaseItemTest):
         # does not observe that, but pytz does. So random datetimes before 1996 will fail this test.
         start = get_random_date(start_date=EWSDate(1996, 1, 1))
         start_dt, end_dt = \
-            get_random_datetime_range(start_date=start, end_date=start + datetime.timedelta(days=365), tz=self.tz)
+            get_random_datetime_range(start_date=start, end_date=start + datetime.timedelta(days=365), tz=self.account.default_timezone)
         item = self.ITEM_CLASS(folder=self.test_folder, start=start_dt, end=end_dt, is_all_day=True,
                                categories=self.categories)
         item.save()
 
         item = self.test_folder.all().only('start', 'end').get(item_id=item.item_id, changekey=item.changekey)
-        self.assertEqual(item.start.astimezone(self.tz).time(), datetime.time(0, 0), (item.start, item.end))
-        self.assertEqual(item.end.astimezone(self.tz).time(), datetime.time(0, 0), (item.start, item.end))
+        self.assertEqual(item.start.astimezone(self.account.default_timezone).time(), datetime.time(0, 0), (item.start, item.end))
+        self.assertEqual(item.end.astimezone(self.account.default_timezone).time(), datetime.time(0, 0), (item.start, item.end))
         item.delete()
 
     def test_view(self):
@@ -4553,16 +4573,16 @@ class CalendarTest(BaseItemTest):
             account=self.account,
             folder=self.test_folder,
             subject=get_random_string(16),
-            start=self.tz.localize(EWSDateTime(2016, 1, 1, 8)),
-            end=self.tz.localize(EWSDateTime(2016, 1, 1, 10)),
+            start=self.account.default_timezone.localize(EWSDateTime(2016, 1, 1, 8)),
+            end=self.account.default_timezone.localize(EWSDateTime(2016, 1, 1, 10)),
             categories=self.categories,
         )
         item2 = self.ITEM_CLASS(
             account=self.account,
             folder=self.test_folder,
             subject=get_random_string(16),
-            start=self.tz.localize(EWSDateTime(2016, 2, 1, 8)),
-            end=self.tz.localize(EWSDateTime(2016, 2, 1, 10)),
+            start=self.account.default_timezone.localize(EWSDateTime(2016, 2, 1, 8)),
+            end=self.account.default_timezone.localize(EWSDateTime(2016, 2, 1, 10)),
             categories=self.categories,
         )
         self.test_folder.bulk_create(items=[item1, item2])
@@ -4624,8 +4644,8 @@ class CalendarTest(BaseItemTest):
     def test_recurring_items(self):
         item = CalendarItem(
             folder=self.test_folder,
-            start=self.tz.localize(EWSDateTime(2017, 9, 4, 11)),
-            end=self.tz.localize(EWSDateTime(2017, 9, 4, 13)),
+            start=self.account.default_timezone.localize(EWSDateTime(2017, 9, 4, 11)),
+            end=self.account.default_timezone.localize(EWSDateTime(2017, 9, 4, 13)),
             subject='Hello Recurrence',
             recurrence=Recurrence(
                 pattern=WeeklyPattern(interval=3, weekdays=[MONDAY, WEDNESDAY]),
@@ -4643,19 +4663,19 @@ class CalendarTest(BaseItemTest):
             'Monday, Boundary: NumberedPattern(EWSDate(2017, 9, 4), 7)'
         )
         self.assertIsInstance(fresh_item.first_occurrence, FirstOccurrence)
-        self.assertEqual(fresh_item.first_occurrence.start, self.tz.localize(EWSDateTime(2017, 9, 4, 11)))
-        self.assertEqual(fresh_item.first_occurrence.end, self.tz.localize(EWSDateTime(2017, 9, 4, 13)))
+        self.assertEqual(fresh_item.first_occurrence.start, self.account.default_timezone.localize(EWSDateTime(2017, 9, 4, 11)))
+        self.assertEqual(fresh_item.first_occurrence.end, self.account.default_timezone.localize(EWSDateTime(2017, 9, 4, 13)))
         self.assertIsInstance(fresh_item.last_occurrence, LastOccurrence)
-        self.assertEqual(fresh_item.last_occurrence.start, self.tz.localize(EWSDateTime(2017, 11, 6, 11)))
-        self.assertEqual(fresh_item.last_occurrence.end, self.tz.localize(EWSDateTime(2017, 11, 6, 13)))
+        self.assertEqual(fresh_item.last_occurrence.start, self.account.default_timezone.localize(EWSDateTime(2017, 11, 6, 11)))
+        self.assertEqual(fresh_item.last_occurrence.end, self.account.default_timezone.localize(EWSDateTime(2017, 11, 6, 13)))
         self.assertEqual(fresh_item.modified_occurrences, None)
         self.assertEqual(fresh_item.deleted_occurrences, None)
 
         # All occurrences expanded
         all_start_times = []
         for i in self.test_folder.view(
-                start=self.tz.localize(EWSDateTime(2017, 9, 1)),
-                end=self.tz.localize(EWSDateTime(2017, 12, 1))
+                start=self.account.default_timezone.localize(EWSDateTime(2017, 9, 1)),
+                end=self.account.default_timezone.localize(EWSDateTime(2017, 12, 1))
         ).only('start', 'categories').order_by('start'):
             if i.categories != self.categories:
                 continue
@@ -4663,13 +4683,13 @@ class CalendarTest(BaseItemTest):
         self.assertListEqual(
             all_start_times,
             [
-                self.tz.localize(EWSDateTime(2017, 9, 4, 11)),
-                self.tz.localize(EWSDateTime(2017, 9, 6, 11)),
-                self.tz.localize(EWSDateTime(2017, 9, 25, 11)),
-                self.tz.localize(EWSDateTime(2017, 9, 27, 11)),
-                self.tz.localize(EWSDateTime(2017, 10, 16, 11)),
-                self.tz.localize(EWSDateTime(2017, 10, 18, 11)),
-                self.tz.localize(EWSDateTime(2017, 11, 6, 11)),
+                self.account.default_timezone.localize(EWSDateTime(2017, 9, 4, 11)),
+                self.account.default_timezone.localize(EWSDateTime(2017, 9, 6, 11)),
+                self.account.default_timezone.localize(EWSDateTime(2017, 9, 25, 11)),
+                self.account.default_timezone.localize(EWSDateTime(2017, 9, 27, 11)),
+                self.account.default_timezone.localize(EWSDateTime(2017, 10, 16, 11)),
+                self.account.default_timezone.localize(EWSDateTime(2017, 10, 18, 11)),
+                self.account.default_timezone.localize(EWSDateTime(2017, 11, 6, 11)),
             ]
         )
 
