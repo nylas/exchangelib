@@ -3784,11 +3784,19 @@ class BaseItemTest(EWSTest):
                 continue
             if f.name == 'reminder_due_by':
                 if new is None:
-                    # EWS does not always return a value if reminder_is_set is False. Set one now
-                    new = old
-                if (new - old).days == 30:
-                    # Sometimes, 'reminder_due_by' is just set to 30 days ahead of what we requested. Yay.
+                    # EWS does not always return a value if reminder_is_set is False.
                     continue
+                if old is not None:
+                    # EWS sometimes randomly sets the new reminder due date to one month before we wanted it, and
+                    # sometimes 30 days before. But only sometimes...
+                    old_date = old.astimezone(self.account.default_timezone).date()
+                    new_date = new.astimezone(self.account.default_timezone).date()
+                    if relativedelta(month=1) + new_date == old_date:
+                        item.reminder_due_by = new
+                        continue
+                    elif old_date - new_date == datetime.timedelta(days=30):
+                        item.reminder_due_by = new
+                        continue
             if f.is_list:
                 old, new = set(old or ()), set(new or ())
             self.assertEqual(old, new, (f.name, old, new))
