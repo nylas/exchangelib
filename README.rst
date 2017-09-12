@@ -105,7 +105,7 @@ Setup and connecting
     # described in http://docs.python-requests.org/en/master/user/advanced/#transport-adapters
     # exchangelib provides a sample adapter which ignores SSL validation errors. Use at own risk.
     from exchangelib.protocol import BaseProtocol, NoVerifyHTTPAdapter
-    BaseProcotol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
+    BaseProtocol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
 
 
 Folders
