@@ -422,6 +422,9 @@ class Q(object):
     def __eq__(self, other):
         return repr(self) == repr(other)
 
+    def __hash__(self):
+        return hash(repr(self))
+
     def __str__(self):
         return self.expr() or 'Q()'
 

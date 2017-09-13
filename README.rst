@@ -116,15 +116,29 @@ Folders
     # The most common folders are available as account.calendar, account.trash, account.drafts, account.inbox,
     # account.outbox, account.sent, account.junk, account.tasks, and account.contacts.
     #
-    # If you want to access other folders, you can either traverse the account.folders dictionary, or find
-    # the folder by name, starting at a direct or indirect parent of the folder you want to find. To search
-    # the full folder hierarchy, start the search from account.root:
-    python_dev_mail_folder = account.root.get_folder_by_name('python-dev')
-    # If you have multiple folders with the same name in your folder hierarchy, start your search further down
-    # the hierarchy:
-    foo1_folder = account.inbox.get_folder_by_name('foo')
-    foo2_folder = python_dev_mail_folder.get_folder_by_name('foo')
-    # For more advanced folder traversing, use some_folder.get_folders()
+    # There are multiple ways of navigating the folder tree and searching for folders
+    some_folder.parent
+    some_folder.parent.parent.parent
+    some_folder.root  # Returns the root of the folder structure, at any level. Same as Account.root
+    some_folder.children  # A generator of child folders
+    some_folder.walk()  # A generator returning all subfolders at arbitrary depth this level
+    # Globbing uses the normal UNIX globbing syntax
+    some_folder.glob('foo*')  # Return child folders matching the pattern
+    some_folder.glob('*/foo')  # Return subfolders named 'foo' in any child folder
+    some_folder.glob('**/foo')  # Return subfolders named 'foo' at any depth
+    some_folder / 'sub_folder' / 'even_deeper' / 'leaf'  # Works like pathlib.Path
+    some_folder.parts  # returns some_folder, some_folder.parent, some_folder.parent.parent as Folder instances
+    # tree() returns a string representation of the tree structure at the given level
+    print(root.tree())
+    '''
+    root
+    ├── inbox
+    │   └── todos
+    └── archive
+        ├── Last Job
+        ├── exchangelib issues
+        └── Mom
+    '''
 
     # Folders have some useful counters:
     account.inbox.total_count
@@ -167,7 +181,7 @@ EWS has some special requirements on datetimes and timezones. You need to use th
 
     right_now_in_utc = UTC.localize(EWSDateTime.now())
     right_now_in_utc = UTC_NOW()
-    
+
 
 Creating, updating, deleting, sending and moving
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -2,6 +2,12 @@
 Change Log
 ==========
 
+HEAD
+____
+* Greatly improved folder navigation. See README
+* Deprecated ``Account.folders`` and ``Folder.get_folder_by_name()``
+
+
 1.10.1
 ------
 * Bugfix release

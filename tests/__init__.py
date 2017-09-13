@@ -44,7 +44,7 @@ from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextFie
     MailboxListField, Choice, FieldPath, EWSElementField, CultureField, DateField, EnumField, EnumListField, IdField, \
     CharField, TextListField
 from exchangelib.folders import Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Messages, Tasks, \
-    Contacts, Folder
+    Contacts, Folder, WellknownFolder, RecipientCache, GALContacts
 from exchangelib.indexed_properties import IndexedElement, EmailAddress, PhysicalAddress, PhoneNumber, \
     SingleFieldIndexedElement, MultiFieldIndexedElement
 from exchangelib.items import Item, CalendarItem, Message, Contact, Task, DistributionList
@@ -1832,13 +1832,11 @@ class AccountTest(EWSTest):
             Account(primary_smtp_address='blah@example.com', autodiscover=False)
 
     def test_get_default_folder(self):
-        class MockCalendar(Calendar):
-            pass
         # Test a normal folder lookup with GetFolder
-        folder = self.account._get_default_folder(MockCalendar)
-        self.assertIsInstance(folder, MockCalendar)
+        folder = self.account.root.get_default_folder(Calendar)
+        self.assertIsInstance(folder, Calendar)
         self.assertNotEqual(folder.folder_id, None)
-        self.assertEqual(folder.name, MockCalendar.LOCALIZED_NAMES[self.account.locale][0])
+        self.assertEqual(folder.name, Calendar.LOCALIZED_NAMES[self.account.locale][0])
 
         class MockCalendar(Calendar):
             @classmethod
@@ -1846,7 +1844,7 @@ class AccountTest(EWSTest):
                 raise ErrorAccessDenied('foo')
 
         # Test an indirect folder lookup with FindItems
-        folder = self.account._get_default_folder(MockCalendar)
+        folder = self.account.root.get_default_folder(MockCalendar)
         self.assertIsInstance(folder, MockCalendar)
         self.assertEqual(folder.folder_id, None)
         self.assertEqual(folder.name, MockCalendar.DISTINGUISHED_FOLDER_ID)
@@ -1859,15 +1857,17 @@ class AccountTest(EWSTest):
         # Test using the one folder of this folder type
         with self.assertRaises(ErrorFolderNotFound):
             # This fails because there are no folders of type MockCalendar
-            self.account._get_default_folder(MockCalendar)
+            self.account.root.get_default_folder(MockCalendar)
 
         _orig = Calendar.get_distinguished
-        Calendar.get_distinguished = MockCalendar.get_distinguished
-        folder = self.account._get_default_folder(Calendar)
-        self.assertIsInstance(folder, Calendar)
-        self.assertNotEqual(folder.folder_id, None)
-        self.assertEqual(folder.name, MockCalendar.LOCALIZED_NAMES[self.account.locale][0])
-        Calendar.get_distinguished = _orig
+        try:
+            Calendar.get_distinguished = MockCalendar.get_distinguished
+            folder = self.account.root.get_default_folder(Calendar)
+            self.assertIsInstance(folder, Calendar)
+            self.assertNotEqual(folder.folder_id, None)
+            self.assertEqual(folder.name, MockCalendar.LOCALIZED_NAMES[self.account.locale][0])
+        finally:
+            Calendar.get_distinguished = _orig
 
 
 class AutodiscoverTest(EWSTest):
@@ -2251,10 +2251,11 @@ r5p9FrBgavAw5bKO54C0oQKpN/5fta5l6Ws0
 
 class FolderTest(EWSTest):
     def test_folders(self):
-        folders = self.account.folders
-        for folder_cls, cls_folders in folders.items():
-            for f in cls_folders:
-                f.test_access()
+        for f in self.account.root.walk():
+            if f.name == 'System':
+                # No access to system folder, apparently
+                continue
+            f.test_access()
         # Test shortcuts
         for f, cls in (
                 (self.account.trash, DeletedItems),
@@ -2274,37 +2275,27 @@ class FolderTest(EWSTest):
             with self.assertRaises(ValueError):
                 f.get_item_field_by_fieldname('XXX')
 
-    def test_getfolders(self):
-        folders = list(self.account.root.get_folders())
+    def test_find_folders(self):
+        folders = list(self.account.root.find_folders())
         self.assertGreater(len(folders), 60, sorted(f.name for f in folders))
-        with self.assertRaises(ValueError):
-            self.account.inbox.get_folder_by_name(get_random_string(16))
 
     def test_folder_grouping(self):
-        folders = self.account.folders
         # If you get errors here, you probably need to fill out [folder class].LOCALIZED_NAMES for your locale.
-        self.assertEqual(len(folders[Inbox]), 1)
-        self.assertEqual(len(folders[SentItems]), 1)
-        self.assertEqual(len(folders[Outbox]), 1)
-        self.assertEqual(len(folders[DeletedItems]), 1)
-        self.assertEqual(len(folders[JunkEmail]), 1)
-        self.assertEqual(len(folders[Drafts]), 1)
-        self.assertGreaterEqual(len(folders[Contacts]), 1)
-        self.assertGreaterEqual(len(folders[Calendar]), 1)
-        self.assertGreaterEqual(len(folders[Tasks]), 1)
-        for f in folders[Messages]:
-            self.assertEqual(f.folder_class, 'IPF.Note')
-        for f in folders[Contacts]:
-            self.assertEqual(f.folder_class, 'IPF.Contact')
-        for f in folders[Calendar]:
-            self.assertEqual(f.folder_class, 'IPF.Appointment')
-        for f in folders[Tasks]:
-            self.assertEqual(f.folder_class, 'IPF.Task')
-
-    def test_get_folder_by_name(self):
-        folder_name = Calendar.LOCALIZED_NAMES[self.account.locale][0]
-        f = self.account.root.get_folder_by_name(folder_name)
-        self.assertEqual(f.name, folder_name)
+        for f in self.account.root.walk():
+            if isinstance(f, (Messages, DeletedItems)):
+                self.assertEqual(f.folder_class, 'IPF.Note')
+            elif isinstance(f, GALContacts):
+                self.assertEqual(f.folder_class, 'IPF.Contact.GalContacts')
+            elif isinstance(f, RecipientCache):
+                self.assertEqual(f.folder_class, 'IPF.Contact.RecipientCache')
+            elif isinstance(f, Contacts):
+                self.assertEqual(f.folder_class, 'IPF.Contact')
+            elif isinstance(f, Calendar):
+                self.assertEqual(f.folder_class, 'IPF.Appointment')
+            elif isinstance(f, Tasks):
+                self.assertEqual(f.folder_class, 'IPF.Task')
+            else:
+                self.assertIsInstance(f, Folder)
 
     def test_counts(self):
         # Test count values on a folder
@@ -2339,21 +2330,28 @@ class FolderTest(EWSTest):
 
     def test_refresh(self):
         # Test that we can refresh folders
-        folders = self.account.folders
-        for folder_cls, cls_folders in folders.items():
-            for f in cls_folders:
-                old_values = {}
-                for field in folder_cls.FIELDS:
-                    old_values[field.name] = getattr(f, field.name)
-                    if field.name in ('account', 'folder_id', 'changekey'):
-                        # These are needed for a successful refresh()
+        for f in self.account.root.walk():
+            if f.name == 'System':
+                # Can't refresh the 'System' folder for some reason
                         continue
-                    if field.is_read_only:
-                        continue
-                    setattr(f, field.name, self.random_val(field))
-                f.refresh()
-                for field in folder_cls.FIELDS:
-                    self.assertEqual(getattr(f, field.name), old_values[field.name])
+            old_values = {}
+            for field in f.FIELDS:
+                old_values[field.name] = getattr(f, field.name)
+                if field.name in ('account', 'folder_id', 'changekey', 'parent_folder_id'):
+                    # These are needed for a successful refresh()
+                    continue
+                if field.is_read_only:
+                    continue
+                setattr(f, field.name, self.random_val(field))
+            f.refresh()
+            for field in f.FIELDS:
+                if field.name == 'changekey':
+                    # folders may change while we're testing
+                    continue
+                if field.is_read_only:
+                    # count values may change during the test
+                    continue
+                self.assertEqual(getattr(f, field.name), old_values[field.name], field.name)
 
         folder = Folder()
         with self.assertRaises(ValueError):
@@ -2361,6 +2359,45 @@ class FolderTest(EWSTest):
         folder.account = 'XXX'
         with self.assertRaises(ValueError):
             folder.refresh()  # Must have an item_id
+
+    def test_parent(self):
+        self.assertEqual(
+            self.account.calendar.parent.name,
+            'Top of Information Store'
+        )
+        self.assertEqual(
+            self.account.calendar.parent.parent.name,
+            'root'
+        )
+
+    def test_children(self):
+        self.assertIn(
+            'Top of Information Store',
+            [c.name for c in self.account.root.children]
+        )
+
+    def test_parts(self):
+        self.assertEqual(
+            [p.name for p in self.account.calendar.parts],
+            ['root', 'Top of Information Store', self.account.calendar.name]
+        )
+
+    def test_walk(self):
+        self.assertGreaterEqual(len(list(self.account.root.walk())), 20)
+        self.assertGreaterEqual(len(list(self.account.contacts.walk())), 2)
+
+    def test_tree(self):
+        self.assertTrue(self.account.root.tree().startswith('root'))
+
+    def test_glob(self):
+        self.assertGreaterEqual(len(list(self.account.root.glob('*'))), 5)
+        self.assertEqual(len(list(self.account.contacts.glob('GAL*'))), 1)
+
+    def test_div_navigation(self):
+        self.assertEqual(
+            self.account.root / 'Top of Information Store' / self.account.calendar.name,
+            self.account.calendar
+        )
 
 
 class BaseItemTest(EWSTest):

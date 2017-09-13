@@ -192,6 +192,9 @@ class ItemId(EWSElement):
             return False
         return self.id == other.id and self.changekey == other.changekey
 
+    def __hash__(self):
+        return hash(tuple(getattr(self, f) for f in self.__slots__))
+
 
 class ParentItemId(ItemId):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa563720(v=exchg.150).aspx
@@ -221,6 +224,13 @@ class ConversationId(ItemId):
         # Sometimes required, see MSDN link
         IdField('changekey', field_uri=ItemId.CHANGEKEY_ATTR, is_required=False),
     ]
+
+    __slots__ = ItemId.__slots__
+
+
+class ParentFolderId(ItemId):
+    # MSDN: https://msdn.microsoft.com/en-us/library/office/aa494327(v=exchg.150).aspx
+    ELEMENT_NAME = 'ParentFolderId'
 
     __slots__ = ItemId.__slots__
 

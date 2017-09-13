@@ -374,10 +374,11 @@ class GetRoomLists(EWSService):
     element_container_name = '{%s}RoomLists' % MNS
 
     def call(self):
+        from .properties import RoomList
+
         if self.protocol.version.build < EXCHANGE_2010:
             raise NotImplementedError('%s is only supported for Exchange 2010 servers and later' % self.SERVICE_NAME)
         elements = self._get_elements(payload=self.get_payload())
-        from .properties import RoomList
         return [RoomList.from_xml(elem=elem, account=None) for elem in elements]
 
     def get_payload(self):
@@ -392,10 +393,10 @@ class GetRooms(EWSService):
     element_container_name = '{%s}Rooms' % MNS
 
     def call(self, roomlist):
+        from .properties import Room
         if self.protocol.version.build < EXCHANGE_2010:
             raise NotImplementedError('%s is only supported for Exchange 2010 servers and later' % self.SERVICE_NAME)
         elements = self._get_elements(payload=self.get_payload(roomlist=roomlist))
-        from .properties import Room
         return [Room.from_xml(elem=elem, account=None) for elem in elements]
 
     def get_payload(self, roomlist):
@@ -1079,10 +1080,10 @@ class DeleteAttachment(EWSAccountService):
     def _get_element_container(self, message, name=None):
         # DeleteAttachment returns RootItemIds directly beneath DeleteAttachmentResponseMessage. Collect the elements
         # and make our own fake container.
+        from .properties import RootItemId
         res = super(DeleteAttachment, self)._get_element_container(message=message, name=name)
         if not res:
             return res
-        from .properties import RootItemId
         fake_elem = create_element('FakeContainer')
         for elem in message.findall(RootItemId.response_tag()):
             fake_elem.append(elem)
@@ -1156,15 +1157,14 @@ class UploadItems(EWSAccountService, EWSPooledMixIn):
         and the second element is a Data string returned from an ExportItems
         call.
         """
+        from .properties import ParentFolderId
         uploaditems = create_element('m:%s' % self.SERVICE_NAME)
         itemselement = create_element('m:Items')
         uploaditems.append(itemselement)
         for parent_folder, data_str in items:
-            item = create_element("t:Item", CreateAction="CreateNew")
-            parentfolderid = create_element('t:ParentFolderId')
-            parentfolderid.attrib['Id'] = parent_folder.folder_id
-            parentfolderid.attrib['ChangeKey'] = parent_folder.changekey
-            item.append(parentfolderid)
+            item = create_element('t:Item', CreateAction='CreateNew')
+            parentfolderid = ParentFolderId(parent_folder.folder_id, parent_folder.changekey)
+            set_xml_value(item, parentfolderid, version=self.account.version)
             add_xml_child(item, 't:Data', data_str)
             itemselement.append(item)
         return uploaditems

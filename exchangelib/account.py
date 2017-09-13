@@ -7,7 +7,7 @@ from logging import getLogger
 
 from cached_property import threaded_cached_property
 from future.utils import python_2_unicode_compatible
-from six import text_type, string_types
+from six import string_types
 
 from .autodiscover import discover
 from .credentials import DELEGATE, IMPERSONATION
@@ -15,7 +15,7 @@ from .errors import ErrorFolderNotFound, ErrorAccessDenied, UnknownTimeZone
 from .ewsdatetime import EWSTimeZone, UTC
 from .fields import FieldPath
 from .folders import Root, Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Tasks, Contacts, \
-    RecoverableItemsRoot, RecoverableItemsDeletions, Folder, SHALLOW, DEEP
+    RecoverableItemsRoot, RecoverableItemsDeletions, Folder
 from .items import Item, BulkCreateResult, HARD_DELETE, \
     AUTO_RESOLVE, SEND_TO_NONE, SAVE_ONLY, SEND_AND_SAVE_COPY, SEND_ONLY, ALL_OCCURRENCIES, \
     DELETE_TYPE_CHOICES, MESSAGE_DISPOSITION_CHOICES, CONFLICT_RESOLUTION_CHOICES, AFFECTED_TASK_OCCURRENCES_CHOICES, \
@@ -79,96 +79,72 @@ class Account(object):
         # We may need to override the default server version on a per-account basis because Microsoft may report one
         # server version up-front but delegate account requests to an older backend server.
         self.version = self.protocol.version
-        self.root = Root.get_distinguished(account=self)
+        try:
+            self.root = Root.get_distinguished(account=self)
+        except ErrorAccessDenied:
+            # We may not have access to folder services. This will leave the account severely crippled, but at least
+            # survive the error.
+            log.warning('Access denied to root folder')
+            self.root = Root(account=self)
 
         assert isinstance(self.protocol, Protocol)
         log.debug('Added account: %s', self)
 
-    @threaded_cached_property
+    @property
     def folders(self):
-        # 'Top of Information Store' is a folder available in some Exchange accounts. It only contains folders
-        # owned by the account.
-        folders = self.root.get_folders(depth=SHALLOW)  # Start by searching top-level folders.
-        for folder in folders:
-            if folder.name == 'Top of Information Store':
-                folders = folder.get_folders(depth=SHALLOW)
-                break
-        else:
-            # We need to dig deeper. Get everything.
-            folders = self.root.get_folders(depth=DEEP)
-        mapped_folders = defaultdict(list)
-        for f in folders:
-            mapped_folders[f.__class__].append(f)
-        return mapped_folders
-
-    def _get_default_folder(self, fld_class):
-        try:
-            # Get the default folder
-            log.debug('Testing default %s folder with GetFolder', fld_class)
-            return fld_class.get_distinguished(account=self)
-        except ErrorAccessDenied:
-            # Maybe we just don't have GetFolder access? Try FindItems instead
-            log.debug('Testing default %s folder with FindItem', fld_class)
-            fld = fld_class(account=self)  # Creates a folder instance with default distinguished folder name
-            fld.test_access()
-            return fld
-        except ErrorFolderNotFound:
-            # There's no folder named fld_class.DISTINGUISHED_FOLDER_ID. Try to guess which folder is the default.
-            # Exchange makes this unnecessarily difficult.
-            log.debug('Searching default %s folder in full folder list', fld_class)
-            flds = self.folders[fld_class]
-            if not flds:
-                raise ErrorFolderNotFound('No useable default %s folders' % fld_class)
-            assert len(flds) == 1, 'Multiple possible default %s folders: %s' % (
-                fld_class, [text_type(f) for f in flds])
-            return flds[0]
+        import warnings
+        warnings.warn('The Account.folders mapping is deprecated. Use Account.root.walk() instead')
+        folders_map = defaultdict(list)
+        for f in self.root.walk():
+            folders_map[f.__class__].append(f)
+        return folders_map
 
     @threaded_cached_property
     def calendar(self):
         # If the account contains a shared calendar from a different user, that calendar will be in the folder list.
         # Attempt not to return one of those. An account may not always have a calendar called "Calendar", but a
         # Calendar folder with a localized name instead. Return that, if it's available.
-        return self._get_default_folder(Calendar)
+        return self.root.get_default_folder(Calendar)
 
     @threaded_cached_property
     def trash(self):
-        return self._get_default_folder(DeletedItems)
+        return self.root.get_default_folder(DeletedItems)
 
     @threaded_cached_property
     def drafts(self):
-        return self._get_default_folder(Drafts)
+        return self.root.get_default_folder(Drafts)
 
     @threaded_cached_property
     def inbox(self):
-        return self._get_default_folder(Inbox)
+        return self.root.get_default_folder(Inbox)
 
     @threaded_cached_property
     def outbox(self):
-        return self._get_default_folder(Outbox)
+        return self.root.get_default_folder(Outbox)
 
     @threaded_cached_property
     def sent(self):
-        return self._get_default_folder(SentItems)
+        return self.root.get_default_folder(SentItems)
 
     @threaded_cached_property
     def junk(self):
-        return self._get_default_folder(JunkEmail)
+        return self.root.get_default_folder(JunkEmail)
 
     @threaded_cached_property
     def tasks(self):
-        return self._get_default_folder(Tasks)
+        return self.root.get_default_folder(Tasks)
 
     @threaded_cached_property
     def contacts(self):
-        return self._get_default_folder(Contacts)
+        return self.root.get_default_folder(Contacts)
 
     @threaded_cached_property
     def recoverable_items_root(self):
-        return self._get_default_folder(RecoverableItemsRoot)
+        return self.root.get_default_folder(RecoverableItemsRoot)
 
     @threaded_cached_property
     def recoverable_deleted_items(self):
-        return self._get_default_folder(RecoverableItemsDeletions)
+        return self.root.get_default_folder(RecoverableItemsDeletions)
 
     @property
     def domain(self):

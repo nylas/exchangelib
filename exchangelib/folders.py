@@ -1,16 +1,21 @@
 # coding=utf-8
 from __future__ import unicode_literals
 
+from fnmatch import fnmatch
 import logging
+from operator import attrgetter
+import re
 
+from cached_property import threaded_cached_property
 from future.utils import python_2_unicode_compatible
-from six import string_types
+from six import text_type, string_types
 
-from .errors import ErrorAccessDenied, ErrorCannotDeleteObject
-from .fields import IntegerField, TextField, DateTimeField, FieldPath, EffectiveRightsField, MailboxField, IdField
+from .errors import ErrorAccessDenied, ErrorCannotDeleteObject, ErrorFolderNotFound
+from .fields import IntegerField, TextField, DateTimeField, FieldPath, EffectiveRightsField, MailboxField, IdField, \
+    EWSElementField
 from .items import Item, CalendarItem, Contact, Message, Task, MeetingRequest, MeetingResponse, MeetingCancellation, \
     DistributionList, ITEM_CLASSES, ITEM_TRAVERSAL_CHOICES, SHAPE_CHOICES, IdOnly
-from .properties import ItemId, Mailbox, EWSElement
+from .properties import ItemId, Mailbox, EWSElement, ParentFolderId
 from .queryset import QuerySet
 from .restriction import Restriction
 from .services import FindFolder, GetFolder, FindItem
@@ -91,6 +96,9 @@ class CalendarView(EWSElement):
 
 @python_2_unicode_compatible
 class Folder(EWSElement):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa581334(v=exchg.150).aspx
+    """
     DISTINGUISHED_FOLDER_ID = None  # See https://msdn.microsoft.com/en-us/library/office/aa580808(v=exchg.150).aspx
     # Default item type for this folder. See http://msdn.microsoft.com/en-us/library/hh354773(v=exchg.80).aspx
     CONTAINER_CLASS = None
@@ -100,6 +108,7 @@ class Folder(EWSElement):
     FIELDS = [
         IdField('folder_id', field_uri='folder:FolderId', is_searchable=False),
         IdField('changekey', field_uri='folder:Changekey', is_searchable=False),
+        EWSElementField('parent_folder_id', field_uri='folder:ParentFolderId', value_cls=ParentFolderId),
         TextField('folder_class', field_uri='folder:FolderClass'),
         TextField('name', field_uri='folder:DisplayName'),
         IntegerField('total_count', field_uri='folder:TotalCount', is_read_only=True),
@@ -108,8 +117,8 @@ class Folder(EWSElement):
         EffectiveRightsField('effective_rights', field_uri='folder:EffectiveRights', is_read_only=True),
     ]
 
-    __slots__ = ('account', 'folder_id', 'changekey', 'folder_class', 'name', 'total_count', 'child_folder_count',
-                 'unread_count', 'effective_rights')
+    __slots__ = ('account', 'folder_id', 'changekey', 'parent_folder_id', 'folder_class', 'name', 'total_count',
+                 'child_folder_count', 'unread_count', 'effective_rights')
 
     def __init__(self, **kwargs):
         self.account = kwargs.pop('account', None)
@@ -130,16 +139,125 @@ class Folder(EWSElement):
             assert self.changekey
 
     @property
+    def parent(self):
+        if self.parent_folder_id.id == self.folder_id:
+            # Some folders have a parent that references itself. Avoid circulare references here
+            return None
+        return self.account.root.get_folder(self.parent_folder_id.id)
+
+    @property
+    def children(self):
+        for c in self.account.root.get_children(self):
+            yield c
+
+    def get_folder_by_name(self, name):
+        """Takes a case-sensitive folder name and returns an instance of that folder, if a folder with that name exists
+        as a direct or indirect subfolder of this folder.
+        """
+        import warnings
+        warnings.warn('The get_folder_by_name() method is deprecated. Use "[f for f in self.walk() if f.name == name]" '
+                      'or "some_folder / \'Sub Folder\'" instead, to find folders by name.')
+        matching_folders = [f for f in self.walk() if f.name == name]
+        if not matching_folders:
+            raise ValueError('No subfolders found with name %s' % name)
+        if len(matching_folders) > 1:
+            raise ValueError('Multiple subfolders found with name %s' % name)
+        return matching_folders[0]
+
+    @property
+    def parts(self):
+        parts = [self]
+        f = self.parent
+        while f:
+            parts.insert(0, f)
+            f = f.parent
+        return parts
+
+    @property
+    def root(self):
+        return self.parts[0]
+
+    def absolute(self):
+        return ''.join('/%s' % p.name for p in self.parts)
+
+    def walk(self):
+        for c in self.children:
+            yield c
+            for f in c.walk():
+                yield f
+
+    def glob(self, pattern):
+        split_pattern = pattern.rsplit('/', maxsplit=1)
+        head, tail = (split_pattern[0], None) if len(split_pattern) == 1 else split_pattern
+        if head == '':
+            # We got an absolute path. Restart globbing at root
+            for f in self.root.glob(tail or '*'):
+                yield f
+        elif head == '..':
+            # Relative path with reference to parent. Restart globbing at parent
+            if not self.parent:
+                raise ValueError('Already at top')
+            for f in self.parent.glob(tail or '*'):
+                yield f
+        elif head == '**':
+            # Match anything here or in any subfolder at arbitrary depth
+            for c in self.walk():
+                if fnmatch(c.name, tail or '*'):
+                    yield c
+        else:
+            # Regular pattern
+            for c in self.children:
+                if not fnmatch(c.name, head):
+                    continue
+                if tail is None:
+                    yield c
+                    continue
+                for f in c.glob(tail):
+                    yield f
+
+    def tree(self):
+        """
+        Returns a string representation of the folder structure of this folder. Example:
+
+        root
+        ├── inbox
+        │   └── todos
+        └── archive
+            ├── Last Job
+            ├── exchangelib issues
+            └── Mom
+        """
+        tree = '%s\n' % self.name
+        children = list(self.children)
+        for i, c in enumerate(sorted(children, key=attrgetter('name')), start=1):
+            nodes = c.tree().split('\n')
+            for j, node in enumerate(nodes, start=1):
+                if i != len(children) and j == 1:
+                    # Not the last child, but the first node, which is the name of the child
+                    tree += '├── %s\n' % node
+                elif i != len(children) and j > 1:
+                    # Not the last child, and not name of child
+                    tree += '│   %s\n' % node
+                elif i == len(children) and j == 1:
+                    # Not the last child, but the first node, which is the name of the child
+                    tree += '└── %s\n' % node
+                else:  # Last child, and not name of child
+                    tree += '    %s\n' % node
+        return tree.strip()
+
+    @property
     def is_distinguished(self):
         return self.name and self.DISTINGUISHED_FOLDER_ID and self.name.lower() == self.DISTINGUISHED_FOLDER_ID.lower()
 
     @staticmethod
     def folder_cls_from_container_class(container_class):
-        """Returns a reasonable folder class given a container class, e.g. 'IPF.Note'
+        """Returns a reasonable folder class given a container class, e.g. 'IPF.Note'. Don't iterate WELLKNOWN_FOLDERS
+        because many folder classes have the same CONTAINER_CLASS.
         """
-        try:
-            return {cls.CONTAINER_CLASS: cls for cls in (Calendar, Contacts, Messages, Tasks)}[container_class]
-        except KeyError:
+        for folder_cls in (Messages, Tasks, Calendar, Contacts, GALContacts, RecipientCache):
+            if folder_cls.CONTAINER_CLASS == container_class:
+                return folder_cls
+        else:
             return Folder
 
     @staticmethod
@@ -150,9 +268,9 @@ class Folder(EWSElement):
         """
         folder_classes = set(WELLKNOWN_FOLDERS.values())
         for folder_cls in folder_classes:
-            for localized_name in folder_cls.LOCALIZED_NAMES.get(locale, []):
-                if folder_name.lower() == localized_name.lower():
-                    return folder_cls
+            localized_names = {s.lower() for s in folder_cls.LOCALIZED_NAMES.get(locale, [])}
+            if folder_name.lower() in localized_names:
+                return folder_cls
         raise KeyError()
 
     @classmethod
@@ -341,12 +459,12 @@ class Folder(EWSElement):
 
     def wipe(self):
         # Recursively deletes all items in this folder and all subfolders. Use with caution!
-        for f in self.get_folders():
+        for f in self.children:
+            # TODO: Also delete non-distinguished folders here when we support folder deletion
             try:
                 f.wipe()
             except ErrorAccessDenied:
                 log.warning('Not allowed to wipe %s', f)
-            # TODO: Also delete non-distinguished folders here when we support folder deletion
         log.debug('Wiping folder %s', self)
         for i in self.all().delete():
             if isinstance(i, ErrorCannotDeleteObject):
@@ -387,7 +505,7 @@ class Folder(EWSElement):
     def supported_fields(cls, version=None):
         return tuple(f for f in cls.FIELDS if f.name not in ('folder_id', 'changekey') and f.supports_version(version))
 
-    def get_folders(self, shape=IdOnly, depth=DEEP):
+    def find_folders(self, shape=IdOnly, depth=DEEP):
         # 'depth' controls whether to return direct children or recurse into sub-folders
         if not self.account:
             raise ValueError('Folder must have an account')
@@ -403,7 +521,9 @@ class Folder(EWSElement):
         ):
             # TODO: Support the Restriction class for folders, too
             # The "FolderClass" element value is the only indication we have in the FindFolder response of which
-            # folder class we should create the folder with.
+            # folder class we should create the folder with. And many folders share the same 'FolderClass' value, e.g.
+            # Inbox and DeletedItems. We want to distinguish between these because otherwise we can't locate the right
+            # folders for e.g. Account.inbox and Account.trash.
             #
             # We should be able to just use the name, but apparently default folder names can be renamed to a set of
             # localized names using a PowerShell command:
@@ -411,13 +531,12 @@ class Folder(EWSElement):
             #
             # Instead, search for a folder class using the localized name. If none are found, fall back to getting the
             # folder class by the "FolderClass" value.
-            #
-            # TODO: fld_class.LOCALIZED_NAMES is most definitely neither complete nor authoritative
             if isinstance(elem, Exception):
                 yield elem
                 continue
             dummy_fld = Folder.from_xml(elem=elem, account=self.account)  # We use from_xml() only to parse elem
             try:
+                # TODO: fld_class.LOCALIZED_NAMES is most definitely neither complete nor authoritative
                 folder_cls = self.folder_cls_from_folder_name(folder_name=dummy_fld.name, locale=self.account.locale)
                 log.debug('Folder class %s matches localized folder name %s', folder_cls, dummy_fld.name)
             except KeyError:
@@ -426,37 +545,27 @@ class Folder(EWSElement):
                           dummy_fld.name)
             yield folder_cls(account=self.account, **{f.name: getattr(dummy_fld, f.name) for f in folder_cls.FIELDS})
 
-    def get_folder_by_name(self, name):
-        """Takes a case-sensitive folder name and returns an instance of that folder, if a folder with that name exists
-        as a direct or indirect subfolder of this folder.
-        """
-        assert isinstance(name, string_types)
-        matching_folders = []
-        for f in self.get_folders(depth=DEEP):
-            if f.name == name:
-                matching_folders.append(f)
-        if not matching_folders:
-            raise ValueError('No subfolders found with name %s' % name)
-        if len(matching_folders) > 1:
-            raise ValueError('Multiple subfolders found with name %s' % name)
-        return matching_folders[0]
-
     @classmethod
-    def get_distinguished(cls, account, shape=IdOnly):
-        assert shape in SHAPE_CHOICES
-        additional_fields = [FieldPath(field=f) for f in cls.supported_fields(version=account.version)]
-        folders = []
+    def get_folders(cls, account, ids, additional_fields=None):
+        if additional_fields is None:
+            additional_fields = [FieldPath(field=f) for f in cls.supported_fields(version=account.version)]
         for elem in GetFolder(account=account).call(
-                folders=[cls(account=account)],
+                folders=ids,
                 additional_fields=additional_fields,
-                shape=shape
+                shape=IdOnly
         ):
             if isinstance(elem, Exception):
                 raise elem
-            folder = cls.from_xml(elem=elem, account=account)
-            folder.account = account
-            folders.append(folder)
+            yield cls.from_xml(elem=elem, account=account)
+
+    @classmethod
+    def get_distinguished(cls, account):
+        assert cls.DISTINGUISHED_FOLDER_ID
+        folders = list(cls.get_folders(account=account, ids=[cls(account=account)]))
+        if not folders:
+            raise ErrorFolderNotFound('Could not find distinguished folder %s' % cls.DISTINGUISHED_FOLDER_ID)
         assert len(folders) == 1
+        assert isinstance(folders[0], cls)
         return folders[0]
 
     def refresh(self):
@@ -464,23 +573,27 @@ class Folder(EWSElement):
             raise ValueError('Folder must have an account')
         if not self.folder_id:
             raise ValueError('Folder must have an ID')
-        additional_fields = [FieldPath(field=f) for f in self.supported_fields(version=self.account.version)]
-        folders = []
-        for elem in GetFolder(account=self.account).call(
-                folders=[self],
-                additional_fields=additional_fields,
-                shape=IdOnly
-        ):
-            if isinstance(elem, Exception):
-                raise elem
-            folder = self.from_xml(elem=elem, account=self.account)
-            folders.append(folder)
+        folders = list(self.get_folders(account=self.account, ids=[self]))
+        if not folders:
+            raise ErrorFolderNotFound('Folder %s disappeared' % self)
         assert len(folders) == 1
         fresh_folder = folders[0]
         assert self.folder_id == fresh_folder.folder_id
         # Apparently, the changekey may get updated
         for f in self.FIELDS:
             setattr(self, f.name, getattr(fresh_folder, f.name))
+
+    def __truediv__(self, other):
+        if other == '..':
+            if not self.parent:
+                raise ValueError('Already at top')
+            return self.parent / other
+        if other == '.':
+            return self
+        for c in self.children:
+            if c.name == other:
+                return c
+        raise ErrorFolderNotFound("No subfolder with name '%s'" % other)
 
     def __repr__(self):
         return self.__class__.__name__ + \
@@ -494,7 +607,104 @@ class Folder(EWSElement):
 class Root(Folder):
     DISTINGUISHED_FOLDER_ID = 'root'
 
-    __slots__ = Folder.__slots__
+    __slots__ = Folder.__slots__ + ('_subfolders',)
+
+    def __init__(self, **kwargs):
+        super(Root, self).__init__(**kwargs)
+        self._subfolders = None  # See self._folders_map()
+
+    def refresh(self):
+        self._subfolders = None
+        super(Root, self).refresh()
+
+    def get_folder(self, folder_id):
+        return self._folders_map.get(folder_id, None)
+
+    def get_children(self, folder):
+        for f in self._folders_map.values():
+            if not f.parent:
+                continue
+            if f.parent.folder_id == folder.folder_id:
+                yield f
+
+    @property
+    def _folders_map(self):
+        if self._subfolders is not None:
+            return self._subfolders
+
+        # Map root, and all subfolders of root, at arbitrary depth by folder ID
+        folders_map = {self.folder_id: self}
+        try:
+            for f in self.find_folders(depth=DEEP):
+                if isinstance(f, Exception):
+                    raise f
+                folders_map[f.folder_id] = f
+        except ErrorAccessDenied:
+            # We may not have GetFolder or FindFolder access
+            pass
+        self._subfolders = folders_map
+        return folders_map
+
+    def get_default_folder(self, folder_cls):
+        # Returns the distinguished folder instance of type folder_cls belonging to this account. If no distinguished
+        # folder was found, try as best we can to return the default folder of type 'folder_cls'
+        assert folder_cls.DISTINGUISHED_FOLDER_ID
+        try:
+            # Get the default folder
+            log.debug('Testing default %s folder with GetFolder', folder_cls)
+            f = folder_cls.get_distinguished(account=self.account)
+            return self._folders_map.get(f.folder_id, f)  # Use cached instance if available
+        except ErrorAccessDenied:
+            # Maybe we just don't have GetFolder access? Try FindItems instead
+            log.debug('Testing default %s folder with FindItem', folder_cls)
+            f = folder_cls(account=self.account)  # Creates a folder instance with default distinguished folder name
+            f.test_access()
+            return self._folders_map.get(f.folder_id, f)  # Use cached instance if available
+        except ErrorFolderNotFound:
+            # There's no folder named fld_class.DISTINGUISHED_FOLDER_ID. Try to guess which folder is the default.
+            # Exchange makes this unnecessarily difficult.
+            log.debug('Searching default %s folder in full folder list', folder_cls)
+
+        candidates = []
+        try:
+            # 'Top of Information Store' is a folder available in some Exchange accounts. It only contains folders
+            # owned by the account. Try direct children of that first.
+            tois = self / 'Top of Information Store'
+        except ErrorFolderNotFound:
+            pass
+        else:
+            same_type = [f for f in tois.children if type(f) == folder_cls]
+            are_distinguished = [f for f in same_type if f.is_distinguished]
+            if are_distinguished:
+                candidates = are_distinguished
+            else:
+                localized_names = {s.lower() for s in folder_cls.LOCALIZED_NAMES.get(self.account.locale, [])}
+                candidates = [f for f in same_type if f.name.lower() in localized_names]
+
+        if candidates:
+            if len(candidates) > 1:
+                raise ValueError(
+                    'Multiple possible default %s folders in TOIS: %s'
+                    % (folder_cls, [text_type(f.name) for f in candidates])
+                )
+            return candidates[0]
+
+        # No candidates in TOIS. Try direct children of root.
+        same_type = [f for f in self.children if type(f) == folder_cls]
+        are_distinguished = [f for f in same_type if f.is_distinguished]
+        if are_distinguished:
+            candidates = are_distinguished
+        else:
+            localized_names = {s.lower() for s in folder_cls.LOCALIZED_NAMES.get(self.account.locale, [])}
+            candidates = [f for f in same_type if f.name.lower() in localized_names]
+
+        if candidates:
+            if len(candidates) > 1:
+                raise ValueError('Multiple possible default %s folders in root: %s'
+                                 % (folder_cls, [text_type(f.name) for f in candidates]))
+            return candidates[0]
+
+        raise ErrorFolderNotFound('No useable default %s folders' % folder_cls)
 
 
 class Calendar(Folder):
@@ -703,7 +913,21 @@ class Contacts(Folder):
     __slots__ = Folder.__slots__
 
 
-class GenericFolder(Folder):
+class GALContacts(Contacts):
+    DISTINGUISHED_FOLDER_ID = None
+    CONTAINER_CLASS = 'IPF.Contact.GalContacts'
+
+    LOCALIZED_NAMES = {}
+
+    __slots__ = Folder.__slots__
+
+
+class RecipientCache(Contacts):
+    DISTINGUISHED_FOLDER_ID = None
+    CONTAINER_CLASS = 'IPF.Contact.RecipientCache'
+
+    LOCALIZED_NAMES = {}
+
     __slots__ = Folder.__slots__
 
 
@@ -714,40 +938,39 @@ class WellknownFolder(Folder):
 
 # See http://msdn.microsoft.com/en-us/library/microsoft.exchange.webservices.data.wellknownfoldername(v=exchg.80).aspx
 WELLKNOWN_FOLDERS = dict([
+    ('ArchiveDeletedItems', WellknownFolder),
+    ('ArchiveMsgFolderRoot', WellknownFolder),
+    ('ArchiveRecoverableItemsDeletions', WellknownFolder),
+    ('ArchiveRecoverableItemsPurges', WellknownFolder),
+    ('ArchiveRecoverableItemsRoot', Folder),
+    ('ArchiveRecoverableItemsVersions', WellknownFolder),
+    ('ArchiveRoot', WellknownFolder),
     ('Calendar', Calendar),
+    ('Conflicts', WellknownFolder),
     ('Contacts', Contacts),
+    ('ConversationHistory', WellknownFolder),
     ('DeletedItems', DeletedItems),
     ('Drafts', Drafts),
     ('Inbox', Inbox),
     ('Journal', WellknownFolder),
+    ('JunkEmail', JunkEmail),
+    ('LocalFailures', WellknownFolder),
+    ('MsgFolderRoot', WellknownFolder),
     ('Notes', WellknownFolder),
     ('Outbox', Outbox),
-    ('SentItems', SentItems),
-    ('Tasks', Tasks),
-    ('MsgFolderRoot', WellknownFolder),
     ('PublicFoldersRoot', WellknownFolder),
-    ('Root', Root),
-    ('JunkEmail', JunkEmail),
-    ('Search', WellknownFolder),
-    ('VoiceMail', WellknownFolder),
-    ('RecoverableItemsRoot', RecoverableItemsRoot),
-    ('RecoverableItemsDeletions', RecoverableItemsDeletions),
-    ('RecoverableItemsVersions', WellknownFolder),
-    ('RecoverableItemsPurges', WellknownFolder),
-    ('ArchiveRoot', WellknownFolder),
-    ('ArchiveMsgFolderRoot', WellknownFolder),
-    ('ArchiveDeletedItems', WellknownFolder),
-    ('ArchiveRecoverableItemsRoot', Folder),
-    ('ArchiveRecoverableItemsDeletions', WellknownFolder),
-    ('ArchiveRecoverableItemsVersions', WellknownFolder),
-    ('ArchiveRecoverableItemsPurges', WellknownFolder),
-    ('SyncIssues', WellknownFolder),
-    ('Conflicts', WellknownFolder),
-    ('LocalFailures', WellknownFolder),
-    ('ServerFailures', WellknownFolder),
-    ('RecipientCache', WellknownFolder),
     ('QuickContacts', WellknownFolder),
-    ('ConversationHistory', WellknownFolder),
+    ('RecipientCache', RecipientCache),
+    ('RecoverableItemsDeletions', RecoverableItemsDeletions),
+    ('RecoverableItemsPurges', WellknownFolder),
+    ('RecoverableItemsRoot', RecoverableItemsRoot),
+    ('RecoverableItemsVersions', WellknownFolder),
+    ('Root', Root),
+    ('SearchFolders', WellknownFolder),
+    ('SentItems', SentItems),
+    ('ServerFailures', WellknownFolder),
+    ('SyncIssues', WellknownFolder),
+    ('Tasks', Tasks),
     ('ToDoSearch', WellknownFolder),
-    ('', GenericFolder),
+    ('VoiceMail', WellknownFolder),
 ])
