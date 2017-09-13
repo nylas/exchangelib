@@ -49,11 +49,11 @@ class Credentials(object):
         # policy is used.
         return True
 
-    def __hash__(self):
-        return hash((self.username, self.password))
-
     def __eq__(self, other):
         return self.username == other.username and self.password == other.password
+
+    def __hash__(self):
+        return hash((self.username, self.password))
 
     def __repr__(self):
         return self.__class__.__name__ + repr((self.username, '********'))

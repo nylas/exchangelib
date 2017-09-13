@@ -1110,7 +1110,7 @@ class ExportItems(EWSAccountService, EWSPooledMixIn):
     ERRORS_TO_CATCH_IN_RESPONSE = ResponseMessageError
     CHUNKSIZE = 100
     SERVICE_NAME = 'ExportItems'
-    element_container_name = "{%s}Data" % MNS
+    element_container_name = '{%s}Data' % MNS
 
     def call(self, items):
         return self._pool_requests(payload_func=self.get_payload, **dict(items=items))
@@ -1126,7 +1126,7 @@ class ExportItems(EWSAccountService, EWSPooledMixIn):
 
         return exportitems
 
-    # We need to override this since ExportItemsResponseMessage is formated a
+    # We need to override this since ExportItemsResponseMessage is formatted a
     #  little bit differently. Namely, all we want is the 64bit string in the
     #  Data tag.
     def _get_elements_in_container(self, container):

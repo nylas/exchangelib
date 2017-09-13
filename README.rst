@@ -151,7 +151,7 @@ Folders
 Dates, datetimes and timezones
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-EWS has some special requirements on datetimes and timezones. You need to use the special ``EWSDate``, 
+EWS has some special requirements on datetimes and timezones. You need to use the special ``EWSDate``,
 ``EWSDateTime`` and ``EWSTimeZone`` classes when working with dates.
 
 .. code-block:: python
@@ -161,7 +161,7 @@ EWS has some special requirements on datetimes and timezones. You need to use th
     # You can also get the local timezone defined in your operating system
     tz = EWSTimeZone.localzone()
 
-    # EWSDate and EWSDateTime work just like datetime.datetime and datetime.date. Always create timezone-aware 
+    # EWSDate and EWSDateTime work just like datetime.datetime and datetime.date. Always create timezone-aware
     # datetimes with EWSTimeZone.localize():
     localized_dt = tz.localize(EWSDateTime(2017, 9, 5, 8, 30))
     right_now = tz.localize(EWSDateTime.now())
@@ -442,8 +442,8 @@ description of the possibilities, but we do intend to support all the possibilit
         property_type = 'BinaryArray'
         property_id = 32852
 
-    # Or using distinguished property sets combined with property ID (here as a hex value to align with 
-    # the format usually mentioned in Microsoft docs). This is the definition for a response to an Outlook 
+    # Or using distinguished property sets combined with property ID (here as a hex value to align with
+    # the format usually mentioned in Microsoft docs). This is the definition for a response to an Outlook
     # Vote request (see issue #198):
     class VoteResponse(ExtendedProperty):
         distinguished_property_set_id = 'Common'
@@ -545,7 +545,7 @@ Each ``Message`` item has four timestamp fields:
 * ``datetime_received``
 * ``last_modified_time``
 
-The values for these fields are set by the Exchange server and are not modifiable via EWS. All 
+The values for these fields are set by the Exchange server and are not modifiable via EWS. All
 values are timezone-aware ``EWSDateTime`` instances.
 
 The ``datetime_sent`` value may be earlier than ``datetime_created``.

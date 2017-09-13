@@ -71,7 +71,7 @@ class Account(object):
         try:
             self.default_timezone = default_timezone or EWSTimeZone.localzone()
         except (ValueError, UnknownTimeZone) as e:
-            # There is no translation from local timezone name to Windows timezone name, or e failed to find the 
+            # There is no translation from local timezone name to Windows timezone name, or e failed to find the
             # local timezone.
             log.warning(e.args[0] + '. Fallback to UTC')
             self.default_timezone = UTC
