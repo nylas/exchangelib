@@ -2392,6 +2392,11 @@ class FolderTest(EWSTest):
             ['root', 'Top of Information Store', self.account.calendar.name]
         )
 
+    def test_absolute(self):
+        self.assertEqual(
+            self.account.calendar.absolute,
+            '/root/Top of Information Store/' + self.account.calendar.name
+        )
     def test_walk(self):
         self.assertGreaterEqual(len(list(self.account.root.walk())), 20)
         self.assertGreaterEqual(len(list(self.account.contacts.walk())), 2)

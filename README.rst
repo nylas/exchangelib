@@ -116,11 +116,13 @@ Folders
     # The most common folders are available as account.calendar, account.trash, account.drafts, account.inbox,
     # account.outbox, account.sent, account.junk, account.tasks, and account.contacts.
     #
-    # There are multiple ways of navigating the folder tree and searching for folders
+    # There are multiple ways of navigating the folder tree and searching for folders. Globbing and absolute path may
+    # create unexpected results if your folder names contain slashes.
     some_folder.parent
     some_folder.parent.parent.parent
     some_folder.root  # Returns the root of the folder structure, at any level. Same as Account.root
     some_folder.children  # A generator of child folders
+    some_folder.absolute  # Returns the absolute path, as a string
     some_folder.walk()  # A generator returning all subfolders at arbitrary depth this level
     # Globbing uses the normal UNIX globbing syntax
     some_folder.glob('foo*')  # Return child folders matching the pattern

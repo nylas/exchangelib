@@ -177,6 +177,7 @@ class Folder(EWSElement):
     def root(self):
         return self.parts[0]
 
+    @property
     def absolute(self):
         return ''.join('/%s' % p.name for p in self.parts)
 
