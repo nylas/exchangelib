@@ -28,8 +28,9 @@ from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, 
     ErrorMailboxMoveInProgress, ErrorAccessDenied, ErrorConnectionFailed, RateLimitError, ErrorServerBusy, \
     ErrorTooManyObjectsOpened, ErrorInvalidLicense, ErrorInvalidSchemaVersionForMailboxVersion, \
     ErrorInvalidServerVersion, ErrorItemNotFound, ErrorADUnavailable, ResponseMessageError, ErrorInvalidChangeKey, \
-    ErrorItemSave, ErrorInvalidIdMalformed, ErrorMessageSizeExceeded, UnauthorizedError, ErrorCannotDeleteTaskOccurrence, \
-    ErrorMimeContentConversionFailed, ErrorRecurrenceHasNoOccurrence, ErrorNameResolutionMultipleResults
+    ErrorItemSave, ErrorInvalidIdMalformed, ErrorMessageSizeExceeded, UnauthorizedError, \
+    ErrorCannotDeleteTaskOccurrence, ErrorMimeContentConversionFailed, ErrorRecurrenceHasNoOccurrence, \
+    ErrorNameResolutionMultipleResults, ErrorNameResolutionNoResults
 from .transport import wrap, SOAPNS, TNS, MNS, ENS
 from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, ElementType, \
     xml_to_str, set_xml_value
@@ -972,17 +973,21 @@ class ResolveNames(EWSService):
     # TODO: Does not support paged responses yet. See example in issue #205
     SERVICE_NAME = 'ResolveNames'
     element_container_name = '{%s}ResolutionSet' % MNS
+    ERRORS_TO_CATCH_IN_RESPONSE = EWSService.ERRORS_TO_CATCH_IN_RESPONSE + (ErrorNameResolutionNoResults,)
     WARNINGS_TO_IGNORE_IN_RESPONSE = ErrorNameResolutionMultipleResults
 
     def call(self, unresolved_entries, return_full_contact_data=False, search_scope=None, contact_data_shape=None):
+        from .properties import Mailbox
         elements = self._get_elements(payload=self.get_payload(
             unresolved_entries=unresolved_entries,
             return_full_contact_data=return_full_contact_data,
             search_scope=search_scope,
             contact_data_shape=contact_data_shape,
         ))
-        from .properties import Mailbox
-        return [Mailbox.from_xml(elem=elem.find(Mailbox.response_tag()), account=None) for elem in elements]
+        return [
+            Mailbox.from_xml(elem=elem.find(Mailbox.response_tag()), account=None)
+            for elem in elements if not isinstance(elem, ErrorNameResolutionNoResults)
+        ]
 
     def get_payload(self, unresolved_entries, return_full_contact_data, search_scope, contact_data_shape):
         payload = create_element(

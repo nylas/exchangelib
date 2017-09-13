@@ -1475,6 +1475,16 @@ class CommonTest(EWSTest):
             {'room1@example.com', 'room2@example.com'}
         )
 
+    def test_resolvenames(self):
+        self.assertEqual(
+            self.account.protocol.resolve_names(names='xxx@example.com'),
+            []
+        )
+        self.assertEqual(
+            self.account.protocol.resolve_names(names=self.account.primary_smtp_address),
+            [Mailbox(email_address=self.account.primary_smtp_address)]
+        )
+
     def test_resolvenames_parsing(self):
         # Test static XML since server has no roomlists
         ws = ResolveNames(self.account.protocol)
