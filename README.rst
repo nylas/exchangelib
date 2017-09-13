@@ -148,6 +148,8 @@ Folders
     account.inbox.unread_count
     # Update the counters
     account.inbox.refresh()
+    # The folder structure is cached after first access. To clear the cache, refresh the root folder
+    account.root.refresh()
 
 
 Dates, datetimes and timezones
