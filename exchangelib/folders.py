@@ -256,8 +256,7 @@ class Folder(EWSElement):
         for folder_cls in (Messages, Tasks, Calendar, Contacts, GALContacts, RecipientCache):
             if folder_cls.CONTAINER_CLASS == container_class:
                 return folder_cls
-        else:
-            return Folder
+        return Folder
 
     @staticmethod
     def folder_cls_from_folder_name(folder_name, locale):
