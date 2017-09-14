@@ -188,7 +188,7 @@ class Folder(EWSElement):
                 yield f
 
     def glob(self, pattern):
-        split_pattern = pattern.rsplit('/', maxsplit=1)
+        split_pattern = pattern.rsplit('/', 1)
         head, tail = (split_pattern[0], None) if len(split_pattern) == 1 else split_pattern
         if head == '':
             # We got an absolute path. Restart globbing at root
