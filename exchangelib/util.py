@@ -317,6 +317,7 @@ class DummyResponse(object):
         self.url = url
         self.headers = headers
         self.text = ''
+        self.content = b''
         self.request = DummyRequest(headers=request_headers)
 
 
