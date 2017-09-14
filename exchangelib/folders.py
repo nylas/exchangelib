@@ -593,6 +593,9 @@ class Folder(EWSElement):
                 return c
         raise ErrorFolderNotFound("No subfolder with name '%s'" % other)
 
+    # Python 2 requires __div__
+    __div__ = __truediv__
+
     def __repr__(self):
         return self.__class__.__name__ + \
                repr((self.account, self.name, self.total_count, self.unread_count, self.child_folder_count,
