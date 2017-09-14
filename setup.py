@@ -23,7 +23,7 @@ setup(
     license='BSD',
     keywords='Exchange EWS autodiscover',
     install_requires=['requests>=2.7', 'requests_ntlm>=0.2.0', 'dnspython>=1.14.0', 'pytz', 'lxml',
-                      'cached_property', 'future', 'six', 'tzlocal', 'python-dateutil'],
+                      'cached_property', 'future', 'six', 'tzlocal', 'python-dateutil', 'pygments'],
     packages=['exchangelib'],
     tests_require=['PyYAML', 'requests_mock', 'psutil'],
     test_suite='tests',

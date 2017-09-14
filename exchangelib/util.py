@@ -10,9 +10,13 @@ import socket
 import time
 from xml.etree.ElementTree import Element, fromstring, ParseError
 
+from lxml.etree import parse, tostring
 from future.moves.urllib.parse import urlparse
 from future.moves._thread import get_ident
 from future.utils import PY2
+from pygments import highlight
+from pygments.lexers import XmlLexer
+from pygments.formatters import TerminalFormatter
 import requests.exceptions
 from six import text_type, string_types
 
@@ -258,6 +262,50 @@ def is_xml(text):
     return text[:5] == '<?xml'
 
 
+class PrettyXmlHandler(logging.StreamHandler):
+    """A steaming log handler that prettifies log statements containing XML when output is a terminal"""
+    @staticmethod
+    def prettify_xml(xml_bytes):
+        # Re-formats an XML document to a consistent style
+        return tostring(parse(
+            io.BytesIO(xml_bytes)),
+            xml_declaration=True,
+            encoding='utf-8',
+            pretty_print=True
+        ).replace(b'\t', b'    ').replace(b' xmlns:', b'\n    xmlns:')
+
+    @staticmethod
+    def highlight_xml(xml_str):
+        # Highlights a string containing XML, using terminal color codes
+        return highlight(xml_str, XmlLexer(), TerminalFormatter())
+
+    def emit(self, record):
+        """Pretty-print and syntax highlight a log statement if all these conditions are met:
+           * This is a DEBUG message
+           * We're outputting to a terminal
+           * The log message args is a dict containing keys starting with 'xml_' and values as bytes
+        """
+        if record.levelno == logging.DEBUG and self.is_tty() and isinstance(record.args, dict):
+            for key, value in record.args.items():
+                if not key.startswith('xml_'):
+                    continue
+                if not isinstance(value, bytes):
+                    continue
+                if not is_xml(value[:10].decode('utf-8', errors='ignore')):
+                    continue
+                try:
+                    record.args[key] = self.highlight_xml(self.prettify_xml(value))
+                except Exception:
+                    # Something bad happened, but we don't want to crash the program just because logging failed
+                    pass
+        return super(PrettyXmlHandler, self).emit(record)
+
+    def is_tty(self):
+        # Check if we're outputting to a terminal
+        isatty = getattr(self.stream, 'isatty', None)
+        return isatty and isatty()
+
+
 class DummyRequest(object):
     def __init__(self, headers):
         self.headers = headers
@@ -379,8 +427,8 @@ Response time: %(response_time)s
 Status code: %(status_code)s
 Request headers: %(request_headers)s
 Response headers: %(response_headers)s
-Request data: %(request_data)s
-Response data: %(response_data)s
+Request data: %(xml_request)s
+Response data: %(xml_response)s
 '''
     try:
         while True:
@@ -396,7 +444,7 @@ Response data: %(response_data)s
                 retry=retry, wait=wait, timeout=protocol.TIMEOUT, session_id=session.session_id, thread_id=thread_id,
                 auth=session.auth, url=r.url, adapter=session.get_adapter(url), allow_redirects=allow_redirects,
                 response_time=time_func() - d_start, status_code=r.status_code, request_headers=r.request.headers,
-                response_headers=r.headers, request_data=data, response_data=r.text,
+                response_headers=r.headers, xml_request=data, xml_response=r.content,
             )
             log.debug(log_msg, log_vals)
             if _may_retry_on_error(r, protocol, wait):

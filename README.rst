@@ -564,28 +564,11 @@ can be really handy to see which fields are being sent and received.
 .. code-block:: python
 
     import logging
-    logging.basicConfig(level=logging.DEBUG)
+    # This handler will pretty-print and syntax highlight the request and response XML documents
+    from exchangelib.util import PrettyXmlHandler
+
+    logging.basicConfig(level=logging.DEBUG, handlers=[PrettyXmlHandler()])
     # Your code using exchangelib goes here
-
-
-When you capture a blob of interesting XML from the output, you'll want to pretty-print it to make it readable. Paste
-the blob in your favourite editor (e.g. TextMate has a pretty-print keyboard shortcut when the editor window is in XML
-mode which also highlights the XML), or use this Python snippet:
-
-.. code-block:: python
-
-    import io
-    from lxml.etree import parse, tostring
-
-    xml_str = '''
-    paste your XML blob here
-    '''
-
-    print(tostring(parse(
-        io.BytesIO(xml_str.encode())),
-        xml_declaration=True,
-        pretty_print=True
-    ).decode())
 
 
 Most class definitions have a docstring containing at least a URL to the MSDN  page for the corresponding XML element.

@@ -2,6 +2,11 @@
 Change Log
 ==========
 
+HEAD
+----
+* Added a ``exchangelib.util.PrettyXmlHandler`` log handler which will pretty-print and highlight XML requests
+  and responses.
+
 1.10.2
 ------
 * Greatly improved folder navigation. See the 'Folders' section in the README
