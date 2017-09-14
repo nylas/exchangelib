@@ -492,6 +492,13 @@ Attachments
     # Remove the attachment again
     item.detach(my_file)
 
+    # If you want to embed an image in the item body, you can link to the file in the HTML
+    logo_filename = 'logo.png'
+    with open(logo_filename, 'rb') as f:
+        my_logo = FileAttachment(name=logo_filename, content=fp.read())
+    message.attach(my_logo)
+    message.body = HTMLBody('<html><body>Hello logo: <img src="cid:%s"></body></html>' % logo_filename)
+
     # Attachments cannot be updated via EWS. In this case, you must to detach the attachment, update the
     # relevant fields, and attach the updated attachment.
 
