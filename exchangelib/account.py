@@ -11,7 +11,7 @@ from six import string_types
 
 from .autodiscover import discover
 from .credentials import DELEGATE, IMPERSONATION
-from .errors import ErrorFolderNotFound, ErrorAccessDenied, UnknownTimeZone
+from .errors import ErrorAccessDenied, UnknownTimeZone
 from .ewsdatetime import EWSTimeZone, UTC
 from .fields import FieldPath
 from .folders import Root, Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Tasks, Contacts, \

@@ -4,9 +4,7 @@ from __future__ import unicode_literals
 from fnmatch import fnmatch
 import logging
 from operator import attrgetter
-import re
 
-from cached_property import threaded_cached_property
 from future.utils import python_2_unicode_compatible
 from six import text_type, string_types
 
