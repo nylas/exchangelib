@@ -2364,6 +2364,15 @@ class FolderTest(EWSTest):
                     continue
                 self.assertEqual(getattr(f, field.name), old_values[field.name], field.name)
 
+        # Test refresh of root
+        all_folders = sorted(f.name for f in self.account.root.walk())
+        self.account.root.refresh()
+        self.assertIsNone(self.account.root._subfolders)
+        self.assertEqual(
+            sorted(f.name for f in self.account.root.walk()),
+            all_folders
+        )
+
         folder = Folder()
         with self.assertRaises(ValueError):
             folder.refresh()  # Must have an account
@@ -2408,11 +2417,23 @@ class FolderTest(EWSTest):
     def test_glob(self):
         self.assertGreaterEqual(len(list(self.account.root.glob('*'))), 5)
         self.assertEqual(len(list(self.account.contacts.glob('GAL*'))), 1)
+        self.assertGreaterEqual(len(list(self.account.contacts.glob('/'))), 5)
+        self.assertGreaterEqual(len(list(self.account.contacts.glob('../*'))), 5)
+        self.assertEqual(len(list(self.account.root.glob('**/%s' % self.account.contacts.name))), 1)
+        self.assertEqual(len(list(self.account.root.glob('Top of*/%s' % self.account.contacts.name))), 1)
 
     def test_div_navigation(self):
         self.assertEqual(
             self.account.root / 'Top of Information Store' / self.account.calendar.name,
             self.account.calendar
+        )
+        self.assertEqual(
+            self.account.root / 'Top of Information Store' / '..',
+            self.account.root
+        )
+        self.assertEqual(
+            self.account.root / '.',
+            self.account.root
         )
 
 
