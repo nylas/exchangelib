@@ -75,9 +75,10 @@ mock_version = namedtuple('mock_version', ('build',))
 
 def mock_post(url, status_code, headers, text):
     req = namedtuple('request', ['headers'])(headers={})
+    c = text.encode('utf-8')
     return lambda **kwargs: namedtuple(
-        'response', ['status_code', 'headers', 'text', 'request', 'history', 'url']
-    )(status_code=status_code, headers=headers, text=text, request=req, history=None, url=url)
+        'response', ['status_code', 'headers', 'text', 'content', 'request', 'history', 'url']
+    )(status_code=status_code, headers=headers, text=text, content=c, request=req, history=None, url=url)
 
 
 def mock_session_exception(exc_cls):
