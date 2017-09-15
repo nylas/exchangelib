@@ -3840,14 +3840,17 @@ class BaseItemTest(EWSTest):
                     # EWS does not always return a value if reminder_is_set is False.
                     continue
                 if old is not None:
-                    # EWS sometimes randomly sets the new reminder due date to one month before we wanted it, and
-                    # sometimes 30 days before. But only sometimes...
+                    # EWS sometimes randomly sets the new reminder due date to one month before or after we 
+                    # wanted it, and sometimes 30 days before or after. But only sometimes...
                     old_date = old.astimezone(self.account.default_timezone).date()
                     new_date = new.astimezone(self.account.default_timezone).date()
                     if relativedelta(month=1) + new_date == old_date:
                         item.reminder_due_by = new
                         continue
-                    elif old_date - new_date == datetime.timedelta(days=30):
+                    if relativedelta(month=1) + old_date == new_date:
+                        item.reminder_due_by = new
+                        continue
+                    elif abs(old_date - new_date) == datetime.timedelta(days=30):
                         item.reminder_due_by = new
                         continue
             if f.is_list:
@@ -4001,14 +4004,17 @@ class BaseItemTest(EWSTest):
                     item.reminder_due_by = new
                     continue
                 elif old is not None and new is not None:
-                    # EWS sometimes randomly sets the new reminder due date to one month before we wanted it, and
-                    # sometimes 30 days before. But only sometimes...
+                    # EWS sometimes randomly sets the new reminder due date to one month before or after we 
+                    # wanted it, and sometimes 30 days before or after. But only sometimes...
                     old_date = old.astimezone(self.account.default_timezone).date()
                     new_date = new.astimezone(self.account.default_timezone).date()
                     if relativedelta(month=1) + new_date == old_date:
                         item.reminder_due_by = new
                         continue
-                    elif old_date - new_date == datetime.timedelta(days=30):
+                    if relativedelta(month=1) + old_date == new_date:
+                        item.reminder_due_by = new
+                        continue
+                    elif abs(old_date - new_date) == datetime.timedelta(days=30):
                         item.reminder_due_by = new
                         continue
             if f.is_list:
