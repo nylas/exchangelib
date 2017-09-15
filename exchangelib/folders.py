@@ -585,7 +585,7 @@ class Folder(EWSElement):
         if other == '..':
             if not self.parent:
                 raise ValueError('Already at top')
-            return self.parent / other
+            return self.parent
         if other == '.':
             return self
         for c in self.children:
