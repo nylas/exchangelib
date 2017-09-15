@@ -441,12 +441,17 @@ Response data: %(xml_response)s
             except CONNECTION_ERRORS as e:
                 log.debug('Session %s thread %s: connection error POST\'ing to %s', session.session_id, thread_id, url)
                 r = DummyResponse(url=url, headers={'TimeoutException': e}, request_headers=headers)
-            log_vals = dict(
-                retry=retry, wait=wait, timeout=protocol.TIMEOUT, session_id=session.session_id, thread_id=thread_id,
-                auth=session.auth, url=r.url, adapter=session.get_adapter(url), allow_redirects=allow_redirects,
-                response_time=time_func() - d_start, status_code=r.status_code, request_headers=r.request.headers,
-                response_headers=r.headers, xml_request=data, xml_response=r.content,
-            )
+            except:
+                # Always create a dummy response for logging purposes, before re-raising
+                r = DummyResponse(url=url, headers={}, request_headers=headers)
+                raise
+            finally:
+                log_vals = dict(
+                    retry=retry, wait=wait, timeout=protocol.TIMEOUT, session_id=session.session_id, thread_id=thread_id,
+                    auth=session.auth, url=r.url, adapter=session.get_adapter(url), allow_redirects=allow_redirects,
+                    response_time=time_func() - d_start, status_code=r.status_code, request_headers=r.request.headers,
+                    response_headers=r.headers, xml_request=data, xml_response=r.content,
+                )
             log.debug(log_msg, log_vals)
             if _may_retry_on_error(r, protocol, wait):
                 log.info("Session %s thread %s: Connection error on URL %s (code %s). Cool down %s secs",
