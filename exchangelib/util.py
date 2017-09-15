@@ -229,7 +229,6 @@ def to_xml(text):
             return fromstring((text[BOM_LEN:] if text.startswith(BOM) else text).encode('utf-8'))
         return fromstring(text[BOM_LEN:] if text.startswith(BOM) else text)
     except ParseError:
-        from lxml.etree import XMLParser, parse, tostring
         # Exchange servers may spit out the weirdest XML. lxml is pretty good at recovering from errors
         log.warning('Fallback to lxml processing of faulty XML')
         magical_parser = XMLParser(recover=True)
