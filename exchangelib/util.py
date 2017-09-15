@@ -10,7 +10,7 @@ import socket
 import time
 from xml.etree.ElementTree import Element, fromstring, ParseError
 
-from lxml.etree import parse, tostring
+from lxml.etree import XMLParser, parse, tostring
 from future.moves.urllib.parse import urlparse
 from future.moves._thread import get_ident
 from future.utils import PY2
