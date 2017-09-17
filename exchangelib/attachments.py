@@ -175,6 +175,10 @@ class FileAttachment(Attachment):
         elem.clear()
         return cls(**kwargs)
 
+    def to_xml(self, version):
+        self.content = self.content  # Make sure content is available, to avoid ErrorRequiredPropertyMissing
+        return super(FileAttachment, self).to_xml(version=version)
+
 
 class ItemAttachment(Attachment):
     """

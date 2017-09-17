@@ -253,7 +253,7 @@ class EWSService(object):
                 text, msg_xml))
         if msg_xml is not None:
             # If this is an ErrorInvalidPropertyRequest error, the xml may contain a specific FieldURI
-            for tag_name in ('FieldURI', 'IndexedFieldURI', 'ExtendedFieldURI'):
+            for tag_name in ('FieldURI', 'IndexedFieldURI', 'ExtendedFieldURI', 'ExceptionFieldURI'):
                 field_uri_elem = msg_xml.find('{%s}%s' % (TNS, tag_name))
                 if field_uri_elem is not None:
                     text += ' (field: %s)' % xml_to_str(field_uri_elem)
