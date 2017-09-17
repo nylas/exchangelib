@@ -96,10 +96,6 @@ class Folder(EWSElement):
     def __init__(self, **kwargs):
         self.account = kwargs.pop('account', None)
         super(Folder, self).__init__(**kwargs)
-        # pylint: disable=access-member-before-definition
-        if self.name is None:
-            self.name = self.DISTINGUISHED_FOLDER_ID
-        log.debug('%s created for %s', self, self.account)
 
     def clean(self, version=None):
         super(Folder, self).clean(version=version)
@@ -460,6 +456,10 @@ class Folder(EWSElement):
         fld_id = fld_id_elem.get(FolderId.ID_ATTR)
         changekey = fld_id_elem.get(FolderId.CHANGEKEY_ATTR)
         kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.supported_fields()}
+        if not kwargs['name']:
+            # Some folders are returned with an empty 'DisplayName' element. Assign a default name to them.
+            # TODO: Only do this if we actually requested the 'name' field.
+            kwargs['name'] = cls.DISTINGUISHED_FOLDER_ID
         elem.clear()
         return cls(account=account, folder_id=fld_id, changekey=changekey, **kwargs)
 
@@ -534,7 +534,7 @@ class Folder(EWSElement):
     @classmethod
     def get_distinguished(cls, account):
         assert cls.DISTINGUISHED_FOLDER_ID
-        folders = list(cls.get_folders(account=account, ids=[cls(account=account)]))
+        folders = list(cls.get_folders(account=account, ids=[cls(account=account, name=cls.DISTINGUISHED_FOLDER_ID)]))
         if not folders:
             raise ErrorFolderNotFound('Could not find distinguished folder %s' % cls.DISTINGUISHED_FOLDER_ID)
         assert len(folders) == 1
@@ -631,7 +631,7 @@ class Root(Folder):
         except ErrorAccessDenied:
             # Maybe we just don't have GetFolder access? Try FindItems instead
             log.debug('Testing default %s folder with FindItem', folder_cls)
-            f = folder_cls(account=self.account)  # Creates a folder instance with default distinguished folder name
+            f = folder_cls(account=self.account, name=folder_cls.DISTINGUISHED_FOLDER_ID)
             f.test_access()
             return self._folders_map.get(f.folder_id, f)  # Use cached instance if available
         except ErrorFolderNotFound:

@@ -877,7 +877,10 @@ class RestrictionTest(unittest.TestCase):
 
 class QuerySetTest(unittest.TestCase):
     def test_magic(self):
-        self.assertEqual(str(QuerySet(folder=Inbox(account='XXX'))), 'QuerySet(q=Q(), folder=Inbox (inbox))')
+        self.assertEqual(
+            str(QuerySet(folder=Inbox(account='XXX', name='FooBox'))),
+            'QuerySet(q=Q(), folder=Inbox (FooBox))'
+        )
 
     def test_from_folder(self):
         folder = Inbox(account='XXX')
