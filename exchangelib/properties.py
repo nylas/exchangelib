@@ -347,8 +347,7 @@ class EffectiveRights(EWSElement):
         BooleanField('view_private_items', field_uri='ViewPrivateItems', default=False),
     ]
 
-    __slots__ = ('create_associated', 'create_contents', 'create_hierarchy', 'delete', 'modify', 'read',
-                 'view_private_items')
+    __slots__ = tuple(f.name for f in FIELDS)
 
     def __contains__(self, item):
         return getattr(self, item, False)

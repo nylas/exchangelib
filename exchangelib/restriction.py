@@ -54,7 +54,7 @@ class Q(object):
                     LOOKUP_IEXACT, LOOKUP_CONTAINS, LOOKUP_ICONTAINS, LOOKUP_STARTSWITH, LOOKUP_ISTARTSWITH,
                     LOOKUP_EXISTS}
 
-    __slots__ = 'conn_type', 'field_path', 'op', 'value', 'children', 'query_string'
+    __slots__ = ('conn_type', 'field_path', 'op', 'value', 'children', 'query_string')
 
     def __init__(self, *args, **kwargs):
         self.conn_type = kwargs.pop('conn_type', self.AND)

@@ -129,8 +129,7 @@ class FileAttachment(Attachment):
         Base64Field('_content', field_uri='Content'),
     ]
 
-    __slots__ = ('parent_item', 'attachment_id', 'name', 'content_type', 'content_id', 'content_location', 'size',
-                 'last_modified_time', 'is_inline', 'is_contact_photo', '_content')
+    __slots__ = Attachment.__slots__ + ('is_contact_photo', '_content')
 
     def __init__(self, **kwargs):
         kwargs['_content'] = kwargs.pop('content', None)
@@ -187,8 +186,7 @@ class ItemAttachment(Attachment):
         ItemField('_item', field_uri='Item'),
     ]
 
-    __slots__ = ('parent_item', 'attachment_id', 'name', 'content_type', 'content_id', 'content_location', 'size',
-                 'last_modified_time', 'is_inline', '_item')
+    __slots__ = Attachment.__slots__ + ('_item',)
 
     def __init__(self, **kwargs):
         kwargs['_item'] = kwargs.pop('item', None)
