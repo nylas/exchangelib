@@ -6,7 +6,6 @@ from itertools import islice
 import logging
 
 from future.utils import python_2_unicode_compatible
-from six import string_types
 
 from .items import CalendarItem
 from .fields import FieldPath, FieldOrder

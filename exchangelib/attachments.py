@@ -10,7 +10,6 @@ from .fields import BooleanField, TextField, IntegerField, URIField, DateTimeFie
     ItemField, IdField
 from .properties import RootItemId, EWSElement
 from .services import TNS, GetAttachment, CreateAttachment, DeleteAttachment
-from .util import create_element
 
 string_type = string_types[0]
 log = logging.getLogger(__name__)
