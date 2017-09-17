@@ -12,6 +12,7 @@ If you have problems autodiscovering, start by doing an official test at https:/
 from __future__ import unicode_literals
 
 from contextlib import contextmanager
+import getpass
 import glob
 import logging
 import os
@@ -42,9 +43,12 @@ AUTODISCOVER_NS = 'http://schemas.microsoft.com/exchange/autodiscover/outlook/re
 ERROR_NS = 'http://schemas.microsoft.com/exchange/autodiscover/responseschema/2006'
 RESPONSE_NS = 'http://schemas.microsoft.com/exchange/autodiscover/outlook/responseschema/2006a'
 
-# 'shelve' may pickle objects using different pickle protocol versions. Encode the python version in the filename
-filename_for_version = 'exchangelib.cache.py{}{}'.format(*sys.version_info[:2])
-AUTODISCOVER_PERSISTENT_STORAGE = os.path.join(tempfile.gettempdir(), filename_for_version)
+# 'shelve' may pickle objects using different pickle protocol versions. Append the python major+minor version numbers
+# to the filename. Also append the username, to avoid permission errors.
+major, minor = sys.version_info[:2]
+user = getpass.getuser()
+shelve_filename = 'exchangelib.cache.{user}.py{major}{minor}'.format(user=user, major=major, minor=minor)
+AUTODISCOVER_PERSISTENT_STORAGE = os.path.join(tempfile.gettempdir(), shelve_filename)
 
 
 @contextmanager
