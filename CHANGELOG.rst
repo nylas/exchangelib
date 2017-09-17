@@ -2,9 +2,9 @@
 Change Log
 ==========
 
-HEAD
-----
-* Added a ``exchangelib.util.PrettyXmlHandler`` log handler which will pretty-print and highlight XML requests
+1.10.3
+------
+* Added an ``exchangelib.util.PrettyXmlHandler`` log handler which will pretty-print and highlight XML requests
   and responses.
 
 1.10.2
