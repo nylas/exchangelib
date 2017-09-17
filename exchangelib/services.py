@@ -30,7 +30,7 @@ from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, 
     ErrorInvalidServerVersion, ErrorItemNotFound, ErrorADUnavailable, ResponseMessageError, ErrorInvalidChangeKey, \
     ErrorItemSave, ErrorInvalidIdMalformed, ErrorMessageSizeExceeded, UnauthorizedError, \
     ErrorCannotDeleteTaskOccurrence, ErrorMimeContentConversionFailed, ErrorRecurrenceHasNoOccurrence, \
-    ErrorNameResolutionMultipleResults, ErrorNameResolutionNoResults
+    ErrorNameResolutionMultipleResults, ErrorNameResolutionNoResults, ErrorMissingEmailAddress
 from .transport import wrap, SOAPNS, TNS, MNS, ENS
 from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, ElementType, \
     xml_to_str, set_xml_value
@@ -973,23 +973,29 @@ class ResolveNames(EWSService):
     # TODO: Does not support paged responses yet. See example in issue #205
     SERVICE_NAME = 'ResolveNames'
     element_container_name = '{%s}ResolutionSet' % MNS
-    ERRORS_TO_CATCH_IN_RESPONSE = EWSService.ERRORS_TO_CATCH_IN_RESPONSE + (ErrorNameResolutionNoResults,)
+    ERRORS_TO_CATCH_IN_RESPONSE = EWSService.ERRORS_TO_CATCH_IN_RESPONSE \
+                                  + (ErrorNameResolutionNoResults, ErrorMissingEmailAddress)
     WARNINGS_TO_IGNORE_IN_RESPONSE = ErrorNameResolutionMultipleResults
 
-    def call(self, unresolved_entries, return_full_contact_data=False, search_scope=None, contact_data_shape=None):
+    def call(self, unresolved_entries, parent_folders=None, return_full_contact_data=False, search_scope=None,
+             contact_data_shape=None):
         from .properties import Mailbox
         elements = self._get_elements(payload=self.get_payload(
             unresolved_entries=unresolved_entries,
+            parent_folders=parent_folders,
             return_full_contact_data=return_full_contact_data,
             search_scope=search_scope,
             contact_data_shape=contact_data_shape,
         ))
-        return [
-            Mailbox.from_xml(elem=elem.find(Mailbox.response_tag()), account=None)
-            for elem in elements if not isinstance(elem, ErrorNameResolutionNoResults)
-        ]
+        for elem in elements:
+            if isinstance(elem, ErrorNameResolutionNoResults):
+                continue
+            if isinstance(elem, Exception):
+                raise elem
+            yield Mailbox.from_xml(elem=elem.find(Mailbox.response_tag()), account=None)
 
-    def get_payload(self, unresolved_entries, return_full_contact_data, search_scope, contact_data_shape):
+    def get_payload(self, unresolved_entries, parent_folders, return_full_contact_data, search_scope,
+                    contact_data_shape):
         payload = create_element(
             'm:%s' % self.SERVICE_NAME,
             ReturnFullContactData='true' if return_full_contact_data else 'false',
@@ -1001,6 +1007,9 @@ class ResolveNames(EWSService):
                 raise NotImplementedError(
                     "'contact_data_shape' is only supported for Exchange 2010 SP2 servers and later")
             payload.set('ContactDataShape', contact_data_shape)
+        if parent_folders:
+            parentfolderids = create_element('m:ParentFolderIds')
+            set_xml_value(parentfolderids, parent_folders, version=self.protocol.version)
         is_empty = True
         for entry in unresolved_entries:
             is_empty = False

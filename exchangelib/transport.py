@@ -205,6 +205,7 @@ def dummy_xml(version, name):
     from .services import ResolveNames  # Avoid circular import
     return wrap(content=ResolveNames(protocol=None).get_payload(
         unresolved_entries=[name],
+        parent_folders=None,
         return_full_contact_data=False,
         search_scope=None,
         contact_data_shape=None,

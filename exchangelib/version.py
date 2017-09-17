@@ -231,10 +231,16 @@ class Version(object):
         from .services import ResolveNames
         protocol.version = Version(build=None, api_version=hint or API_VERSIONS[-1])
         try:
-            ResolveNames(protocol=protocol).call(unresolved_entries=[protocol.credentials.username])
-            return protocol.version
+            list(ResolveNames(protocol=protocol).call(unresolved_entries=[protocol.credentials.username]))
         except ErrorInvalidSchemaVersionForMailboxVersion:
             raise TransportError('Unable to guess version')
+        except ResolveNames.ERRORS_TO_CATCH_IN_RESPONSE:
+            # We survived long enough to get a new version
+            pass
+        except ResolveNames.WARNINGS_TO_CATCH_IN_RESPONSE:
+            # We survived long enough to get a new version
+            pass
+        return protocol.version
 
     @staticmethod
     def _is_invalid_version_string(s):

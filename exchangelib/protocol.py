@@ -247,10 +247,10 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
             assert search_scope in SEARCH_SCOPE_CHOICES
         if shape:
             assert shape in SHAPE_CHOICES
-        return ResolveNames(protocol=self).call(
+        return list(ResolveNames(protocol=self).call(
             unresolved_entries=names, return_full_contact_data=return_full_contact_data, search_scope=search_scope,
             contact_data_shape=shape,
-        )
+        ))
 
     def __str__(self):
         return '''\
