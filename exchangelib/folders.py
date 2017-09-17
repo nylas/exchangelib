@@ -18,7 +18,6 @@ from .queryset import QuerySet
 from .restriction import Restriction
 from .services import FindFolder, GetFolder, FindItem
 from .transport import MNS
-from .util import create_element, value_to_xml_text
 
 string_type = string_types[0]
 log = logging.getLogger(__name__)
@@ -43,22 +42,11 @@ class DistinguishedFolderId(ItemId):
 
     FIELDS = [
         IdField('id', field_uri=ItemId.ID_ATTR, is_required=True),
-        IdField('changekey', field_uri=ItemId.CHANGEKEY_ATTR, is_required=False),
-        MailboxField('mailbox', is_required=False)
+        IdField('changekey', field_uri=ItemId.CHANGEKEY_ATTR),
+        MailboxField('mailbox'),
     ]
 
-    __slots__ = 'id', 'changekey', 'mailbox'
-
-    def to_xml(self, version):
-        self.clean(version=version)
-        elem = create_element(self.request_tag())
-        # Use .set() to not fill up the create_element() cache with unique values
-        elem.set(self.ID_ATTR, self.id)
-        if self.changekey:
-            elem.set(self.CHANGEKEY_ATTR, self.changekey)
-        if self.mailbox:
-            elem.append(self.get_field_by_fieldname('mailbox').to_xml(self.mailbox, version=version))
-        return elem
+    __slots__ = ItemId.__slots__ + ('mailbox',)
 
 
 class CalendarView(EWSElement):
@@ -69,9 +57,9 @@ class CalendarView(EWSElement):
     NAMESPACE = MNS
 
     FIELDS = [
-        DateTimeField('start', field_uri='StartDate', is_required=True),
-        DateTimeField('end', field_uri='EndDate', is_required=True),
-        IntegerField('max_items', field_uri='MaxEntriesReturned', min=1),
+        DateTimeField('start', field_uri='StartDate', is_required=True, is_attribute=True),
+        DateTimeField('end', field_uri='EndDate', is_required=True, is_attribute=True),
+        IntegerField('max_items', field_uri='MaxEntriesReturned', min=1, is_attribute=True),
     ]
 
     __slots__ = ('start', 'end', 'max_items')
@@ -80,16 +68,6 @@ class CalendarView(EWSElement):
         super(CalendarView, self).clean(version=version)
         if self.end < self.start:
             raise ValueError("'start' must be before 'end'")
-
-    def to_xml(self, version):
-        self.clean(version=version)
-        i = create_element(self.request_tag())
-        for f in self.supported_fields(version=version):
-            value = getattr(self, f.name)
-            if value is None:
-                continue
-            i.set(f.field_uri, value_to_xml_text(value))
-        return i
 
 
 @python_2_unicode_compatible
@@ -104,8 +82,8 @@ class Folder(EWSElement):
     LOCALIZED_NAMES = dict()  # A map of (str)locale: (tuple)localized_folder_names
     ITEM_MODEL_MAP = {cls.response_tag(): cls for cls in ITEM_CLASSES}
     FIELDS = [
-        IdField('folder_id', field_uri='folder:FolderId', is_searchable=False),
-        IdField('changekey', field_uri='folder:Changekey', is_searchable=False),
+        IdField('folder_id', field_uri=FolderId.ID_ATTR),
+        IdField('changekey', field_uri=FolderId.CHANGEKEY_ATTR),
         EWSElementField('parent_folder_id', field_uri='folder:ParentFolderId', value_cls=ParentFolderId),
         TextField('folder_class', field_uri='folder:FolderClass'),
         TextField('name', field_uri='folder:DisplayName'),
@@ -114,9 +92,6 @@ class Folder(EWSElement):
         IntegerField('unread_count', field_uri='folder:UnreadCount', is_read_only=True),
         EffectiveRightsField('effective_rights', field_uri='folder:EffectiveRights', is_read_only=True),
     ]
-
-    __slots__ = ('account', 'folder_id', 'changekey', 'parent_folder_id', 'folder_class', 'name', 'total_count',
-                 'child_folder_count', 'unread_count', 'effective_rights')
 
     def __init__(self, **kwargs):
         self.account = kwargs.pop('account', None)
@@ -608,8 +583,6 @@ class Folder(EWSElement):
 class Root(Folder):
     DISTINGUISHED_FOLDER_ID = 'root'
 
-    __slots__ = Folder.__slots__ + ('_subfolders',)
-
     def __init__(self, **kwargs):
         super(Root, self).__init__(**kwargs)
         self._subfolders = None  # See self._folders_map()
@@ -727,8 +700,6 @@ class Calendar(Folder):
         'sv_SE': (u'Kalender',),
     }
 
-    __slots__ = Folder.__slots__
-
     def view(self, start, end, max_items=None, *args, **kwargs):
         """ Implements the CalendarView option to FindItem. The difference between filter() and view() is that filter()
         only returns the master CalendarItem for recurring items, while view() unfolds recurring items and returns all
@@ -763,14 +734,10 @@ class DeletedItems(Folder):
         'sv_SE': (u'Borttaget',),
     }
 
-    __slots__ = Folder.__slots__
-
 
 class Messages(Folder):
     CONTAINER_CLASS = 'IPF.Note'
     supported_item_models = (Message, MeetingRequest, MeetingResponse, MeetingCancellation)
-
-    __slots__ = Folder.__slots__
 
 
 class Drafts(Messages):
@@ -787,8 +754,6 @@ class Drafts(Messages):
         'sv_SE': (u'Utkast',),
     }
 
-    __slots__ = Folder.__slots__
-
 
 class Inbox(Messages):
     DISTINGUISHED_FOLDER_ID = 'inbox'
@@ -803,8 +768,6 @@ class Inbox(Messages):
         'ru_RU': (u'Входящие',),
         'sv_SE': (u'Inkorgen',),
     }
-
-    __slots__ = Folder.__slots__
 
 
 class Outbox(Messages):
@@ -821,8 +784,6 @@ class Outbox(Messages):
         'sv_SE': (u'Utkorgen',),
     }
 
-    __slots__ = Folder.__slots__
-
 
 class SentItems(Messages):
     DISTINGUISHED_FOLDER_ID = 'sentitems'
@@ -837,8 +798,6 @@ class SentItems(Messages):
         'ru_RU': (u'Отправленные',),
         'sv_SE': (u'Skickat',),
     }
-
-    __slots__ = Folder.__slots__
 
 
 class JunkEmail(Messages):
@@ -863,8 +822,6 @@ class RecoverableItemsDeletions(Folder):
     LOCALIZED_NAMES = {
     }
 
-    __slots__ = Folder.__slots__
-
 
 class RecoverableItemsRoot(Folder):
     DISTINGUISHED_FOLDER_ID = 'recoverableitemsroot'
@@ -872,8 +829,6 @@ class RecoverableItemsRoot(Folder):
 
     LOCALIZED_NAMES = {
     }
-
-    __slots__ = Folder.__slots__
 
 
 class Tasks(Folder):
@@ -892,8 +847,6 @@ class Tasks(Folder):
         'sv_SE': (u'Uppgifter',),
     }
 
-    __slots__ = Folder.__slots__
-
 
 class Contacts(Folder):
     DISTINGUISHED_FOLDER_ID = 'contacts'
@@ -911,16 +864,12 @@ class Contacts(Folder):
         'sv_SE': (u'Kontakter',),
     }
 
-    __slots__ = Folder.__slots__
-
 
 class GALContacts(Contacts):
     DISTINGUISHED_FOLDER_ID = None
     CONTAINER_CLASS = 'IPF.Contact.GalContacts'
 
     LOCALIZED_NAMES = {}
-
-    __slots__ = Folder.__slots__
 
 
 class RecipientCache(Contacts):
@@ -929,12 +878,11 @@ class RecipientCache(Contacts):
 
     LOCALIZED_NAMES = {}
 
-    __slots__ = Folder.__slots__
 
 
 class WellknownFolder(Folder):
     # Use this class until we have specific folder implementations
-    __slots__ = Folder.__slots__
+    pass
 
 
 # See http://msdn.microsoft.com/en-us/library/microsoft.exchange.webservices.data.wellknownfoldername(v=exchg.80).aspx

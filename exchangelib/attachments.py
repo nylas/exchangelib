@@ -32,30 +32,6 @@ class AttachmentId(EWSElement):
 
     __slots__ = ('id', 'root_id', 'root_changekey')
 
-    def to_xml(self, version):
-        self.clean(version=version)
-        elem = create_element(self.request_tag())
-        # Use .set() to not fill up the create_element() cache with unique values
-        elem.set(self.ID_ATTR, self.id)
-        if self.root_id:
-            elem.set(self.ROOT_ID_ATTR, self.root_id)
-        if self.root_changekey:
-            elem.set(self.ROOT_CHANGEKEY_ATTR, self.root_changekey)
-        return elem
-
-    @classmethod
-    def from_xml(cls, elem, account):
-        if elem is None:
-            return None
-        assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
-        res = cls(
-            id=elem.get(cls.ID_ATTR),
-            root_id=elem.get(cls.ROOT_ID_ATTR),
-            root_changekey=elem.get(cls.ROOT_CHANGEKEY_ATTR)
-        )
-        elem.clear()
-        return res
-
 
 class Attachment(EWSElement):
     """

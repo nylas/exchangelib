@@ -1175,4 +1175,5 @@ class UploadItems(EWSAccountService, EWSPooledMixIn):
         return uploaditems
 
     def _get_elements_in_container(self, container):
-        return [(container.attrib['Id'], container.attrib['ChangeKey'])]
+        from .properties import ItemId
+        return [(container.get(ItemId.ID_ATTR), container.get(ItemId.CHANGEKEY_ATTR))]

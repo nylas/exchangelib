@@ -8,7 +8,7 @@ from six import text_type, string_types
 from .fields import SubField, TextField, EmailField, ChoiceField, DateTimeField, EWSElementField, MailboxField, \
     Choice, BooleanField, IdField
 from .services import MNS, TNS
-from .util import get_xml_attr, create_element
+from .util import get_xml_attr, create_element, set_xml_value, value_to_xml_text
 
 string_type = string_types[0]
 log = logging.getLogger(__name__)
@@ -62,15 +62,28 @@ class EWSElement(object):
         self.clean(version=version)
         # WARNING: The order of addition of XML elements is VERY important. Exchange expects XML elements in a
         # specific, non-documented order and will fail with meaningless errors if the order is wrong.
-        i = create_element(self.request_tag())
+
+        # Call create_element() without args, to not fill up the cache with unique attribute values.
+        elem = create_element(self.request_tag())
+
+        # Add attributes
+        for f in self.attribute_fields():
+            if f.is_read_only:
+                continue
+            value = getattr(self, f.name)
+            if value is None or (f.is_list and not value):
+                continue
+            elem.set(f.field_uri, value_to_xml_text(getattr(self, f.name)))
+
+        # Add elements and values
         for f in self.supported_fields(version=version):
             if f.is_read_only:
                 continue
             value = getattr(self, f.name)
             if value is None or (f.is_list and not value):
                 continue
-            i.append(f.to_xml(value, version=version))
-        return i
+            set_xml_value(elem, f.to_xml(value, version=version), version)
+        return elem
 
     @classmethod
     def request_tag(cls):
@@ -86,9 +99,13 @@ class EWSElement(object):
         return '{%s}%s' % (cls.NAMESPACE, cls.ELEMENT_NAME)
 
     @classmethod
+    def attribute_fields(cls):
+        return tuple(f for f in cls.FIELDS if f.is_attribute)
+
+    @classmethod
     def supported_fields(cls, version=None):
         # Return non-ID field names. If version is specified, only return the fields supported by this version
-        return tuple(f for f in cls.FIELDS if f.name not in ('item_id', 'changekey') and f.supports_version(version))
+        return tuple(f for f in cls.FIELDS if not f.is_attribute and f.supports_version(version))
 
     @classmethod
     def get_field_by_fieldname(cls, fieldname):
@@ -121,32 +138,31 @@ class EWSElement(object):
         return hash(self) == hash(other)
 
     def __hash__(self):
-        return hash(tuple(getattr(self, f) for f in self.__slots__))
+        return hash(
+            tuple(tuple(getattr(self, f.name) or ()) if f.is_list else getattr(self, f.name) for f in self.FIELDS)
+        )
+
+    def __str__(self):
+        return self.__class__.__name__ + '(%s)' % ', '.join(
+            '%s=%s' % (f.name, repr(getattr(self, f.name))) for f in self.FIELDS if getattr(self, f.name) is not None
+        )
 
     def __repr__(self):
-        return self.__class__.__name__ + repr(tuple(getattr(self, f) for f in self.__slots__))
+        return self.__class__.__name__ + '(%s)' % ', '.join(
+            '%s=%s' % (f.name, repr(getattr(self, f.name))) for f in self.FIELDS
+        )
 
 
 class MessageHeader(EWSElement):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa565307(v=exchg.150).aspx
     ELEMENT_NAME = 'InternetMessageHeader'
-    NAME_ATTR = 'HeaderName'
 
     FIELDS = [
-        TextField('name', field_uri='HeaderName'),
+        TextField('name', field_uri='HeaderName', is_attribute=True),
         SubField('value'),
     ]
 
     __slots__ = ('name', 'value')
-
-    @classmethod
-    def from_xml(cls, elem, account):
-        if elem is None:
-            return None
-        assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
-        res = cls(name=elem.get(cls.NAME_ATTR), value=elem.text)
-        elem.clear()
-        return res
 
 
 class ItemId(EWSElement):
@@ -169,32 +185,6 @@ class ItemId(EWSElement):
             kwargs = dict(zip(self.__slots__, args))
         super(ItemId, self).__init__(**kwargs)
 
-    def to_xml(self, version):
-        self.clean(version=version)
-        elem = create_element(self.request_tag())
-        # Use .set() to not fill up the create_element() cache with unique values
-        elem.set(self.ID_ATTR, self.id)
-        elem.set(self.CHANGEKEY_ATTR, self.changekey)
-        return elem
-
-    @classmethod
-    def from_xml(cls, elem, account):
-        if elem is None:
-            return None
-        assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
-        res = cls(id=elem.get(cls.ID_ATTR), changekey=elem.get(cls.CHANGEKEY_ATTR))
-        elem.clear()
-        return res
-
-    def __eq__(self, other):
-        # A more efficient version of super().__eq__
-        if other is None:
-            return False
-        return self.id == other.id and self.changekey == other.changekey
-
-    def __hash__(self):
-        return hash(tuple(getattr(self, f) for f in self.__slots__))
-
 
 class ParentItemId(ItemId):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa563720(v=exchg.150).aspx
@@ -211,6 +201,10 @@ class RootItemId(ItemId):
 
     ID_ATTR = 'RootItemId'
     CHANGEKEY_ATTR = 'RootItemChangeKey'
+    FIELDS = [
+        IdField('id', field_uri=ID_ATTR, is_required=True),
+        IdField('changekey', field_uri=CHANGEKEY_ATTR, is_required=True),
+    ]
 
     __slots__ = ItemId.__slots__
 
@@ -222,7 +216,7 @@ class ConversationId(ItemId):
     FIELDS = [
         IdField('id', field_uri=ItemId.ID_ATTR, is_required=True),
         # Sometimes required, see MSDN link
-        IdField('changekey', field_uri=ItemId.CHANGEKEY_ATTR, is_required=False),
+        IdField('changekey', field_uri=ItemId.CHANGEKEY_ATTR),
     ]
 
     __slots__ = ItemId.__slots__
@@ -290,6 +284,8 @@ class RoomList(Mailbox):
     ELEMENT_NAME = 'RoomList'
     NAMESPACE = MNS
 
+    __slots__ = Mailbox.__slots__
+
     @classmethod
     def response_tag(cls):
         # In a GetRoomLists response, room lists are delivered as Address elements
@@ -300,6 +296,8 @@ class RoomList(Mailbox):
 class Room(Mailbox):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/dd899479(v=exchg.150).aspx
     ELEMENT_NAME = 'Room'
+
+    __slots__ = Mailbox.__slots__
 
     @classmethod
     def from_xml(cls, elem, account):

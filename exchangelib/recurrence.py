@@ -253,9 +253,11 @@ class Occurrence(EWSElement):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa565603(v=exchg.150).aspx
     ELEMENT_NAME = 'Occurrence'
 
+    ID_ATTR = 'ItemId'
+    CHANGEKEY_ATTR = 'ChangeKey'
     FIELDS = [
-        IdField('item_id', is_read_only=True, is_searchable=False),
-        IdField('changekey', is_read_only=True, is_searchable=False),
+        IdField('item_id', field_uri=ID_ATTR),
+        IdField('changekey', field_uri=CHANGEKEY_ATTR),
         # The modified start time of the item, as EWSDateTime
         DateTimeField('start', field_uri='t:Start'),
         # The modified end time of the item, as EWSDateTime

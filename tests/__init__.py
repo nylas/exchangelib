@@ -1264,14 +1264,14 @@ class EWSTest(unittest.TestCase):
                     return [self.account.primary_smtp_address]
         if isinstance(field, EmailAddressField):
             addrs = []
-            for label in EmailAddress.LABEL_FIELD.supported_choices(version=self.account.version):
+            for label in EmailAddress.get_field_by_fieldname('label').supported_choices(version=self.account.version):
                 addr = EmailAddress(email=get_random_email())
                 addr.label = label
                 addrs.append(addr)
             return addrs
         if isinstance(field, PhysicalAddressField):
             addrs = []
-            for label in PhysicalAddress.LABEL_FIELD.supported_choices(version=self.account.version):
+            for label in PhysicalAddress.get_field_by_fieldname('label').supported_choices(version=self.account.version):
                 addr = PhysicalAddress(street=get_random_string(32), city=get_random_string(32),
                                        state=get_random_string(32), country=get_random_string(32),
                                        zipcode=get_random_string(8))
@@ -1280,7 +1280,7 @@ class EWSTest(unittest.TestCase):
             return addrs
         if isinstance(field, PhoneNumberField):
             pns = []
-            for label in PhoneNumber.LABEL_FIELD.supported_choices(version=self.account.version):
+            for label in PhoneNumber.get_field_by_fieldname('label').supported_choices(version=self.account.version):
                 pn = PhoneNumber(phone_number=get_random_string(16))
                 pn.label = label
                 pns.append(pn)
@@ -1477,12 +1477,12 @@ class CommonTest(EWSTest):
         )
 
     def test_resolvenames(self):
-        self.assertEqual(
-            self.account.protocol.resolve_names(names='xxx@example.com'),
+        self.assertGreaterEqual(
+            self.account.protocol.resolve_names(names=['xxx@example.com']),
             []
         )
         self.assertEqual(
-            self.account.protocol.resolve_names(names=self.account.primary_smtp_address),
+            self.account.protocol.resolve_names(names=[self.account.primary_smtp_address]),
             [Mailbox(email_address=self.account.primary_smtp_address)]
         )
 
@@ -3080,7 +3080,7 @@ class BaseItemTest(EWSTest):
         # Test order_by() on IndexedField (simple and multi-subfield). Only Contact items have these
         if self.ITEM_CLASS == Contact:
             test_items = []
-            label = self.random_val(EmailAddress.LABEL_FIELD)
+            label = self.random_val(EmailAddress.get_field_by_fieldname('label'))
             for i in range(4):
                 item = self.get_test_item()
                 item.email_addresses = [EmailAddress(email='%s@foo.com' % i, label=label)]
@@ -3100,7 +3100,7 @@ class BaseItemTest(EWSTest):
             self.bulk_delete(qs)
 
             test_items = []
-            label = self.random_val(PhysicalAddress.LABEL_FIELD)
+            label = self.random_val(PhysicalAddress.get_field_by_fieldname('label'))
             for i in range(4):
                 item = self.get_test_item()
                 item.physical_addresses = [PhysicalAddress(street='Elm St %s' % i, label=label)]
@@ -3861,7 +3861,7 @@ class BaseItemTest(EWSTest):
                     # EWS does not always return a value if reminder_is_set is False.
                     continue
                 if old is not None:
-                    # EWS sometimes randomly sets the new reminder due date to one month before or after we 
+                    # EWS sometimes randomly sets the new reminder due date to one month before or after we
                     # wanted it, and sometimes 30 days before or after. But only sometimes...
                     old_date = old.astimezone(self.account.default_timezone).date()
                     new_date = new.astimezone(self.account.default_timezone).date()
@@ -4025,7 +4025,7 @@ class BaseItemTest(EWSTest):
                     item.reminder_due_by = new
                     continue
                 elif old is not None and new is not None:
-                    # EWS sometimes randomly sets the new reminder due date to one month before or after we 
+                    # EWS sometimes randomly sets the new reminder due date to one month before or after we
                     # wanted it, and sometimes 30 days before or after. But only sometimes...
                     old_date = old.astimezone(self.account.default_timezone).date()
                     new_date = new.astimezone(self.account.default_timezone).date()
@@ -4106,7 +4106,7 @@ class BaseItemTest(EWSTest):
 
         # Try reuploading our results
         upload_results = self.account.upload([(self.test_folder, data) for data in export_results])
-        self.assertEqual(len(items), len(upload_results))
+        self.assertEqual(len(items), len(upload_results), (items, upload_results))
         for result in upload_results:
             # Must be a completely new ItemId
             self.assertIsInstance(result, tuple)
@@ -4748,7 +4748,7 @@ class CalendarTest(BaseItemTest):
         self.assertEqual(
             str(fresh_item.recurrence),
             'Pattern: Occurs on weekdays Monday, Wednesday of every 3 week(s) where the first day of the week is '
-            'Monday, Boundary: NumberedPattern(EWSDate(2017, 9, 4), 7)'
+            'Monday, Boundary: NumberedPattern(start=EWSDate(2017, 9, 4), number=7)'
         )
         self.assertIsInstance(fresh_item.first_occurrence, FirstOccurrence)
         self.assertEqual(fresh_item.first_occurrence.start, self.account.default_timezone.localize(EWSDateTime(2017, 9, 4, 11)))
@@ -4972,13 +4972,14 @@ if __name__ == '__main__':
     import logging
     import sys
 
-    loglevel = logging.DEBUG
-    try:
-        if '-q' in sys.argv:
-            sys.argv.remove('-q')
-            loglevel = logging.WARNING
-    except IndexError:
-        pass
-    logging.basicConfig(level=loglevel)
+    if '-q' in sys.argv:
+        sys.argv.remove('-q')
+        loglevel = logging.WARNING
+        logging.basicConfig(level=loglevel)
+    else:
+        from exchangelib.util import PrettyXmlHandler
+        loglevel = logging.DEBUG
+        logging.basicConfig(level=loglevel, handlers=[PrettyXmlHandler()])
+
     logging.getLogger('exchangelib').setLevel(loglevel)
     unittest.main()

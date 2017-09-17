@@ -77,6 +77,14 @@ class QuerySet(object):
     def is_cached(self):
         return self._cache is not None
 
+    @property
+    def _item_id_field(self):
+        return FieldPath.from_string('item_id', folder=self.folder)
+
+    @property
+    def _changekey_field(self):
+        return FieldPath.from_string('changekey', folder=self.folder)
+
     def _additional_fields(self):
         if self.only_fields is None:
             # The list of field paths was not restricted. Get all field paths we support, as a set, but remove item_id
@@ -86,7 +94,7 @@ class QuerySet(object):
         else:
             assert isinstance(self.only_fields, tuple)
             # Remove ItemId and ChangeKey. We get them unconditionally
-            additional_fields = {f for f in self.only_fields if f.field.name not in {'item_id', 'changekey'}}
+            additional_fields = {f for f in self.only_fields if not f.field.is_attribute}
 
             # For CalendarItem items, we want to inject internal timezone fields into the requested fields.
             has_start = 'start' in {f.field.name for f in additional_fields}
@@ -246,14 +254,13 @@ class QuerySet(object):
     def _as_items(self, iterable):
         from .items import Item
         if self.only_fields:
-            only_field_names = {f.field.name for f in self.only_fields}
-            has_additional_fields = bool(only_field_names - {'item_id', 'changekey'})
-            if not has_additional_fields:
+            has_non_attribute_fields = bool({f for f in self.only_fields if not f.field.is_attribute})
+            if not has_non_attribute_fields:
                 # _query() will return an iterator of (item_id, changekey) tuples
-                if 'changekey' not in only_field_names:
+                if self._changekey_field not in self.only_fields:
                     for item_id, changekey in iterable:
                         yield Item(item_id=item_id)
-                elif 'item_id' not in only_field_names:
+                elif self._item_id_field not in self.only_fields:
                     for item_id, changekey in iterable:
                         yield Item(changekey=changekey)
                 else:
@@ -265,14 +272,13 @@ class QuerySet(object):
 
     def _as_values(self, iterable):
         assert self.only_fields, 'values() requires at least one field name'
-        only_field_names = {f.field.name for f in self.only_fields}
-        has_additional_fields = bool(only_field_names - {'item_id', 'changekey'})
-        if not has_additional_fields:
+        has_non_attribute_fields = bool({f for f in self.only_fields if not f.field.is_attribute})
+        if not has_non_attribute_fields:
             # _query() will return an iterator of (item_id, changekey) tuples
-            if 'changekey' not in only_field_names:
+            if self._changekey_field not in self.only_fields:
                 for item_id, changekey in iterable:
                     yield {'item_id': item_id}
-            elif 'item_id' not in only_field_names:
+            elif self._item_id_field not in self.only_fields:
                 for item_id, changekey in iterable:
                     yield {'changekey': changekey}
             else:
@@ -284,14 +290,13 @@ class QuerySet(object):
 
     def _as_values_list(self, iterable):
         assert self.only_fields, 'values_list() requires at least one field name'
-        only_field_names = {f.field.name for f in self.only_fields}
-        has_additional_fields = bool(only_field_names - {'item_id', 'changekey'})
-        if not has_additional_fields:
+        has_non_attribute_fields = bool({f for f in self.only_fields if not f.field.is_attribute})
+        if not has_non_attribute_fields:
             # _query() will return an iterator of (item_id, changekey) tuples
-            if 'changekey' not in only_field_names:
+            if self._changekey_field not in self.only_fields:
                 for item_id, changekey in iterable:
                     yield (item_id,)
-            elif 'item_id' not in only_field_names:
+            elif self._item_id_field not in self.only_fields:
                 for item_id, changekey in iterable:
                     yield (changekey,)
             else:
@@ -304,12 +309,12 @@ class QuerySet(object):
     def _as_flat_values_list(self, iterable):
         assert self.only_fields and len(self.only_fields) == 1, 'flat=True requires exactly one field name'
         flat_field_path = self.only_fields[0]
-        if flat_field_path.field.name == 'item_id':
+        if flat_field_path == self._item_id_field:
             # _query() will return an iterator of (item_id, changekey) tuples
             for item_id, changekey in iterable:
                 yield item_id
             return
-        if flat_field_path.field.name == 'changekey':
+        if flat_field_path == self._changekey_field:
             # _query() will return an iterator of (item_id, changekey) tuples
             for item_id, changekey in iterable:
                 yield changekey
@@ -438,11 +443,8 @@ class QuerySet(object):
         elif not args and set(kwargs.keys()) == {'item_id', 'changekey'}:
             # We allow calling get(item_id=..., changekey=...) to get a single item, but only if exactly these two
             # kwargs are present.
-            item_id, changekey = kwargs['item_id'], kwargs['changekey']
-            if not isinstance(item_id, string_types):
-                raise ValueError("'item_id' must be a string")
-            if not isinstance(changekey, string_types):
-                raise ValueError("'changekey' must be a string")
+            item_id = self._item_id_field.field.clean(kwargs['item_id'], version=self.folder.account.version)
+            changekey = self._changekey_field.field.clean(kwargs['changekey'], version=self.folder.account.version)
             items = list(self.folder.fetch(ids=[(item_id, changekey)], only_fields=self.only_fields))
         else:
             new_qs = self.filter(*args, **kwargs)

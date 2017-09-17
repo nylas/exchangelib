@@ -89,8 +89,8 @@ class Item(EWSElement):
     FIELDS = [
         # TODO: MimeContent actually supports writing, but is still untested
         Base64Field('mime_content', field_uri='item:MimeContent', is_read_only=True),
-        IdField('item_id', is_read_only=True, is_searchable=False),
-        IdField('changekey', is_read_only=True, is_searchable=False),
+        IdField('item_id', field_uri=ItemId.ID_ATTR, is_read_only=True),
+        IdField('changekey', field_uri=ItemId.CHANGEKEY_ATTR, is_read_only=True),
         # Placeholder for ParentFolderId
         # Placeholder for ItemClass
         CharField('subject', field_uri='item:Subject'),
@@ -391,9 +391,8 @@ class Item(EWSElement):
 
     def __eq__(self, other):
         if isinstance(other, tuple):
-            item_id, changekey = other
-            return self.item_id == item_id and self.changekey == changekey
-        return self.item_id == other.item_id and self.changekey == other.changekey
+            return hash((self.item_id, self.changekey)) == hash(other)
+        return hash(self) == hash(other)
 
     def __hash__(self):
         # If we have an item_id and changekey, use that as key. Else return a hash of all attributes
@@ -403,16 +402,6 @@ class Item(EWSElement):
             tuple(tuple(getattr(self, f.name) or ()) if f.is_list else getattr(self, f.name) for f in self.FIELDS)
         ))
 
-    def __str__(self):
-        return self.__class__.__name__ + '(%s)' % ', '.join(
-            '%s=%s' % (f.name, repr(getattr(self, f.name))) for f in self.FIELDS if getattr(self, f.name) is not None
-        )
-
-    def __repr__(self):
-        return self.__class__.__name__ + '(%s)' % ', '.join(
-            '%s=%s' % (f.name, repr(getattr(self, f.name))) for f in self.FIELDS
-        )
-
 
 @python_2_unicode_compatible
 class BulkCreateResult(Item):
@@ -420,12 +409,10 @@ class BulkCreateResult(Item):
     A dummy class to store return values from a CreateItem service call
     """
     FIELDS = [
-        IdField('item_id', is_read_only=True, is_required=True),
-        IdField('changekey', is_read_only=True, is_required=True),
+        IdField('item_id', field_uri=ItemId.ID_ATTR, is_required=True, is_read_only=True),
+        IdField('changekey', field_uri=ItemId.CHANGEKEY_ATTR, is_required=True, is_read_only=True),
         AttachmentField('attachments', field_uri='item:Attachments'),  # ItemAttachment or FileAttachment
     ]
-
-    __slots__ = ('item_id', 'changekey', 'attachments')
 
     @classmethod
     def from_xml(cls, elem, account):

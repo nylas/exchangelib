@@ -51,9 +51,9 @@ def resolve_field_path(field_path, folder, strict=True):
         if strict and not label:
             raise ValueError(
                 "IndexedField path '%s' must specify label, e.g. '%s__%s'"
-                % (field_path, fieldname, field.value_cls.LABEL_FIELD.default)
+                % (field_path, fieldname, field.value_cls.get_field_by_fieldname('label').default)
             )
-        valid_labels = field.value_cls.LABEL_FIELD.supported_choices(version=folder.account.version)
+        valid_labels = field.value_cls.get_field_by_fieldname('label').supported_choices(version=folder.account.version)
         if label and label not in valid_labels:
             raise ValueError(
                 "Label '%s' on IndexedField path '%s' must be one of %s"
@@ -63,7 +63,7 @@ def resolve_field_path(field_path, folder, strict=True):
             if strict and not subfieldname:
                 raise ValueError(
                     "IndexedField path '%s' must specify subfield, e.g. '%s__%s__%s'"
-                    % (field_path, fieldname, label, field.value_cls.FIELDS[0].name)
+                    % (field_path, fieldname, label, field.value_cls.FIELDS[1].name)
                 )
 
             if subfieldname:
@@ -136,7 +136,8 @@ class FieldPath(object):
         # If this path does not point to a specific subfield on an indexed property, return all the possible path
         # combinations for this field path.
         if isinstance(self.field, IndexedField):
-            labels = [self.label] if self.label else self.field.value_cls.LABEL_FIELD.supported_choices(version=version)
+            labels = [self.label] if self.label \
+                else self.field.value_cls.get_field_by_fieldname('label').supported_choices(version=version)
             subfields = [self.subfield] if self.subfield else self.field.value_cls.supported_fields(version=version)
             for label in labels:
                 for subfield in subfields:
@@ -194,8 +195,8 @@ class Field(object):
     is_complex = False
 
     def __init__(self, name, is_required=False, is_required_after_save=False, is_read_only=False,
-                 is_read_only_after_send=False, is_searchable=True, default=None, supported_from=None,
-                 deprecated_from=None):
+                 is_read_only_after_send=False, is_searchable=True, is_attribute=False, default=None,
+                 supported_from=None, deprecated_from=None):
         self.name = name
         self.default = default  # Default value if none is given
         self.is_required = is_required
@@ -208,6 +209,8 @@ class Field(object):
         # Define whether the field can be used in a QuerySet. For some reason, EWS disallows searching on some fields,
         # instead throwing ErrorInvalidValueForProperty
         self.is_searchable = is_searchable
+        # When true, this field is treated as an XML attribute instead of an element
+        self.is_attribute = is_attribute
         # The Exchange build when this field was introduced. When talking with versions prior to this version,
         # we will ignore this field.
         if supported_from is not None:
@@ -507,8 +510,11 @@ class TextField(FieldURIField):
     is_complex = True
 
     def from_xml(self, elem, account):
-        field_elem = elem.find(self.response_tag())
-        val = None if field_elem is None else field_elem.text or None
+        if self.is_attribute:
+            val = elem.get(self.field_uri)
+        else:
+            field_elem = elem.find(self.response_tag())
+            val = None if field_elem is None else field_elem.text or None
         if val is not None:
             return val
         return self.default
@@ -552,6 +558,8 @@ class IdField(CharField):
     def __init__(self, *args, **kwargs):
         super(IdField, self).__init__(*args, **kwargs)
         self.max_length = 512  # This is above the normal 255 limit, but this is actually an attribute, not a field
+        self.is_searchable = False
+        self.is_attribute = True
 
 
 class CharListField(CharField):
@@ -814,6 +822,10 @@ class AttachmentField(EWSElementListField):
 
 class LabelField(ChoiceField):
     # A field to hold the label on an IndexedElement
+    def __init__(self, *args, **kwargs):
+        super(LabelField, self).__init__(*args, **kwargs)
+        self.is_attribute = True
+
     def from_xml(self, elem, account):
         return elem.get(self.field_uri)
 
@@ -858,6 +870,10 @@ class NamedSubField(SubField):
         if val is not None:
             return val
         return self.default
+
+    def to_xml(self, value, version):
+        field_elem = create_element(self.request_tag())
+        return set_xml_value(field_elem, value, version=version)
 
     def field_uri_xml(self, field_uri, label):
         return create_element('t:IndexedFieldURI', FieldURI='%s:%s' % (field_uri, self.field_uri), FieldIndex=label)
