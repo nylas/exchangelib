@@ -15,8 +15,8 @@ before_install:
   -in settings.yml.enc -out settings.yml -d
 
 install:
-# Currently, only lxml master branch compiles with Python nightly
-- if [[ "$( python --version | grep 'a' )" ]] ; then pip install cython && pip install git+https://github.com/lxml/lxml.git ; fi
+# Sometimes, only lxml master branch compiles with Python nightly
+# - if [[ "$( python --version | grep 'a' )" ]] ; then pip install cython && pip install git+https://github.com/lxml/lxml.git ; fi
 - pip install .
 # Install test dependencies manually since we're calling tests/__init__.py directly in the 'script' section
 - pip install PyYAML requests_mock psutil
