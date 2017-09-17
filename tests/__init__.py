@@ -4982,12 +4982,9 @@ if __name__ == '__main__':
 
     if '-q' in sys.argv:
         sys.argv.remove('-q')
-        loglevel = logging.WARNING
-        logging.basicConfig(level=loglevel)
+        logging.basicConfig(level=logging.WARNING)
     else:
         from exchangelib.util import PrettyXmlHandler
-        loglevel = logging.DEBUG
-        logging.basicConfig(level=loglevel, handlers=[PrettyXmlHandler()])
+        logging.basicConfig(level=logging.DEBUG, handlers=[PrettyXmlHandler()])
 
-    logging.getLogger('exchangelib').setLevel(loglevel)
     unittest.main()
