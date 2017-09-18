@@ -6,6 +6,7 @@ import glob
 from itertools import chain
 import io
 from keyword import kwlist
+import logging
 import os
 import random
 import socket
@@ -5000,14 +5001,12 @@ def get_random_datetime_range(start_date=EWSDate(1990, 1, 1), end_date=EWSDate(2
 
 
 if __name__ == '__main__':
-    import logging
     import sys
 
     if '-q' in sys.argv:
         sys.argv.remove('-q')
         logging.basicConfig(level=logging.WARNING)
     else:
-        from exchangelib.util import PrettyXmlHandler
         logging.basicConfig(level=logging.DEBUG, handlers=[PrettyXmlHandler()])
 
     unittest.main()
