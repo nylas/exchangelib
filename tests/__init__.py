@@ -1142,7 +1142,7 @@ class UtilTest(unittest.TestCase):
 
     def test_pretty_xml_handler(self):
         # Test that a normal, non-XML log record is passed through unchanged
-        stream = io.StringIO()
+        stream = io.BytesIO() if PY2 else io.StringIO()
         stream.isatty = lambda: True
         h = PrettyXmlHandler(stream=stream)
         self.assertTrue(h.is_tty())
@@ -1152,7 +1152,7 @@ class UtilTest(unittest.TestCase):
         self.assertEqual(h.stream.read(), 'hello\n')
 
         # Test formatting of an XML record. It should contain newlines and color codes.
-        stream = io.StringIO()
+        stream = io.BytesIO() if PY2 else io.StringIO()
         stream.isatty = lambda: True
         h = PrettyXmlHandler(stream=stream)
         r = logging.LogRecord(name='baz', level=logging.DEBUG, pathname='/foo/bar', lineno=1, msg='hello %(xml_foo)s', args=({'xml_foo': b'<?xml version="1.0" encoding="UTF-8"?><foo>bar</foo>'},), exc_info=None)
