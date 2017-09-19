@@ -476,7 +476,7 @@ class GetItem(EWSAccountService, EWSPooledMixIn):
         if additional_fields:
             additional_properties = create_element('t:AdditionalProperties')
             expanded_fields = chain(*(f.expand(version=self.account.version) for f in additional_fields))
-            set_xml_value(additional_properties, expanded_fields, self.account.version)
+            set_xml_value(additional_properties, sorted(expanded_fields, key=lambda f: f.path), self.account.version)
             itemshape.append(additional_properties)
         getitem.append(itemshape)
         item_ids = create_element('m:ItemIds')
@@ -783,7 +783,7 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
         if additional_fields:
             additional_properties = create_element('t:AdditionalProperties')
             expanded_fields = chain(*(f.expand(version=self.account.version) for f in additional_fields))
-            set_xml_value(additional_properties, expanded_fields, self.account.version)
+            set_xml_value(additional_properties, sorted(expanded_fields, key=lambda f: f.path), self.account.version)
             itemshape.append(additional_properties)
         finditem.append(itemshape)
         if calendar_view is None:
@@ -839,7 +839,7 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
         if additional_fields:
             additional_properties = create_element('t:AdditionalProperties')
             expanded_fields = chain(*(f.expand(version=self.account.version) for f in additional_fields))
-            set_xml_value(additional_properties, expanded_fields, self.account.version)
+            set_xml_value(additional_properties, sorted(expanded_fields, key=lambda f: f.path), self.account.version)
             foldershape.append(additional_properties)
         findfolder.append(foldershape)
         if self.account.version.build >= EXCHANGE_2010:
@@ -884,7 +884,7 @@ class GetFolder(EWSAccountService):
         if additional_fields:
             additional_properties = create_element('t:AdditionalProperties')
             expanded_fields = chain(*(f.expand(version=self.account.version) for f in additional_fields))
-            set_xml_value(additional_properties, expanded_fields, self.account.version)
+            set_xml_value(additional_properties, sorted(expanded_fields, key=lambda f: f.path), self.account.version)
             foldershape.append(additional_properties)
         getfolder.append(foldershape)
         folder_ids = create_element('m:FolderIds')
