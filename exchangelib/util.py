@@ -293,7 +293,10 @@ class PrettyXmlHandler(logging.StreamHandler):
                 if not is_xml(value[:10].decode('utf-8', errors='ignore')):
                     continue
                 try:
-                    record.args[key] = self.highlight_xml(self.prettify_xml(value))
+                    if PY2:
+                        record.args[key] = self.highlight_xml(self.prettify_xml(value)).encode('utf-8')
+                    else:
+                        record.args[key] = self.highlight_xml(self.prettify_xml(value))
                 except Exception:
                     # Something bad happened, but we don't want to crash the program just because logging failed
                     pass

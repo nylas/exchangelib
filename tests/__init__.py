@@ -6,6 +6,7 @@ import glob
 from itertools import chain
 import io
 from keyword import kwlist
+import logging
 import os
 import random
 import socket
@@ -59,7 +60,7 @@ from exchangelib.restriction import Restriction, Q
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, GetAttachment, ResolveNames, TNS
 from exchangelib.transport import NOAUTH, BASIC, DIGEST, NTLM, wrap, _get_auth_method_from_response
 from exchangelib.util import chunkify, peek, get_redirect_url, to_xml, BOM, get_domain, value_to_xml_text, \
-    post_ratelimited, create_element, CONNECTION_ERRORS
+    post_ratelimited, create_element, CONNECTION_ERRORS, PrettyXmlHandler
 from exchangelib.version import Build, Version, EXCHANGE_2007, EXCHANGE_2010, EXCHANGE_2013, EXCHANGE_2016
 from exchangelib.winzone import generate_map, CLDR_TO_MS_TIMEZONE_MAP
 
@@ -1138,6 +1139,29 @@ class UtilTest(unittest.TestCase):
         self.assertEqual(get_domain('foo@example.com'), 'example.com')
         with self.assertRaises(ValueError):
             get_domain('blah')
+
+    def test_pretty_xml_handler(self):
+        # Test that a normal, non-XML log record is passed through unchanged
+        stream = io.BytesIO() if PY2 else io.StringIO()
+        stream.isatty = lambda: True
+        h = PrettyXmlHandler(stream=stream)
+        self.assertTrue(h.is_tty())
+        r = logging.LogRecord(name='baz', level=logging.INFO, pathname='/foo/bar', lineno=1, msg='hello', args=(), exc_info=None)
+        h.emit(r)
+        h.stream.seek(0)
+        self.assertEqual(h.stream.read(), 'hello\n')
+
+        # Test formatting of an XML record. It should contain newlines and color codes.
+        stream = io.BytesIO() if PY2 else io.StringIO()
+        stream.isatty = lambda: True
+        h = PrettyXmlHandler(stream=stream)
+        r = logging.LogRecord(name='baz', level=logging.DEBUG, pathname='/foo/bar', lineno=1, msg='hello %(xml_foo)s', args=({'xml_foo': b'<?xml version="1.0" encoding="UTF-8"?><foo>bar</foo>'},), exc_info=None)
+        h.emit(r)
+        h.stream.seek(0)
+        self.assertEqual(
+            h.stream.read(),
+            "hello \x1b[36m<?xml version='1.0' encoding='utf-8'?>\x1b[39;49;00m\n\x1b[34;01m<foo\x1b[39;49;00m\x1b[34;01m>\x1b[39;49;00mbar\x1b[34;01m</foo>\x1b[39;49;00m\n\n"
+        )
 
 
 class EWSTest(unittest.TestCase):
@@ -4984,14 +5008,12 @@ def get_random_datetime_range(start_date=EWSDate(1990, 1, 1), end_date=EWSDate(2
 
 
 if __name__ == '__main__':
-    import logging
     import sys
 
     if '-q' in sys.argv:
         sys.argv.remove('-q')
         logging.basicConfig(level=logging.WARNING)
     else:
-        from exchangelib.util import PrettyXmlHandler
         logging.basicConfig(level=logging.DEBUG, handlers=[PrettyXmlHandler()])
 
     unittest.main()
