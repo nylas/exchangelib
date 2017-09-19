@@ -4276,21 +4276,21 @@ class BaseItemTest(EWSTest):
 
         attr_name = 'my_flag'
         self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=Flag)
-
-        # Test item creation, refresh, and update
-        item = self.get_test_item(folder=self.test_folder)
-        prop_val = item.my_flag
-        self.assertTrue(isinstance(prop_val, int))
-        item.save()
-        item.refresh()
-        self.assertEqual(prop_val, item.my_flag)
-        new_prop_val = self.random_val(self.ITEM_CLASS.get_field_by_fieldname(attr_name))
-        item.my_flag = new_prop_val
-        item.save()
-        item.refresh()
-        self.assertEqual(new_prop_val, item.my_flag)
-
-        self.ITEM_CLASS.deregister(attr_name=attr_name)
+        try:
+            # Test item creation, refresh, and update
+            item = self.get_test_item(folder=self.test_folder)
+            prop_val = item.my_flag
+            self.assertTrue(isinstance(prop_val, int))
+            item.save()
+            item.refresh()
+            self.assertEqual(prop_val, item.my_flag)
+            new_prop_val = self.random_val(self.ITEM_CLASS.get_field_by_fieldname(attr_name))
+            item.my_flag = new_prop_val
+            item.save()
+            item.refresh()
+            self.assertEqual(new_prop_val, item.my_flag)
+        finally:
+            self.ITEM_CLASS.deregister(attr_name=attr_name)
 
     def test_extended_distinguished_property(self):
         class MyMeeting(ExtendedProperty):
