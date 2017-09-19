@@ -2761,22 +2761,23 @@ class BaseItemTest(EWSTest):
 
         attr_name = 'unsupported_property'
         self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=UnsupportedProp)
-        for f in self.ITEM_CLASS.FIELDS:
-            if f.name == attr_name:
-                f.supported_from = Build(99, 99, 99, 99)
+        try:
+            for f in self.ITEM_CLASS.FIELDS:
+                if f.name == attr_name:
+                    f.supported_from = Build(99, 99, 99, 99)
 
-        with self.assertRaises(ValueError):
-            self.test_folder.get(**{attr_name: 'XXX'})
-        with self.assertRaises(ValueError):
-            list(self.test_folder.filter(**{attr_name: 'XXX'}))
-        with self.assertRaises(ValueError):
-            list(self.test_folder.all().only(attr_name))
-        with self.assertRaises(ValueError):
-            list(self.test_folder.all().values(attr_name))
-        with self.assertRaises(ValueError):
-            list(self.test_folder.all().values_list(attr_name))
-
-        self.ITEM_CLASS.deregister(attr_name=attr_name)
+            with self.assertRaises(ValueError):
+                self.test_folder.get(**{attr_name: 'XXX'})
+            with self.assertRaises(ValueError):
+                list(self.test_folder.filter(**{attr_name: 'XXX'}))
+            with self.assertRaises(ValueError):
+                list(self.test_folder.all().only(attr_name))
+            with self.assertRaises(ValueError):
+                list(self.test_folder.all().values(attr_name))
+            with self.assertRaises(ValueError):
+                list(self.test_folder.all().values_list(attr_name))
+        finally:
+            self.ITEM_CLASS.deregister(attr_name=attr_name)
 
     def test_querysets(self):
         test_items = []
@@ -4185,30 +4186,31 @@ class BaseItemTest(EWSTest):
             self.ITEM_CLASS.deregister('subject')  # Not an extended property
 
         self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=TestProp)
+        try:
+            # After register
+            self.assertEqual(TestProp.python_type(), int)
+            self.assertIn(attr_name, {f.name for f in self.ITEM_CLASS.supported_fields()})
 
-        # After register
-        self.assertEqual(TestProp.python_type(), int)
-        self.assertIn(attr_name, {f.name for f in self.ITEM_CLASS.supported_fields()})
+            # Test item creation, refresh, and update
+            item = self.get_test_item(folder=self.test_folder)
+            prop_val = item.dead_beef
+            self.assertTrue(isinstance(prop_val, int))
+            item.save()
+            item.refresh()
+            self.assertEqual(prop_val, item.dead_beef)
+            new_prop_val = get_random_int(0, 256)
+            item.dead_beef = new_prop_val
+            item.save()
+            item.refresh()
+            self.assertEqual(new_prop_val, item.dead_beef)
 
-        # Test item creation, refresh, and update
-        item = self.get_test_item(folder=self.test_folder)
-        prop_val = item.dead_beef
-        self.assertTrue(isinstance(prop_val, int))
-        item.save()
-        item.refresh()
-        self.assertEqual(prop_val, item.dead_beef)
-        new_prop_val = get_random_int(0, 256)
-        item.dead_beef = new_prop_val
-        item.save()
-        item.refresh()
-        self.assertEqual(new_prop_val, item.dead_beef)
-
-        # Test deregister
-        with self.assertRaises(ValueError):
-            self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=TestProp)  # Already registered
-        with self.assertRaises(ValueError):
-            self.ITEM_CLASS.register(attr_name='XXX', attr_cls=Mailbox)  # Not an extended property
-        self.ITEM_CLASS.deregister(attr_name=attr_name)
+            # Test deregister
+            with self.assertRaises(ValueError):
+                self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=TestProp)  # Already registered
+            with self.assertRaises(ValueError):
+                self.ITEM_CLASS.register(attr_name='XXX', attr_cls=Mailbox)  # Not an extended property
+        finally:
+            self.ITEM_CLASS.deregister(attr_name=attr_name)
         self.assertNotIn(attr_name, {f.name for f in self.ITEM_CLASS.supported_fields()})
 
     def test_extended_property_arraytype(self):
@@ -4220,21 +4222,21 @@ class BaseItemTest(EWSTest):
 
         attr_name = 'dead_beef_array'
         self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=TestArayProp)
-
-        # Test item creation, refresh, and update
-        item = self.get_test_item(folder=self.test_folder)
-        prop_val = item.dead_beef_array
-        self.assertTrue(isinstance(prop_val, list))
-        item.save()
-        item.refresh()
-        self.assertEqual(prop_val, item.dead_beef_array)
-        new_prop_val = self.random_val(self.ITEM_CLASS.get_field_by_fieldname(attr_name))
-        item.dead_beef_array = new_prop_val
-        item.save()
-        item.refresh()
-        self.assertEqual(new_prop_val, item.dead_beef_array)
-
-        self.ITEM_CLASS.deregister(attr_name=attr_name)
+        try:
+            # Test item creation, refresh, and update
+            item = self.get_test_item(folder=self.test_folder)
+            prop_val = item.dead_beef_array
+            self.assertTrue(isinstance(prop_val, list))
+            item.save()
+            item.refresh()
+            self.assertEqual(prop_val, item.dead_beef_array)
+            new_prop_val = self.random_val(self.ITEM_CLASS.get_field_by_fieldname(attr_name))
+            item.dead_beef_array = new_prop_val
+            item.save()
+            item.refresh()
+            self.assertEqual(new_prop_val, item.dead_beef_array)
+        finally:
+            self.ITEM_CLASS.deregister(attr_name=attr_name)
 
     def test_extended_property_with_tag(self):
         class Flag(ExtendedProperty):
@@ -4243,21 +4245,21 @@ class BaseItemTest(EWSTest):
 
         attr_name = 'my_flag'
         self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=Flag)
-
-        # Test item creation, refresh, and update
-        item = self.get_test_item(folder=self.test_folder)
-        prop_val = item.my_flag
-        self.assertTrue(isinstance(prop_val, int))
-        item.save()
-        item.refresh()
-        self.assertEqual(prop_val, item.my_flag)
-        new_prop_val = self.random_val(self.ITEM_CLASS.get_field_by_fieldname(attr_name))
-        item.my_flag = new_prop_val
-        item.save()
-        item.refresh()
-        self.assertEqual(new_prop_val, item.my_flag)
-
-        self.ITEM_CLASS.deregister(attr_name=attr_name)
+        try:
+            # Test item creation, refresh, and update
+            item = self.get_test_item(folder=self.test_folder)
+            prop_val = item.my_flag
+            self.assertTrue(isinstance(prop_val, int))
+            item.save()
+            item.refresh()
+            self.assertEqual(prop_val, item.my_flag)
+            new_prop_val = self.random_val(self.ITEM_CLASS.get_field_by_fieldname(attr_name))
+            item.my_flag = new_prop_val
+            item.save()
+            item.refresh()
+            self.assertEqual(new_prop_val, item.my_flag)
+        finally:
+            self.ITEM_CLASS.deregister(attr_name=attr_name)
 
     def test_extended_property_with_invalid_tag(self):
         class InvalidProp(ExtendedProperty):
@@ -4298,26 +4300,26 @@ class BaseItemTest(EWSTest):
 
         attr_name = 'my_meeting'
         self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=MyMeeting)
-
-        # Test item creation, refresh, and update
-        item = self.get_test_item(folder=self.test_folder)
-        # MyMeeting is an extended prop version of the CalendarItem 'uid' field. We don't want 'uid' to overwrite that.
-        # overwriting each other.
-        item.uid = None
-        prop_val = item.my_meeting
-        self.assertTrue(isinstance(prop_val, bytes))
-        item.save()
-        item = list(self.account.fetch(ids=[(item.item_id, item.changekey)]))[0]
-        self.assertEqual(prop_val, item.my_meeting, (prop_val, item.my_meeting))
-        new_prop_val = self.random_val(self.ITEM_CLASS.get_field_by_fieldname(attr_name))
-        item.my_meeting = new_prop_val
-        # MyMeeting is an extended prop version of the CalendarItem 'uid' field. We don't want 'uid' to overwrite that.
-        item.uid = None
-        item.save()
-        item = list(self.account.fetch(ids=[(item.item_id, item.changekey)]))[0]
-        self.assertEqual(new_prop_val, item.my_meeting)
-
-        self.ITEM_CLASS.deregister(attr_name=attr_name)
+        try:
+            # Test item creation, refresh, and update
+            item = self.get_test_item(folder=self.test_folder)
+            # MyMeeting is an extended prop version of the CalendarItem 'uid' field. We don't want 'uid' to overwrite that.
+            # overwriting each other.
+            item.uid = None
+            prop_val = item.my_meeting
+            self.assertTrue(isinstance(prop_val, bytes))
+            item.save()
+            item = list(self.account.fetch(ids=[(item.item_id, item.changekey)]))[0]
+            self.assertEqual(prop_val, item.my_meeting, (prop_val, item.my_meeting))
+            new_prop_val = self.random_val(self.ITEM_CLASS.get_field_by_fieldname(attr_name))
+            item.my_meeting = new_prop_val
+            # MyMeeting is an extended prop version of the CalendarItem 'uid' field. We don't want 'uid' to overwrite that.
+            item.uid = None
+            item.save()
+            item = list(self.account.fetch(ids=[(item.item_id, item.changekey)]))[0]
+            self.assertEqual(new_prop_val, item.my_meeting)
+        finally:
+            self.ITEM_CLASS.deregister(attr_name=attr_name)
 
     def test_extended_property_binary_array(self):
         class MyMeetingArray(ExtendedProperty):
@@ -4328,20 +4330,21 @@ class BaseItemTest(EWSTest):
         attr_name = 'my_meeting_array'
         self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=MyMeetingArray)
 
-        # Test item creation, refresh, and update
-        item = self.get_test_item(folder=self.test_folder)
-        prop_val = item.my_meeting_array
-        self.assertTrue(isinstance(prop_val, list))
-        item.save()
-        item = list(self.account.fetch(ids=[(item.item_id, item.changekey)]))[0]
-        self.assertEqual(prop_val, item.my_meeting_array)
-        new_prop_val = self.random_val(self.ITEM_CLASS.get_field_by_fieldname(attr_name))
-        item.my_meeting_array = new_prop_val
-        item.save()
-        item = list(self.account.fetch(ids=[(item.item_id, item.changekey)]))[0]
-        self.assertEqual(new_prop_val, item.my_meeting_array)
-
-        self.ITEM_CLASS.deregister(attr_name=attr_name)
+        try:
+            # Test item creation, refresh, and update
+            item = self.get_test_item(folder=self.test_folder)
+            prop_val = item.my_meeting_array
+            self.assertTrue(isinstance(prop_val, list))
+            item.save()
+            item = list(self.account.fetch(ids=[(item.item_id, item.changekey)]))[0]
+            self.assertEqual(prop_val, item.my_meeting_array)
+            new_prop_val = self.random_val(self.ITEM_CLASS.get_field_by_fieldname(attr_name))
+            item.my_meeting_array = new_prop_val
+            item.save()
+            item = list(self.account.fetch(ids=[(item.item_id, item.changekey)]))[0]
+            self.assertEqual(new_prop_val, item.my_meeting_array)
+        finally:
+            self.ITEM_CLASS.deregister(attr_name=attr_name)
 
     def test_attachment_failure(self):
         att1 = FileAttachment(name='my_file_1.txt', content=u'Hello from unicode æøå'.encode('utf-8'))
