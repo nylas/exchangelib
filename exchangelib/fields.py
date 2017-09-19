@@ -369,7 +369,7 @@ class DecimalField(IntegerField):
 
 class EnumField(IntegerField):
     # A field type where you can enter either the 1-based index in an enum (tuple), or the enum value. Values will be
-    # stored internally as integers.
+    # stored internally as integers but output in XML as strings.
     def __init__(self, *args, **kwargs):
         self.enum = kwargs.pop('enum')
         # Set difference min/max defaults than IntegerField
@@ -423,6 +423,24 @@ class EnumField(IntegerField):
 
 class EnumListField(EnumField):
     is_list = True
+
+
+class EnumAsIntField(EnumField):
+    # Like EnumField, but communicates values with EWS in integers
+    def from_xml(self, elem, account):
+        field_elem = elem.find(self.response_tag())
+        val = None if field_elem is None else field_elem.text or None
+        if val is not None:
+            try:
+                return int(val)
+            except ValueError:
+                log.warning("Cannot convert value '%s' on field '%s' to type %s", val, self.name, self.value_cls)
+                return None
+        return self.default
+
+    def to_xml(self, value, version):
+        field_elem = create_element(self.request_tag())
+        return set_xml_value(field_elem, value, version=version)
 
 
 class Base64Field(FieldURIField):

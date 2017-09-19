@@ -2996,8 +2996,8 @@ class BaseItemTest(EWSTest):
         for f in self.ITEM_CLASS.FIELDS:
             if f.is_searchable or isinstance(f, IdField) or not f.supports_version(self.account.version):
                 continue
-            if f.name == 'percent_complete':
-                # This field doesn't raise an error when used in a filter, but also doesn't match anything
+            if f.name in ('percent_complete', 'allow_new_time_proposal'):
+                # These fields don't raise an error when used in a filter, but also don't match anything in a filter
                 continue
             try:
                 filter_val = f.clean(self.random_val(f))
@@ -4129,7 +4129,8 @@ class BaseItemTest(EWSTest):
                 # datetime_created and last_modified_time aren't copied, but instead are added to the new item after
                 # uploading. This means mime_content and size can also change. Items also get new IDs on upload.
                 if f.name in {'item_id', 'changekey', 'first_occurrence', 'last_occurrence', 'datetime_created',
-                              'last_modified_time', 'mime_content', 'size', 'conversation_id'}:
+                              'last_modified_time', 'mime_content', 'size', 'conversation_id',
+                              'conflicting_meeting_count'}:
                     continue
                 dict_item[f.name] = getattr(item, f.name)
                 if f.name == 'attachments':
@@ -4293,6 +4294,9 @@ class BaseItemTest(EWSTest):
             self.ITEM_CLASS.deregister(attr_name=attr_name)
 
     def test_extended_distinguished_property(self):
+        if self.ITEM_CLASS == CalendarItem:
+            raise self.skipTest("This extendedproperty doesn't work on CalendarItems")
+
         class MyMeeting(ExtendedProperty):
             distinguished_property_set_id = 'Meeting'
             property_type = 'Binary'

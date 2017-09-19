@@ -12,7 +12,7 @@ from .fields import BooleanField, IntegerField, DecimalField, Base64Field, TextF
     URIField, BodyField, DateTimeField, MessageHeaderField, PhoneNumberField, EmailAddressField, PhysicalAddressField, \
     ExtendedPropertyField, AttachmentField, RecurrenceField, MailboxField,  MailboxListField, AttendeesField, Choice, \
     OccurrenceField, OccurrenceListField, MemberListField, EWSElementField, EffectiveRightsField, TimeZoneField, \
-    CultureField, TextBodyField, IdField, CharField, TextListField, EnumField
+    CultureField, TextBodyField, IdField, CharField, TextListField, EnumAsIntField
 from .properties import EWSElement, ItemId, ConversationId, ParentFolderId, Attendee
 from .recurrence import FirstOccurrence, LastOccurrence, Occurrence, DeletedOccurrence
 from .util import is_iterable
@@ -432,39 +432,46 @@ class CalendarItem(Item):
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa564765(v=exchg.150).aspx
     """
     ELEMENT_NAME = 'CalendarItem'
+    CONFERENCE_TYPES = ('NetMeeting', 'NetShow', 'Chat')
     FIELDS = Item.FIELDS + [
         TextField('uid', field_uri='calendar:UID', is_required_after_save=True, is_searchable=False),
         DateTimeField('start', field_uri='calendar:Start', is_required=True),
         DateTimeField('end', field_uri='calendar:End', is_required=True),
-        # Placeholder for OriginalStart
+        DateTimeField('original_start', field_uri='calendar:OriginalStart', is_read_only=True),
         BooleanField('is_all_day', field_uri='calendar:IsAllDayEvent', is_required=True, default=False),
         ChoiceField('legacy_free_busy_status', field_uri='calendar:LegacyFreeBusyStatus', choices={
             Choice('Free'), Choice('Tentative'), Choice('Busy'), Choice('OOF'), Choice('NoData'),
             Choice('WorkingElsewhere', supported_from=EXCHANGE_2013)
         }, is_required=True, default='Busy'),
         TextField('location', field_uri='calendar:Location'),
-        # Placeholder for When
-        # Placeholder for IsMeeting
+        TextField('when', field_uri='calendar:When'),
+        BooleanField('is_meeting', field_uri='calendar:IsMeeting', is_read_only=True),
         BooleanField('is_cancelled', field_uri='calendar:IsCancelled', is_read_only=True),
-        # Placeholder for IsRecurring
-        # Placeholder for MeetingRequestWasSent
-        # Placeholder for IsResponseRequested
+        BooleanField('is_recurring', field_uri='calendar:IsRecurring', is_read_only=True),
+        BooleanField('meeting_request_was_sent', field_uri='calendar:MeetingRequestWasSent', is_read_only=True),
+        BooleanField('is_response_requested', field_uri='calendar:IsResponseRequested', default=None,
+                     is_required_after_save=True, is_searchable=False),
         ChoiceField('type', field_uri='calendar:CalendarItemType', choices={
             Choice('Single'), Choice('Occurrence'), Choice('Exception'), Choice('RecurringMaster'),
         }, is_read_only=True),
-        # Placeholder for MyResponseType
+        ChoiceField('my_response_type', field_uri='calendar:MyResponseType', choices={
+            Choice(c) for c in Attendee.RESPONSE_TYPES
+        }, is_read_only=True),
         MailboxField('organizer', field_uri='calendar:Organizer', is_read_only=True),
         AttendeesField('required_attendees', field_uri='calendar:RequiredAttendees', is_searchable=False),
         AttendeesField('optional_attendees', field_uri='calendar:OptionalAttendees', is_searchable=False),
         AttendeesField('resources', field_uri='calendar:Resources', is_searchable=False),
-        # Placeholder for ConflictingMeetingCount
-        # Placeholder for AdjacentMeetingCount
+        IntegerField('conflicting_meeting_count', field_uri='calendar:ConflictingMeetingCount', is_read_only=True),
+        IntegerField('adjacent_meeting_count', field_uri='calendar:AdjacentMeetingCount', is_read_only=True),
         # Placeholder for ConflictingMeetings
         # Placeholder for AdjacentMeetings
-        # Placeholder for Duration
-        # Placeholder for AppointmentReplyTime
-        # Placeholder for AppointmentSequenceNumber
+        CharField('duration', field_uri='calendar:Duration', is_read_only=True),
+        DateTimeField('appointment_reply_time', field_uri='calendar:AppointmentReplyTime', is_read_only=True),
+        IntegerField('appointment_sequence_number', field_uri='calendar:AppointmentSequenceNumber', is_read_only=True),
         # Placeholder for AppointmentState
+        # AppointmentState is an EnumListField-like field, but with bitmask values:
+        #    https://msdn.microsoft.com/en-us/library/office/aa564700(v=exchg.150).aspx
+        # We could probably subclass EnumListField to implement this field.
         RecurrenceField('recurrence', field_uri='calendar:Recurrence', is_searchable=False),
         OccurrenceField('first_occurrence', field_uri='calendar:FirstOccurrence', value_cls=FirstOccurrence,
                         is_read_only=True),
@@ -480,11 +487,14 @@ class CalendarItem(Item):
                       is_read_only=True, is_searchable=False),
         TimeZoneField('_end_timezone', field_uri='calendar:EndTimeZone', supported_from=EXCHANGE_2010,
                       is_read_only=True, is_searchable=False),
-        # Placeholder for ConferenceType
-        # Placeholder for AllowNewTimeProposal
-        # Placeholder for IsOnlineMeeting
-        # Placeholder for MeetingWorkspaceUrl
-        # Placeholder for NetShowUrl
+        EnumAsIntField('conference_type', field_uri='calendar:ConferenceType', enum=CONFERENCE_TYPES, min=0,
+                       default=None, is_required_after_save=True),
+        BooleanField('allow_new_time_proposal', field_uri='calendar:AllowNewTimeProposal', default=None,
+                     is_required_after_save=True, is_searchable=False),
+        BooleanField('is_online_meeting', field_uri='calendar:IsOnlineMeeting', default=None,
+                     is_required_after_save=True),
+        URIField('meeting_workspace_url', field_uri='calendar:MeetingWorkspaceUrl'),
+        URIField('net_show_url', field_uri='calendar:NetShowUrl'),
     ]
 
     @classmethod
