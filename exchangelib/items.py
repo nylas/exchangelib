@@ -12,8 +12,8 @@ from .fields import BooleanField, IntegerField, DecimalField, Base64Field, TextF
     URIField, BodyField, DateTimeField, MessageHeaderField, PhoneNumberField, EmailAddressField, PhysicalAddressField, \
     ExtendedPropertyField, AttachmentField, RecurrenceField, MailboxField,  MailboxListField, AttendeesField, Choice, \
     OccurrenceField, OccurrenceListField, MemberListField, EWSElementField, EffectiveRightsField, TimeZoneField, \
-    CultureField, TextBodyField, IdField, CharField, TextListField
-from .properties import EWSElement, ItemId, ConversationId
+    CultureField, TextBodyField, IdField, CharField, TextListField, EnumField
+from .properties import EWSElement, ItemId, ConversationId, ParentFolderId, Attendee
 from .recurrence import FirstOccurrence, LastOccurrence, Occurrence, DeletedOccurrence
 from .util import is_iterable
 from .version import EXCHANGE_2010, EXCHANGE_2013
@@ -91,8 +91,9 @@ class Item(EWSElement):
         Base64Field('mime_content', field_uri='item:MimeContent', is_read_only=True),
         IdField('item_id', field_uri=ItemId.ID_ATTR, is_read_only=True),
         IdField('changekey', field_uri=ItemId.CHANGEKEY_ATTR, is_read_only=True),
-        # Placeholder for ParentFolderId
-        # Placeholder for ItemClass
+        EWSElementField('parent_folder_id', field_uri='folder:ParentFolderId', value_cls=ParentFolderId,
+                        is_read_only=True),
+        CharField('item_class', field_uri='item:ItemClass', is_read_only=True),
         CharField('subject', field_uri='item:Subject'),
         ChoiceField('sensitivity', field_uri='item:Sensitivity', choices={
             Choice('Normal'), Choice('Personal'), Choice('Private'), Choice('Confidential')
@@ -130,11 +131,14 @@ class Item(EWSElement):
         CharField('last_modified_name', field_uri='item:LastModifiedName', is_read_only=True),
         DateTimeField('last_modified_time', field_uri='item:LastModifiedTime', is_read_only=True),
         BooleanField('is_associated', field_uri='item:IsAssociated', is_read_only=True),
-        # Placeholder for WebClientReadFormQueryString
-        # Placeholder for WebClientEditFormQueryString
+        # These two URIFields throw ErrorInternalServerError
+        # URIField('web_client_read_form_query_string', field_uri='calendar:WebClientReadFormQueryString',
+        #          is_read_only=True, supported_from=EXCHANGE_2010),
+        # URIField('web_client_edit_form_query_string', field_uri='calendar:WebClientEditFormQueryString',
+        #          is_read_only=True, supported_from=EXCHANGE_2010),
         EWSElementField('conversation_id', field_uri='item:ConversationId', value_cls=ConversationId,
                         is_read_only=True),
-        # Placeholder for UniqueBody
+        BodyField('unique_body', field_uri='item:UniqueBody', is_read_only=True, supported_from=EXCHANGE_2010),
     ]
 
     # We can't use __slots__ because we need to add extended properties dynamically
