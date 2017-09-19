@@ -263,12 +263,12 @@ class Attendee(EWSElement):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa580339(v=exchg.150).aspx
     ELEMENT_NAME = 'Attendee'
 
+    RESPONSE_TYPES = {'Unknown', 'Organizer', 'Tentative', 'Accept', 'Decline', 'NoResponseReceived'}
+
     FIELDS = [
         MailboxField('mailbox', is_required=True),
-        ChoiceField('response_type', field_uri='ResponseType', choices={
-            Choice('Unknown'), Choice('Organizer'), Choice('Tentative'), Choice('Accept'), Choice('Decline'),
-            Choice('NoResponseReceived')
-        }, default='Unknown'),
+        ChoiceField('response_type', field_uri='ResponseType', choices={Choice(c) for c in RESPONSE_TYPES},
+                    default='Unknown'),
         DateTimeField('last_response_time', field_uri='LastResponseTime'),
     ]
 
