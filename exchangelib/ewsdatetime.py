@@ -10,7 +10,7 @@ import pytz.exceptions
 import tzlocal
 
 from .errors import NaiveDateTimeNotAllowed, UnknownTimeZone, AmbiguousTimeError, NonExistentTimeError
-from .winzone import PYTZ_TO_MS_TIMEZONE_MAP
+from .winzone import PYTZ_TO_MS_TIMEZONE_MAP, MS_TIMEZONE_TO_PYTZ_MAP
 
 log = logging.getLogger(__name__)
 
@@ -155,7 +155,7 @@ class EWSTimeZone(object):
     services.GetServerTimeZones.
     """
     PYTZ_TO_MS_MAP = PYTZ_TO_MS_TIMEZONE_MAP
-    MS_TO_PYTZ_MAP = dict((v, k) for k, v in PYTZ_TO_MS_MAP.items())
+    MS_TO_PYTZ_MAP = MS_TIMEZONE_TO_PYTZ_MAP
 
     def __eq__(self, other):
         # Microsoft timezones are less granular than pytz, so an EWSTimeZone created from 'Europe/Copenhagen' may return

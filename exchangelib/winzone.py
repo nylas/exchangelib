@@ -482,7 +482,7 @@ CLDR_TO_MS_TIMEZONE_MAP = {
 }
 
 # Add timezone names used by pytz (which gets timezone names from IANA) that are not found in the CLDR.
-# A full list of the IANA names missing in CLDR can be found with:
+# TODO: A full list of the IANA names missing in CLDR can be found with:
 #
 #    sorted(set(pytz.all_timezones) - set(CLDR_TO_MS_TIMEZONE_MAP))
 #
@@ -490,4 +490,9 @@ PYTZ_TO_MS_TIMEZONE_MAP = dict(CLDR_TO_MS_TIMEZONE_MAP, **{
     'Asia/Kolkata': 'India Standard Time',
     'UTC': 'UTC',
     'GMT': 'GMT Standard Time',
+})
+
+# Reverse map from Microsoft timezone ID to pytz timezone name. Non-CLDR timezone ID's can be added here.
+MS_TIMEZONE_TO_PYTZ_MAP = dict(dict((v, k) for k, v in PYTZ_TO_MS_TIMEZONE_MAP.items()), **{
+    'tzone://Microsoft/Utc': 'UTC',
 })
