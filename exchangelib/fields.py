@@ -372,9 +372,11 @@ class EnumField(IntegerField):
     # stored internally as integers.
     def __init__(self, *args, **kwargs):
         self.enum = kwargs.pop('enum')
+        # Set difference min/max defaults than IntegerField
+        assert 'max' not in kwargs
+        kwargs['min'] = kwargs.pop('min', 1)
+        kwargs['max'] = kwargs['min'] + len(self.enum) - 1
         super(EnumField, self).__init__(*args, **kwargs)
-        self.min = 1
-        self.max = len(self.enum)
 
     def clean(self, value, version=None):
         if self.is_list:
