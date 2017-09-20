@@ -618,7 +618,7 @@ class Task(Item):
         }, is_read_only=True),
         CharField('delegator', field_uri='task:Delegator', is_read_only=True),
         DateTimeField('due_date', field_uri='task:DueDate'),
-        # Placeholder for IsAssignmentEditable
+        BooleanField('is_editable', field_uri='task:IsAssignmentEditable', is_read_only=True),
         BooleanField('is_complete', field_uri='task:IsComplete', is_read_only=True),
         BooleanField('is_recurring', field_uri='task:IsRecurring', is_read_only=True),
         BooleanField('is_team_task', field_uri='task:IsTeamTask', is_read_only=True),
