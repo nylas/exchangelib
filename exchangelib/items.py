@@ -538,17 +538,17 @@ class Message(Item):
                      is_required=True, default=False, is_read_only_after_send=True),
         BooleanField('is_delivery_receipt_requested', field_uri='message:IsDeliveryReceiptRequested',
                      is_required=True, default=False, is_read_only_after_send=True),
-        # Placeholder for ConversationIndex
-        # Placeholder for ConversationTopic
-        # We can't use fieldname 'from' since it's a Python keyword
+        Base64Field('conversation_index', field_uri='message:ConversationIndex', is_read_only=True),
+        CharField('conversation_topic', field_uri='message:ConversationTopic', is_read_only=True),
+        # Rename 'From' to 'author'. We can't use fieldname 'from' since it's a Python keyword.
         MailboxField('author', field_uri='message:From', is_read_only_after_send=True),
         CharField('message_id', field_uri='message:InternetMessageId', is_read_only=True, is_read_only_after_send=True),
         BooleanField('is_read', field_uri='message:IsRead', is_required=True, default=False),
         BooleanField('is_response_requested', field_uri='message:IsResponseRequested', default=False, is_required=True),
         TextField('references', field_uri='message:References'),
         MailboxField('reply_to', field_uri='message:ReplyTo', is_read_only_after_send=True, is_searchable=False),
-        # Placeholder for ReceivedBy
-        # Placeholder for ReceivedRepresenting
+        MailboxField('received_by', field_uri='message:ReceivedBy', is_read_only=True),
+        MailboxField('received_representing', field_uri='message:ReceivedRepresenting', is_read_only=True),
         # Placeholder for ReminderMessageData
     ]
 
