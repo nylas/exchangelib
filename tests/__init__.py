@@ -4151,10 +4151,11 @@ class BaseItemTest(EWSTest):
             # fieldnames is everything except the ID so we'll use it to compare
             for f in item.FIELDS:
                 # datetime_created and last_modified_time aren't copied, but instead are added to the new item after
-                # uploading. This means mime_content and size can also change. Items also get new IDs on upload.
+                # uploading. This means mime_content and size can also change. Items also get new IDs on upload. And
+                # meeting_count values are dependent on contents of current calendar.
                 if f.name in {'item_id', 'changekey', 'first_occurrence', 'last_occurrence', 'datetime_created',
                               'last_modified_time', 'mime_content', 'size', 'conversation_id',
-                              'conflicting_meeting_count'}:
+                              'adjacent_meeting_count', 'conflicting_meeting_count'}:
                     continue
                 dict_item[f.name] = getattr(item, f.name)
                 if f.name == 'attachments':
