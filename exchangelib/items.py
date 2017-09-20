@@ -12,7 +12,7 @@ from .fields import BooleanField, IntegerField, DecimalField, Base64Field, TextF
     URIField, BodyField, DateTimeField, MessageHeaderField, PhoneNumberField, EmailAddressField, PhysicalAddressField, \
     ExtendedPropertyField, AttachmentField, RecurrenceField, MailboxField,  MailboxListField, AttendeesField, Choice, \
     OccurrenceField, OccurrenceListField, MemberListField, EWSElementField, EffectiveRightsField, TimeZoneField, \
-    CultureField, TextBodyField, IdField, CharField, TextListField, EnumAsIntField
+    CultureField, TextBodyField, IdField, CharField, TextListField, EnumAsIntField, EmailField
 from .properties import EWSElement, ItemId, ConversationId, ParentFolderId, Attendee
 from .recurrence import FirstOccurrence, LastOccurrence, Occurrence, DeletedOccurrence
 from .util import is_iterable
@@ -706,31 +706,38 @@ class Contact(Item):
         TextField('assistant_name', field_uri='contacts:AssistantName'),
         DateTimeField('birthday', field_uri='contacts:Birthday'),
         URIField('business_homepage', field_uri='contacts:BusinessHomePage'),
-        # Placeholder for Children
+        CharListField('children', field_uri='contacts:Children'),
         TextListField('companies', field_uri='contacts:Companies', is_searchable=False),
-        # Placeholder for ContactSource
+        ChoiceField('contact_source', field_uri='contacts:ContactSource', choices={
+            Choice('Store'), Choice('ActiveDirectory')
+        }, is_read_only=True),
         TextField('department', field_uri='contacts:Department'),
         TextField('generation', field_uri='contacts:Generation'),
-        # IMAddressField('im_addresses', field_uri='contacts:ImAddresses'),
+        CharField('im_addresses', field_uri='contacts:ImAddresses', is_read_only=True),
         TextField('job_title', field_uri='contacts:JobTitle'),
         TextField('manager', field_uri='contacts:Manager'),
         TextField('mileage', field_uri='contacts:Mileage'),
         CharField('office', field_uri='contacts:OfficeLocation'),
-        # Placeholder for PostalAddressIndex
+        ChoiceField('postal_address_index', field_uri='contacts:PostalAddressIndex', choices={
+            Choice('Business'), Choice('Home'), Choice('Other'), Choice('None')
+        }, default='None', is_required_after_save=True),
         CharField('profession', field_uri='contacts:Profession'),
-        # Placeholder for SpouseName
+        TextField('spouse_name', field_uri='contacts:SpouseName'),
         CharField('surname', field_uri='contacts:Surname'),
-        # Placeholder for WeddingAnniversary
-        # Placeholder for HasPicture
-        # Placeholder for PhoneticFullName
-        # Placeholder for PhoneticFirstName
-        # Placeholder for PhoneticLastName
-        # EmailField('email_alias', field_uri='contacts:Alias'),
-        # CharField('notes', field_uri='contacts:Notes', supported_from=EXCHANGE_2010_SP2),  # TODO: throws errors
+        DateTimeField('wedding_anniversary', field_uri='contacts:WeddingAnniversary'),
+        BooleanField('has_picture', field_uri='contacts:HasPicture', supported_from=EXCHANGE_2010, is_read_only=True),
+        TextField('phonetic_full_name', field_uri='contacts:PhoneticFullName', supported_from=EXCHANGE_2013,
+                  is_read_only=True),
+        TextField('phonetic_first_name', field_uri='contacts:PhoneticFirstName', supported_from=EXCHANGE_2013,
+                  is_read_only=True),
+        TextField('phonetic_last_name', field_uri='contacts:PhoneticLastName', supported_from=EXCHANGE_2013,
+                  is_read_only=True),
+        EmailField('email_alias', field_uri='contacts:Alias', is_read_only=True),
+        CharField('notes', field_uri='contacts:Notes', supported_from=EXCHANGE_2013, is_read_only=True),
         # Placeholder for Photo
         # Placeholder for UserSMIMECertificate
         # Placeholder for MSExchangeCertificate
-        # Placeholder for DirectoryId
+        TextField('directory_id', field_uri='contacts:DirectoryId', supported_from=EXCHANGE_2013, is_read_only=True),
         # Placeholder for ManagerMailbox
         # Placeholder for DirectReports
     ]
