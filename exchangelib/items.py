@@ -751,7 +751,9 @@ class DistributionList(Item):
     FIELDS = Item.FIELDS + [
         CharField('display_name', field_uri='contacts:DisplayName', is_required=True),
         CharField('file_as', field_uri='contacts:FileAs', is_read_only=True),
-        # Placeholder for ContactSource
+        ChoiceField('contact_source', field_uri='contacts:ContactSource', choices={
+            Choice('Store'), Choice('ActiveDirectory')
+        }, is_read_only=True),
         MemberListField('members', field_uri='distributionlist:Members'),
     ]
 
@@ -762,8 +764,8 @@ class PostItem(Item):
     """
     ELEMENT_NAME = 'PostItem'
     FIELDS = Item.FIELDS + [
-        # Placeholder for ConversationIndex
-        # Placeholder for ConversationTopic
+        Base64Field('conversation_index', field_uri='message:ConversationIndex', is_read_only=True),
+        CharField('conversation_topic', field_uri='message:ConversationTopic', is_read_only=True),
         MailboxField('author', field_uri='message:From', is_read_only_after_send=True),
         CharField('message_id', field_uri='message:InternetMessageId', is_read_only=True, is_read_only_after_send=True),
         BooleanField('is_read', field_uri='message:IsRead', is_required=True, default=False),
