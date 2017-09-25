@@ -20,7 +20,7 @@ from .items import Item, BulkCreateResult, HARD_DELETE, \
     AUTO_RESOLVE, SEND_TO_NONE, SAVE_ONLY, SEND_AND_SAVE_COPY, SEND_ONLY, ALL_OCCURRENCIES, \
     DELETE_TYPE_CHOICES, MESSAGE_DISPOSITION_CHOICES, CONFLICT_RESOLUTION_CHOICES, AFFECTED_TASK_OCCURRENCES_CHOICES, \
     SEND_MEETING_INVITATIONS_CHOICES, SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES, \
-    SEND_MEETING_CANCELLATIONS_CHOICES
+    SEND_MEETING_CANCELLATIONS_CHOICES, IdOnly
 from .protocol import Protocol
 from .queryset import QuerySet
 from .services import ExportItems, UploadItems, GetItem, CreateItem, UpdateItem, DeleteItem, MoveItem, SendItem
@@ -384,11 +384,13 @@ class Account(object):
             # We accept generators, so it's not always convenient for caller to know up-front if 'ids' is empty. Allow
             # empty 'ids' and return early.
             return
-        if only_fields:
-            only_fields = validation_folder.validate_fields(fields=only_fields)
+        if only_fields is None:
+            # We didn't restrict list of field paths. Get all fields from the server, including extended properties.
+            additional_fields = {FieldPath(field=f) for f in validation_folder.allowed_fields()}
         else:
-            only_fields = {FieldPath(field=f) for f in validation_folder.allowed_fields()}
-        for i in GetItem(account=self).call(items=ids, additional_fields=only_fields):
+            additional_fields = validation_folder.validate_fields(fields=only_fields)
+        # Always use IdOnly here, because AllProperties doesn't actually get *all* properties
+        for i in GetItem(account=self).call(items=ids, additional_fields=additional_fields, shape=IdOnly):
             if isinstance(i, Exception):
                 yield i
             else:

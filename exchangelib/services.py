@@ -454,7 +454,7 @@ class GetItem(EWSAccountService, EWSPooledMixIn):
     SERVICE_NAME = 'GetItem'
     element_container_name = '{%s}Items' % MNS
 
-    def call(self, items, additional_fields):
+    def call(self, items, additional_fields, shape):
         """
         Returns all items in an account that correspond to a list of ID's, in stable order.
 
@@ -465,14 +465,14 @@ class GetItem(EWSAccountService, EWSPooledMixIn):
         return self._pool_requests(payload_func=self.get_payload, **dict(
             items=items,
             additional_fields=additional_fields,
+            shape=shape,
         ))
 
-    def get_payload(self, items, additional_fields):
+    def get_payload(self, items, additional_fields, shape):
         from .folders import ItemId
-        from .items import IdOnly
         getitem = create_element('m:%s' % self.SERVICE_NAME)
         itemshape = create_element('m:ItemShape')
-        add_xml_child(itemshape, 't:BaseShape', IdOnly)
+        add_xml_child(itemshape, 't:BaseShape', shape)
         if additional_fields:
             additional_properties = create_element('t:AdditionalProperties')
             expanded_fields = chain(*(f.expand(version=self.account.version) for f in additional_fields))

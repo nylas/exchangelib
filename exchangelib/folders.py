@@ -344,17 +344,17 @@ class Folder(EWSElement):
     def get(self, *args, **kwargs):
         return QuerySet(self).get(*args, **kwargs)
 
-    def find_items(self, q, shape=IdOnly, depth=SHALLOW, additional_fields=tuple(), order_fields=None,
+    def find_items(self, q, shape=IdOnly, depth=SHALLOW, additional_fields=None, order_fields=None,
                    calendar_view=None, page_size=None, max_items=None):
         """
         Private method to call the FindItem service
 
         :param q: a Q instance containing any restrictions
-        :param shape: controls the exact fields returned are governed by. Be aware that complex elements can only be
-                      fetched with fetch().
+        :param shape: controls whether to return (item_id, chanegkey) tuples or Item objects. If additional_fields is
+               non-null, we always return Item objects.
         :param depth: controls the whether to return soft-deleted items or not.
-        :param additional_fields: the extra properties we want on the return objects. If None, we'll return
-                                  (item_id, changekey) tuples instead of Item obejcts.
+        :param additional_fields: the extra properties we want on the return objects. If None, we'll fetch all fields.
+               Be aware that complex elements can only be fetched with fetch().
         :param order_fields: the SortOrder fields, if any
         :param calendar_view: a CalendarView instance, if any
         :param page_size: the requested number of items per page

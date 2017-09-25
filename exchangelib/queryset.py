@@ -7,7 +7,7 @@ import logging
 
 from future.utils import python_2_unicode_compatible
 
-from .items import CalendarItem
+from .items import CalendarItem, IdOnly
 from .fields import FieldPath, FieldOrder
 from .restriction import Q
 from .version import EXCHANGE_2010
@@ -85,33 +85,32 @@ class QuerySet(object):
         return FieldPath.from_string('changekey', folder=self.folder)
 
     def _additional_fields(self):
-        if self.only_fields is None:
-            # The list of field paths was not restricted. Get all field paths we support, as a set, but remove item_id
-            # and changekey. We get them unconditionally.
+        assert isinstance(self.only_fields, tuple)
+        # Remove ItemId and ChangeKey. We get them unconditionally
+        additional_fields = {f for f in self.only_fields if not f.field.is_attribute}
 
-            additional_fields = {FieldPath(field=f) for f in self.folder.allowed_fields()}
+        # For CalendarItem items, we want to inject internal timezone fields into the requested fields.
+        has_start = 'start' in {f.field.name for f in additional_fields}
+        has_end = 'end' in {f.field.name for f in additional_fields}
+        meeting_tz_field, start_tz_field, end_tz_field = CalendarItem.timezone_fields()
+        if self.folder.account.version.build < EXCHANGE_2010:
+            if has_start or has_end:
+                additional_fields.add(FieldPath(field=meeting_tz_field))
         else:
-            assert isinstance(self.only_fields, tuple)
-            # Remove ItemId and ChangeKey. We get them unconditionally
-            additional_fields = {f for f in self.only_fields if not f.field.is_attribute}
-
-            # For CalendarItem items, we want to inject internal timezone fields into the requested fields.
-            has_start = 'start' in {f.field.name for f in additional_fields}
-            has_end = 'end' in {f.field.name for f in additional_fields}
-            meeting_tz_field, start_tz_field, end_tz_field = CalendarItem.timezone_fields()
-            if self.folder.account.version.build < EXCHANGE_2010:
-                if has_start or has_end:
-                    additional_fields.add(FieldPath(field=meeting_tz_field))
-            else:
-                if has_start:
-                    additional_fields.add(FieldPath(field=start_tz_field))
-                if has_end:
-                    additional_fields.add(FieldPath(field=end_tz_field))
+            if has_start:
+                additional_fields.add(FieldPath(field=start_tz_field))
+            if has_end:
+                additional_fields.add(FieldPath(field=end_tz_field))
         return additional_fields
 
     def _query(self):
-        additional_fields = self._additional_fields()
-        complex_fields_requested = bool(set(f.field for f in additional_fields) & self.folder.complex_fields())
+        if self.only_fields is None:
+            # We didn't restrict list of field paths. Get all fields from the server, including extended properties.
+            additional_fields = {FieldPath(field=f) for f in self.folder.allowed_fields()}
+            complex_fields_requested = True
+        else:
+            additional_fields = self._additional_fields()
+            complex_fields_requested = bool(set(f.field for f in additional_fields) & self.folder.complex_fields())
 
         # EWS can do server-side sorting on multiple fields. A caveat is that server-side sorting is not supported
         # for calendar views. In this case, we do all the sorting client-side.
@@ -119,16 +118,8 @@ class QuerySet(object):
             must_sort_clientside = bool(self.order_fields)
             order_fields = None
         else:
-            order_fields = self.order_fields
             must_sort_clientside = False
-
-        find_item_kwargs = dict(
-            additional_fields=None,
-            order_fields=order_fields,
-            calendar_view=self.calendar_view,
-            page_size=self.page_size,
-            max_items=self.max_items,
-        )
+            order_fields = self.order_fields
 
         if must_sort_clientside:
             # Also fetch order_by fields that we only need for client-side sorting.
@@ -138,17 +129,29 @@ class QuerySet(object):
         else:
             extra_order_fields = set()
 
+        find_item_kwargs = dict(
+            shape=IdOnly,  # Always use IdOnly here, because AllProperties doesn't actually get *all* properties
+            additional_fields=additional_fields,
+            order_fields=order_fields,
+            calendar_view=self.calendar_view,
+            page_size=self.page_size,
+            max_items=self.max_items,
+        )
+
         if complex_fields_requested:
-            # The FindItems service does not support complex field types. Fallback to getting ids and calling GetItems
+            # The FindItem service does not support complex field types. Tell find_items() to return
+            # (item_id, changekey) tuples, and pass that to fetch().
+            find_item_kwargs['additional_fields'] = None
             items = self.folder.fetch(
                 ids=self.folder.find_items(self.q, **find_item_kwargs),
                 only_fields=additional_fields
             )
         else:
-            # If we requested no additional fields, we can take a shortcut by setting additional_fields=None. This tells
-            # find_items() to do less work.
-            if additional_fields:
-                find_item_kwargs['additional_fields'] = additional_fields
+            if not additional_fields:
+                # If additional_fields is the empty set, we only requested item_id and changekey fields. We can then
+                # take a shortcut by using (shape=IdOnly, additional_fields=None) to tell find_items() to return
+                # (item_id, changekey) tuples. We'll post-process those later.
+                find_item_kwargs['additional_fields'] = None
             items = self.folder.find_items(self.q, **find_item_kwargs)
         if not must_sort_clientside:
             return items
