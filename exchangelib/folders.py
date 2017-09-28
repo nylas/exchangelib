@@ -591,6 +591,12 @@ class Root(Folder):
         self._subfolders = None
         super(Root, self).refresh()
 
+    @property
+    def tois(self):
+        # 'Top of Information Store' is a folder available in some Exchange accounts. It usually contains the
+        # distinguished folders belonging to the account (inbox, calendar, trash etc.).
+        return self / 'Top of Information Store'
+
     def get_folder(self, folder_id):
         return self._folders_map.get(folder_id, None)
 
@@ -640,20 +646,17 @@ class Root(Folder):
             log.debug('Searching default %s folder in full folder list', folder_cls)
 
         candidates = []
+        # Try direct children of TOIS first. TOIS might not exist.
         try:
-            # 'Top of Information Store' is a folder available in some Exchange accounts. It only contains folders
-            # owned by the account. Try direct children of that first.
-            tois = self / 'Top of Information Store'
-        except ErrorFolderNotFound:
-            pass
-        else:
-            same_type = [f for f in tois.children if type(f) == folder_cls]
+            same_type = [f for f in self.tois.children if type(f) == folder_cls]
             are_distinguished = [f for f in same_type if f.is_distinguished]
             if are_distinguished:
                 candidates = are_distinguished
             else:
                 localized_names = {s.lower() for s in folder_cls.LOCALIZED_NAMES.get(self.account.locale, [])}
                 candidates = [f for f in same_type if f.name.lower() in localized_names]
+        except ErrorFolderNotFound:
+            pass
 
         if candidates:
             if len(candidates) > 1:
