@@ -137,7 +137,7 @@ class Item(EWSElement):
         # URIField('web_client_edit_form_query_string', field_uri='calendar:WebClientEditFormQueryString',
         #          is_read_only=True, supported_from=EXCHANGE_2010),
         EWSElementField('conversation_id', field_uri='item:ConversationId', value_cls=ConversationId,
-                        is_read_only=True),
+                        is_read_only=True, supported_from=EXCHANGE_2010),
         BodyField('unique_body', field_uri='item:UniqueBody', is_read_only=True, supported_from=EXCHANGE_2010),
     ]
 
