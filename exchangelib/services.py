@@ -120,7 +120,7 @@ class EWSService(object):
         # guessing tango, but then the server may decide that any arbitrary legacy backend server may actually process
         # the request for an account. Prepare to handle ErrorInvalidSchemaVersionForMailboxVersion errors and set the
         # server version per-account.
-        from .version import API_VERSIONS, Version
+        from .version import API_VERSIONS
         if isinstance(self, EWSAccountService):
             account = self.account
             hint = self.account.version
@@ -151,21 +151,33 @@ class EWSService(object):
                 # The guessed server version is wrong for this account. Try the next version
                 log.debug('API version %s was invalid for account %s', api_version, account)
                 continue
-            if api_version != hint.api_version or hint.build is None:
-                # The api_version that worked was different than our hint, or we never got a build version. Set new
-                # version for account.
-                if api_version != hint.api_version:
-                    log.debug('New API version for account %s (%s -> %s)', account, hint.api_version, api_version)
-                else:
-                    log.debug('Adding missing build number for account %s', account)
-                new_version = Version.from_response(requested_api_version=api_version, response=r.text)
-                if isinstance(self, EWSAccountService):
-                    self.account.version = new_version
-                else:
-                    self.protocol.version = new_version
+            except ResponseMessageError:
+                # We got an error message from Exchange, but we still want to get any new version info from the response
+                self._update_api_version(hint=hint, api_version=api_version, response=r)
+                raise
+            else:
+                self._update_api_version(hint=hint, api_version=api_version, response=r)
             return res
         raise ErrorInvalidSchemaVersionForMailboxVersion('Tried versions %s but all were invalid for account %s' %
                                                          (api_versions, account))
+
+    def _update_api_version(self, hint, api_version, response):
+        if api_version == hint.api_version and hint.build is not None:
+            # Nothing to do
+            return
+        # The api_version that worked was different than our hint, or we never got a build version. Set new
+        # version for account.
+        from .version import Version
+        account = self.account if isinstance(self, EWSAccountService) else None
+        if api_version != hint.api_version:
+            log.debug('Found new API version (%s -> %s)', hint.api_version, api_version)
+        else:
+            log.debug('Adding missing build number %s', api_version)
+        new_version = Version.from_response(requested_api_version=api_version, response=response.text)
+        if isinstance(self, EWSAccountService):
+            self.account.version = new_version
+        else:
+            self.protocol.version = new_version
 
     @classmethod
     def _get_soap_payload(cls, soap_response):
@@ -973,8 +985,7 @@ class ResolveNames(EWSService):
     # TODO: Does not support paged responses yet. See example in issue #205
     SERVICE_NAME = 'ResolveNames'
     element_container_name = '{%s}ResolutionSet' % MNS
-    ERRORS_TO_CATCH_IN_RESPONSE = EWSService.ERRORS_TO_CATCH_IN_RESPONSE \
-                                  + (ErrorNameResolutionNoResults, ErrorMissingEmailAddress)
+    ERRORS_TO_CATCH_IN_RESPONSE = ErrorNameResolutionNoResults
     WARNINGS_TO_IGNORE_IN_RESPONSE = ErrorNameResolutionMultipleResults
 
     def call(self, unresolved_entries, parent_folders=None, return_full_contact_data=False, search_scope=None,
