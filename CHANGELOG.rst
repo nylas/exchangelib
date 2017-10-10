@@ -2,6 +2,11 @@
 Change Log
 ==========
 
+1.10.4
+------
+* Added support for most item fields. The remaining ones are mentioned in issue #203.
+
+
 1.10.3
 ------
 * Added an ``exchangelib.util.PrettyXmlHandler`` log handler which will pretty-print and highlight XML requests
