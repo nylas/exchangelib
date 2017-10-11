@@ -130,7 +130,7 @@ class Item(EWSElement):
         EffectiveRightsField('effective_rights', field_uri='item:EffectiveRights', is_read_only=True),
         CharField('last_modified_name', field_uri='item:LastModifiedName', is_read_only=True),
         DateTimeField('last_modified_time', field_uri='item:LastModifiedTime', is_read_only=True),
-        BooleanField('is_associated', field_uri='item:IsAssociated', is_read_only=True),
+        BooleanField('is_associated', field_uri='item:IsAssociated', is_read_only=True, supported_from=EXCHANGE_2010),
         # These two URIFields throw ErrorInternalServerError
         # URIField('web_client_read_form_query_string', field_uri='calendar:WebClientReadFormQueryString',
         #          is_read_only=True, supported_from=EXCHANGE_2010),
