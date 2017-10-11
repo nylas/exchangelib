@@ -91,7 +91,7 @@ class Item(EWSElement):
         Base64Field('mime_content', field_uri='item:MimeContent', is_read_only=True),
         IdField('item_id', field_uri=ItemId.ID_ATTR, is_read_only=True),
         IdField('changekey', field_uri=ItemId.CHANGEKEY_ATTR, is_read_only=True),
-        EWSElementField('parent_folder_id', field_uri='folder:ParentFolderId', value_cls=ParentFolderId,
+        EWSElementField('parent_folder_id', field_uri='item:ParentFolderId', value_cls=ParentFolderId,
                         is_read_only=True),
         CharField('item_class', field_uri='item:ItemClass', is_read_only=True),
         CharField('subject', field_uri='item:Subject'),
