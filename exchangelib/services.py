@@ -30,7 +30,7 @@ from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, 
     ErrorInvalidServerVersion, ErrorItemNotFound, ErrorADUnavailable, ResponseMessageError, ErrorInvalidChangeKey, \
     ErrorItemSave, ErrorInvalidIdMalformed, ErrorMessageSizeExceeded, UnauthorizedError, \
     ErrorCannotDeleteTaskOccurrence, ErrorMimeContentConversionFailed, ErrorRecurrenceHasNoOccurrence, \
-    ErrorNameResolutionMultipleResults, ErrorNameResolutionNoResults, ErrorMissingEmailAddress
+    ErrorNameResolutionMultipleResults, ErrorNameResolutionNoResults
 from .transport import wrap, SOAPNS, TNS, MNS, ENS
 from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, ElementType, \
     xml_to_str, set_xml_value
@@ -168,7 +168,6 @@ class EWSService(object):
         # The api_version that worked was different than our hint, or we never got a build version. Set new
         # version for account.
         from .version import Version
-        account = self.account if isinstance(self, EWSAccountService) else None
         if api_version != hint.api_version:
             log.debug('Found new API version (%s -> %s)', hint.api_version, api_version)
         else:
