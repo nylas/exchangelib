@@ -258,6 +258,30 @@ class Mailbox(EWSElement):
             return hash(self.item_id)
         return hash(self.email_address.lower())
 
+class Mailbox4Oof(Mailbox):
+    """
+    When setting Oof messages a mailbox has to look sligtly different
+    MSDN: https://msdn.microsoft.com/en-us/library/aa580294(v=exchg.140).aspx
+    """
+    ELEMENT_NAME = 'Mailbox'
+
+    FIELDS = [
+        TextField('name', field_uri='Name'),
+        EmailField('email_address', field_uri='Address'),
+        ChoiceField('routing_type', field_uri='RoutingType', choices={Choice('SMTP')},
+                    default='SMTP'),
+    ]
+
+    __slots__ = ('name', 'email_address', 'routing_type')
+
+    def clean(self, version=None):
+        super().clean(version=version)
+        if not self.email_address:
+            raise ValueError("Mailbox must have an 'email_address'")
+
+    def __hash__(self):
+        return hash(self.email_address.lower())
+
 
 class Attendee(EWSElement):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa580339(v=exchg.150).aspx

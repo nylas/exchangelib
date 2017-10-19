@@ -9,6 +9,8 @@ from cached_property import threaded_cached_property
 from future.utils import python_2_unicode_compatible
 from six import string_types
 
+from exchangelib.services import GetUserOofSettings
+from exchangelib.settings import OofSettings
 from .autodiscover import discover
 from .credentials import DELEGATE, IMPERSONATION
 from .errors import ErrorAccessDenied, UnknownTimeZone
@@ -149,6 +151,14 @@ class Account(object):
     @property
     def domain(self):
         return get_domain(self.primary_smtp_address)
+
+    @property
+    def oof_settings(self):
+        service = GetUserOofSettings(self)
+        result = []
+        oof_xml = service.call(self.primary_smtp_address)
+        if oof_xml:
+            return OofSettings.from_xml(oof_xml, self)
 
     def export(self, items):
         """
