@@ -173,6 +173,10 @@ class EWSTimeZone(object):
         try:
             return cls.timezone(cls.MS_TO_PYTZ_MAP[ms_id])
         except KeyError:
+            if '/' in ms_id:
+                # EWS sometimes returns an ID that has a region/location format, e.g. 'Europe/Copenhagen'. Try the string
+                # unaltered.
+                return cls.timezone(ms_id)
             raise UnknownTimeZone("Windows timezone ID '%s' is unknown by CLDR" % ms_id)
 
     @classmethod
