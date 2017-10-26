@@ -193,7 +193,7 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
         version = kwargs.pop('version', None)
         super(Protocol, self).__init__(*args, **kwargs)
 
-        scheme = 'https' if self.has_ssl else 'https'
+        scheme = 'https' if self.has_ssl else 'http'
         self.wsdl_url = '%s://%s/EWS/Services.wsdl' % (scheme, self.server)
         self.messages_url = '%s://%s/EWS/messages.xsd' % (scheme, self.server)
         self.types_url = '%s://%s/EWS/types.xsd' % (scheme, self.server)
