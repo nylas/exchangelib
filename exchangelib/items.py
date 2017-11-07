@@ -372,6 +372,8 @@ class Item(EWSElement):
             raise ValueError("'%s' is already registered" % attr_name)
         if not issubclass(attr_cls, ExtendedProperty):
             raise ValueError("'%s' must be a subclass of ExtendedProperty" % attr_cls)
+        # Check if class attributes are properly defined
+        attr_cls.validate_cls()
         # ExtendedProperty is not a real field, but a placeholder in the fields list. See
         #   https://msdn.microsoft.com/en-us/library/office/aa580790(v=exchg.150).aspx
         #

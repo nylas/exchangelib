@@ -79,30 +79,58 @@ class ExtendedProperty(EWSElement):
         self.value = kwargs.pop('value')
         super(ExtendedProperty, self).__init__(**kwargs)
 
-    def clean(self, version=None):
-        if self.distinguished_property_set_id:
-            assert not any([self.property_set_id, self.property_tag])
-            assert any([self.property_id, self.property_name])
-            assert self.distinguished_property_set_id in self.DISTINGUISHED_SETS
-        if self.property_set_id:
-            assert not any([self.distinguished_property_set_id, self.property_tag])
-            assert any([self.property_id, self.property_name])
-        if self.property_tag:
-            assert not any([
-                self.distinguished_property_set_id, self.property_set_id, self.property_name, self.property_id
-            ])
-            if 0x8000 <= self.property_tag_as_int() <= 0xFFFE:
+    @classmethod
+    def validate_cls(cls):
+        # Validate values of class attributes and their inter-dependencies
+        if cls.distinguished_property_set_id:
+            if any([cls.property_set_id, cls.property_tag]):
                 raise ValueError(
-                    "'property_tag' value '%s' is reserved for custom properties" % self.property_tag_as_hex()
+                    "When 'distinguished_property_set_id' is set, 'property_set_id' and 'property_tag' must be None"
                 )
-        if self.property_name:
-            assert not any([self.property_id, self.property_tag])
-            assert any([self.distinguished_property_set_id, self.property_set_id])
-        if self.property_id:
-            assert not any([self.property_name, self.property_tag])
-            assert any([self.distinguished_property_set_id, self.property_set_id])
-        assert self.property_type in self.PROPERTY_TYPES
+            if not any([cls.property_id, cls.property_name]):
+                raise ValueError(
+                    "When 'distinguished_property_set_id' is set, 'property_id' or 'property_name' must also be set"
+                )
+            assert cls.distinguished_property_set_id in cls.DISTINGUISHED_SETS
+        if cls.property_set_id:
+            if any([cls.distinguished_property_set_id, cls.property_tag]):
+                raise ValueError(
+                    "When 'property_set_id' is set, 'distinguished_property_set_id' and 'property_tag' must be None"
+                )
+            if not any([cls.property_id, cls.property_name]):
+                raise ValueError(
+                    "When 'property_set_id' is set, 'property_id' or 'property_name' must also be set"
+                )
+        if cls.property_tag:
+            if any([
+                cls.distinguished_property_set_id, cls.property_set_id, cls.property_name, cls.property_id
+            ]):
+                raise ValueError("When 'property_tag' is set, only 'property_type' must be set")
+            if 0x8000 <= cls.property_tag_as_int() <= 0xFFFE:
+                raise ValueError(
+                    "'property_tag' value '%s' is reserved for custom properties" % cls.property_tag_as_hex()
+                )
+        if cls.property_name:
+            if any([cls.property_id, cls.property_tag]):
+                raise ValueError("When 'property_name' is set, 'property_id' and 'property_tag' must be None")
+            if not any([cls.distinguished_property_set_id, cls.property_set_id]):
+                raise ValueError(
+                    "When 'property_name' is set, 'distinguished_property_set_id' or 'property_set_id' must also be set"
+                )
+        if cls.property_id:
+            if any([cls.property_name, cls.property_tag]):
+                raise ValueError("When 'property_id' is set, 'property_name' and 'property_tag' must be None")
+            if not any([cls.distinguished_property_set_id, cls.property_set_id]):
+                raise ValueError(
+                    "When 'property_id' is set, 'distinguished_property_set_id' or 'property_set_id' must also be set"
+                )
+        if cls.property_type not in cls.PROPERTY_TYPES:
+            raise ValueError(
+                "'property_type' value '%s' must be one of %s" % (cls.property_type, sorted(cls.PROPERTY_TYPES))
+            )
 
+    def clean(self, version=None):
+        self.validate_cls()
         python_type = self.python_type()
         if self.is_array_type():
             if not is_iterable(self.value):
