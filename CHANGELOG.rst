@@ -2,6 +2,11 @@
 Change Log
 ==========
 
+1.10.5
+------
+* Bugfix release
+
+
 1.10.4
 ------
 * Added support for most item fields. The remaining ones are mentioned in issue #203.
