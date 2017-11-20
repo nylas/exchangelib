@@ -10,11 +10,12 @@ from .ewsdatetime import EWSDate, EWSDateTime, EWSTimeZone, UTC, UTC_NOW
 from .extended_properties import ExtendedProperty, ExternId
 from .folders import SHALLOW, DEEP
 from .items import CalendarItem, Contact, DistributionList, Message, PostItem, Task
-from .properties import Body, HTMLBody, ItemId, Mailbox, Attendee, Room, RoomList
+from .properties import Body, HTMLBody, ItemId, Mailbox, Mailbox4Oof, Attendee, Room, RoomList
 from .restriction import Q
 from .transport import BASIC, DIGEST, NTLM
 from .version import Build, Version
-
+from .settings import OofSettings
+from .services import SetUserOofSettings
 __all__ = [
     'Account',
     'FileAttachment', 'ItemAttachment',
@@ -24,11 +25,13 @@ __all__ = [
     'EWSDate', 'EWSDateTime', 'EWSTimeZone', 'UTC', 'UTC_NOW',
     'ExtendedProperty',
     'CalendarItem', 'Contact', 'DistributionList', 'Message', 'PostItem', 'Task',
-    'ItemId', 'Mailbox', 'Attendee', 'Room', 'RoomList', 'Body', 'HTMLBody',
+    'ItemId', 'Mailbox', 'Mailbox4Oof', 'Attendee', 'Room', 'RoomList', 'Body', 'HTMLBody',
+    'OofSettings',
     'Q',
     'SHALLOW', 'DEEP',
     'BASIC', 'DIGEST', 'NTLM',
     'Build', 'Version',
+    'SetUserOofSettings',
 ]
 
 
