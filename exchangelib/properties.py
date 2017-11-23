@@ -241,10 +241,10 @@ class Mailbox(EWSElement):
             Choice('Unknown'), Choice('OneOff')
         }, default='Mailbox'),
         EWSElementField('item_id', value_cls=ItemId, is_read_only=True),
-        # There's also the 'RoutingType' element, but it's optional and must have value "SMTP"
+        ChoiceField('routing_type', field_uri='RoutingType', choices={Choice('SMTP')}, default='SMTP'),
     ]
 
-    __slots__ = ('name', 'email_address', 'mailbox_type', 'item_id')
+    __slots__ = ('name', 'email_address', 'mailbox_type', 'item_id', 'routing_type')
 
     def clean(self, version=None):
         super(Mailbox, self).clean(version=version)
@@ -258,29 +258,28 @@ class Mailbox(EWSElement):
             return hash(self.item_id)
         return hash(self.email_address.lower())
 
-class Mailbox4Oof(Mailbox):
-    """
-    When setting Oof messages a mailbox has to look sligtly different
-    MSDN: https://msdn.microsoft.com/en-us/library/aa580294(v=exchg.140).aspx
-    """
-    ELEMENT_NAME = 'Mailbox'
 
+class AvailabilityMailbox(EWSElement):
+    # Like Mailbox, but with slightly different attributes
+    #
+    # MSDN: https://msdn.microsoft.com/en-us/library/aa564754(v=exchg.140).aspx
+    ELEMENT_NAME = 'Mailbox'
     FIELDS = [
         TextField('name', field_uri='Name'),
-        EmailField('email_address', field_uri='Address'),
-        ChoiceField('routing_type', field_uri='RoutingType', choices={Choice('SMTP')},
-                    default='SMTP'),
+        EmailField('email_address', field_uri='Address', is_required=True),
+        ChoiceField('routing_type', field_uri='RoutingType', choices={Choice('SMTP')}, default='SMTP'),
     ]
 
     __slots__ = ('name', 'email_address', 'routing_type')
 
-    def clean(self, version=None):
-        super().clean(version=version)
-        if not self.email_address:
-            raise ValueError("Mailbox must have an 'email_address'")
-
     def __hash__(self):
+        # Exchange may add 'name' on insert. We're satisfied if the email address matches.
         return hash(self.email_address.lower())
+
+    @classmethod
+    def from_mailbox(cls, mailbox):
+        assert isinstance(mailbox, Mailbox)
+        return cls(name=mailbox.name, email_address=mailbox.email_address, routing_type=mailbox.routing_type)
 
 
 class Attendee(EWSElement):

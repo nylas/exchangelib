@@ -57,7 +57,9 @@ from exchangelib.recurrence import Recurrence, AbsoluteYearlyPattern, RelativeYe
     DeletedOccurrence, NoEndPattern, EndDatePattern, NumberedPattern, ExtraWeekdaysField, DAY, WEEK_DAY, WEEKEND_DAY, \
     MONDAY, WEDNESDAY, FEBRUARY, AUGUST, SECOND, LAST
 from exchangelib.restriction import Restriction, Q
-from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, GetAttachment, ResolveNames, TNS
+from exchangelib.settings import OofSettings
+from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, GetAttachment, ResolveNames, \
+    GetUserOofSettings, SetUserOofSettings, TNS
 from exchangelib.transport import NOAUTH, BASIC, DIGEST, NTLM, wrap, _get_auth_method_from_response
 from exchangelib.util import chunkify, peek, get_redirect_url, to_xml, BOM, get_domain, value_to_xml_text, \
     post_ratelimited, create_element, CONNECTION_ERRORS, PrettyXmlHandler
@@ -1568,6 +1570,46 @@ class CommonTest(EWSTest):
             {Mailbox.from_xml(elem=elem.find(Mailbox.response_tag()), account=None).email_address for elem in res},
             {'anne@example.com', 'john@example.com'}
         )
+
+    def test_oof_settings(self):
+        oof = OofSettings(
+            state=OofSettings.ENABLED,
+            external_audience='None',
+            internal_reply="I'm on holidays. See ya guys!",
+            external_reply='Dear Sir, your email has now been deleted.',
+        )
+        self.account.oof_settings = oof
+        self.assertEqual(self.account.oof_settings, oof)
+
+        oof = OofSettings(
+            state=OofSettings.ENABLED,
+            external_audience='Known',
+            internal_reply='XXX',
+            external_reply='YYY',
+        )
+        self.account.oof_settings = oof
+        self.assertEqual(self.account.oof_settings, oof)
+
+        # Scheduled duration must not be in the past
+        start, end = get_random_datetime_range(start_date=EWSDate.today())
+        oof = OofSettings(
+            state=OofSettings.SCHEDULED,
+            external_audience='Known',
+            internal_reply="I'm in the pub. See ya guys!",
+            external_reply="I'm having a business dinner in town",
+            start=start,
+            end=end,
+        )
+        self.account.oof_settings = oof
+        self.assertEqual(self.account.oof_settings, oof)
+
+        oof = OofSettings(
+            state=OofSettings.DISABLED,
+            internal_reply='XXX',
+            external_reply='YYY',
+        )
+        self.account.oof_settings = oof
+        self.assertEqual(self.account.oof_settings, oof)
 
     def test_sessionpool(self):
         # First, empty the calendar

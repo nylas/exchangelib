@@ -1198,33 +1198,17 @@ class UploadItems(EWSAccountService, EWSPooledMixIn):
         return [(container.get(ItemId.ID_ATTR), container.get(ItemId.CHANGEKEY_ATTR))]
 
 
-class GetUserOofSettings(EWSAccountService):
-    """
-    MSDN: https://msdn.microsoft.com/en-us/library/office/aa493825(v=exchg.140).aspx
-    """
-    SERVICE_NAME = 'GetUserOofSettings'
-    element_container_name = '{%s}OofSettings' % TNS
-
-    def call(self, address):
-        elements = self._get_elements(payload=self.get_payload(address))
-        if elements:
-            return elements[0]
-
-    def get_payload(self, address):
-        payload = create_element('m:%sRequest' % self.SERVICE_NAME)
-        address_elem = create_element('t:Address')
-        set_xml_value(address_elem, address, version=self.account.version)
-        add_xml_child(payload, 't:Mailbox', address_elem)
-        return payload
-
+class BaseUserOofSettings(EWSAccountService):
+    # Common response parsing for non-standard OOF services
     def _get_element_container(self, message, name=None):
         assert isinstance(message, ElementType)
-        response_message = message.find( '{%s}ResponseMessage' % MNS)
+        # ResponseClass: See http://msdn.microsoft.com/en-us/library/aa566424(v=EXCHG.140).aspx
+        response_message = message.find('{%s}ResponseMessage' % MNS)
         response_class = response_message.get('ResponseClass')
         # ResponseCode, MessageText: See http://msdn.microsoft.com/en-us/library/aa580757(v=EXCHG.140).aspx
         response_code = get_xml_attr(response_message, '{%s}ResponseCode' % MNS)
-        msg_text = get_xml_attr(message, '{%s}MessageText' % MNS)
-        msg_xml = message.find('{%s}MessageXml' % MNS)
+        msg_text = get_xml_attr(response_message, '{%s}MessageText' % MNS)
+        msg_xml = response_message.find('{%s}MessageXml' % MNS)
         if response_class == 'Success' and response_code == 'NoError':
             if not name:
                 return True
@@ -1252,57 +1236,50 @@ class GetUserOofSettings(EWSAccountService):
         except self.ERRORS_TO_CATCH_IN_RESPONSE as e:
             return e
 
+
+class GetUserOofSettings(BaseUserOofSettings):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/aa563465(v=exchg.140).aspx
+    """
+    SERVICE_NAME = 'GetUserOofSettings'
+    element_container_name = '{%s}OofSettings' % TNS
+
+    def call(self, mailbox):
+        return self._get_elements(payload=self.get_payload(mailbox=mailbox))
+
+    def get_payload(self, mailbox):
+        from .properties import AvailabilityMailbox
+        payload = create_element('m:%sRequest' % self.SERVICE_NAME)
+        return set_xml_value(payload, AvailabilityMailbox.from_mailbox(mailbox), version=self.account.version)
+
     def _get_elements_in_response(self, response):
-        assert isinstance(response, list)
-        result = []
-        for msg in response:
-            assert isinstance(msg, ElementType)
-            container_or_exc = self._get_element_container(message=msg, name=self.element_container_name)
-            result.append(container_or_exc)
-        return result
+        # This service only returns one result, but 'response' is a list
+        from .settings import OofSettings
+        assert len(response) == 1
+        response = response[0]
+        assert isinstance(response, ElementType), response
+        container_or_exc = self._get_element_container(message=response, name=self.element_container_name)
+        if isinstance(container_or_exc, ElementType):
+            return OofSettings.from_xml(container_or_exc, account=self.account)
+        else:
+            raise container_or_exc
 
 
-class SetUserOofSettings(EWSAccountService, EWSPooledMixIn):
+class SetUserOofSettings(BaseUserOofSettings):
     """
     Set automatic replies for the specified mailbox.
-    MSDN https://msdn.microsoft.com/en-us/library/aa580294(v=exchg.140).aspx
-
-    Example:
-    >>> from exchangelib import Account, SetUserOofSettings, OofSettings
-    >>> account = Account(primary_smtp_address='me@somwhere.com')
-    >>> oof = OofSettings(
-    >>>     state='Enabled',
-    >>>     reply_internal = "I'm on holidays. See ya guys!"
-    >>>     reply_external = "Long text."
-    >>> )
-    >>> service = SetUserOofSettings(account)
-    >>> service.call(oof)
+    MSDN: https://msdn.microsoft.com/en-us/library/aa580294(v=exchg.140).aspx
     """
     SERVICE_NAME = 'SetUserOofSettings'
-    CHUNKSIZE = 100
-    def call(self, oof_settings, mailbox=None):
-        return self._pool_requests(payload_func=self.get_payload, items=[oof_settings],
-                                   mailbox=mailbox)
 
-    def get_payload(self, oof_settings, mailbox=None):
-        oof_settings = oof_settings[0]
-        account = self.account
-        version = account.version
-        if mailbox is None:
-            from .properties import Mailbox4Oof
-            mailbox = Mailbox4Oof(email_address=account.primary_smtp_address, name=account.fullname)
-        createitem = create_element(
-            'm:%sRequest' % self.SERVICE_NAME,
-          )
-        createitem.append(mailbox.to_xml(version))
-        createitem.append(oof_settings.to_xml(version))
-        return createitem
+    def call(self, oof_settings, mailbox):
+        res = list(self._get_elements(payload=self.get_payload(oof_settings=oof_settings, mailbox=mailbox)))
+        assert len(res) == 1
+        return res[0]
 
-    def _get_element_container(self, message, name=None):
-        assert isinstance(message, ElementType)
-        # ResponseClass: See http://msdn.microsoft.com/en-us/library/aa566424(v=EXCHG.140).aspx
-        response_class = message.get('ResponseClass')
-        if response_class is None:
-            message = message.find('{%s}ResponseMessage' % MNS)
-        return super()._get_element_container(message, name)
-
+    def get_payload(self, oof_settings, mailbox):
+        from .properties import AvailabilityMailbox
+        payload = create_element('m:%sRequest' % self.SERVICE_NAME)
+        set_xml_value(payload, AvailabilityMailbox.from_mailbox(mailbox), version=self.account.version)
+        set_xml_value(payload, oof_settings, version=self.account.version)
+        return payload

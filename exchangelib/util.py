@@ -41,7 +41,7 @@ BOM_LEN = len(BOM)
 
 def is_iterable(value, generators_allowed=False):
     """
-    Checks if value is a list-like object. Don't match generators and generator-like objects here by default, because 
+    Checks if value is a list-like object. Don't match generators and generator-like objects here by default, because
     callers don't necessarily guarantee that they only iterate the value once. Take care to not match string types.
 
     :param value: any type of object
