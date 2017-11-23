@@ -2,6 +2,11 @@
 Change Log
 ==========
 
+HEAD
+----
+* Added support for getting and setting ``Account.oof_settings`` using the new ``OofSettings`` class.
+
+
 1.10.5
 ------
 * Bugfix release

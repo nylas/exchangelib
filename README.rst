@@ -562,6 +562,32 @@ values are timezone-aware ``EWSDateTime`` instances.
 The ``datetime_sent`` value may be earlier than ``datetime_created``.
 
 
+Out of Facility
+^^^^^^^^^^^^^^^
+
+You can get and set OOF messages using the ``Account.oof_settings`` property:
+
+.. code-block:: python
+
+    # Get the current OOF settings
+    a.oof_settings
+    # Change the OOF settings to something else
+    a.oof_settings = OofSettings(
+        state=OofSettings.SCHEDULED,
+        external_audience='Known',
+        internal_reply="I'm in the pub. See ya guys!",
+        external_reply="I'm having a business dinner in town",
+        start=tz.localize(EWSDateTime(2017, 11, 1, 11)),
+        end=tz.localize(EWSDateTime(2017, 12, 1, 11)),
+    )
+    # Disable OOF messages
+    a.oof_settings = OofSettings(
+        state=OofSettings.DISABLED,
+        internal_reply='',
+        external_reply='',
+    )
+
+
 Troubleshooting
 ^^^^^^^^^^^^^^^
 If you are having trouble using this library, the first thing to try is to enable debug logging. This will output a huge
