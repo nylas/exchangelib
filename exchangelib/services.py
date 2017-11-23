@@ -1196,3 +1196,90 @@ class UploadItems(EWSAccountService, EWSPooledMixIn):
     def _get_elements_in_container(self, container):
         from .properties import ItemId
         return [(container.get(ItemId.ID_ATTR), container.get(ItemId.CHANGEKEY_ATTR))]
+
+
+class BaseUserOofSettings(EWSAccountService):
+    # Common response parsing for non-standard OOF services
+    def _get_element_container(self, message, name=None):
+        assert isinstance(message, ElementType)
+        # ResponseClass: See http://msdn.microsoft.com/en-us/library/aa566424(v=EXCHG.140).aspx
+        response_message = message.find('{%s}ResponseMessage' % MNS)
+        response_class = response_message.get('ResponseClass')
+        # ResponseCode, MessageText: See http://msdn.microsoft.com/en-us/library/aa580757(v=EXCHG.140).aspx
+        response_code = get_xml_attr(response_message, '{%s}ResponseCode' % MNS)
+        msg_text = get_xml_attr(response_message, '{%s}MessageText' % MNS)
+        msg_xml = response_message.find('{%s}MessageXml' % MNS)
+        if response_class == 'Success' and response_code == 'NoError':
+            if not name:
+                return True
+            container = message.find(name)
+            if container is None:
+                raise TransportError('No %s elements in ResponseMessage (%s)' % (name, xml_to_str(message)))
+            return container
+        if response_code == 'NoError':
+            return True
+        # Raise any non-acceptable errors in the container, or return the container or the acceptable exception instance
+        if response_class == 'Warning':
+            try:
+                self._raise_errors(code=response_code, text=msg_text, msg_xml=msg_xml)
+            except self.WARNINGS_TO_CATCH_IN_RESPONSE as e:
+                return e
+            except self.WARNINGS_TO_IGNORE_IN_RESPONSE as e:
+                log.warning(str(e))
+                container = message.find(name)
+                if container is None:
+                    raise TransportError('No %s elements in ResponseMessage (%s)' % (name, xml_to_str(message)))
+                return container
+        # rspclass == 'Error', or 'Success' and not 'NoError'
+        try:
+            self._raise_errors(code=response_code, text=msg_text, msg_xml=msg_xml)
+        except self.ERRORS_TO_CATCH_IN_RESPONSE as e:
+            return e
+
+
+class GetUserOofSettings(BaseUserOofSettings):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/aa563465(v=exchg.140).aspx
+    """
+    SERVICE_NAME = 'GetUserOofSettings'
+    element_container_name = '{%s}OofSettings' % TNS
+
+    def call(self, mailbox):
+        return self._get_elements(payload=self.get_payload(mailbox=mailbox))
+
+    def get_payload(self, mailbox):
+        from .properties import AvailabilityMailbox
+        payload = create_element('m:%sRequest' % self.SERVICE_NAME)
+        return set_xml_value(payload, AvailabilityMailbox.from_mailbox(mailbox), version=self.account.version)
+
+    def _get_elements_in_response(self, response):
+        # This service only returns one result, but 'response' is a list
+        from .settings import OofSettings
+        assert len(response) == 1
+        response = response[0]
+        assert isinstance(response, ElementType), response
+        container_or_exc = self._get_element_container(message=response, name=self.element_container_name)
+        if isinstance(container_or_exc, ElementType):
+            return OofSettings.from_xml(container_or_exc, account=self.account)
+        else:
+            raise container_or_exc
+
+
+class SetUserOofSettings(BaseUserOofSettings):
+    """
+    Set automatic replies for the specified mailbox.
+    MSDN: https://msdn.microsoft.com/en-us/library/aa580294(v=exchg.140).aspx
+    """
+    SERVICE_NAME = 'SetUserOofSettings'
+
+    def call(self, oof_settings, mailbox):
+        res = list(self._get_elements(payload=self.get_payload(oof_settings=oof_settings, mailbox=mailbox)))
+        assert len(res) == 1
+        return res[0]
+
+    def get_payload(self, oof_settings, mailbox):
+        from .properties import AvailabilityMailbox
+        payload = create_element('m:%sRequest' % self.SERVICE_NAME)
+        set_xml_value(payload, AvailabilityMailbox.from_mailbox(mailbox), version=self.account.version)
+        set_xml_value(payload, oof_settings, version=self.account.version)
+        return payload

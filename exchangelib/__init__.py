@@ -14,7 +14,7 @@ from .properties import Body, HTMLBody, ItemId, Mailbox, Attendee, Room, RoomLis
 from .restriction import Q
 from .transport import BASIC, DIGEST, NTLM
 from .version import Build, Version
-
+from .settings import OofSettings
 __all__ = [
     'Account',
     'FileAttachment', 'ItemAttachment',
@@ -25,6 +25,7 @@ __all__ = [
     'ExtendedProperty',
     'CalendarItem', 'Contact', 'DistributionList', 'Message', 'PostItem', 'Task',
     'ItemId', 'Mailbox', 'Attendee', 'Room', 'RoomList', 'Body', 'HTMLBody',
+    'OofSettings',
     'Q',
     'SHALLOW', 'DEEP',
     'BASIC', 'DIGEST', 'NTLM',

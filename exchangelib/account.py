@@ -9,6 +9,8 @@ from cached_property import threaded_cached_property
 from future.utils import python_2_unicode_compatible
 from six import string_types
 
+from exchangelib.services import GetUserOofSettings, SetUserOofSettings
+from exchangelib.settings import OofSettings
 from .autodiscover import discover
 from .credentials import DELEGATE, IMPERSONATION
 from .errors import ErrorAccessDenied, UnknownTimeZone
@@ -21,6 +23,7 @@ from .items import Item, BulkCreateResult, HARD_DELETE, \
     DELETE_TYPE_CHOICES, MESSAGE_DISPOSITION_CHOICES, CONFLICT_RESOLUTION_CHOICES, AFFECTED_TASK_OCCURRENCES_CHOICES, \
     SEND_MEETING_INVITATIONS_CHOICES, SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES, \
     SEND_MEETING_CANCELLATIONS_CHOICES, IdOnly
+from .properties import Mailbox
 from .protocol import Protocol
 from .queryset import QuerySet
 from .services import ExportItems, UploadItems, GetItem, CreateItem, UpdateItem, DeleteItem, MoveItem, SendItem
@@ -149,6 +152,19 @@ class Account(object):
     @property
     def domain(self):
         return get_domain(self.primary_smtp_address)
+
+    @property
+    def oof_settings(self):
+        # We don't want to cache this property because then we can't easily get updates. 'threaded_cached_property'
+        # supports the 'del self.oof_settings' syntax to invalidate the cache, but does not support custom setter
+        # methods. Having a non-cached service call here goes against the assumption that properties are cheap, but the
+        # alternative is to create get_oof_settings() and set_oof_settings(), and that's just too Java-ish for my taste.
+        return GetUserOofSettings(self).call(mailbox=Mailbox(email_address=self.primary_smtp_address))
+
+    @oof_settings.setter
+    def oof_settings(self, value):
+        assert isinstance(value, OofSettings)
+        SetUserOofSettings(self).call(mailbox=Mailbox(email_address=self.primary_smtp_address), oof_settings=value)
 
     def export(self, items):
         """
