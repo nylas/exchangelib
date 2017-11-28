@@ -235,8 +235,7 @@ class Folder(EWSElement):
 
         locale is a string, e.g. 'da_DK'
         """
-        folder_classes = set(WELLKNOWN_FOLDERS.values())
-        for folder_cls in folder_classes:
+        for folder_cls in WELLKNOWN_FOLDERS:
             localized_names = {s.lower() for s in folder_cls.LOCALIZED_NAMES.get(locale, [])}
             if folder_name.lower() in localized_names:
                 return folder_cls
@@ -818,22 +817,6 @@ class JunkEmail(Messages):
     }
 
 
-class RecoverableItemsDeletions(Folder):
-    DISTINGUISHED_FOLDER_ID = 'recoverableitemsdeletions'
-    supported_item_models = ITEM_CLASSES
-
-    LOCALIZED_NAMES = {
-    }
-
-
-class RecoverableItemsRoot(Folder):
-    DISTINGUISHED_FOLDER_ID = 'recoverableitemsroot'
-    supported_item_models = ITEM_CLASSES
-
-    LOCALIZED_NAMES = {
-    }
-
-
 class Tasks(Folder):
     DISTINGUISHED_FOLDER_ID = 'tasks'
     CONTAINER_CLASS = 'IPF.Task'
@@ -882,47 +865,178 @@ class RecipientCache(Contacts):
     LOCALIZED_NAMES = {}
 
 
-
 class WellknownFolder(Folder):
     # Use this class until we have specific folder implementations
-    pass
+    supported_item_models = ITEM_CLASSES
+
+
+class AdminAuditLogs(WellknownFolder):
+    DISTINGUISHED_FOLDER_ID = 'adminauditlogs'
+
+
+class ArchiveDeletedItems(WellknownFolder):
+    DISTINGUISHED_FOLDER_ID = 'archivedeleteditems'
+
+
+class ArchiveInbox(WellknownFolder):
+    DISTINGUISHED_FOLDER_ID = 'archiveinbox'
+
+
+class ArchiveMsgFolderRoot(WellknownFolder):
+    DISTINGUISHED_FOLDER_ID = 'archivemsgfolderroot'
+
+
+class ArchiveRecoverableItemsDeletions(WellknownFolder):
+    DISTINGUISHED_FOLDER_ID = 'archiverecoverableitemsdeletions'
+
+
+class ArchiveRecoverableItemsPurges(WellknownFolder):
+    DISTINGUISHED_FOLDER_ID = 'archiverecoverableitemspurges'
+
+
+class ArchiveRecoverableItemsRoot(WellknownFolder):
+    DISTINGUISHED_FOLDER_ID = 'archiverecoverableitemsroot'
+
+
+class ArchiveRecoverableItemsVersions(WellknownFolder):
+    DISTINGUISHED_FOLDER_ID = 'archiverecoverableitemsversions'
+
+
+class ArchiveRoot(WellknownFolder):
+    DISTINGUISHED_FOLDER_ID = 'archiveroot'
+
+
+class Conflicts(WellknownFolder):
+    DISTINGUISHED_FOLDER_ID = 'conflicts'
+
+
+class ConversationHistory(WellknownFolder):
+    DISTINGUISHED_FOLDER_ID = 'conversationhistory'
+
+
+class Directory(WellknownFolder):
+    DISTINGUISHED_FOLDER_ID = 'directory'
+
+
+class Favorites(WellknownFolder):
+    DISTINGUISHED_FOLDER_ID = 'favorites'
+
+
+class IMContactList(WellknownFolder):
+    DISTINGUISHED_FOLDER_ID = 'imcontactlist'
+
+
+class Journal(WellknownFolder):
+    DISTINGUISHED_FOLDER_ID = 'journal'
+
+
+class LocalFailures(WellknownFolder):
+    DISTINGUISHED_FOLDER_ID = 'localfailures'
+
+
+class MsgFolderRoot(WellknownFolder):
+    DISTINGUISHED_FOLDER_ID = 'msgfolderroot'
+
+
+class MyContacts(WellknownFolder):
+    DISTINGUISHED_FOLDER_ID = 'mycontacts'
+
+
+class Notes(WellknownFolder):
+    DISTINGUISHED_FOLDER_ID = 'notes'
+
+
+class PeopleConnect(WellknownFolder):
+    DISTINGUISHED_FOLDER_ID = 'peopleconnect'
+
+
+class PublicFoldersRoot(WellknownFolder):
+    DISTINGUISHED_FOLDER_ID = 'publicfoldersroot'
+
+
+class QuickContacts(WellknownFolder):
+    DISTINGUISHED_FOLDER_ID = 'quickcontacts'
+
+
+class RecoverableItemsDeletions(WellknownFolder):
+    DISTINGUISHED_FOLDER_ID = 'recoverableitemsdeletions'
+
+
+class RecoverableItemsPurges(WellknownFolder):
+    DISTINGUISHED_FOLDER_ID = 'recoverableitemspurges'
+
+
+class RecoverableItemsRoot(WellknownFolder):
+    DISTINGUISHED_FOLDER_ID = 'recoverableitemsroot'
+
+
+class RecoverableItemsVersions(WellknownFolder):
+    DISTINGUISHED_FOLDER_ID = 'recoverableitemsversions'
+
+
+class SearchFolders(WellknownFolder):
+    DISTINGUISHED_FOLDER_ID = 'searchfolders'
+
+
+class ServerFailures(WellknownFolder):
+    DISTINGUISHED_FOLDER_ID = 'serverfailures'
+
+
+class SyncIssues(WellknownFolder):
+    DISTINGUISHED_FOLDER_ID = 'syncissues'
+
+
+class ToDoSearch(WellknownFolder):
+    DISTINGUISHED_FOLDER_ID = 'todoSsarch'
+
+
+class VoiceMail(WellknownFolder):
+    DISTINGUISHED_FOLDER_ID = 'voicemail'
 
 
 # See http://msdn.microsoft.com/en-us/library/microsoft.exchange.webservices.data.wellknownfoldername(v=exchg.80).aspx
-WELLKNOWN_FOLDERS = dict([
-    ('ArchiveDeletedItems', WellknownFolder),
-    ('ArchiveMsgFolderRoot', WellknownFolder),
-    ('ArchiveRecoverableItemsDeletions', WellknownFolder),
-    ('ArchiveRecoverableItemsPurges', WellknownFolder),
-    ('ArchiveRecoverableItemsRoot', Folder),
-    ('ArchiveRecoverableItemsVersions', WellknownFolder),
-    ('ArchiveRoot', WellknownFolder),
-    ('Calendar', Calendar),
-    ('Conflicts', WellknownFolder),
-    ('Contacts', Contacts),
-    ('ConversationHistory', WellknownFolder),
-    ('DeletedItems', DeletedItems),
-    ('Drafts', Drafts),
-    ('Inbox', Inbox),
-    ('Journal', WellknownFolder),
-    ('JunkEmail', JunkEmail),
-    ('LocalFailures', WellknownFolder),
-    ('MsgFolderRoot', WellknownFolder),
-    ('Notes', WellknownFolder),
-    ('Outbox', Outbox),
-    ('PublicFoldersRoot', WellknownFolder),
-    ('QuickContacts', WellknownFolder),
-    ('RecipientCache', RecipientCache),
-    ('RecoverableItemsDeletions', RecoverableItemsDeletions),
-    ('RecoverableItemsPurges', WellknownFolder),
-    ('RecoverableItemsRoot', RecoverableItemsRoot),
-    ('RecoverableItemsVersions', WellknownFolder),
-    ('Root', Root),
-    ('SearchFolders', WellknownFolder),
-    ('SentItems', SentItems),
-    ('ServerFailures', WellknownFolder),
-    ('SyncIssues', WellknownFolder),
-    ('Tasks', Tasks),
-    ('ToDoSearch', WellknownFolder),
-    ('VoiceMail', WellknownFolder),
-])
+# and https://msdn.microsoft.com/en-us/library/office/aa580808(v=exchg.150).aspx
+WELLKNOWN_FOLDERS = [
+    AdminAuditLogs,
+    ArchiveDeletedItems,
+    ArchiveInbox,
+    ArchiveMsgFolderRoot,
+    ArchiveRecoverableItemsDeletions,
+    ArchiveRecoverableItemsPurges,
+    ArchiveRecoverableItemsRoot,
+    ArchiveRecoverableItemsVersions,
+    ArchiveRoot,
+    Calendar,
+    Conflicts,
+    Contacts,
+    ConversationHistory,
+    DeletedItems,
+    Directory,
+    Drafts,
+    Favorites,
+    IMContactList,
+    Inbox,
+    Journal,
+    JunkEmail,
+    LocalFailures,
+    MsgFolderRoot,
+    MyContacts,
+    Notes,
+    Outbox,
+    PeopleConnect,
+    PublicFoldersRoot,
+    QuickContacts,
+    RecipientCache,
+    RecoverableItemsDeletions,
+    RecoverableItemsPurges,
+    RecoverableItemsRoot,
+    RecoverableItemsVersions,
+    Root,
+    SearchFolders,
+    SentItems,
+    ServerFailures,
+    SyncIssues,
+    Tasks,
+    ToDoSearch,
+    VoiceMail,
+]

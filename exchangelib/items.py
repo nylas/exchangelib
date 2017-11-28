@@ -288,7 +288,7 @@ class Item(EWSElement):
         self._delete(delete_type=SOFT_DELETE, send_meeting_cancellations=send_meeting_cancellations,
                      affected_task_occurrences=affected_task_occurrences, suppress_read_receipts=suppress_read_receipts)
         self.item_id, self.changekey = None, None
-        self.folder = self.folder.account.recoverable_deleted_items
+        self.folder = self.folder.account.recoverable_items_deletions
 
     def delete(self, send_meeting_cancellations=SEND_TO_NONE, affected_task_occurrences=ALL_OCCURRENCIES,
                suppress_read_receipts=True):

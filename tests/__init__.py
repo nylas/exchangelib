@@ -1642,17 +1642,48 @@ class CommonTest(EWSTest):
         for item in (
                 self.account.protocol,
                 self.account.version,
-                self.account.trash,
-                self.account.drafts,
-                self.account.inbox,
-                self.account.outbox,
-                self.account.sent,
-                self.account.junk,
-                self.account.contacts,
-                self.account.tasks,
+                # Folder shortcuts
+                self.account.admin_audit_logs,
+                self.account.archive_deleted_items,
+                self.account.archive_inbox,
+                self.account.archive_msg_folder_root,
+                self.account.archive_recoverable_items_deletions,
+                self.account.archive_recoverable_items_purges,
+                self.account.archive_recoverable_items_root,
+                self.account.archive_recoverable_items_versions,
+                self.account.archive_root,
                 self.account.calendar,
+                self.account.conflicts,
+                self.account.contacts,
+                self.account.conversation_history,
+                self.account.directory,
+                self.account.drafts,
+                self.account.favories,
+                self.account.im_contact_list,
+                self.account.inbox,
+                self.account.journal,
+                self.account.junk,
+                self.account.local_failures,
+                self.account.msg_folder_root,
+                self.account.my_contacts,
+                self.account.notes,
+                self.account.outbox,
+                self.account.people_connect,
+                self.account.public_folders_root,
+                self.account.quick_contacts,
+                self.account.recipient_cache,
+                self.account.recoverable_items_deletions,
+                self.account.recoverable_items_purges,
                 self.account.recoverable_items_root,
-                self.account.recoverable_deleted_items,
+                self.account.recoverable_items_versions,
+                self.account.search_folders,
+                self.account.sent,
+                self.account.server_failures,
+                self.account.sync_issues,
+                self.account.tasks,
+                self.account.todo_search,
+                self.account.trash,
+                self.account.voice_mail,
         ):
             # Just test that these at least don't throw errors
             repr(item)
@@ -3983,7 +4014,7 @@ class BaseItemTest(EWSTest):
     def test_soft_delete(self):
         # First, empty trash bin
         self.account.trash.filter(categories__contains=self.categories).delete()
-        self.account.recoverable_deleted_items.filter(categories__contains=self.categories).delete()
+        self.account.recoverable_items_deletions.filter(categories__contains=self.categories).delete()
         item = self.get_test_item().save()
         item_id = (item.item_id, item.changekey)
         # Soft delete
@@ -3995,7 +4026,7 @@ class BaseItemTest(EWSTest):
         self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 0)
         self.assertEqual(len(self.account.trash.filter(categories__contains=item.categories)), 0)
         # But we can find it in the recoverable items folder
-        self.assertEqual(len(self.account.recoverable_deleted_items.filter(categories__contains=item.categories)), 1)
+        self.assertEqual(len(self.account.recoverable_items_deletions.filter(categories__contains=item.categories)), 1)
 
     def test_move_to_trash(self):
         # First, empty trash bin

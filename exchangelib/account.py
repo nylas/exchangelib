@@ -16,8 +16,13 @@ from .credentials import DELEGATE, IMPERSONATION
 from .errors import ErrorAccessDenied, UnknownTimeZone
 from .ewsdatetime import EWSTimeZone, UTC
 from .fields import FieldPath
-from .folders import Root, Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Tasks, Contacts, \
-    RecoverableItemsRoot, RecoverableItemsDeletions, Folder
+from .folders import Folder, AdminAuditLogs, ArchiveDeletedItems, ArchiveInbox, ArchiveMsgFolderRoot, \
+    ArchiveRecoverableItemsDeletions, ArchiveRecoverableItemsPurges, ArchiveRecoverableItemsRoot, \
+    ArchiveRecoverableItemsVersions, ArchiveRoot, Calendar, Conflicts, Contacts, ConversationHistory, DeletedItems, \
+    Directory, Drafts, Favorites, IMContactList, Inbox, Journal, JunkEmail, LocalFailures, MsgFolderRoot, MyContacts, \
+    Notes, Outbox, PeopleConnect, PublicFoldersRoot, QuickContacts, RecipientCache, RecoverableItemsDeletions, \
+    RecoverableItemsPurges, RecoverableItemsRoot, RecoverableItemsVersions, Root, SearchFolders, SentItems, \
+    ServerFailures, SyncIssues, Tasks, ToDoSearch, VoiceMail
 from .items import Item, BulkCreateResult, HARD_DELETE, \
     AUTO_RESOLVE, SEND_TO_NONE, SAVE_ONLY, SEND_AND_SAVE_COPY, SEND_ONLY, ALL_OCCURRENCIES, \
     DELETE_TYPE_CHOICES, MESSAGE_DISPOSITION_CHOICES, CONFLICT_RESOLUTION_CHOICES, AFFECTED_TASK_OCCURRENCES_CHOICES, \
@@ -103,6 +108,42 @@ class Account(object):
         return folders_map
 
     @threaded_cached_property
+    def admin_audit_logs(self):
+        return self.root.get_default_folder(AdminAuditLogs)
+
+    @threaded_cached_property
+    def archive_deleted_items(self):
+        return self.root.get_default_folder(ArchiveDeletedItems)
+
+    @threaded_cached_property
+    def archive_inbox(self):
+        return self.root.get_default_folder(ArchiveInbox)
+
+    @threaded_cached_property
+    def archive_msg_folder_root(self):
+        return self.root.get_default_folder(ArchiveMsgFolderRoot)
+
+    @threaded_cached_property
+    def archive_recoverable_items_deletions(self):
+        return self.root.get_default_folder(ArchiveRecoverableItemsDeletions)
+
+    @threaded_cached_property
+    def archive_recoverable_items_purges(self):
+        return self.root.get_default_folder(ArchiveRecoverableItemsPurges)
+
+    @threaded_cached_property
+    def archive_recoverable_items_root(self):
+        return self.root.get_default_folder(ArchiveRecoverableItemsRoot)
+
+    @threaded_cached_property
+    def archive_recoverable_items_versions(self):
+        return self.root.get_default_folder(ArchiveRecoverableItemsVersions)
+
+    @threaded_cached_property
+    def archive_root(self):
+        return self.root.get_default_folder(ArchiveRoot)
+
+    @threaded_cached_property
     def calendar(self):
         # If the account contains a shared calendar from a different user, that calendar will be in the folder list.
         # Attempt not to return one of those. An account may not always have a calendar called "Calendar", but a
@@ -110,44 +151,128 @@ class Account(object):
         return self.root.get_default_folder(Calendar)
 
     @threaded_cached_property
-    def trash(self):
-        return self.root.get_default_folder(DeletedItems)
-
-    @threaded_cached_property
-    def drafts(self):
-        return self.root.get_default_folder(Drafts)
-
-    @threaded_cached_property
-    def inbox(self):
-        return self.root.get_default_folder(Inbox)
-
-    @threaded_cached_property
-    def outbox(self):
-        return self.root.get_default_folder(Outbox)
-
-    @threaded_cached_property
-    def sent(self):
-        return self.root.get_default_folder(SentItems)
-
-    @threaded_cached_property
-    def junk(self):
-        return self.root.get_default_folder(JunkEmail)
-
-    @threaded_cached_property
-    def tasks(self):
-        return self.root.get_default_folder(Tasks)
+    def conflicts(self):
+        return self.root.get_default_folder(Conflicts)
 
     @threaded_cached_property
     def contacts(self):
         return self.root.get_default_folder(Contacts)
 
     @threaded_cached_property
+    def conversation_history(self):
+        return self.root.get_default_folder(ConversationHistory)
+
+    @threaded_cached_property
+    def directory(self):
+        return self.root.get_default_folder(Directory)
+
+    @threaded_cached_property
+    def drafts(self):
+        return self.root.get_default_folder(Drafts)
+
+    @threaded_cached_property
+    def favories(self):
+        return self.root.get_default_folder(Favorites)
+
+    @threaded_cached_property
+    def im_contact_list(self):
+        return self.root.get_default_folder(IMContactList)
+
+    @threaded_cached_property
+    def inbox(self):
+        return self.root.get_default_folder(Inbox)
+
+    @threaded_cached_property
+    def journal(self):
+        return self.root.get_default_folder(Journal)
+
+    @threaded_cached_property
+    def junk(self):
+        return self.root.get_default_folder(JunkEmail)
+
+    @threaded_cached_property
+    def local_failures(self):
+        return self.root.get_default_folder(LocalFailures)
+
+    @threaded_cached_property
+    def msg_folder_root(self):
+        return self.root.get_default_folder(MsgFolderRoot)
+
+    @threaded_cached_property
+    def my_contacts(self):
+        return self.root.get_default_folder(MyContacts)
+
+    @threaded_cached_property
+    def notes(self):
+        return self.root.get_default_folder(Notes)
+
+    @threaded_cached_property
+    def outbox(self):
+        return self.root.get_default_folder(Outbox)
+
+    @threaded_cached_property
+    def people_connect(self):
+        return self.root.get_default_folder(PeopleConnect)
+
+    @threaded_cached_property
+    def public_folders_root(self):
+        return self.root.get_default_folder(PublicFoldersRoot)
+
+    @threaded_cached_property
+    def quick_contacts(self):
+        return self.root.get_default_folder(QuickContacts)
+
+    @threaded_cached_property
+    def recipient_cache(self):
+        return self.root.get_default_folder(RecipientCache)
+
+    @threaded_cached_property
+    def recoverable_items_deletions(self):
+        return self.root.get_default_folder(RecoverableItemsDeletions)
+
+    @threaded_cached_property
+    def recoverable_items_purges(self):
+        return self.root.get_default_folder(RecoverableItemsPurges)
+
+    @threaded_cached_property
     def recoverable_items_root(self):
         return self.root.get_default_folder(RecoverableItemsRoot)
 
     @threaded_cached_property
-    def recoverable_deleted_items(self):
-        return self.root.get_default_folder(RecoverableItemsDeletions)
+    def recoverable_items_versions(self):
+        return self.root.get_default_folder(RecoverableItemsVersions)
+
+    @threaded_cached_property
+    def search_folders(self):
+        return self.root.get_default_folder(SearchFolders)
+
+    @threaded_cached_property
+    def sent(self):
+        return self.root.get_default_folder(SentItems)
+
+    @threaded_cached_property
+    def server_failures(self):
+        return self.root.get_default_folder(ServerFailures)
+
+    @threaded_cached_property
+    def sync_issues(self):
+        return self.root.get_default_folder(SyncIssues)
+
+    @threaded_cached_property
+    def tasks(self):
+        return self.root.get_default_folder(Tasks)
+
+    @threaded_cached_property
+    def todo_search(self):
+        return self.root.get_default_folder(ToDoSearch)
+
+    @threaded_cached_property
+    def trash(self):
+        return self.root.get_default_folder(DeletedItems)
+
+    @threaded_cached_property
+    def voice_mail(self):
+        return self.root.get_default_folder(VoiceMail)
 
     @property
     def domain(self):
