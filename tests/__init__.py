@@ -1604,8 +1604,6 @@ class CommonTest(EWSTest):
 
         oof = OofSettings(
             state=OofSettings.DISABLED,
-            internal_reply='XXX',
-            external_reply='YYY',
         )
         self.account.oof_settings = oof
         self.assertEqual(self.account.oof_settings, oof)

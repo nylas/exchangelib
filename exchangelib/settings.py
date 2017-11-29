@@ -93,7 +93,7 @@ class OofSettings(EWSElement):
         for attr in ('internal_reply', 'external_reply'):
             value = getattr(self, attr)
             if value is None:
-                continue
+                value = ''  # The value can be empty, but the XML element must always be present
             f = self.get_field_by_fieldname(attr)
             set_xml_value(elem, f.to_xml(value, version=version), version)
         return elem
