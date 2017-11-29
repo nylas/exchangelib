@@ -2,8 +2,8 @@
 Change Log
 ==========
 
-HEAD
-----
+1.10.6
+------
 * Added support for getting and setting ``Account.oof_settings`` using the new ``OofSettings`` class.
 * Added snake_case named shortcuts to all distinguished folders on the ``Account`` model. E.g.
   ``Account.search_folders``.
