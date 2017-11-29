@@ -45,7 +45,7 @@ from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextFie
     MailboxListField, Choice, FieldPath, EWSElementField, CultureField, DateField, EnumField, EnumListField, IdField, \
     CharField, TextListField
 from exchangelib.folders import Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Messages, Tasks, \
-    Contacts, Folder, WellknownFolder, RecipientCache, GALContacts
+    Contacts, Folder, RecipientCache, GALContacts
 from exchangelib.indexed_properties import IndexedElement, EmailAddress, PhysicalAddress, PhoneNumber, \
     SingleFieldIndexedElement, MultiFieldIndexedElement
 from exchangelib.items import Item, CalendarItem, Message, Contact, Task, DistributionList
@@ -58,8 +58,7 @@ from exchangelib.recurrence import Recurrence, AbsoluteYearlyPattern, RelativeYe
     MONDAY, WEDNESDAY, FEBRUARY, AUGUST, SECOND, LAST
 from exchangelib.restriction import Restriction, Q
 from exchangelib.settings import OofSettings
-from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, GetAttachment, ResolveNames, \
-    GetUserOofSettings, SetUserOofSettings, TNS
+from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, GetAttachment, ResolveNames, TNS
 from exchangelib.transport import NOAUTH, BASIC, DIGEST, NTLM, wrap, _get_auth_method_from_response
 from exchangelib.util import chunkify, peek, get_redirect_url, to_xml, BOM, get_domain, value_to_xml_text, \
     post_ratelimited, create_element, CONNECTION_ERRORS, PrettyXmlHandler
