@@ -777,7 +777,7 @@ class Outbox(Messages):
 
     LOCALIZED_NAMES = {
         'da_DK': (u'Udbakke',),
-        'de_DE': (u'Kalender',),
+        'de_DE': (u'Postausgang',),
         'en_US': (u'Outbox',),
         'es_ES': (u'Bandeja de salida',),
         'fr_CA': (u"Boîte d'envoi",),
