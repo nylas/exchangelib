@@ -51,7 +51,7 @@ class OofSettings(EWSElement):
             if self.start >= self.end:
                 raise ValueError("'start' must be before 'end'")
             if self.end < UTC_NOW():
-                raise ValueError("'start' must be before 'end'")
+                raise ValueError("'end' must be in the future")
         if self.state != self.DISABLED and (not self.internal_reply or not self.external_reply):
             raise ValueError("'internal_reply' and 'external_reply' must be set when state is not '%s'" % self.DISABLED)
 

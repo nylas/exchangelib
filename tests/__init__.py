@@ -1611,6 +1611,34 @@ class CommonTest(EWSTest):
         self.account.oof_settings = oof
         self.assertEqual(self.account.oof_settings, oof)
 
+    def test_oof_settings_validation(self):
+        with self.assertRaises(ValueError):
+            # Needs a start and end
+            OofSettings(
+                state=OofSettings.SCHEDULED,
+            ).clean(version=None)
+        with self.assertRaises(ValueError):
+            # Start must be before end
+            OofSettings(
+                state=OofSettings.SCHEDULED,
+                start=UTC.localize(EWSDateTime(2100, 12, 1)),
+                end=UTC.localize(EWSDateTime(2100, 11, 1)),
+            ).clean(version=None)
+        with self.assertRaises(ValueError):
+            # End must be in the future
+            OofSettings(
+                state=OofSettings.SCHEDULED,
+                start=UTC.localize(EWSDateTime(2000, 11, 1)),
+                end=UTC.localize(EWSDateTime(2000, 12, 1)),
+            ).clean(version=None)
+        with self.assertRaises(ValueError):
+            # Must have an internal and external reply
+            OofSettings(
+                state=OofSettings.SCHEDULED,
+                start=UTC.localize(EWSDateTime(2100, 11, 1)),
+                end=UTC.localize(EWSDateTime(2100, 12, 1)),
+            ).clean(version=None)
+
     def test_sessionpool(self):
         # First, empty the calendar
         start = self.account.default_timezone.localize(EWSDateTime(2011, 10, 12, 8))
