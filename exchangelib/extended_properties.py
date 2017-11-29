@@ -91,7 +91,11 @@ class ExtendedProperty(EWSElement):
                 raise ValueError(
                     "When 'distinguished_property_set_id' is set, 'property_id' or 'property_name' must also be set"
                 )
-            assert cls.distinguished_property_set_id in cls.DISTINGUISHED_SETS
+            if cls.distinguished_property_set_id not in cls.DISTINGUISHED_SETS:
+                raise ValueError(
+                    "'distinguished_property_set_id' value '%s' must be one of %s"
+                    % (cls.distinguished_property_set_id, sorted(cls.DISTINGUISHED_SETS))
+                )
         if cls.property_set_id:
             if any([cls.distinguished_property_set_id, cls.property_tag]):
                 raise ValueError(

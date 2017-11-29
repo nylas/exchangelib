@@ -4482,6 +4482,99 @@ class BaseItemTest(EWSTest):
         finally:
             self.ITEM_CLASS.deregister(attr_name=attr_name)
 
+    def test_extended_property_validation(self):
+        """
+        if cls.property_type not in cls.PROPERTY_TYPES:
+            raise ValueError(
+                "'property_type' value '%s' must be one of %s" % (cls.property_type, sorted(cls.PROPERTY_TYPES))
+            )
+        """
+        # Must not have property_set_id or property_tag
+        class TestProp(ExtendedProperty):
+            distinguished_property_set_id = 'XXX'
+            property_set_id = 'YYY'
+        with self.assertRaises(ValueError):
+            TestProp.validate_cls()
+
+        # Must have property_id or property_name
+        class TestProp(ExtendedProperty):
+            distinguished_property_set_id = 'XXX'
+        with self.assertRaises(ValueError):
+            TestProp.validate_cls()
+
+        # distinguished_property_set_id must have a valid value
+        class TestProp(ExtendedProperty):
+            distinguished_property_set_id = 'XXX'
+            property_id = 'YYY'
+        with self.assertRaises(ValueError):
+            TestProp.validate_cls()
+
+        # Must not have distinguished_property_set_id or property_tag
+        class TestProp(ExtendedProperty):
+            property_set_id = 'XXX'
+            property_tag = 'YYY'
+        with self.assertRaises(ValueError):
+            TestProp.validate_cls()
+
+        # Must have property_id or property_name
+        class TestProp(ExtendedProperty):
+            property_set_id = 'XXX'
+        with self.assertRaises(ValueError):
+            TestProp.validate_cls()
+
+        # property_tag is only compatible with property_type
+        class TestProp(ExtendedProperty):
+            property_tag = 'XXX'
+            property_set_id = 'YYY'
+        with self.assertRaises(ValueError):
+            TestProp.validate_cls()
+
+        # property_tag must be an integer or string that can be converted to int
+        class TestProp(ExtendedProperty):
+            property_tag = 'XXX'
+        with self.assertRaises(ValueError):
+            TestProp.validate_cls()
+
+        # property_tag must not be in the reserved range
+        class TestProp(ExtendedProperty):
+            property_tag = 0x8001
+        with self.assertRaises(ValueError):
+            TestProp.validate_cls()
+
+        # Must not have property_id or property_tag
+        class TestProp(ExtendedProperty):
+            property_name = 'XXX'
+            property_id = 'YYY'
+        with self.assertRaises(ValueError):
+            TestProp.validate_cls()
+
+        # Must have distinguished_property_set_id or property_set_id
+        class TestProp(ExtendedProperty):
+            property_name = 'XXX'
+        with self.assertRaises(ValueError):
+            TestProp.validate_cls()
+
+        # Must not have property_name or property_tag
+        class TestProp(ExtendedProperty):
+            property_id = 'XXX'
+            property_name = 'YYY'
+        with self.assertRaises(ValueError):
+            TestProp.validate_cls()  # This actually hits the check on property_name values
+
+        # Must have distinguished_property_set_id or property_set_id
+        class TestProp(ExtendedProperty):
+            property_id = 'XXX'
+        with self.assertRaises(ValueError):
+            TestProp.validate_cls()
+
+        # property_type must be a valid value
+        class TestProp(ExtendedProperty):
+            property_id = 'XXX'
+            property_set_id = 'YYY'
+            property_type = 'ZZZ'
+        with self.assertRaises(ValueError):
+            TestProp.validate_cls()
+
     def test_attachment_failure(self):
         att1 = FileAttachment(name='my_file_1.txt', content=u'Hello from unicode æøå'.encode('utf-8'))
         att1.attachment_id = 'XXX'
