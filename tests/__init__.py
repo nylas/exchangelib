@@ -4880,11 +4880,7 @@ class CalendarTest(BaseItemTest):
 
     def test_all_day_datetimes(self):
         # Test that start and end datetimes for all-day items are returned in the datetime of the account.
-
-        # The timezone we're testing (CET/CEST) had a DST date change in 1996 (see
-        # https://en.wikipedia.org/wiki/Summer_Time_in_Europe). The Microsoft timezone definition on the server
-        # does not observe that, but pytz does. So random datetimes before 1996 will fail this test.
-        start = get_random_date(start_date=EWSDate(1996, 1, 1))
+        start = get_random_date()
         start_dt, end_dt = \
             get_random_datetime_range(start_date=start, end_date=start + datetime.timedelta(days=365), tz=self.account.default_timezone)
         item = self.ITEM_CLASS(folder=self.test_folder, start=start_dt, end=end_dt, is_all_day=True,
@@ -5180,12 +5176,16 @@ def get_random_email():
     ))
 
 
-def get_random_date(start_date=EWSDate(1990, 1, 1), end_date=EWSDate(2030, 1, 1)):
+# The timezone we're testing (CET/CEST) had a DST date change in 1996 (see
+# https://en.wikipedia.org/wiki/Summer_Time_in_Europe). The Microsoft timezone definition on the server
+# does not observe that, but pytz does. So random datetimes before 1996 will fail tests randomly.
+
+def get_random_date(start_date=EWSDate(1996, 1, 1), end_date=EWSDate(2030, 1, 1)):
     # Keep with a reasonable date range. A wider date range is unstable WRT timezones
     return EWSDate.fromordinal(random.randint(start_date.toordinal(), end_date.toordinal()))
 
 
-def get_random_datetime(start_date=EWSDate(1990, 1, 1), end_date=EWSDate(2030, 1, 1), tz=UTC):
+def get_random_datetime(start_date=EWSDate(1996, 1, 1), end_date=EWSDate(2030, 1, 1), tz=UTC):
     # Create a random datetime with minute precision. Both dates are inclusive.
     # Keep with a reasonable date range. A wider date range than the default values is unstable WRT timezones.
     while True:
@@ -5198,7 +5198,7 @@ def get_random_datetime(start_date=EWSDate(1990, 1, 1), end_date=EWSDate(2030, 1
             pass
 
 
-def get_random_datetime_range(start_date=EWSDate(1990, 1, 1), end_date=EWSDate(2030, 1, 1), tz=UTC):
+def get_random_datetime_range(start_date=EWSDate(1996, 1, 1), end_date=EWSDate(2030, 1, 1), tz=UTC):
     # Create two random datetimes.  Both dates are inclusive.
     # Keep with a reasonable date range. A wider date range than the default values is unstable WRT timezones.
     # Calendar items raise ErrorCalendarDurationIsTooLong if duration is > 5 years.
