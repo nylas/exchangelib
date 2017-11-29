@@ -859,7 +859,7 @@ class GALContacts(Contacts):
 
 
 class RecipientCache(Contacts):
-    DISTINGUISHED_FOLDER_ID = None
+    DISTINGUISHED_FOLDER_ID = 'recipientcache'
     CONTAINER_CLASS = 'IPF.Contact.RecipientCache'
 
     LOCALIZED_NAMES = {}
@@ -987,7 +987,7 @@ class SyncIssues(WellknownFolder):
 
 
 class ToDoSearch(WellknownFolder):
-    DISTINGUISHED_FOLDER_ID = 'todoSsarch'
+    DISTINGUISHED_FOLDER_ID = 'todosearch'
 
 
 class VoiceMail(WellknownFolder):

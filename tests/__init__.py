@@ -1642,52 +1642,61 @@ class CommonTest(EWSTest):
         for item in (
                 self.account.protocol,
                 self.account.version,
-                # Folder shortcuts
-                self.account.admin_audit_logs,
-                self.account.archive_deleted_items,
-                self.account.archive_inbox,
-                self.account.archive_msg_folder_root,
-                self.account.archive_recoverable_items_deletions,
-                self.account.archive_recoverable_items_purges,
-                self.account.archive_recoverable_items_root,
-                self.account.archive_recoverable_items_versions,
-                self.account.archive_root,
-                self.account.calendar,
-                self.account.conflicts,
-                self.account.contacts,
-                self.account.conversation_history,
-                self.account.directory,
-                self.account.drafts,
-                self.account.favories,
-                self.account.im_contact_list,
-                self.account.inbox,
-                self.account.journal,
-                self.account.junk,
-                self.account.local_failures,
-                self.account.msg_folder_root,
-                self.account.my_contacts,
-                self.account.notes,
-                self.account.outbox,
-                self.account.people_connect,
-                self.account.public_folders_root,
-                self.account.quick_contacts,
-                self.account.recipient_cache,
-                self.account.recoverable_items_deletions,
-                self.account.recoverable_items_purges,
-                self.account.recoverable_items_root,
-                self.account.recoverable_items_versions,
-                self.account.search_folders,
-                self.account.sent,
-                self.account.server_failures,
-                self.account.sync_issues,
-                self.account.tasks,
-                self.account.todo_search,
-                self.account.trash,
-                self.account.voice_mail,
         ):
             # Just test that these at least don't throw errors
             repr(item)
             str(item)
+        for attr in (
+                'admin_audit_logs',
+                'archive_deleted_items',
+                'archive_inbox',
+                'archive_msg_folder_root',
+                'archive_recoverable_items_deletions',
+                'archive_recoverable_items_purges',
+                'archive_recoverable_items_root',
+                'archive_recoverable_items_versions',
+                'archive_root',
+                'calendar',
+                'conflicts',
+                'contacts',
+                'conversation_history',
+                'directory',
+                'drafts',
+                'favories',
+                'im_contact_list',
+                'inbox',
+                'journal',
+                'junk',
+                'local_failures',
+                'msg_folder_root',
+                'my_contacts',
+                'notes',
+                'outbox',
+                'people_connect',
+                'public_folders_root',
+                'quick_contacts',
+                'recipient_cache',
+                'recoverable_items_deletions',
+                'recoverable_items_purges',
+                'recoverable_items_root',
+                'recoverable_items_versions',
+                'search_folders',
+                'sent',
+                'server_failures',
+                'sync_issues',
+                'tasks',
+                'todo_search',
+                'trash',
+                'voice_mail',
+        ):
+            # Test distinguished folder shortcuts. Some may raise ErrorAccessDenied
+            try:
+                item = getattr(self.account, attr)
+            except (ErrorAccessDenied, ErrorFolderNotFound, ErrorInvalidOperation):
+                continue
+            else:
+                repr(item)
+                str(item)
 
     def test_configuration(self):
         with self.assertRaises(AttributeError):
