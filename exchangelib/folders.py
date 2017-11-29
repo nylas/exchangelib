@@ -433,6 +433,9 @@ class Folder(EWSElement):
                 f.wipe()
             except ErrorAccessDenied:
                 log.warning('Not allowed to wipe %s', f)
+        if isinstance(self, Root):
+            log.debug('Skipping root - wiping is not supported')
+            return
         log.debug('Wiping folder %s', self)
         for i in self.all().delete():
             if isinstance(i, ErrorCannotDeleteObject):
