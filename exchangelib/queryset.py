@@ -442,11 +442,11 @@ class QuerySet(object):
         if self.is_cached and not args and not kwargs:
             # We can only safely use the cache if get() is called without args
             items = self._cache
-        elif not args and set(kwargs.keys()) == {'item_id', 'changekey'}:
+        elif not args and set(kwargs.keys()) in ({'item_id'}, {'item_id', 'changekey'}):
             # We allow calling get(item_id=..., changekey=...) to get a single item, but only if exactly these two
             # kwargs are present.
             item_id = self._item_id_field.field.clean(kwargs['item_id'], version=self.folder.account.version)
-            changekey = self._changekey_field.field.clean(kwargs['changekey'], version=self.folder.account.version)
+            changekey = self._changekey_field.field.clean(kwargs.get('changekey'), version=self.folder.account.version)
             items = list(self.folder.fetch(ids=[(item_id, changekey)], only_fields=self.only_fields))
         else:
             new_qs = self.filter(*args, **kwargs)
