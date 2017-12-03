@@ -174,7 +174,7 @@ class ItemId(EWSElement):
     CHANGEKEY_ATTR = 'ChangeKey'
     FIELDS = [
         IdField('id', field_uri=ID_ATTR, is_required=True),
-        IdField('changekey', field_uri=CHANGEKEY_ATTR, is_required=True),
+        IdField('changekey', field_uri=CHANGEKEY_ATTR, is_required=False),
     ]
 
     __slots__ = ('id', 'changekey')
@@ -236,15 +236,15 @@ class Mailbox(EWSElement):
     FIELDS = [
         TextField('name', field_uri='Name'),
         EmailField('email_address', field_uri='EmailAddress'),
+        ChoiceField('routing_type', field_uri='RoutingType', choices={Choice('SMTP')}, default='SMTP'),
         ChoiceField('mailbox_type', field_uri='MailboxType', choices={
             Choice('Mailbox'), Choice('PublicDL'), Choice('PrivateDL'), Choice('Contact'), Choice('PublicFolder'),
             Choice('Unknown'), Choice('OneOff')
         }, default='Mailbox'),
         EWSElementField('item_id', value_cls=ItemId, is_read_only=True),
-        ChoiceField('routing_type', field_uri='RoutingType', choices={Choice('SMTP')}, default='SMTP'),
     ]
 
-    __slots__ = ('name', 'email_address', 'mailbox_type', 'item_id', 'routing_type')
+    __slots__ = ('name', 'email_address', 'routing_type', 'mailbox_type', 'item_id')
 
     def clean(self, version=None):
         super(Mailbox, self).clean(version=version)

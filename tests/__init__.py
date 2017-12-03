@@ -3094,16 +3094,24 @@ class BaseItemTest(EWSTest):
         with self.assertRaises(ValueError):
             list(self.test_folder.filter(item_id__in=[item.item_id]))
         with self.assertRaises(ValueError):
-            list(self.test_folder.get(item_id=item.item_id))
-        with self.assertRaises(ValueError):
             list(self.test_folder.get(item_id=item.item_id, changekey=item.changekey, subject='XXX'))
         with self.assertRaises(ValueError):
-            list(self.test_folder.get(item_id=None, changekey='foo'))
-        with self.assertRaises(ValueError):
-            list(self.test_folder.get(item_id='foo', changekey=None))
+            list(self.test_folder.get(item_id=None, changekey=item.changekey))
 
         # Test a simple get()
         get_item = self.test_folder.get(item_id=item.item_id, changekey=item.changekey)
+        self.assertEqual(item.item_id, get_item.item_id)
+        self.assertEqual(item.changekey, get_item.changekey)
+        self.assertEqual(item.subject, get_item.subject)
+        self.assertEqual(item.body, get_item.body)
+
+        # Test get() with ID only
+        get_item = self.test_folder.get(item_id=item.item_id)
+        self.assertEqual(item.item_id, get_item.item_id)
+        self.assertEqual(item.changekey, get_item.changekey)
+        self.assertEqual(item.subject, get_item.subject)
+        self.assertEqual(item.body, get_item.body)
+        get_item = self.test_folder.get(item_id=item.item_id, changekey=None)
         self.assertEqual(item.item_id, get_item.item_id)
         self.assertEqual(item.changekey, get_item.changekey)
         self.assertEqual(item.subject, get_item.subject)
