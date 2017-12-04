@@ -1,5 +1,10 @@
 Exchange Web Services client library
 ====================================
+:release:       1.10.6
+:date:          2017-11-29
+:home:          https://github.com/ecederstrand/exchangelib/
+:pypi-repo:     https://pypi.python.org/pypi/exchangelib/
+
 This module provides an well-performing, well-behaving, platform-independent and simple interface for communicating with
 a Microsoft Exchange 2007-2016 Server or Office365 using Exchange Web Services (EWS). It currently implements
 autodiscover, and functions for searching, creating, updating, deleting, exporting and uploading calendar, mailbox,
