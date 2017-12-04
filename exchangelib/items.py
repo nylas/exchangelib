@@ -79,7 +79,48 @@ ContactsActiveDirectory = 'ContactsActiveDirectory'
 SEARCH_SCOPE_CHOICES = (ActiveDirectory, ActiveDirectoryContacts, Contacts, ContactsActiveDirectory)
 
 
-class Item(EWSElement):
+class RegisterMixIn(EWSElement):
+    INSERT_AFTER_FIELD = None
+
+    @classmethod
+    def register(cls, attr_name, attr_cls):
+        """
+        Register a custom extended property in this item class so they can be accessed just like any other attribute
+        """
+        assert cls.INSERT_AFTER_FIELD
+        try:
+            cls.get_field_by_fieldname(attr_name)
+        except ValueError:
+            pass
+        else:
+            raise ValueError("'%s' is already registered" % attr_name)
+        if not issubclass(attr_cls, ExtendedProperty):
+            raise ValueError("'%s' must be a subclass of ExtendedProperty" % attr_cls)
+        # Check if class attributes are properly defined
+        attr_cls.validate_cls()
+        # ExtendedProperty is not a real field, but a placeholder in the fields list. See
+        #   https://msdn.microsoft.com/en-us/library/office/aa580790(v=exchg.150).aspx
+        #
+        # Find the correct index for the new extended property, and insert.
+        idx = tuple(f.name for f in cls.FIELDS).index(cls.INSERT_AFTER_FIELD) + 1
+        field = ExtendedPropertyField(attr_name, value_cls=attr_cls)
+        cls.add_field(field, idx=idx)
+
+    @classmethod
+    def deregister(cls, attr_name):
+        """
+        De-register an extended property that has been registered with register()
+        """
+        try:
+            field = cls.get_field_by_fieldname(attr_name)
+        except ValueError:
+            raise ValueError("'%s' is not registered" % attr_name)
+        if not isinstance(field, ExtendedPropertyField):
+            raise ValueError("'%s' is not registered as an ExtendedProperty" % attr_name)
+        cls.remove_field(field)
+
+
+class Item(RegisterMixIn):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa580790(v=exchg.150).aspx
     """
@@ -140,6 +181,9 @@ class Item(EWSElement):
                         is_read_only=True, supported_from=EXCHANGE_2010),
         BodyField('unique_body', field_uri='item:UniqueBody', is_read_only=True, supported_from=EXCHANGE_2010),
     ]
+
+    # Used to register extended properties
+    INSERT_AFTER_FIELD = 'has_attachments'
 
     # We can't use __slots__ because we need to add extended properties dynamically
 
@@ -358,42 +402,6 @@ class Item(EWSElement):
         kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.supported_fields()}
         elem.clear()
         return cls(account=account, item_id=item_id, changekey=changekey, **kwargs)
-
-    @classmethod
-    def register(cls, attr_name, attr_cls):
-        """
-        Register a custom extended property in this item class so they can be accessed just like any other attribute
-        """
-        try:
-            cls.get_field_by_fieldname(attr_name)
-        except ValueError:
-            pass
-        else:
-            raise ValueError("'%s' is already registered" % attr_name)
-        if not issubclass(attr_cls, ExtendedProperty):
-            raise ValueError("'%s' must be a subclass of ExtendedProperty" % attr_cls)
-        # Check if class attributes are properly defined
-        attr_cls.validate_cls()
-        # ExtendedProperty is not a real field, but a placeholder in the fields list. See
-        #   https://msdn.microsoft.com/en-us/library/office/aa580790(v=exchg.150).aspx
-        #
-        # Find the correct index for the new extended property, which is after 'has_attachments', and insert.
-        idx = tuple(f.name for f in cls.FIELDS).index('has_attachments') + 1
-        field = ExtendedPropertyField(attr_name, value_cls=attr_cls)
-        cls.add_field(field, idx=idx)
-
-    @classmethod
-    def deregister(cls, attr_name):
-        """
-        De-register an extended property that has been registered with register()
-        """
-        try:
-            field = cls.get_field_by_fieldname(attr_name)
-        except ValueError:
-            raise ValueError("'%s' is not registered" % attr_name)
-        if not isinstance(field, ExtendedPropertyField):
-            raise ValueError("'%s' is not registered as an ExtendedProperty" % attr_name)
-        cls.remove_field(field)
 
     def __eq__(self, other):
         if isinstance(other, tuple):

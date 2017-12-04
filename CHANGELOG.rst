@@ -2,6 +2,10 @@
 Change Log
 ==========
 
+HEAD
+----
+* Added support for registering extended properties on folders.
+
 1.10.6
 ------
 * Added support for getting and setting ``Account.oof_settings`` using the new ``OofSettings`` class.

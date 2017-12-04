@@ -6,7 +6,7 @@ import logging
 from six import text_type, string_types
 
 from .fields import SubField, TextField, EmailField, ChoiceField, DateTimeField, EWSElementField, MailboxField, \
-    Choice, BooleanField, IdField
+    Choice, BooleanField, IdField, ExtendedPropertyField
 from .services import MNS, TNS
 from .util import get_xml_attr, create_element, set_xml_value, value_to_xml_text
 
@@ -45,6 +45,10 @@ class EWSElement(object):
         # Validate attribute values using the field validator
         for f in self.FIELDS:
             if not f.supports_version(version):
+                continue
+            if isinstance(f, ExtendedPropertyField) and not hasattr(self, f.name):
+                # The extended field may have been registered after this item was created. Set default values.
+                setattr(self, f.name, f.clean(None, version=version))
                 continue
             val = getattr(self, f.name)
             setattr(self, f.name, f.clean(val, version=version))

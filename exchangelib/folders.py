@@ -12,7 +12,7 @@ from .errors import ErrorAccessDenied, ErrorCannotDeleteObject, ErrorFolderNotFo
 from .fields import IntegerField, TextField, DateTimeField, FieldPath, EffectiveRightsField, MailboxField, IdField, \
     EWSElementField
 from .items import Item, CalendarItem, Contact, Message, Task, MeetingRequest, MeetingResponse, MeetingCancellation, \
-    DistributionList, ITEM_CLASSES, ITEM_TRAVERSAL_CHOICES, SHAPE_CHOICES, IdOnly
+    DistributionList, RegisterMixIn, ITEM_CLASSES, ITEM_TRAVERSAL_CHOICES, SHAPE_CHOICES, IdOnly
 from .properties import ItemId, Mailbox, EWSElement, ParentFolderId
 from .queryset import QuerySet
 from .restriction import Restriction
@@ -71,7 +71,7 @@ class CalendarView(EWSElement):
 
 
 @python_2_unicode_compatible
-class Folder(EWSElement):
+class Folder(RegisterMixIn):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa581334(v=exchg.150).aspx
     """
@@ -92,6 +92,9 @@ class Folder(EWSElement):
         IntegerField('unread_count', field_uri='folder:UnreadCount', is_read_only=True),
         EffectiveRightsField('effective_rights', field_uri='folder:EffectiveRights', is_read_only=True),
     ]
+
+    # Used to register extended properties
+    INSERT_AFTER_FIELD = 'child_folder_count'
 
     def __init__(self, **kwargs):
         self.account = kwargs.pop('account', None)

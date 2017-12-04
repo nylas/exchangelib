@@ -409,9 +409,9 @@ Here are some examples of using the API:
 
 Extended properties
 ^^^^^^^^^^^^^^^^^^^
-Extended properties makes it possible to attach custom key-value pairs to items stored on the Exchange server. There are
-multiple online resources that describe working with extended properties, and list many of the magic values that are
-used by existing Exchange clients to store common and custom properties. The following is not a comprehensive
+Extended properties makes it possible to attach custom key-value pairs to items and folders on the Exchange server.
+There are multiple online resources that describe working with extended properties, and list many of the magic values
+that are used by existing Exchange clients to store common and custom properties. The following is not a comprehensive
 description of the possibilities, but we do intend to support all the possibilities provided by EWS.
 
 .. code-block:: python
@@ -458,6 +458,14 @@ description of the possibilities, but we do intend to support all the possibilit
         distinguished_property_set_id = 'Common'
         property_id = 0x00008524
         property_type = 'String'
+
+    # Extended properties also work with folders. Here's an example of getting the size (in bytes) of a folder:
+    class FolderSize(ExtendedProperty):
+        property_tag = 0x0e08
+        property_type = 'Integer'
+
+    Folder.register('size', FolderSize)
+    print(my_folder.size)
 
 
 Attachments

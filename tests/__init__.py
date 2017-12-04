@@ -2546,6 +2546,7 @@ class FolderTest(EWSTest):
             self.account.calendar.absolute,
             '/root/Top of Information Store/' + self.account.calendar.name
         )
+
     def test_walk(self):
         self.assertGreaterEqual(len(list(self.account.root.walk())), 20)
         self.assertGreaterEqual(len(list(self.account.contacts.walk())), 2)
@@ -2574,6 +2575,16 @@ class FolderTest(EWSTest):
             self.account.root / '.',
             self.account.root
         )
+
+    def test_extended_properties(self):
+        # Extended properties also work with folders. Here's an example of getting the size (in bytes) of a folder:
+        class FolderSize(ExtendedProperty):
+            property_tag = 0x0e08
+            property_type = 'Integer'
+
+        Folder.register('size', FolderSize)
+        self.account.inbox.refresh()
+        self.assertGreater(self.account.inbox.size, 0)
 
 
 class BaseItemTest(EWSTest):
