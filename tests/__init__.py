@@ -2582,9 +2582,12 @@ class FolderTest(EWSTest):
             property_tag = 0x0e08
             property_type = 'Integer'
 
-        Folder.register('size', FolderSize)
-        self.account.inbox.refresh()
-        self.assertGreater(self.account.inbox.size, 0)
+        try:
+            Folder.register('size', FolderSize)
+            self.account.inbox.refresh()
+            self.assertGreater(self.account.inbox.size, 0)
+        finally:
+            Folder.deregister('size')
 
 
 class BaseItemTest(EWSTest):
