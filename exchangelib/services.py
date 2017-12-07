@@ -939,6 +939,7 @@ class CreateFolder(EWSAccountService):
         is_empty = True
         for folder in folders:
             is_empty = False
+            log.debug('Creating folder %s', folder)
             set_xml_value(folders_elem, folder, self.account.version)
         assert not is_empty, '"folders" must not be empty'
         create_folder.append(folders_elem)
@@ -1008,6 +1009,7 @@ class UpdateFolder(EWSAccountService):
         is_empty = True
         for folder, fieldnames in folders:
             is_empty = False
+            log.debug('Updating folder %s', folder)
             folderchange = create_element('t:FolderChange')
             set_xml_value(folderchange, folder, version=self.account.version)
             updates = create_element('t:Updates')
@@ -1037,7 +1039,7 @@ class DeleteFolder(EWSAccountService):
         is_empty = True
         for folder in folders:
             is_empty = False
-            log.debug('Getting folder %s', folder)
+            log.debug('Deleting folder %s', folder)
             if isinstance(folder, tuple):
                 set_xml_value(folder_ids, FolderId(*folder) if isinstance(folder, tuple) else folder,
                               version=self.account.version)
@@ -1046,6 +1048,36 @@ class DeleteFolder(EWSAccountService):
         assert not is_empty, '"folders" must not be empty'
         deletefolder.append(folder_ids)
         return deletefolder
+
+
+class EmptyFolder(EWSAccountService):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/ff709454(v=exchg.150).aspx
+    """
+    SERVICE_NAME = 'EmptyFolder'
+    element_container_name = None  # EmptyFolder doesn't return a response object, just status in XML attrs
+
+    def call(self, folders, delete_type, delete_sub_folders):
+        return self._get_elements(payload=self.get_payload(folders=folders, delete_type=delete_type,
+                                                           delete_sub_folders=delete_sub_folders))
+
+    def get_payload(self, folders, delete_type, delete_sub_folders):
+        from .folders import FolderId
+        emptyfolder = create_element('m:%s' % self.SERVICE_NAME, DeleteType=delete_type,
+                                     DeleteSubFolders='true' if delete_sub_folders else 'false')
+        folder_ids = create_element('m:FolderIds')
+        is_empty = True
+        for folder in folders:
+            is_empty = False
+            log.debug('Emptying folder %s', folder)
+            if isinstance(folder, tuple):
+                set_xml_value(folder_ids, FolderId(*folder) if isinstance(folder, tuple) else folder,
+                              version=self.account.version)
+                continue
+            set_xml_value(folder_ids, folder, version=self.account.version)
+        assert not is_empty, '"folders" must not be empty'
+        emptyfolder.append(folder_ids)
+        return emptyfolder
 
 
 class SendItem(EWSAccountService):

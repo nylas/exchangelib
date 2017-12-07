@@ -8,15 +8,16 @@ from operator import attrgetter
 from future.utils import python_2_unicode_compatible
 from six import text_type, string_types
 
-from .errors import ErrorAccessDenied, ErrorCannotDeleteObject, ErrorFolderNotFound
+from .errors import ErrorAccessDenied, ErrorFolderNotFound, ErrorDeleteDistinguishedFolder, ErrorCannotEmptyFolder
 from .fields import IntegerField, TextField, DateTimeField, FieldPath, EffectiveRightsField, MailboxField, IdField, \
     EWSElementField
 from .items import Item, CalendarItem, Contact, Message, Task, MeetingRequest, MeetingResponse, MeetingCancellation, \
-    DistributionList, RegisterMixIn, ITEM_CLASSES, ITEM_TRAVERSAL_CHOICES, SHAPE_CHOICES, IdOnly
+    DistributionList, RegisterMixIn, ITEM_CLASSES, ITEM_TRAVERSAL_CHOICES, SHAPE_CHOICES, IdOnly, DELETE_TYPE_CHOICES, \
+    HARD_DELETE
 from .properties import ItemId, Mailbox, EWSElement, ParentFolderId
 from .queryset import QuerySet
 from .restriction import Restriction
-from .services import FindFolder, GetFolder, FindItem, CreateFolder, UpdateFolder, DeleteFolder
+from .services import FindFolder, GetFolder, FindItem, CreateFolder, UpdateFolder, DeleteFolder, EmptyFolder
 from .transport import TNS, MNS
 
 string_type = string_types[0]
@@ -138,8 +139,9 @@ class Folder(RegisterMixIn):
 
     @property
     def children(self):
-        for c in self.account.root.get_children(self):
-            yield c
+        # It's dangerous to return a generator here because we may then call methods on a child that result in the
+        # cache being updated while it's iterated.
+        return list(self.account.root.get_children(self))
 
     def get_folder_by_name(self, name):
         """Takes a case-sensitive folder name and returns an instance of that folder, if a folder with that name exists
@@ -456,6 +458,7 @@ class Folder(RegisterMixIn):
             if isinstance(res[0], Exception):
                 raise res[0]
             self.folder_id, self.changekey = res[0].folder_id, res[0].changekey
+            self.account.root.add_folder(self)  # Add this folder to the cache
             return self
         else:
             if not update_fields:
@@ -478,31 +481,48 @@ class Folder(RegisterMixIn):
             assert self.folder_id == folder_id
             assert self.changekey != changekey
             self.changekey = changekey
+            self.account.root.update_folder(self)  # Update the folder in the cache
 
     def delete(self):
         res = list(DeleteFolder(account=self.account).call(folders=[self]))
         assert len(res) == 1, res
         if isinstance(res[0], Exception):
             raise res[0]
+        self.account.root.remove_folder(self)  # Remove the updated folder from the cache
         self.folder_id, self.changekey = None, None
 
+    def empty(self, delete_type=HARD_DELETE, delete_sub_folders=False):
+        assert delete_type in DELETE_TYPE_CHOICES
+        res = list(EmptyFolder(account=self.account).call(folders=[self], delete_type=delete_type,
+                                                          delete_sub_folders=delete_sub_folders))
+        assert len(res) == 1, res
+        if isinstance(res[0], Exception):
+            raise res[0]
+        if delete_sub_folders:
+            # We don't know exactly what was deleted, so invalidate the entire folder cache to be safe
+            self.account.root.clear_cache()
+
     def wipe(self):
-        # Recursively deletes all items in this folder and all subfolders. Use with caution!
-        for f in self.children:
-            # TODO: Also delete non-distinguished folders here when we support folder deletion
+        # Recursively deletes all items in this folder, and all subfolders and their content. Use with caution!
+        try:
+            self.empty(delete_sub_folders=True)
+        except (ErrorAccessDenied, ErrorCannotEmptyFolder):
             try:
-                f.wipe()
-            except ErrorAccessDenied:
-                log.warning('Not allowed to wipe %s', f)
-        if isinstance(self, Root):
-            log.debug('Skipping root - wiping is not supported')
-            return
-        log.debug('Wiping folder %s', self)
-        for i in self.all().delete():
-            if isinstance(i, ErrorCannotDeleteObject):
-                log.warning('Not allowed to delete item (%s)', i)
-            elif isinstance(i, Exception):
-                raise i
+                self.empty()
+            except (ErrorAccessDenied, ErrorCannotEmptyFolder):
+                log.warning('Not allowed to empty %s', self)
+            for f in self.children:
+                try:
+                    f.delete()
+                except (ErrorAccessDenied, ErrorDeleteDistinguishedFolder):
+                    log.warning('Not allowed to delete %s', f)
+                    try:
+                        f.empty(delete_sub_folders=True)
+                    except (ErrorAccessDenied, ErrorCannotEmptyFolder):
+                        try:
+                            self.empty()
+                        except (ErrorAccessDenied, ErrorCannotEmptyFolder):
+                            log.warning('Not allowed to empty %s', self)
 
     def test_access(self):
         """
@@ -663,6 +683,24 @@ class Root(Folder):
 
     def get_folder(self, folder_id):
         return self._folders_map.get(folder_id, None)
+
+    def add_folder(self, folder):
+        assert folder.folder_id
+        self._folders_map[folder.folder_id] = folder
+
+    def update_folder(self, folder):
+        assert folder.folder_id
+        self._folders_map[folder.folder_id] = folder
+
+    def remove_folder(self, folder):
+        assert folder.folder_id
+        try:
+            del self._folders_map[folder.folder_id]
+        except KeyError:
+            pass
+
+    def clear_cache(self):
+        self._subfolders = None
 
     def get_children(self, folder):
         for f in self._folders_map.values():

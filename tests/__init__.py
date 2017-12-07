@@ -2589,7 +2589,7 @@ class FolderTest(EWSTest):
         finally:
             Folder.deregister('size')
 
-    def test_create_update_delete(self):
+    def test_create_update_empty_delete(self):
         f = Folder(parent=self.account.inbox, name=get_random_string(16))
         f.save()
         self.assertIsNotNone(f.folder_id)
@@ -2604,6 +2604,14 @@ class FolderTest(EWSTest):
         with self.assertRaises(ValueError):
             # FolderClass may not be deleted
             f.save(update_fields=['folder_class'])
+
+        # Create a subfolder
+        Folder(parent=f, name=get_random_string(16)).save()
+        f.empty()
+        self.assertEqual(len(list(f.children)), 1)
+
+        f.empty(delete_sub_folders=True)
+        self.assertEqual(len(list(f.children)), 0)
 
         f.delete()
         with self.assertRaises(ValueError):
