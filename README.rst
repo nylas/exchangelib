@@ -157,6 +157,16 @@ Folders
     account.root.refresh()
 
 
+    # Folders can be created, updated and deleted:
+    f = Folder(parent=self.account.inbox, name='My New Folder')
+    f.save()
+
+    f.name = 'My New Subfolder'
+    f.save()
+
+    f.delete()
+
+
 Dates, datetimes and timezones
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

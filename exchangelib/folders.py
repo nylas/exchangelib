@@ -16,8 +16,8 @@ from .items import Item, CalendarItem, Contact, Message, Task, MeetingRequest, M
 from .properties import ItemId, Mailbox, EWSElement, ParentFolderId
 from .queryset import QuerySet
 from .restriction import Restriction
-from .services import FindFolder, GetFolder, FindItem
-from .transport import MNS
+from .services import FindFolder, GetFolder, FindItem, CreateFolder, UpdateFolder, DeleteFolder
+from .transport import TNS, MNS
 
 string_type = string_types[0]
 log = logging.getLogger(__name__)
@@ -75,6 +75,8 @@ class Folder(RegisterMixIn):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa581334(v=exchg.150).aspx
     """
+    ELEMENT_NAME = 'Folder'
+    NAMESPACE = TNS
     DISTINGUISHED_FOLDER_ID = None  # See https://msdn.microsoft.com/en-us/library/office/aa580808(v=exchg.150).aspx
     # Default item type for this folder. See http://msdn.microsoft.com/en-us/library/hh354773(v=exchg.80).aspx
     CONTAINER_CLASS = None
@@ -84,8 +86,9 @@ class Folder(RegisterMixIn):
     FIELDS = [
         IdField('folder_id', field_uri=FolderId.ID_ATTR),
         IdField('changekey', field_uri=FolderId.CHANGEKEY_ATTR),
-        EWSElementField('parent_folder_id', field_uri='folder:ParentFolderId', value_cls=ParentFolderId),
-        TextField('folder_class', field_uri='folder:FolderClass'),
+        EWSElementField('parent_folder_id', field_uri='folder:ParentFolderId', value_cls=ParentFolderId,
+                        is_read_only=True),
+        TextField('folder_class', field_uri='folder:FolderClass', is_required_after_save=True),
         TextField('name', field_uri='folder:DisplayName'),
         IntegerField('total_count', field_uri='folder:TotalCount', is_read_only=True),
         IntegerField('child_folder_count', field_uri='folder:ChildFolderCount', is_read_only=True),
@@ -98,6 +101,15 @@ class Folder(RegisterMixIn):
 
     def __init__(self, **kwargs):
         self.account = kwargs.pop('account', None)
+        parent = kwargs.pop('parent', None)
+        if parent:
+            if self.account:
+                assert parent.account == self.account
+            else:
+                self.account = parent.account
+            if 'parent_folder_id' in kwargs:
+                assert parent.id == kwargs['parent_folder_id']
+            kwargs['parent_folder_id'] = ParentFolderId(id=parent.folder_id, changekey=parent.changekey)
         super(Folder, self).__init__(**kwargs)
 
     def clean(self, version=None):
@@ -105,17 +117,24 @@ class Folder(RegisterMixIn):
         if self.account is not None:
             from .account import Account
             assert isinstance(self.account, Account)
-        if not self.is_distinguished:
-            assert self.folder_id
-        if self.folder_id:
-            assert self.changekey
 
     @property
     def parent(self):
+        if not self.parent_folder_id:
+            return None
         if self.parent_folder_id.id == self.folder_id:
-            # Some folders have a parent that references itself. Avoid circulare references here
+            # Some folders have a parent that references itself. Avoid circular references here
             return None
         return self.account.root.get_folder(self.parent_folder_id.id)
+
+    @parent.setter
+    def parent(self, value):
+        if value is None:
+            self.parent_folder_id = None
+        else:
+            assert isinstance(value, Folder)
+            self.parent_folder_id = ParentFolderId(id=value.folder_id, changekey=value.changekey)
+            self.account = value.account
 
     @property
     def children(self):
@@ -428,6 +447,45 @@ class Folder(RegisterMixIn):
     def fetch(self, *args, **kwargs):
         return self.account.fetch(folder=self, *args, **kwargs)
 
+    def save(self, update_fields=None):
+        if self.folder_id is None:
+            if update_fields:
+                raise ValueError("'update_fields' is only valid for updates")
+            res = list(CreateFolder(account=self.account).call(parent_folder=self.parent, folders=[self]))
+            assert len(res) == 1, res
+            if isinstance(res[0], Exception):
+                raise res[0]
+            self.folder_id, self.changekey = res[0].folder_id, res[0].changekey
+            return self
+        else:
+            if not update_fields:
+                # The fields to update was not specified explicitly. Update all fields where update is possible
+                update_fields = []
+                for f in self.supported_fields(version=self.account.version):
+                    if f.is_read_only:
+                        # These cannot be changed
+                        continue
+                    if f.is_required or f.is_required_after_save:
+                        if getattr(self, f.name) is None or (f.is_list and not getattr(self, f.name)):
+                            # These are required and cannot be deleted
+                            continue
+                    update_fields.append(f.name)
+            res = list(UpdateFolder(account=self.account).call(folders=[(self, update_fields)]))
+            assert len(res) == 1, res
+            if isinstance(res[0], Exception):
+                raise res[0]
+            folder_id, changekey = res[0].folder_id, res[0].changekey
+            assert self.folder_id == folder_id
+            assert self.changekey != changekey
+            self.changekey = changekey
+
+    def delete(self):
+        res = list(DeleteFolder(account=self.account).call(folders=[self]))
+        assert len(res) == 1, res
+        if isinstance(res[0], Exception):
+            raise res[0]
+        self.folder_id, self.changekey = None, None
+
     def wipe(self):
         # Recursively deletes all items in this folder and all subfolders. Use with caution!
         for f in self.children:
@@ -469,7 +527,6 @@ class Folder(RegisterMixIn):
         return cls(account=account, folder_id=fld_id, changekey=changekey, **kwargs)
 
     def to_xml(self, version):
-        self.clean(version=version)
         if self.is_distinguished:
             # Don't add the changekey here. When modifying folder content, we usually don't care if others have changed
             # the folder content since we fetched the changekey.
@@ -477,7 +534,9 @@ class Folder(RegisterMixIn):
                 id=self.DISTINGUISHED_FOLDER_ID,
                 mailbox=Mailbox(email_address=self.account.primary_smtp_address)
             ).to_xml(version=version)
-        return FolderId(id=self.folder_id, changekey=self.changekey).to_xml(version=version)
+        if self.folder_id:
+            return FolderId(id=self.folder_id, changekey=self.changekey).to_xml(version=version)
+        return super(Folder, self).to_xml(version=version)
 
     @classmethod
     def supported_fields(cls, version=None):

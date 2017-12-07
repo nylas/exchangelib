@@ -480,7 +480,7 @@ class GetItem(EWSAccountService, EWSPooledMixIn):
         ))
 
     def get_payload(self, items, additional_fields, shape):
-        from .folders import ItemId
+        from .properties import ItemId
         getitem = create_element('m:%s' % self.SERVICE_NAME)
         itemshape = create_element('m:ItemShape')
         add_xml_child(itemshape, 't:BaseShape', shape)
@@ -663,7 +663,7 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
         # Takes a list of (Item, fieldnames) tuples where 'Item' is a instance of a subclass of Item and 'fieldnames'
         # are the attribute names that were updated. Returns the XML for an UpdateItem call.
         # an UpdateItem request.
-        from .folders import ItemId
+        from .properties import ItemId
         if self.account.version.build >= EXCHANGE_2013:
             updateitem = create_element(
                 'm:%s' % self.SERVICE_NAME,
@@ -722,7 +722,7 @@ class DeleteItem(EWSAccountService, EWSPooledMixIn):
     def get_payload(self, items, delete_type, send_meeting_cancellations, affected_task_occurrences,
                     suppress_read_receipts):
         # Takes a list of (item_id, changekey) tuples or Item objects and returns the XML for a DeleteItem request.
-        from .folders import ItemId
+        from .properties import ItemId
         if self.account.version.build >= EXCHANGE_2013:
             deleteitem = create_element(
                 'm:%s' % self.SERVICE_NAME,
@@ -912,6 +912,142 @@ class GetFolder(EWSAccountService):
         return getfolder
 
 
+class CreateFolder(EWSAccountService):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa563574(v=exchg.150).aspx
+    """
+    SERVICE_NAME = 'CreateFolder'
+    element_container_name = '{%s}Folders' % MNS
+
+    def call(self, parent_folder, folders):
+        from .folders import Folder
+        elements = self._get_elements(payload=self.get_payload(parent_folder=parent_folder, folders=folders))
+        for elem in elements:
+            if isinstance(elem, Exception):
+                yield elem
+            else:
+                yield Folder.from_xml(elem=elem, account=self.account)
+
+    def get_payload(self, parent_folder, folders):
+        from .folders import Folder
+        assert isinstance(parent_folder, Folder)
+        create_folder = create_element('m:%s' % self.SERVICE_NAME)
+        parentfolderid = create_element('m:ParentFolderId')
+        set_xml_value(parentfolderid, parent_folder, version=self.account.version)
+        set_xml_value(create_folder, parentfolderid, version=self.account.version)
+        folders_elem = create_element('m:Folders')
+        is_empty = True
+        for folder in folders:
+            is_empty = False
+            set_xml_value(folders_elem, folder, self.account.version)
+        assert not is_empty, '"folders" must not be empty'
+        create_folder.append(folders_elem)
+        return create_folder
+
+
+class UpdateFolder(EWSAccountService):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa580257(v=exchg.150).aspx
+    """
+    SERVICE_NAME = 'UpdateFolder'
+    element_container_name = '{%s}Folders' % MNS
+
+    def call(self, folders):
+        from .folders import Folder
+        elements = self._get_elements(payload=self.get_payload(folders=folders))
+        for elem in elements:
+            if isinstance(elem, Exception):
+                yield elem
+            else:
+                yield Folder.from_xml(elem=elem, account=self.account)
+
+    @staticmethod
+    def _sort_fieldnames(folder_model, fieldnames):
+        # Take a list of fieldnames and return the fields in the order they are mentioned in folder_model.FIELDS.
+        for f in folder_model.FIELDS:
+            if f.name in fieldnames:
+                yield f.name
+
+    def _set_folder_elem(self, folder_model, field_path, value):
+        setfolderfield = create_element('t:SetFolderField')
+        set_xml_value(setfolderfield, field_path, self.account.version)
+        folder = create_element(folder_model.request_tag())
+        field_elem = field_path.field.to_xml(value, self.account.version)
+        set_xml_value(folder, field_elem, self.account.version)
+        setfolderfield.append(folder)
+        return setfolderfield
+
+    def _delete_folder_elem(self, field_path):
+        deletefolderfield = create_element('t:DeleteFolderField')
+        return set_xml_value(deletefolderfield, field_path, self.account.version)
+
+    def _get_folder_update_elems(self, folder, fieldnames):
+        from .fields import FieldPath
+        folder_model = folder.__class__
+        fieldnames_set = set(fieldnames)
+
+        for fieldname in self._sort_fieldnames(folder_model=folder_model, fieldnames=fieldnames_set):
+            field = folder_model.get_field_by_fieldname(fieldname)
+            if field.is_read_only:
+                raise ValueError('%s is a read-only field' % field.name)
+            value = field.clean(getattr(folder, field.name), version=self.account.version)  # Make sure the value is OK
+
+            if value is None or (field.is_list and not value):
+                # A value of None or [] means we want to remove this field from the item
+                if field.is_required or field.is_required_after_save:
+                    raise ValueError('%s is a required field and may not be deleted' % field.name)
+                for field_path in FieldPath(field=field).expand(version=self.account.version):
+                    yield self._delete_folder_elem(field_path=field_path)
+                continue
+
+            yield self._set_folder_elem(folder_model=folder_model, field_path=FieldPath(field=field), value=value)
+
+    def get_payload(self, folders):
+        updatefolder = create_element('m:%s' % self.SERVICE_NAME)
+        folderchanges = create_element('m:FolderChanges')
+        is_empty = True
+        for folder, fieldnames in folders:
+            is_empty = False
+            folderchange = create_element('t:FolderChange')
+            set_xml_value(folderchange, folder, version=self.account.version)
+            updates = create_element('t:Updates')
+            for elem in self._get_folder_update_elems(folder=folder, fieldnames=fieldnames):
+                updates.append(elem)
+            folderchange.append(updates)
+            folderchanges.append(folderchange)
+        assert not is_empty, '"folders" must not be empty'
+        updatefolder.append(folderchanges)
+        return updatefolder
+
+
+class DeleteFolder(EWSAccountService):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa564767(v=exchg.150).aspx
+    """
+    SERVICE_NAME = 'DeleteFolder'
+    element_container_name = None  # DeleteFolder doesn't return a response object, just status in XML attrs
+
+    def call(self, folders):
+        return self._get_elements(payload=self.get_payload(folders=folders))
+
+    def get_payload(self, folders):
+        from .folders import FolderId
+        deletefolder = create_element('m:%s' % self.SERVICE_NAME)
+        folder_ids = create_element('m:FolderIds')
+        is_empty = True
+        for folder in folders:
+            is_empty = False
+            log.debug('Getting folder %s', folder)
+            if isinstance(folder, tuple):
+                set_xml_value(folder_ids, FolderId(*folder) if isinstance(folder, tuple) else folder,
+                              version=self.account.version)
+                continue
+            set_xml_value(folder_ids, folder, version=self.account.version)
+        assert not is_empty, '"folders" must not be empty'
+        deletefolder.append(folder_ids)
+        return deletefolder
+
+
 class SendItem(EWSAccountService):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa580238(v=exchg.150).aspx
@@ -923,7 +1059,7 @@ class SendItem(EWSAccountService):
         return self._get_elements(payload=self.get_payload(items=items, saved_item_folder=saved_item_folder))
 
     def get_payload(self, items, saved_item_folder):
-        from .folders import ItemId
+        from .properties import ItemId
         senditem = create_element(
             'm:%s' % self.SERVICE_NAME,
             SaveItemToFolder='true' if saved_item_folder else 'false',
@@ -959,7 +1095,7 @@ class MoveItem(EWSAccountService):
 
     def get_payload(self, items, to_folder):
         # Takes a list of items and returns their new item IDs
-        from .folders import ItemId
+        from .properties import ItemId
         moveeitem = create_element('m:%s' % self.SERVICE_NAME)
 
         tofolderid = create_element('m:ToFolderId')
@@ -1140,7 +1276,7 @@ class ExportItems(EWSAccountService, EWSPooledMixIn):
         return self._pool_requests(payload_func=self.get_payload, **dict(items=items))
 
     def get_payload(self, items):
-        from .folders import ItemId
+        from .properties import ItemId
         exportitems = create_element('m:%s' % self.SERVICE_NAME)
         itemids = create_element('m:ItemIds')
         exportitems.append(itemids)

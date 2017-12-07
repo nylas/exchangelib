@@ -36,7 +36,7 @@ from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalid
     ErrorInvalidChangeKey, ErrorInvalidIdMalformed, ErrorContainsFilterWrongType, ErrorAccessDenied, \
     ErrorFolderNotFound, ErrorInvalidRequest, SOAPError, ErrorInvalidServerVersion, NaiveDateTimeNotAllowed, \
     AmbiguousTimeError, NonExistentTimeError, ErrorUnsupportedPathForQuery, ErrorInvalidPropertyForOperation, \
-    ErrorInvalidValueForProperty, ErrorPropertyUpdate
+    ErrorInvalidValueForProperty, ErrorPropertyUpdate, ErrorDeleteDistinguishedFolder
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.extended_properties import ExtendedProperty, ExternId
 from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextField, EmailField, URIField, ChoiceField, \
@@ -2588,6 +2588,34 @@ class FolderTest(EWSTest):
             self.assertGreater(self.account.inbox.size, 0)
         finally:
             Folder.deregister('size')
+
+    def test_create_update_delete(self):
+        f = Folder(parent=self.account.inbox, name=get_random_string(16))
+        f.save()
+        self.assertIsNotNone(f.folder_id)
+        self.assertIsNotNone(f.changekey)
+
+        new_name = get_random_string(16)
+        f.name = new_name
+        f.save()
+        f.refresh()
+        self.assertEqual(f.name, new_name)
+
+        with self.assertRaises(ValueError):
+            # FolderClass may not be deleted
+            f.save(update_fields=['folder_class'])
+
+        f.delete()
+        with self.assertRaises(ValueError):
+            # No longer has an ID
+            f.refresh()
+
+        # Delete all subfolders of inbox
+        for c in self.account.inbox.children:
+            c.delete()
+
+        with self.assertRaises(ErrorDeleteDistinguishedFolder):
+            self.account.inbox.delete()
 
 
 class BaseItemTest(EWSTest):
