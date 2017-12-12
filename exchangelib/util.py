@@ -484,7 +484,7 @@ Response data: %(xml_response)s
         raise
     except Exception as e:
         # Let higher layers handle this. Add full context for better debugging.
-        log.error('%s: %s\n%s', e.__class__.__name__, text_type(e), log_msg % log_vals)
+        log.error(str('%s: %s\n%s'), e.__class__.__name__, str(e), log_msg % log_vals)
         protocol.retire_session(session)
         raise
     if r.status_code == 500 and r.text and is_xml(r.text):
@@ -552,4 +552,4 @@ def _raise_response_errors(r, protocol, log_msg, log_vals):
     if 'TimeoutException' in r.headers:
         raise r.headers['TimeoutException']
     # This could be anything. Let higher layers handle this. Add full context for better debugging.
-    raise TransportError('Unknown failure\n' + log_msg % log_vals)
+    raise TransportError(str('Unknown failure\n') + log_msg % log_vals)
