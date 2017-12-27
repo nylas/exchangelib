@@ -1,7 +1,12 @@
 #!/usr/bin/env python
 """
-To upload to PyPI:
-   python setup.py sdist bdist_wheel upload
+Release notes:
+* Bumpt version in setup.py
+* Bump version and date in README.rst
+* Bump version in CHANGELOG.rst
+* Commit changes
+* Tag version
+* Push to PyPI: python setup.py sdist bdist_wheel upload
 """
 import io
 import os
@@ -15,7 +20,7 @@ def read(fname):
 
 setup(
     name='exchangelib',
-    version='1.10.6',
+    version='1.10.7',
     author='Erik Cederstrand',
     author_email='erik@cederstrand.dk',
     description='Client for Microsoft Exchange Web Services (EWS)',

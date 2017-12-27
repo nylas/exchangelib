@@ -4,6 +4,10 @@ Change Log
 
 HEAD
 ----
+
+
+1.10.7
+------
 * Added support for registering extended properties on folders.
 * Added support for creating, updating, deleting and emptying folders.
 

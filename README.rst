@@ -1,7 +1,7 @@
 Exchange Web Services client library
 ====================================
-:release:       1.10.6
-:date:          2017-11-29
+:release:       1.10.7
+:date:          2017-12-27
 :home:          https://github.com/ecederstrand/exchangelib/
 :pypi-repo:     https://pypi.python.org/pypi/exchangelib/
 
@@ -29,7 +29,7 @@ task, contact and distribution list items.
 
 Usage
 -----
-Here are some examples of how `exchangelib` works:
+Here are some examples of how ``exchangelib`` works:
 
 
 Setup and connecting
