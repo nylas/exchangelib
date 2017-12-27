@@ -1717,7 +1717,7 @@ class CommonTest(EWSTest):
             # Test distinguished folder shortcuts. Some may raise ErrorAccessDenied
             try:
                 item = getattr(self.account, attr)
-            except (ErrorAccessDenied, ErrorFolderNotFound, ErrorInvalidOperation):
+            except (ErrorAccessDenied, ErrorFolderNotFound, ErrorItemNotFound, ErrorInvalidOperation):
                 continue
             else:
                 repr(item)
@@ -2427,7 +2427,7 @@ class FolderTest(EWSTest):
 
     def test_find_folders(self):
         folders = list(self.account.root.find_folders())
-        self.assertGreater(len(folders), 60, sorted(f.name for f in folders))
+        self.assertGreater(len(folders), 50, sorted(f.name for f in folders))
 
     def test_folder_grouping(self):
         # If you get errors here, you probably need to fill out [folder class].LOCALIZED_NAMES for your locale.
