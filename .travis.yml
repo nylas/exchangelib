@@ -24,8 +24,14 @@ install:
 - pip install coveralls
 
 script:
-# Wipe contents of the test account before each run, to avoid account going over quota
-# - python tests/__init__.py -q EWSTest.wipe_test_account
 - coverage run --source=exchangelib setup.py test
 
 after_success: coveralls
+
+jobs:
+  include:
+    - stage: wipe_test_account
+      # Wipe contents of the test account after a complete build, to avoid account going over quota
+      script: python tests/__init__.py -q EWSTest.wipe_test_account
+      python: 3.6
+      os: linux
