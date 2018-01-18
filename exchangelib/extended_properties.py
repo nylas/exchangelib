@@ -82,6 +82,15 @@ class ExtendedProperty(EWSElement):
     @classmethod
     def validate_cls(cls):
         # Validate values of class attributes and their inter-dependencies
+        cls._validate_distinguished_property_set_id()
+        cls._validate_property_set_id()
+        cls._validate_property_tag()
+        cls._validate_property_name()
+        cls._validate_property_id()
+        cls._validate_property_type()
+
+    @classmethod
+    def _validate_distinguished_property_set_id(cls):
         if cls.distinguished_property_set_id:
             if any([cls.property_set_id, cls.property_tag]):
                 raise ValueError(
@@ -96,6 +105,9 @@ class ExtendedProperty(EWSElement):
                     "'distinguished_property_set_id' value '%s' must be one of %s"
                     % (cls.distinguished_property_set_id, sorted(cls.DISTINGUISHED_SETS))
                 )
+
+    @classmethod
+    def _validate_property_set_id(cls):
         if cls.property_set_id:
             if any([cls.distinguished_property_set_id, cls.property_tag]):
                 raise ValueError(
@@ -105,6 +117,9 @@ class ExtendedProperty(EWSElement):
                 raise ValueError(
                     "When 'property_set_id' is set, 'property_id' or 'property_name' must also be set"
                 )
+
+    @classmethod
+    def _validate_property_tag(cls):
         if cls.property_tag:
             if any([
                 cls.distinguished_property_set_id, cls.property_set_id, cls.property_name, cls.property_id
@@ -114,6 +129,9 @@ class ExtendedProperty(EWSElement):
                 raise ValueError(
                     "'property_tag' value '%s' is reserved for custom properties" % cls.property_tag_as_hex()
                 )
+
+    @classmethod
+    def _validate_property_name(cls):
         if cls.property_name:
             if any([cls.property_id, cls.property_tag]):
                 raise ValueError("When 'property_name' is set, 'property_id' and 'property_tag' must be None")
@@ -121,6 +139,9 @@ class ExtendedProperty(EWSElement):
                 raise ValueError(
                     "When 'property_name' is set, 'distinguished_property_set_id' or 'property_set_id' must also be set"
                 )
+
+    @classmethod
+    def _validate_property_id(cls):
         if cls.property_id:
             if any([cls.property_name, cls.property_tag]):
                 raise ValueError("When 'property_id' is set, 'property_name' and 'property_tag' must be None")
@@ -128,6 +149,9 @@ class ExtendedProperty(EWSElement):
                 raise ValueError(
                     "When 'property_id' is set, 'distinguished_property_set_id' or 'property_set_id' must also be set"
                 )
+
+    @classmethod
+    def _validate_property_type(cls):
         if cls.property_type not in cls.PROPERTY_TYPES:
             raise ValueError(
                 "'property_type' value '%s' must be one of %s" % (cls.property_type, sorted(cls.PROPERTY_TYPES))
