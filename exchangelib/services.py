@@ -1427,10 +1427,9 @@ class GetUserOofSettings(BaseUserOofSettings):
         response = response[0]
         assert isinstance(response, ElementType), response
         container_or_exc = self._get_element_container(message=response, name=self.element_container_name)
-        if isinstance(container_or_exc, ElementType):
-            return OofSettings.from_xml(container_or_exc, account=self.account)
-        else:
+        if isinstance(container_or_exc, Exception):
             raise container_or_exc
+        return OofSettings.from_xml(container_or_exc, account=self.account)
 
 
 class SetUserOofSettings(BaseUserOofSettings):
