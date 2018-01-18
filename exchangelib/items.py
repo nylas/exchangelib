@@ -225,7 +225,7 @@ class Item(RegisterMixIn):
                 send_meeting_invitations=send_meeting_invitations
             )
             assert self.item_id == item_id
-            assert self.changekey != changekey
+            # Don't assert that changekeys are different. No-op saves will sometimes leave the changekey intact
             self.changekey = changekey
         else:
             if update_fields:
@@ -502,7 +502,7 @@ class CalendarItem(Item):
         BooleanField('allow_new_time_proposal', field_uri='calendar:AllowNewTimeProposal', default=None,
                      is_required_after_save=True, is_searchable=False),
         BooleanField('is_online_meeting', field_uri='calendar:IsOnlineMeeting', default=None,
-                     is_required_after_save=True),
+                     is_read_only=True),
         URIField('meeting_workspace_url', field_uri='calendar:MeetingWorkspaceUrl'),
         URIField('net_show_url', field_uri='calendar:NetShowUrl'),
     ]
