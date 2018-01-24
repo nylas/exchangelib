@@ -99,7 +99,7 @@ class Build(object):
         return cls(**kwargs)
 
     def api_version(self):
-        if self.major_version == 15 and self.minor_version == 0 and self.major_build >= 847:
+        if EXCHANGE_2013_SP1 <= self < EXCHANGE_2016:
             return 'Exchange2013_SP1'
         try:
             return self.API_VERSION_MAP[self.major_version][self.minor_version]
@@ -153,6 +153,7 @@ EXCHANGE_2007 = Build(8, 0)
 EXCHANGE_2010 = Build(14, 0)
 EXCHANGE_2010_SP2 = Build(14, 2)
 EXCHANGE_2013 = Build(15, 0)
+EXCHANGE_2013_SP1 = Build(15, 0, 847)
 EXCHANGE_2016 = Build(15, 1)
 
 
