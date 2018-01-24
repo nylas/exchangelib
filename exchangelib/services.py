@@ -34,7 +34,7 @@ from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, 
 from .transport import wrap, SOAPNS, TNS, MNS, ENS
 from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, ElementType, \
     xml_to_str, set_xml_value
-from .version import EXCHANGE_2010, EXCHANGE_2010_SP2, EXCHANGE_2013
+from .version import EXCHANGE_2010, EXCHANGE_2010_SP2, EXCHANGE_2013_SP1
 
 log = logging.getLogger(__name__)
 
@@ -664,7 +664,7 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
         # are the attribute names that were updated. Returns the XML for an UpdateItem call.
         # an UpdateItem request.
         from .properties import ItemId
-        if self.account.version.build >= EXCHANGE_2013:
+        if self.account.version.build >= EXCHANGE_2013_SP1:
             updateitem = create_element(
                 'm:%s' % self.SERVICE_NAME,
                 ConflictResolution=conflict_resolution,
@@ -723,7 +723,7 @@ class DeleteItem(EWSAccountService, EWSPooledMixIn):
                     suppress_read_receipts):
         # Takes a list of (item_id, changekey) tuples or Item objects and returns the XML for a DeleteItem request.
         from .properties import ItemId
-        if self.account.version.build >= EXCHANGE_2013:
+        if self.account.version.build >= EXCHANGE_2013_SP1:
             deleteitem = create_element(
                 'm:%s' % self.SERVICE_NAME,
                 DeleteType=delete_type,
