@@ -476,6 +476,27 @@ description of the possibilities, but we do intend to support all the possibilit
 
     Folder.register('size', FolderSize)
     print(my_folder.size)
+    
+    # In general, here's how to work with any MAPI property as listed in e.g. 
+    # https://msdn.microsoft.com/EN-US/library/office/cc815517.aspx. Let's take `PidLidTaskDueDate` as an 
+    # example. This is the due date for a message maked with the follow-up flag in Microsoft Outlook.
+    #
+    # The PidLidTaskDueDate is documented here: https://msdn.microsoft.com/en-us/library/office/cc839641.aspx. 
+    # The property ID is `0x00008105` and the property set is `PSETID_Task`. But EWS wants the UUID for 
+    # `PSETID_Task`, so we look that up in the MS-OXPROPS pdf: 
+    # https://msdn.microsoft.com/en-us/library/cc433490(v=exchg.80).aspx. The UUID is 
+    # `00062003-0000-0000-C000-000000000046`. The property type is `PT_SYSTIME` which is also called 
+    # `SystemTime` (see 
+    # https://msdn.microsoft.com/en-us/library/microsoft.exchange.webservices.data.mapipropertytype(v=exchg.80).aspx).
+    #
+    # In conclusion, the definition for the due date becomes:
+
+    class FlagDue(ExtendedProperty):
+        property_set_id = '00062003-0000-0000-C000-000000000046'
+        property_id = 0x8105
+        property_type = 'SystemTime'
+
+    Message.register('flag_due', FlagDue)
 
 
 Attachments
