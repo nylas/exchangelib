@@ -9,6 +9,7 @@ from .fields import SubField, TextField, EmailField, ChoiceField, DateTimeField,
     Choice, BooleanField, IdField, ExtendedPropertyField
 from .services import MNS, TNS
 from .util import get_xml_attr, create_element, set_xml_value, value_to_xml_text
+from .version import EXCHANGE_2013
 
 string_type = string_types[0]
 log = logging.getLogger(__name__)
@@ -243,7 +244,7 @@ class Mailbox(EWSElement):
         ChoiceField('routing_type', field_uri='RoutingType', choices={Choice('SMTP')}, default='SMTP'),
         ChoiceField('mailbox_type', field_uri='MailboxType', choices={
             Choice('Mailbox'), Choice('PublicDL'), Choice('PrivateDL'), Choice('Contact'), Choice('PublicFolder'),
-            Choice('Unknown'), Choice('OneOff')
+            Choice('Unknown'), Choice('OneOff'), Choice('GroupMailbox', supported_from=EXCHANGE_2013)
         }, default='Mailbox'),
         EWSElementField('item_id', value_cls=ItemId, is_read_only=True),
     ]
