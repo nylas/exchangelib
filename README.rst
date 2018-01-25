@@ -27,9 +27,17 @@ task, contact and distribution list items.
     :target: https://coveralls.io/github/ecederstrand/exchangelib?branch=master
 
 
-Usage
------
-Here are some examples of how ``exchangelib`` works:
+Teaser
+------
+Here's a short example of how ``exchangelib`` works. Let's print the first 100 inbox messages in reverse order:
+
+.. code-block:: python
+
+    credentials = Credentials('john@example.com', 'topsecret')
+    account = Account('john@example.com', credentials=credentials, autodiscover=True)
+
+    for item in account.inbox.all().order_by('-datetime_received')[:100]:
+        print(item.subject, item.sender, item.datetime_received)
 
 
 Setup and connecting
