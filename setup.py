@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 """
 Release notes:
-* Bumpt version in setup.py
+* Bump version in setup.py
 * Bump version and date in README.rst
 * Bump version in CHANGELOG.rst
-* Commit changes
-* Tag version
+* Commit and push changes
 * Push to PyPI: python setup.py sdist bdist_wheel upload
+* Create release on GitHub
 """
 import io
 import os
