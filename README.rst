@@ -45,7 +45,8 @@ Setup and connecting
 
 .. code-block:: python
 
-    from datetime import timedelta
+    from datetime import datetime, timedelta
+    import pytz
     from exchangelib import DELEGATE, IMPERSONATION, Account, Credentials, ServiceAccount, \
         EWSDateTime, EWSTimeZone, Configuration, NTLM, CalendarItem, Message, \
         Mailbox, Attendee, Q, ExtendedProperty, FileAttachment, ItemAttachment, \
@@ -208,6 +209,11 @@ EWS has some special requirements on datetimes and timezones. You need to use th
 
     right_now_in_utc = UTC.localize(EWSDateTime.now())
     right_now_in_utc = UTC_NOW()
+    
+    # Already have a Python datetime object you want to use? Make sure it's localized. Then pass it to from_datetime()
+    pytz_tz = pytz.timezone('Europe/Copenhagen')
+    py_dt = pytz_tz.localize(datetime(2017, 12, 11, 10, 9, 8))
+    ews_now = EWSDateTime.from_datetime(py_dt)
 
 
 Creating, updating, deleting, sending and moving
