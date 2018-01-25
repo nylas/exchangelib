@@ -128,7 +128,7 @@ class Item(RegisterMixIn):
 
     # FIELDS is an ordered list of attributes supported by this item class
     FIELDS = [
-        Base64Field('mime_content', field_uri='item:MimeContent'),
+        Base64Field('mime_content', field_uri='item:MimeContent', is_read_only_after_send=True),
         IdField('item_id', field_uri=ItemId.ID_ATTR, is_read_only=True),
         IdField('changekey', field_uri=ItemId.CHANGEKEY_ATTR, is_read_only=True),
         EWSElementField('parent_folder_id', field_uri='item:ParentFolderId', value_cls=ParentFolderId,

@@ -2742,9 +2742,6 @@ class BaseItemTest(EWSTest):
             if not item.is_draft and f.is_read_only_after_send:
                 # These cannot be changed when the item is no longer a draft
                 continue
-            if f.name == 'mime_content':
-                # This needs special formatting. See separate test_mime_content() test
-                continue
             if f.name == 'attachments':
                 # Testing attachments is heavy. Leave this to specific tests
                 update_kwargs[f.name] = []
