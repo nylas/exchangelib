@@ -61,7 +61,7 @@ from exchangelib.settings import OofSettings
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, GetAttachment, ResolveNames, TNS
 from exchangelib.transport import NOAUTH, BASIC, DIGEST, NTLM, wrap, _get_auth_method_from_response
 from exchangelib.util import chunkify, peek, get_redirect_url, to_xml, BOM, get_domain, value_to_xml_text, \
-    post_ratelimited, create_element, CONNECTION_ERRORS, PrettyXmlHandler
+    post_ratelimited, create_element, CONNECTION_ERRORS, PrettyXmlHandler, xml_to_str
 from exchangelib.version import Build, Version, EXCHANGE_2007, EXCHANGE_2010, EXCHANGE_2013, EXCHANGE_2016
 from exchangelib.winzone import generate_map, CLDR_TO_MS_TIMEZONE_MAP
 
@@ -866,6 +866,31 @@ class RestrictionTest(unittest.TestCase):
         self.assertEqual((~Q(foo__contains=('bar', 'baz'))).conn_type, Q.NOT)
         self.assertEqual((~~Q(foo__contains=('bar', 'baz'))).conn_type, Q.AND)
         self.assertEqual(Q(foo__contains=('bar', 'baz')), ~~Q(foo__contains=('bar', 'baz')))
+        # Test generated XML of 'Not' statement when there is only one child. Skip 't:And' between 't:Not' and 't:Or'.
+        result = '''\
+<m:Restriction>
+    <t:Not>
+        <t:Or>
+            <t:IsEqualTo>
+                <t:FieldURI FieldURI="item:Subject"/>
+                <t:FieldURIOrConstant>
+                    <t:Constant Value="bar"/>
+                </t:FieldURIOrConstant>
+            </t:IsEqualTo>
+            <t:IsEqualTo>
+                <t:FieldURI FieldURI="item:Subject"/>
+                <t:FieldURIOrConstant>
+                    <t:Constant Value="baz"/>
+                </t:FieldURIOrConstant>
+            </t:IsEqualTo>
+        </t:Or>
+    </t:Not>
+</m:Restriction>'''
+        q = ~(Q(subject='bar') | Q(subject='baz'))
+        self.assertEqual(
+            xml_to_str(q.to_xml(folder=Calendar(), version=None)),
+            ''.join(l.lstrip() for l in result.split('\n'))
+        )
 
     def test_q_boolean_ops(self):
         self.assertEqual((Q(foo=5) & Q(foo=6)).conn_type, Q.AND)

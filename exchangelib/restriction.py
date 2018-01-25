@@ -367,6 +367,9 @@ class Q(object):
                     uriorconst = create_element('t:FieldURIOrConstant')
                     uriorconst.append(constant)
                     elem.append(uriorconst)
+        elif len(self.children) == 1:
+            # We have only one child
+            elem = self.children[0].xml_elem(folder=folder, version=version)
         else:
             # We have multiple children. If conn_type is NOT, then group children with AND. We'll add the NOT later
             elem = self._conn_to_xml(self.AND if self.conn_type == self.NOT else self.conn_type)
