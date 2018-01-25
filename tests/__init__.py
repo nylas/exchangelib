@@ -2,6 +2,8 @@
 from collections import namedtuple
 import datetime
 from decimal import Decimal
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 import glob
 from itertools import chain
 import io
@@ -2681,6 +2683,9 @@ class BaseItemTest(EWSTest):
             if f.is_read_only:
                 # These cannot be created
                 continue
+            if f.name == 'mime_content':
+                # This needs special formatting. See separate test_mime_content() test
+                continue
             if f.name == 'attachments':
                 # Testing attachments is heavy. Leave this to specific tests
                 insert_kwargs[f.name] = []
@@ -2736,6 +2741,9 @@ class BaseItemTest(EWSTest):
                 continue
             if not item.is_draft and f.is_read_only_after_send:
                 # These cannot be changed when the item is no longer a draft
+                continue
+            if f.name == 'mime_content':
+                # This needs special formatting. See separate test_mime_content() test
                 continue
             if f.name == 'attachments':
                 # Testing attachments is heavy. Leave this to specific tests
@@ -5163,6 +5171,24 @@ class MessagesTest(BaseItemTest):
         ids = self.account.sent.filter(categories__contains=item.categories).values_list('item_id', 'changekey')
         self.assertEqual(len(ids), 1)
         self.bulk_delete(ids)
+
+    def test_mime_content(self):
+        # Tests the 'mime_content' field
+        subject = get_random_string(16)
+        msg = MIMEMultipart()
+        msg['From'] = self.account.primary_smtp_address
+        msg['To'] = self.account.primary_smtp_address
+        msg['Subject'] = subject
+        body = 'MIME test mail'
+        msg.attach(MIMEText(body, 'plain', _charset='utf-8'))
+        mime_content = msg.as_string().encode('utf-8')
+        item = self.ITEM_CLASS(
+            folder=self.test_folder,
+            to_recipients=[self.account.primary_smtp_address],
+            mime_content=mime_content
+        ).save()
+        self.assertEqual(self.test_folder.get(subject=subject).body, body)
+        item.delete()
 
 
 class TasksTest(BaseItemTest):

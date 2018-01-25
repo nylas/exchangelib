@@ -128,8 +128,7 @@ class Item(RegisterMixIn):
 
     # FIELDS is an ordered list of attributes supported by this item class
     FIELDS = [
-        # TODO: MimeContent actually supports writing, but is still untested
-        Base64Field('mime_content', field_uri='item:MimeContent', is_read_only=True),
+        Base64Field('mime_content', field_uri='item:MimeContent'),
         IdField('item_id', field_uri=ItemId.ID_ATTR, is_read_only=True),
         IdField('changekey', field_uri=ItemId.CHANGEKEY_ATTR, is_read_only=True),
         EWSElementField('parent_folder_id', field_uri='item:ParentFolderId', value_cls=ParentFolderId,
