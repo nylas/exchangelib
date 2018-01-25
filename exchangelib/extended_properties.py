@@ -57,8 +57,8 @@ class ExtendedProperty(EWSElement):
         # 'ObjectArray',
         'Short',
         'ShortArray',
-        # 'SystemTime',  # Not implemented yet
-        # 'SystemTimeArray',  # Not implemented yet
+        'SystemTime',
+        'SystemTimeArray',
         'String',
         'StringArray',
     }  # The commented-out types cannot be used for setting or getting (see docs) and are thus not very useful here
