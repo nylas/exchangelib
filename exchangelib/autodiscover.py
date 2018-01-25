@@ -175,28 +175,29 @@ def discover(email, credentials):
     # should be safe.
     autodiscover_key = (domain, credentials)
     # Use lock to guard against multiple threads competing to cache information
-    if autodiscover_key in _autodiscover_cache:
-        # Python dict() is thread safe, so accessing _autodiscover_cache without a lock should be OK
-        protocol = _autodiscover_cache[autodiscover_key]
-        assert isinstance(protocol, AutodiscoverProtocol)
-        log.debug('Cache hit for domain %s credentials %s: %s', domain, credentials, protocol.server)
-        try:
-            # This is the main path when the cache is primed
-            primary_smtp_address, protocol = _autodiscover_quick(credentials=credentials, email=email,
-                                                                 protocol=protocol)
-            assert primary_smtp_address
-            assert isinstance(protocol, Protocol)
-            return primary_smtp_address, protocol
-        except AutoDiscoverFailed:
-            # Autodiscover no longer works with this domain. Clear cache and try again
-            del _autodiscover_cache[autodiscover_key]
-            return discover(email=email, credentials=credentials)
-        except AutoDiscoverRedirect as e:
-            log.debug('%s redirects to %s', email, e.redirect_email)
-            if email.lower() == e.redirect_email.lower():
-                raise_from(AutoDiscoverCircularRedirect('Redirect to same email address: %s' % email), None)
-            # Start over with the new email address
-            return discover(email=e.redirect_email, credentials=credentials)
+    with _autodiscover_cache_lock:
+        if autodiscover_key in _autodiscover_cache:
+            # Python dict() is thread safe, so accessing _autodiscover_cache without a lock should be OK
+            protocol = _autodiscover_cache[autodiscover_key]
+            assert isinstance(protocol, AutodiscoverProtocol)
+            log.debug('Cache hit for domain %s credentials %s: %s', domain, credentials, protocol.server)
+            try:
+                # This is the main path when the cache is primed
+                primary_smtp_address, protocol = _autodiscover_quick(credentials=credentials, email=email,
+                                                                     protocol=protocol)
+                assert primary_smtp_address
+                assert isinstance(protocol, Protocol)
+                return primary_smtp_address, protocol
+            except AutoDiscoverFailed:
+                # Autodiscover no longer works with this domain. Clear cache and try again
+                del _autodiscover_cache[autodiscover_key]
+                return discover(email=email, credentials=credentials)
+            except AutoDiscoverRedirect as e:
+                log.debug('%s redirects to %s', email, e.redirect_email)
+                if email.lower() == e.redirect_email.lower():
+                    raise_from(AutoDiscoverCircularRedirect('Redirect to same email address: %s' % email), None)
+                # Start over with the new email address
+                return discover(email=e.redirect_email, credentials=credentials)
 
     log.debug('Waiting for _autodiscover_cache_lock')
     with _autodiscover_cache_lock:
@@ -301,11 +302,13 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl):
         # These are both valid responses from an autodiscover server, showing that we have found the correct
         # server for the original domain. Fill cache before re-raising
         log.debug('Adding cache entry for %s (hostname %s)', domain, hostname)
+        # We have already acquired the cache lock at this point
         _autodiscover_cache[(domain, credentials)] = autodiscover_protocol
         raise
 
     # Cache the final hostname of the autodiscover service so we don't need to autodiscover the same domain again
     log.debug('Adding cache entry for %s (hostname %s, has_ssl %s)', domain, hostname, has_ssl)
+    # We have already acquired the cache lock at this point
     _autodiscover_cache[(domain, credentials)] = autodiscover_protocol
     # Autodiscover response contains an auth type, but we don't want to spend time here testing if it actually works.
     # Instead of forcing a possibly-wrong auth type, just let Protocol auto-detect the auth type.
