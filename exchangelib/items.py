@@ -229,12 +229,20 @@ class Item(RegisterMixIn):
         else:
             if update_fields:
                 raise ValueError("'update_fields' is only valid for updates")
+            tmp_attachments = None
+            if self.account.version.build < EXCHANGE_2010 and self.attachments:
+                # Exchange 2007 can't save attachments immediately. You need to first save, then attach. Store
+                # the attachment of this item temporarily and attach later.
+                tmp_attachments, self.attachments = self.attachments, []
             item = self._create(message_disposition=SAVE_ONLY, send_meeting_invitations=send_meeting_invitations)
             self.item_id, self.changekey = item.item_id, item.changekey
             for old_att, new_att in zip(self.attachments, item.attachments):
                 assert old_att.attachment_id is None
                 assert new_att.attachment_id is not None
                 old_att.attachment_id = new_att.attachment_id
+            if tmp_attachments:
+                # Exchange 2007 workaround. See above
+                self.attach(tmp_attachments)
         return self
 
     def _create(self, message_disposition, send_meeting_invitations):
@@ -585,8 +593,15 @@ class Message(Item):
                 return self.send_and_save(conflict_resolution=conflict_resolution,
                                           send_meeting_invitations=send_meeting_invitations)
             assert copy_to_folder is None
-            res = self._create(message_disposition=SEND_ONLY, send_meeting_invitations=send_meeting_invitations)
-            assert res is None
+            if self.account.version.build < EXCHANGE_2010 and self.attachments:
+                # Exchange 2007 can't send attachments immediately. You need to first save, then attach, then send.
+                # This is done in send_and_save(). Delete to fully emulate send-only behavior.
+                self.send_and_save(conflict_resolution=conflict_resolution,
+                                   send_meeting_invitations=send_meeting_invitations)
+                self.delete()
+            else:
+                res = self._create(message_disposition=SEND_ONLY, send_meeting_invitations=send_meeting_invitations)
+                assert res is None
 
     def send_and_save(self, update_fields=None, conflict_resolution=AUTO_RESOLVE,
                       send_meeting_invitations=SEND_TO_NONE):
@@ -599,11 +614,19 @@ class Message(Item):
                 send_meeting_invitations=send_meeting_invitations
             )
         else:
-            res = self._create(
-                message_disposition=SEND_AND_SAVE_COPY,
-                send_meeting_invitations=send_meeting_invitations
-            )
-        assert res is None
+            if self.account.version.build < EXCHANGE_2010 and self.attachments:
+                # Exchange 2007 can't send-and-save attachments immediately. You need to first save, then attach, then
+                # send. This is done in save().
+                self.save(update_fields=update_fields, conflict_resolution=conflict_resolution,
+                          send_meeting_invitations=send_meeting_invitations)
+                self.send(save_copy=False, conflict_resolution=conflict_resolution,
+                          send_meeting_invitations=send_meeting_invitations)
+            else:
+                res = self._create(
+                    message_disposition=SEND_AND_SAVE_COPY,
+                    send_meeting_invitations=send_meeting_invitations
+                )
+                assert res is None
 
 
 class Task(Item):
