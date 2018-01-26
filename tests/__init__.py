@@ -5362,3 +5362,6 @@ if __name__ == '__main__':
         logging.basicConfig(level=logging.DEBUG, handlers=[PrettyXmlHandler()])
 
     unittest.main()
+else:
+    # Don't print warnings and stack traces mixed with test progress. We'll get the debug info for test failures later.
+    logging.basicConfig(level=logging.CRITICAL)
