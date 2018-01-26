@@ -4847,6 +4847,9 @@ class BaseItemTest(EWSTest):
             if f.name == 'is_read':
                 # This is always true for item attachments?
                 continue
+            if f.name == 'mime_content':
+                # This will change depending on other contents fields
+                continue
             old_val = getattr(attached_item1, f.name)
             new_val = getattr(fresh_attachments[0].item, f.name)
             if f.is_list:
@@ -4868,6 +4871,9 @@ class BaseItemTest(EWSTest):
                 continue
             if f.name == 'is_read':
                 # This is always true for item attachments?
+                continue
+            if f.name == 'mime_content':
+                # This will change depending on other contents fields
                 continue
             old_val = getattr(attached_item2, f.name)
             new_val = getattr(fresh_attachments[1].item, f.name)
@@ -4895,6 +4901,9 @@ class BaseItemTest(EWSTest):
                 continue
             if f.name == 'is_read':
                 # This is always true for item attachments?
+                continue
+            if f.name == 'mime_content':
+                # This will change depending on other contents fields
                 continue
             old_val = getattr(attached_item1, f.name)
             new_val = getattr(fresh_attachments[0].item, f.name)
