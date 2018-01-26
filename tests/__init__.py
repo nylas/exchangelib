@@ -874,15 +874,15 @@ class RestrictionTest(unittest.TestCase):
     <t:Not>
         <t:Or>
             <t:IsEqualTo>
-                <t:FieldURI FieldURI="item:Subject"/>
+                <t:FieldURI FieldURI="item:Subject" />
                 <t:FieldURIOrConstant>
-                    <t:Constant Value="bar"/>
+                    <t:Constant Value="bar" />
                 </t:FieldURIOrConstant>
             </t:IsEqualTo>
             <t:IsEqualTo>
-                <t:FieldURI FieldURI="item:Subject"/>
+                <t:FieldURI FieldURI="item:Subject" />
                 <t:FieldURIOrConstant>
-                    <t:Constant Value="baz"/>
+                    <t:Constant Value="baz" />
                 </t:FieldURIOrConstant>
             </t:IsEqualTo>
         </t:Or>
