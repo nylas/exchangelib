@@ -4246,6 +4246,9 @@ class BaseItemTest(EWSTest):
 
         # Test update
         update_kwargs = self.get_random_update_kwargs(item=item, insert_kwargs=insert_kwargs)
+        if self.ITEM_CLASS in (Contact, DistributionList):
+            # Contact and DistributionList don't support mime_type updates at all
+            update_kwargs.pop('mime_content', None)
         update_fieldnames = [f for f in update_kwargs.keys() if f != 'attachments']
         for k, v in update_kwargs.items():
             setattr(item, k, v)

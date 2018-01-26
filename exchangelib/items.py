@@ -282,6 +282,9 @@ class Item(RegisterMixIn):
                 if not self.is_draft and f.is_read_only_after_send:
                     # These cannot be changed when the item is no longer a draft
                     continue
+                if f.name == 'mime_content' and isinstance(self, (Contact, DistributionList)):
+                    # Contact and DistributionList don't support updating mime_content, no matter the draft status
+                    continue
                 update_fieldnames.append(f.name)
         # bulk_update() returns a tuple
         res = self.account.bulk_update(
