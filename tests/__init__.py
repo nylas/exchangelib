@@ -4294,7 +4294,7 @@ class BaseItemTest(EWSTest):
             if f.is_required or f.is_required_after_save:
                 # These cannot be deleted
                 continue
-            if f.is_read_only:
+            if f.is_read_only or f.is_read_only_after_send:
                 # These cannot be changed
                 continue
             wipe_kwargs[f.name] = None
@@ -4313,10 +4313,7 @@ class BaseItemTest(EWSTest):
                 continue
             if f.is_required or f.is_required_after_save:
                 continue
-            if f.is_read_only:
-                continue
-            if f.name == 'mime_content':
-                # This will change depending on other contents fields
+            if f.is_read_only or f.is_read_only_after_send:
                 continue
             old, new = getattr(item, f.name), wipe_kwargs[f.name]
             if f.is_list:
@@ -4807,6 +4804,9 @@ class BaseItemTest(EWSTest):
                 continue
             if f.name == 'reminder_due_by':
                 # EWS sets a default value if it is not set on insert. Ignore
+                continue
+            if f.name == 'mime_content':
+                # This will change depending on other contents fields
                 continue
             old_val = getattr(attached_item1, f.name)
             new_val = getattr(fresh_attachments[0].item, f.name)
