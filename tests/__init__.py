@@ -1266,17 +1266,17 @@ class EWSTest(unittest.TestCase):
         if isinstance(field, CultureField):
             return get_random_choice(['da-DK', 'de-DE', 'en-US', 'es-ES', 'fr-CA', 'nl-NL', 'ru-RU', 'sv-SE'])
         if isinstance(field, BodyField):
-            return get_random_string(512)
+            return get_random_string(400)
         if isinstance(field, CharListField):
             return [get_random_string(16) for _ in range(random.randint(1, 4))]
         if isinstance(field, TextListField):
-            return [get_random_string(4000) for _ in range(random.randint(1, 4))]
+            return [get_random_string(400) for _ in range(random.randint(1, 4))]
         if isinstance(field, CharField):
             return get_random_string(field.max_length)
         if isinstance(field, TextField):
-            return get_random_string(4000)
+            return get_random_string(400)
         if isinstance(field, Base64Field):
-            return get_random_string(512)
+            return get_random_bytes(400)
         if isinstance(field, BooleanField):
             return get_random_bool()
         if isinstance(field, DecimalField):
@@ -1286,7 +1286,7 @@ class EWSTest(unittest.TestCase):
         if isinstance(field, DateTimeField):
             return get_random_datetime(tz=self.account.default_timezone)
         if isinstance(field, AttachmentField):
-            return [FileAttachment(name='my_file.txt', content=b'test_content')]
+            return [FileAttachment(name='my_file.txt', content=get_random_bytes(400))]
         if isinstance(field, MailboxListField):
             # email_address must be a real account on the server(?)
             # TODO: Mailbox has multiple optional args but vals must match server account, so we can't easily test
@@ -5294,6 +5294,10 @@ def get_random_string(length, spaces=True, special=True):
         # If strip() made the string shorter, make sure to fill it up
         res += get_random_string(length - len(res), spaces=False)
     return res
+
+
+def get_random_bytes(*args, **kwargs):
+    return get_random_string(*args, **kwargs).encode('utf-8')
 
 
 def get_random_url():
