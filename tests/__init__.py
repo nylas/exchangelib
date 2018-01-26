@@ -16,6 +16,7 @@ import string
 import tempfile
 import time
 import unittest
+import warnings
 from xml.etree.ElementTree import ParseError
 
 from dateutil.relativedelta import relativedelta
@@ -2410,15 +2411,18 @@ r5p9FrBgavAw5bKO54C0oQKpN/5fta5l6Ws0
                     exchangelib.autodiscover._autodiscover_cache.clear()
                     discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
 
-                # Make sure we can survive SSL validation errors when using the custom adapter
-                exchangelib.autodiscover._autodiscover_cache.clear()
-                BaseProtocol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
-                discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
+                # Disable insecure SSL warnings
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    # Make sure we can survive SSL validation errors when using the custom adapter
+                    exchangelib.autodiscover._autodiscover_cache.clear()
+                    BaseProtocol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
+                    discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
 
-                # Test that the custom adapter also works when validation is OK again
-                del os.environ['REQUESTS_CA_BUNDLE']
-                exchangelib.autodiscover._autodiscover_cache.clear()
-                discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
+                    # Test that the custom adapter also works when validation is OK again
+                    del os.environ['REQUESTS_CA_BUNDLE']
+                    exchangelib.autodiscover._autodiscover_cache.clear()
+                    discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
             finally:
                 # Reset environment
                 os.environ.pop('REQUESTS_CA_BUNDLE', None)  # May already have been deleted
