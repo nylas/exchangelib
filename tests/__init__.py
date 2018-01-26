@@ -3972,6 +3972,9 @@ class BaseItemTest(EWSTest):
             if f.name == 'reminder_due_by':
                 # EWS sets a default value if it is not set on insert. Ignore
                 continue
+            if f.name == 'mime_content':
+                # This will change depending on other contents fields
+                continue
             old = getattr(item, f.name)
             # Test field as single element in only()
             for fresh_item in self.test_folder.filter(categories__contains=item.categories).only(f.name):
@@ -4066,6 +4069,9 @@ class BaseItemTest(EWSTest):
             if f.name == 'reminder_due_by':
                 # EWS sets a default value if it is not set on insert. Ignore
                 continue
+            if f.name == 'mime_content':
+                # This will change depending on other contents fields
+                continue
             if f.is_list:
                 old, new = set(old or ()), set(new or ())
             self.assertEqual(old, new, (f.name, old, new))
@@ -4083,6 +4089,9 @@ class BaseItemTest(EWSTest):
             old, new = getattr(item, f.name), getattr(fresh_item, f.name)
             if f.is_read_only and old is None:
                 # Some fields are automatically updated server-side
+                continue
+            if f.name == 'mime_content':
+                # This will change depending on other contents fields
                 continue
             if f.name == 'reminder_due_by':
                 if new is None:
@@ -4223,6 +4232,9 @@ class BaseItemTest(EWSTest):
             if f.name == 'reminder_due_by':
                 # EWS sets a default value if it is not set on insert. Ignore
                 continue
+            if f.name == 'mime_content':
+                # This will change depending on other contents fields
+                continue
             old, new = getattr(item, f.name), insert_kwargs[f.name]
             if f.is_list:
                 old, new = set(old or ()), set(new or ())
@@ -4245,6 +4257,9 @@ class BaseItemTest(EWSTest):
                 # Cannot be used with this EWS version
                 continue
             if f.is_read_only:
+                continue
+            if f.name == 'mime_content':
+                # This will change depending on other contents fields
                 continue
             old, new = getattr(item, f.name), update_kwargs[f.name]
             if f.name == 'reminder_due_by':
@@ -4299,6 +4314,9 @@ class BaseItemTest(EWSTest):
             if f.is_required or f.is_required_after_save:
                 continue
             if f.is_read_only:
+                continue
+            if f.name == 'mime_content':
+                # This will change depending on other contents fields
                 continue
             old, new = getattr(item, f.name), wipe_kwargs[f.name]
             if f.is_list:
