@@ -673,7 +673,6 @@ Most class definitions have a docstring containing at least a URL to the MSDN  p
 Notes
 ^^^^^
 
-Most, but not all, item attributes are supported. Adding more attributes is usually uncomplicated. Feel
-free to open a PR or an issue.
+Item export and upload is supported, for efficient backup, restore and migration. See `Account.export()` and `Account.upload()`.
 
-Item export and upload is supported, for efficient backup, restore and migration.
+Almost all item fields are supported. The remaining ones are tracked in https://github.com/ecederstrand/exchangelib/issues/203.
