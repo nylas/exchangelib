@@ -1428,6 +1428,7 @@ class GetUserOofSettings(BaseUserOofSettings):
         assert isinstance(response, ElementType), response
         container_or_exc = self._get_element_container(message=response, name=self.element_container_name)
         if isinstance(container_or_exc, Exception):
+            # pylint: disable=raising-bad-type
             raise container_or_exc
         return OofSettings.from_xml(container_or_exc, account=self.account)
 

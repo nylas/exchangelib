@@ -16,6 +16,7 @@ import string
 import tempfile
 import time
 import unittest
+import warnings
 from xml.etree.ElementTree import ParseError
 
 from dateutil.relativedelta import relativedelta
@@ -874,15 +875,15 @@ class RestrictionTest(unittest.TestCase):
     <t:Not>
         <t:Or>
             <t:IsEqualTo>
-                <t:FieldURI FieldURI="item:Subject"/>
+                <t:FieldURI FieldURI="item:Subject" />
                 <t:FieldURIOrConstant>
-                    <t:Constant Value="bar"/>
+                    <t:Constant Value="bar" />
                 </t:FieldURIOrConstant>
             </t:IsEqualTo>
             <t:IsEqualTo>
-                <t:FieldURI FieldURI="item:Subject"/>
+                <t:FieldURI FieldURI="item:Subject" />
                 <t:FieldURIOrConstant>
-                    <t:Constant Value="baz"/>
+                    <t:Constant Value="baz" />
                 </t:FieldURIOrConstant>
             </t:IsEqualTo>
         </t:Or>
@@ -1265,17 +1266,17 @@ class EWSTest(unittest.TestCase):
         if isinstance(field, CultureField):
             return get_random_choice(['da-DK', 'de-DE', 'en-US', 'es-ES', 'fr-CA', 'nl-NL', 'ru-RU', 'sv-SE'])
         if isinstance(field, BodyField):
-            return get_random_string(512)
+            return get_random_string(400)
         if isinstance(field, CharListField):
             return [get_random_string(16) for _ in range(random.randint(1, 4))]
         if isinstance(field, TextListField):
-            return [get_random_string(4000) for _ in range(random.randint(1, 4))]
+            return [get_random_string(400) for _ in range(random.randint(1, 4))]
         if isinstance(field, CharField):
             return get_random_string(field.max_length)
         if isinstance(field, TextField):
-            return get_random_string(4000)
+            return get_random_string(400)
         if isinstance(field, Base64Field):
-            return get_random_string(512)
+            return get_random_bytes(400)
         if isinstance(field, BooleanField):
             return get_random_bool()
         if isinstance(field, DecimalField):
@@ -1285,7 +1286,7 @@ class EWSTest(unittest.TestCase):
         if isinstance(field, DateTimeField):
             return get_random_datetime(tz=self.account.default_timezone)
         if isinstance(field, AttachmentField):
-            return [FileAttachment(name='my_file.txt', content=b'test_content')]
+            return [FileAttachment(name='my_file.txt', content=get_random_bytes(400))]
         if isinstance(field, MailboxListField):
             # email_address must be a real account on the server(?)
             # TODO: Mailbox has multiple optional args but vals must match server account, so we can't easily test
@@ -2410,15 +2411,18 @@ r5p9FrBgavAw5bKO54C0oQKpN/5fta5l6Ws0
                     exchangelib.autodiscover._autodiscover_cache.clear()
                     discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
 
-                # Make sure we can survive SSL validation errors when using the custom adapter
-                exchangelib.autodiscover._autodiscover_cache.clear()
-                BaseProtocol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
-                discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
+                # Disable insecure SSL warnings
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    # Make sure we can survive SSL validation errors when using the custom adapter
+                    exchangelib.autodiscover._autodiscover_cache.clear()
+                    BaseProtocol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
+                    discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
 
-                # Test that the custom adapter also works when validation is OK again
-                del os.environ['REQUESTS_CA_BUNDLE']
-                exchangelib.autodiscover._autodiscover_cache.clear()
-                discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
+                    # Test that the custom adapter also works when validation is OK again
+                    del os.environ['REQUESTS_CA_BUNDLE']
+                    exchangelib.autodiscover._autodiscover_cache.clear()
+                    discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
             finally:
                 # Reset environment
                 os.environ.pop('REQUESTS_CA_BUNDLE', None)  # May already have been deleted
@@ -3972,6 +3976,9 @@ class BaseItemTest(EWSTest):
             if f.name == 'reminder_due_by':
                 # EWS sets a default value if it is not set on insert. Ignore
                 continue
+            if f.name == 'mime_content':
+                # This will change depending on other contents fields
+                continue
             old = getattr(item, f.name)
             # Test field as single element in only()
             for fresh_item in self.test_folder.filter(categories__contains=item.categories).only(f.name):
@@ -4066,6 +4073,9 @@ class BaseItemTest(EWSTest):
             if f.name == 'reminder_due_by':
                 # EWS sets a default value if it is not set on insert. Ignore
                 continue
+            if f.name == 'mime_content':
+                # This will change depending on other contents fields
+                continue
             if f.is_list:
                 old, new = set(old or ()), set(new or ())
             self.assertEqual(old, new, (f.name, old, new))
@@ -4083,6 +4093,9 @@ class BaseItemTest(EWSTest):
             old, new = getattr(item, f.name), getattr(fresh_item, f.name)
             if f.is_read_only and old is None:
                 # Some fields are automatically updated server-side
+                continue
+            if f.name == 'mime_content':
+                # This will change depending on other contents fields
                 continue
             if f.name == 'reminder_due_by':
                 if new is None:
@@ -4223,6 +4236,9 @@ class BaseItemTest(EWSTest):
             if f.name == 'reminder_due_by':
                 # EWS sets a default value if it is not set on insert. Ignore
                 continue
+            if f.name == 'mime_content':
+                # This will change depending on other contents fields
+                continue
             old, new = getattr(item, f.name), insert_kwargs[f.name]
             if f.is_list:
                 old, new = set(old or ()), set(new or ())
@@ -4230,6 +4246,9 @@ class BaseItemTest(EWSTest):
 
         # Test update
         update_kwargs = self.get_random_update_kwargs(item=item, insert_kwargs=insert_kwargs)
+        if self.ITEM_CLASS in (Contact, DistributionList):
+            # Contact and DistributionList don't support mime_type updates at all
+            update_kwargs.pop('mime_content', None)
         update_fieldnames = [f for f in update_kwargs.keys() if f != 'attachments']
         for k, v in update_kwargs.items():
             setattr(item, k, v)
@@ -4245,6 +4264,9 @@ class BaseItemTest(EWSTest):
                 # Cannot be used with this EWS version
                 continue
             if f.is_read_only:
+                continue
+            if f.name == 'mime_content':
+                # This will change depending on other contents fields
                 continue
             old, new = getattr(item, f.name), update_kwargs[f.name]
             if f.name == 'reminder_due_by':
@@ -4279,7 +4301,7 @@ class BaseItemTest(EWSTest):
             if f.is_required or f.is_required_after_save:
                 # These cannot be deleted
                 continue
-            if f.is_read_only:
+            if f.is_read_only or f.is_read_only_after_send:
                 # These cannot be changed
                 continue
             wipe_kwargs[f.name] = None
@@ -4298,7 +4320,7 @@ class BaseItemTest(EWSTest):
                 continue
             if f.is_required or f.is_required_after_save:
                 continue
-            if f.is_read_only:
+            if f.is_read_only or f.is_read_only_after_send:
                 continue
             old, new = getattr(item, f.name), wipe_kwargs[f.name]
             if f.is_list:
@@ -4790,6 +4812,9 @@ class BaseItemTest(EWSTest):
             if f.name == 'reminder_due_by':
                 # EWS sets a default value if it is not set on insert. Ignore
                 continue
+            if f.name == 'mime_content':
+                # This will change depending on other contents fields
+                continue
             old_val = getattr(attached_item1, f.name)
             new_val = getattr(fresh_attachments[0].item, f.name)
             if f.is_list:
@@ -4825,6 +4850,9 @@ class BaseItemTest(EWSTest):
             if f.name == 'is_read':
                 # This is always true for item attachments?
                 continue
+            if f.name == 'mime_content':
+                # This will change depending on other contents fields
+                continue
             old_val = getattr(attached_item1, f.name)
             new_val = getattr(fresh_attachments[0].item, f.name)
             if f.is_list:
@@ -4846,6 +4874,9 @@ class BaseItemTest(EWSTest):
                 continue
             if f.name == 'is_read':
                 # This is always true for item attachments?
+                continue
+            if f.name == 'mime_content':
+                # This will change depending on other contents fields
                 continue
             old_val = getattr(attached_item2, f.name)
             new_val = getattr(fresh_attachments[1].item, f.name)
@@ -4873,6 +4904,9 @@ class BaseItemTest(EWSTest):
                 continue
             if f.name == 'is_read':
                 # This is always true for item attachments?
+                continue
+            if f.name == 'mime_content':
+                # This will change depending on other contents fields
                 continue
             old_val = getattr(attached_item1, f.name)
             new_val = getattr(fresh_attachments[0].item, f.name)
@@ -5262,6 +5296,10 @@ def get_random_string(length, spaces=True, special=True):
     return res
 
 
+def get_random_bytes(*args, **kwargs):
+    return get_random_string(*args, **kwargs).encode('utf-8')
+
+
 def get_random_url():
     path_len = random.randint(1, 16)
     domain_len = random.randint(1, 30)
@@ -5324,3 +5362,6 @@ if __name__ == '__main__':
         logging.basicConfig(level=logging.DEBUG, handlers=[PrettyXmlHandler()])
 
     unittest.main()
+else:
+    # Don't print warnings and stack traces mixed with test progress. We'll get the debug info for test failures later.
+    logging.basicConfig(level=logging.CRITICAL)

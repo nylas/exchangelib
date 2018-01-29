@@ -8,7 +8,8 @@ from operator import attrgetter
 from future.utils import python_2_unicode_compatible
 from six import text_type, string_types
 
-from .errors import ErrorAccessDenied, ErrorFolderNotFound, ErrorDeleteDistinguishedFolder, ErrorCannotEmptyFolder
+from .errors import ErrorAccessDenied, ErrorFolderNotFound, ErrorDeleteDistinguishedFolder, ErrorCannotEmptyFolder, \
+    ErrorCannotDeleteObject
 from .fields import IntegerField, TextField, DateTimeField, FieldPath, EffectiveRightsField, MailboxField, IdField, \
     EWSElementField
 from .items import Item, CalendarItem, Contact, Message, Task, MeetingRequest, MeetingResponse, MeetingCancellation, \
@@ -504,6 +505,7 @@ class Folder(RegisterMixIn):
 
     def wipe(self):
         # Recursively deletes all items in this folder, and all subfolders and their content. Use with caution!
+        log.warning('Wiping %s', self)
         try:
             self.empty(delete_sub_folders=True)
         except (ErrorAccessDenied, ErrorCannotEmptyFolder):
@@ -511,18 +513,12 @@ class Folder(RegisterMixIn):
                 self.empty()
             except (ErrorAccessDenied, ErrorCannotEmptyFolder):
                 log.warning('Not allowed to empty %s', self)
-            for f in self.children:
                 try:
-                    f.delete()
-                except (ErrorAccessDenied, ErrorDeleteDistinguishedFolder):
-                    log.warning('Not allowed to delete %s', f)
-                    try:
-                        f.empty(delete_sub_folders=True)
-                    except (ErrorAccessDenied, ErrorCannotEmptyFolder):
-                        try:
-                            self.empty()
-                        except (ErrorAccessDenied, ErrorCannotEmptyFolder):
-                            log.warning('Not allowed to empty %s', self)
+                    self.all().delete()
+                except (ErrorAccessDenied, ErrorCannotDeleteObject):
+                    log.warning('Not allowed to delete items in %s', self)
+        for f in self.children:
+            f.wipe()
 
     def test_access(self):
         """

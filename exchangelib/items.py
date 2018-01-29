@@ -230,7 +230,7 @@ class Item(RegisterMixIn):
             if update_fields:
                 raise ValueError("'update_fields' is only valid for updates")
             tmp_attachments = None
-            if self.account.version.build < EXCHANGE_2010 and self.attachments:
+            if self.account and self.account.version.build < EXCHANGE_2010 and self.attachments:
                 # Exchange 2007 can't save attachments immediately. You need to first save, then attach. Store
                 # the attachment of this item temporarily and attach later.
                 tmp_attachments, self.attachments = self.attachments, []
@@ -281,6 +281,9 @@ class Item(RegisterMixIn):
                         continue
                 if not self.is_draft and f.is_read_only_after_send:
                     # These cannot be changed when the item is no longer a draft
+                    continue
+                if f.name == 'mime_content' and isinstance(self, (Contact, DistributionList)):
+                    # Contact and DistributionList don't support updating mime_content, no matter the draft status
                     continue
                 update_fieldnames.append(f.name)
         # bulk_update() returns a tuple
