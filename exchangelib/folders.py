@@ -8,8 +8,8 @@ from operator import attrgetter
 from future.utils import python_2_unicode_compatible
 from six import text_type, string_types
 
-from .errors import ErrorAccessDenied, ErrorFolderNotFound, ErrorDeleteDistinguishedFolder, ErrorCannotEmptyFolder, \
-    ErrorCannotDeleteObject
+from .errors import ErrorAccessDenied, ErrorFolderNotFound, ErrorCannotEmptyFolder, ErrorCannotDeleteObject, \
+    ErrorNoPublicFolderReplicaAvailable, ErrorInvalidOperation
 from .fields import IntegerField, TextField, DateTimeField, FieldPath, EffectiveRightsField, MailboxField, IdField, \
     EWSElementField
 from .items import Item, CalendarItem, Contact, Message, Task, MeetingRequest, MeetingResponse, MeetingCancellation, \
@@ -49,6 +49,12 @@ class DistinguishedFolderId(ItemId):
     ]
 
     __slots__ = ItemId.__slots__ + ('mailbox',)
+
+    def clean(self, version=None):
+        super(DistinguishedFolderId, self).clean(version=version)
+        if self.id in (Root.DISTINGUISHED_FOLDER_ID, PublicFoldersRoot.DISTINGUISHED_FOLDER_ID):
+            # Avoid "ErrorInvalidOperation: It is not valid to specify a mailbox with the public folder root" from EWS
+            self.mailbox = None
 
 
 class CalendarView(EWSElement):
@@ -103,6 +109,7 @@ class Folder(RegisterMixIn):
 
     def __init__(self, **kwargs):
         self.account = kwargs.pop('account', None)
+        self.is_distinguished = kwargs.pop('is_distinguished', False)
         parent = kwargs.pop('parent', None)
         if parent:
             if self.account:
@@ -241,7 +248,7 @@ class Folder(RegisterMixIn):
         return tree.strip()
 
     @property
-    def is_distinguished(self):
+    def has_distinguished_name(self):
         return self.name and self.DISTINGUISHED_FOLDER_ID and self.name.lower() == self.DISTINGUISHED_FOLDER_ID.lower()
 
     @staticmethod
@@ -543,7 +550,7 @@ class Folder(RegisterMixIn):
         return cls(account=account, folder_id=fld_id, changekey=changekey, **kwargs)
 
     def to_xml(self, version):
-        if self.is_distinguished:
+        if self.is_distinguished or (not self.folder_id and self.has_distinguished_name):
             # Don't add the changekey here. When modifying folder content, we usually don't care if others have changed
             # the folder content since we fetched the changekey.
             return DistinguishedFolderId(
@@ -608,18 +615,24 @@ class Folder(RegisterMixIn):
                 shape=IdOnly
         ):
             if isinstance(elem, Exception):
-                raise elem
+                yield elem
+                continue
             yield cls.from_xml(elem=elem, account=account)
 
     @classmethod
     def get_distinguished(cls, account):
+        """Gets the distinguished folder for this folder class"""
         assert cls.DISTINGUISHED_FOLDER_ID
         folders = list(cls.get_folders(account=account, ids=[cls(account=account, name=cls.DISTINGUISHED_FOLDER_ID)]))
         if not folders:
             raise ErrorFolderNotFound('Could not find distinguished folder %s' % cls.DISTINGUISHED_FOLDER_ID)
         assert len(folders) == 1
-        assert isinstance(folders[0], cls)
-        return folders[0]
+        folder = folders[0]
+        if isinstance(folder, Exception):
+            raise folder
+        assert isinstance(folder, cls)
+        folder.is_distinguished = True
+        return folder
 
     def refresh(self):
         if not self.account:
@@ -631,6 +644,8 @@ class Folder(RegisterMixIn):
             raise ErrorFolderNotFound('Folder %s disappeared' % self)
         assert len(folders) == 1
         fresh_folder = folders[0]
+        if isinstance(fresh_folder, Exception):
+            raise fresh_folder
         assert self.folder_id == fresh_folder.folder_id
         # Apparently, the changekey may get updated
         for f in self.FIELDS:
@@ -710,12 +725,28 @@ class Root(Folder):
         if self._subfolders is not None:
             return self._subfolders
 
-        # Map root, and all subfolders of root, at arbitrary depth by folder ID
+        # Map root, and all subfolders of root, at arbitrary depth by folder ID. First get distinguished folders, then
+        # everything else. AdminAuditLogs folder is not retrievable and makes all other folders fail.
         folders_map = {self.folder_id: self}
         try:
+            for f in self.get_folders(
+                    account=self.account,
+                    ids=[cls(account=self.account, name=cls.DISTINGUISHED_FOLDER_ID)
+                         for cls in WELLKNOWN_FOLDERS if cls != AdminAuditLogs]):
+                if isinstance(f, (ErrorFolderNotFound, ErrorNoPublicFolderReplicaAvailable)):
+                    # This is just a distinguished folder the server does not have
+                    continue
+                if isinstance(f, ErrorInvalidOperation) and f.value == 'The distinguished folder name is unrecognized.':
+                    # This is just a distinguished folder the server does not have
+                    continue
+                f.is_distinguished = True
+                folders_map[f.folder_id] = f
             for f in self.find_folders(depth=DEEP):
                 if isinstance(f, Exception):
                     raise f
+                if f.folder_id in folders_map:
+                    # Already exists. Probably a distinguished folder
+                    continue
                 folders_map[f.folder_id] = f
         except ErrorAccessDenied:
             # We may not have GetFolder or FindFolder access
@@ -730,8 +761,11 @@ class Root(Folder):
         try:
             # Get the default folder
             log.debug('Testing default %s folder with GetFolder', folder_cls)
-            f = folder_cls.get_distinguished(account=self.account)
-            return self._folders_map.get(f.folder_id, f)  # Use cached instance if available
+            # Use cached instance if available
+            for f in self._folders_map.values():
+                if isinstance(f, folder_cls) and f.is_distinguished:
+                    return f
+            return folder_cls.get_distinguished(account=self.account)
         except ErrorAccessDenied:
             # Maybe we just don't have GetFolder access? Try FindItems instead
             log.debug('Testing default %s folder with FindItem', folder_cls)

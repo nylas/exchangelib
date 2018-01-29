@@ -30,7 +30,8 @@ from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, 
     ErrorInvalidServerVersion, ErrorItemNotFound, ErrorADUnavailable, ResponseMessageError, ErrorInvalidChangeKey, \
     ErrorItemSave, ErrorInvalidIdMalformed, ErrorMessageSizeExceeded, UnauthorizedError, \
     ErrorCannotDeleteTaskOccurrence, ErrorMimeContentConversionFailed, ErrorRecurrenceHasNoOccurrence, \
-    ErrorNameResolutionMultipleResults, ErrorNameResolutionNoResults
+    ErrorNameResolutionMultipleResults, ErrorNameResolutionNoResults, ErrorNoPublicFolderReplicaAvailable, \
+    ErrorInvalidOperation
 from .transport import wrap, SOAPNS, TNS, MNS, ENS
 from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, ElementType, \
     xml_to_str, set_xml_value
@@ -94,6 +95,7 @@ class EWSService(object):
                 ErrorMailboxMoveInProgress,
                 ErrorMailboxStoreUnavailable,
                 ErrorNonExistentMailbox,
+                ErrorNoPublicFolderReplicaAvailable,
                 ErrorNoRespondingCASInDestinationSite,
                 ErrorQuotaExceeded,
                 ErrorServerBusy,
@@ -871,6 +873,10 @@ class GetFolder(EWSAccountService):
     """
     SERVICE_NAME = 'GetFolder'
     element_container_name = '{%s}Folders' % MNS
+    ERRORS_TO_CATCH_IN_RESPONSE = EWSAccountService.ERRORS_TO_CATCH_IN_RESPONSE + (
+        ErrorFolderNotFound, ErrorNoPublicFolderReplicaAvailable, ErrorInvalidOperation,
+    )
+
 
     def call(self, folders, additional_fields, shape):
         """
