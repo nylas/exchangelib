@@ -1715,7 +1715,7 @@ class CommonTest(EWSTest):
                 'conversation_history',
                 'directory',
                 'drafts',
-                'favories',
+                'favorites',
                 'im_contact_list',
                 'inbox',
                 'journal',

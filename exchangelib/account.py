@@ -171,7 +171,7 @@ class Account(object):
         return self.root.get_default_folder(Drafts)
 
     @threaded_cached_property
-    def favories(self):
+    def favorites(self):
         return self.root.get_default_folder(Favorites)
 
     @threaded_cached_property
