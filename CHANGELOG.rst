@@ -4,6 +4,7 @@ Change Log
 
 HEAD
 ----
+* Removed ``Folder.get_folder_by_name()`` which has been deprecated since version ``1.10.2``
 
 
 1.10.7

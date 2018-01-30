@@ -151,20 +151,6 @@ class Folder(RegisterMixIn):
         # cache being updated while it's iterated.
         return list(self.account.root.get_children(self))
 
-    def get_folder_by_name(self, name):
-        """Takes a case-sensitive folder name and returns an instance of that folder, if a folder with that name exists
-        as a direct or indirect subfolder of this folder.
-        """
-        import warnings
-        warnings.warn('The get_folder_by_name() method is deprecated. Use "[f for f in self.walk() if f.name == name]" '
-                      'or "some_folder / \'Sub Folder\'" instead, to find folders by name.')
-        matching_folders = [f for f in self.walk() if f.name == name]
-        if not matching_folders:
-            raise ValueError('No subfolders found with name %s' % name)
-        if len(matching_folders) > 1:
-            raise ValueError('Multiple subfolders found with name %s' % name)
-        return matching_folders[0]
-
     @property
     def parts(self):
         parts = [self]
