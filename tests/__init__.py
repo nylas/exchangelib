@@ -39,7 +39,8 @@ from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalid
     ErrorInvalidChangeKey, ErrorInvalidIdMalformed, ErrorContainsFilterWrongType, ErrorAccessDenied, \
     ErrorFolderNotFound, ErrorInvalidRequest, SOAPError, ErrorInvalidServerVersion, NaiveDateTimeNotAllowed, \
     AmbiguousTimeError, NonExistentTimeError, ErrorUnsupportedPathForQuery, ErrorInvalidPropertyForOperation, \
-    ErrorInvalidValueForProperty, ErrorPropertyUpdate, ErrorDeleteDistinguishedFolder
+    ErrorInvalidValueForProperty, ErrorPropertyUpdate, ErrorDeleteDistinguishedFolder, \
+    ErrorNoPublicFolderReplicaAvailable
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.extended_properties import ExtendedProperty, ExternId
 from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextField, EmailField, URIField, ChoiceField, \
@@ -1745,11 +1746,13 @@ class CommonTest(EWSTest):
             # Test distinguished folder shortcuts. Some may raise ErrorAccessDenied
             try:
                 item = getattr(self.account, attr)
-            except (ErrorAccessDenied, ErrorFolderNotFound, ErrorItemNotFound, ErrorInvalidOperation):
+            except (ErrorAccessDenied, ErrorFolderNotFound, ErrorItemNotFound, ErrorInvalidOperation,
+                    ErrorNoPublicFolderReplicaAvailable):
                 continue
             else:
                 repr(item)
                 str(item)
+                self.assertTrue(item.is_distinguished)
 
     def test_configuration(self):
         with self.assertRaises(AttributeError):
@@ -2621,7 +2624,7 @@ class FolderTest(EWSTest):
             Folder.deregister('size')
 
     def test_create_update_empty_delete(self):
-        f = Folder(parent=self.account.inbox, name=get_random_string(16))
+        f = Messages(parent=self.account.inbox, name=get_random_string(16))
         f.save()
         self.assertIsNotNone(f.folder_id)
         self.assertIsNotNone(f.changekey)
@@ -2637,11 +2640,17 @@ class FolderTest(EWSTest):
             f.save(update_fields=['folder_class'])
 
         # Create a subfolder
-        Folder(parent=f, name=get_random_string(16)).save()
+        Messages(parent=f, name=get_random_string(16)).save()
+        self.assertEqual(len(list(f.children)), 1)
         f.empty()
         self.assertEqual(len(list(f.children)), 1)
-
         f.empty(delete_sub_folders=True)
+        self.assertEqual(len(list(f.children)), 0)
+
+        # Create a subfolder again, and delete it by wiping
+        Messages(parent=f, name=get_random_string(16)).save()
+        self.assertEqual(len(list(f.children)), 1)
+        f.wipe()
         self.assertEqual(len(list(f.children)), 0)
 
         f.delete()

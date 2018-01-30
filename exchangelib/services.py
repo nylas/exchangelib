@@ -473,6 +473,7 @@ class GetItem(EWSAccountService, EWSPooledMixIn):
 
         :param items: a list of (id, changekey) tuples or Item objects
         :param additional_fields: the extra fields that should be returned with the item, as FieldPath objects
+        :param shape: The shape of returned objects
         :return: XML elements for the items, in stable order
         """
         return self._pool_requests(payload_func=self.get_payload, **dict(
@@ -836,14 +837,20 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
         :param shape: The set of attributes to return
         :param depth: How deep in the folder structure to search for folders
         :param page_size: The number of items to return per request
+        :param max_items: The maximum number of items to return
         :return: XML elements for the matching folders
         """
-        return self._paged_call(payload_func=self.get_payload, max_items=max_items, **dict(
+        from .folders import Folder
+        for elem in self._paged_call(payload_func=self.get_payload, max_items=max_items, **dict(
             additional_fields=additional_fields,
             shape=shape,
             depth=depth,
             page_size=page_size,
-        ))
+        )):
+            if isinstance(elem, Exception):
+                yield elem
+                continue
+            yield Folder.from_xml(elem=elem, account=self.account)
 
     def get_payload(self, additional_fields, shape, depth, page_size, offset=0):
         findfolder = create_element('m:%s' % self.SERVICE_NAME, Traversal=depth)
@@ -877,21 +884,30 @@ class GetFolder(EWSAccountService):
         ErrorFolderNotFound, ErrorNoPublicFolderReplicaAvailable, ErrorInvalidOperation,
     )
 
-
     def call(self, folders, additional_fields, shape):
         """
         Takes a folder ID and returns the full information for that folder.
 
-        :param folders: a list of (id, changekey) tuples or Folder objects
+        :param folders: a list of Folder objects
         :param additional_fields: the extra fields that should be returned with the folder, as FieldPath objects
         :param shape: The set of attributes to return
         :return: XML elements for the folders, in stable order
         """
-        return self._get_elements(payload=self.get_payload(
+        # We can't easily find the correct folder class from the returned XML. Instead, return objects with the same
+        # class as the folder instance it was requested with.
+        folders_list = list(folders)  # Convert to a list, in case 'folders' is a generator
+        for folder, elem in zip(folders_list, self._get_elements(payload=self.get_payload(
             folders=folders,
             additional_fields=additional_fields,
             shape=shape,
-        ))
+        ))):
+            if isinstance(elem, Exception):
+                yield elem
+                continue
+            f = folder.from_xml(elem=elem, account=self.account)
+            if folder.is_distinguished or (not folder.folder_id and folder.has_distinguished_name):
+                f.is_distinguished = True
+            yield f
 
     def get_payload(self, folders, additional_fields, shape):
         from .folders import FolderId
@@ -926,13 +942,19 @@ class CreateFolder(EWSAccountService):
     element_container_name = '{%s}Folders' % MNS
 
     def call(self, parent_folder, folders):
-        from .folders import Folder
-        elements = self._get_elements(payload=self.get_payload(parent_folder=parent_folder, folders=folders))
-        for elem in elements:
+        # We can't easily find the correct folder class from the returned XML. Instead, return objects with the same
+        # class as the folder instance it was requested with.
+        folders_list = list(folders)  # Convert to a list, in case 'folders' is a generator
+        for folder, elem in zip(folders_list, self._get_elements(payload=self.get_payload(
+                parent_folder=parent_folder, folders=folders
+        ))):
             if isinstance(elem, Exception):
                 yield elem
-            else:
-                yield Folder.from_xml(elem=elem, account=self.account)
+                continue
+            f = folder.from_xml(elem=elem, account=self.account)
+            if folder.is_distinguished or (not folder.folder_id and folder.has_distinguished_name):
+                f.is_distinguished = True
+            yield f
 
     def get_payload(self, parent_folder, folders):
         from .folders import Folder
@@ -960,13 +982,17 @@ class UpdateFolder(EWSAccountService):
     element_container_name = '{%s}Folders' % MNS
 
     def call(self, folders):
-        from .folders import Folder
-        elements = self._get_elements(payload=self.get_payload(folders=folders))
-        for elem in elements:
+        # We can't easily find the correct folder class from the returned XML. Instead, return objects with the same
+        # class as the folder instance it was requested with.
+        folders_list = list(f[0] for f in folders)  # Convert to a list, in case 'folders' is a generator
+        for folder, elem in zip(folders_list, self._get_elements(payload=self.get_payload(folders=folders))):
             if isinstance(elem, Exception):
                 yield elem
-            else:
-                yield Folder.from_xml(elem=elem, account=self.account)
+                continue
+            f = folder.from_xml(elem=elem, account=self.account)
+            if folder.is_distinguished or (not folder.folder_id and folder.has_distinguished_name):
+                f.is_distinguished = True
+            yield f
 
     @staticmethod
     def _sort_fieldnames(folder_model, fieldnames):

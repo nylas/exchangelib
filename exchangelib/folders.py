@@ -259,7 +259,7 @@ class Folder(RegisterMixIn):
         for folder_cls in (Messages, Tasks, Calendar, Contacts, GALContacts, RecipientCache):
             if folder_cls.CONTAINER_CLASS == container_class:
                 return folder_cls
-        return Folder
+        raise KeyError()
 
     @staticmethod
     def folder_cls_from_folder_name(folder_name, locale):
@@ -511,13 +511,20 @@ class Folder(RegisterMixIn):
             self.account.root.clear_cache()
 
     def wipe(self):
-        # Recursively deletes all items in this folder, and all subfolders and their content. Use with caution!
+        # Recursively deletes all items in this folder, and all subfolders and their content. Attempts to protect
+        # distinguished folders from being deleted. Use with caution!
         log.warning('Wiping %s', self)
+        has_distinguished_subfolders = any(f.is_distinguished for f in self.children)
         try:
-            self.empty(delete_sub_folders=True)
+            if has_distinguished_subfolders:
+                self.empty(delete_sub_folders=False)
+            else:
+                self.empty(delete_sub_folders=True)
         except (ErrorAccessDenied, ErrorCannotEmptyFolder):
             try:
-                self.empty()
+                if has_distinguished_subfolders:
+                    raise  # We already tried this
+                self.empty(delete_sub_folders=False)
             except (ErrorAccessDenied, ErrorCannotEmptyFolder):
                 log.warning('Not allowed to empty %s', self)
                 try:
@@ -526,6 +533,9 @@ class Folder(RegisterMixIn):
                     log.warning('Not allowed to delete items in %s', self)
         for f in self.children:
             f.wipe()
+            # Remove non-distinguished children that are empty and have no subfolders
+            if not f.is_distinguished and not f.children:
+                f.delete()
 
     def test_access(self):
         """
@@ -547,7 +557,35 @@ class Folder(RegisterMixIn):
             # TODO: Only do this if we actually requested the 'name' field.
             kwargs['name'] = cls.DISTINGUISHED_FOLDER_ID
         elem.clear()
-        return cls(account=account, folder_id=fld_id, changekey=changekey, **kwargs)
+        if cls == Folder:
+            # We were called on the generic Folder class. Try to find a more specific class to return objects as.
+            #
+            # The "FolderClass" element value is the only indication we have in the FindFolder response of which
+            # folder class we should create the folder with. And many folders share the same 'FolderClass' value, e.g.
+            # Inbox and DeletedItems. We want to distinguish between these because otherwise we can't locate the right
+            # folders types for e.g. Account.inbox and Account.trash.
+            #
+            # We should be able to just use the name, but apparently default folder names can be renamed to a set of
+            # localized names using a PowerShell command:
+            #     https://technet.microsoft.com/da-dk/library/dd351103(v=exchg.160).aspx
+            #
+            # Instead, search for a folder class using the localized name. If none are found, fall back to getting the
+            # folder class by the "FolderClass" value.
+            try:
+                # TODO: fld_class.LOCALIZED_NAMES is most definitely neither complete nor authoritative
+                folder_cls = cls.folder_cls_from_folder_name(folder_name=kwargs['name'], locale=account.locale)
+                log.error('Folder class %s matches localized folder name %s', folder_cls, kwargs['name'])
+            except KeyError:
+                try:
+                    folder_cls = cls.folder_cls_from_container_class(kwargs['folder_class'])
+                    log.error('Folder class %s matches container class %s (%s)', folder_cls, kwargs['folder_class'],
+                              kwargs['name'])
+                except KeyError:
+                    log.error('Fallback to container class %s (%s)', kwargs['folder_class'], kwargs['name'])
+                    folder_cls = cls
+        else:
+            folder_cls = cls
+        return folder_cls(account=account, folder_id=fld_id, changekey=changekey, **kwargs)
 
     def to_xml(self, version):
         if self.is_distinguished or (not self.folder_id and self.has_distinguished_name):
@@ -572,58 +610,36 @@ class Folder(RegisterMixIn):
         assert shape in SHAPE_CHOICES
         assert depth in FOLDER_TRAVERSAL_CHOICES
         additional_fields = [FieldPath(field=f) for f in self.supported_fields(version=self.account.version)]
-        for elem in FindFolder(account=self.account, folders=[self]).call(
+        # TODO: Support the Restriction class for folders, too
+        return FindFolder(account=self.account, folders=[self]).call(
                 additional_fields=additional_fields,
                 shape=shape,
                 depth=depth,
                 page_size=100,
                 max_items=None,
-        ):
-            # TODO: Support the Restriction class for folders, too
-            # The "FolderClass" element value is the only indication we have in the FindFolder response of which
-            # folder class we should create the folder with. And many folders share the same 'FolderClass' value, e.g.
-            # Inbox and DeletedItems. We want to distinguish between these because otherwise we can't locate the right
-            # folders for e.g. Account.inbox and Account.trash.
-            #
-            # We should be able to just use the name, but apparently default folder names can be renamed to a set of
-            # localized names using a PowerShell command:
-            #     https://technet.microsoft.com/da-dk/library/dd351103(v=exchg.160).aspx
-            #
-            # Instead, search for a folder class using the localized name. If none are found, fall back to getting the
-            # folder class by the "FolderClass" value.
-            if isinstance(elem, Exception):
-                yield elem
-                continue
-            dummy_fld = Folder.from_xml(elem=elem, account=self.account)  # We use from_xml() only to parse elem
-            try:
-                # TODO: fld_class.LOCALIZED_NAMES is most definitely neither complete nor authoritative
-                folder_cls = self.folder_cls_from_folder_name(folder_name=dummy_fld.name, locale=self.account.locale)
-                log.debug('Folder class %s matches localized folder name %s', folder_cls, dummy_fld.name)
-            except KeyError:
-                folder_cls = self.folder_cls_from_container_class(dummy_fld.folder_class)
-                log.debug('Folder class %s matches container class %s (%s)', folder_cls, dummy_fld.folder_class,
-                          dummy_fld.name)
-            yield folder_cls(account=self.account, **{f.name: getattr(dummy_fld, f.name) for f in folder_cls.FIELDS})
+        )
 
     @classmethod
-    def get_folders(cls, account, ids, additional_fields=None):
+    def get_folders(cls, account, folders, additional_fields=None):
+        """ 'folders' is an iterable of Folder instances """
         if additional_fields is None:
             additional_fields = [FieldPath(field=f) for f in cls.supported_fields(version=account.version)]
-        for elem in GetFolder(account=account).call(
-                folders=ids,
+        # We can't easily find the correct folder class from the returned XML. Instead, return objects with the same
+        # class as the folder instance it was requested with.
+        folders_list = list(folders)  # Convert to a list, in case 'folders' is a generator
+        return GetFolder(account=account).call(
+                folders=folders_list,
                 additional_fields=additional_fields,
                 shape=IdOnly
-        ):
-            if isinstance(elem, Exception):
-                yield elem
-                continue
-            yield cls.from_xml(elem=elem, account=account)
+        )
 
     @classmethod
     def get_distinguished(cls, account):
         """Gets the distinguished folder for this folder class"""
         assert cls.DISTINGUISHED_FOLDER_ID
-        folders = list(cls.get_folders(account=account, ids=[cls(account=account, name=cls.DISTINGUISHED_FOLDER_ID)]))
+        folders = list(cls.get_folders(
+            account=account, folders=[cls(account=account, name=cls.DISTINGUISHED_FOLDER_ID)])
+        )
         if not folders:
             raise ErrorFolderNotFound('Could not find distinguished folder %s' % cls.DISTINGUISHED_FOLDER_ID)
         assert len(folders) == 1
@@ -631,7 +647,6 @@ class Folder(RegisterMixIn):
         if isinstance(folder, Exception):
             raise folder
         assert isinstance(folder, cls)
-        folder.is_distinguished = True
         return folder
 
     def refresh(self):
@@ -639,7 +654,7 @@ class Folder(RegisterMixIn):
             raise ValueError('Folder must have an account')
         if not self.folder_id:
             raise ValueError('Folder must have an ID')
-        folders = list(self.get_folders(account=self.account, ids=[self]))
+        folders = list(self.get_folders(account=self.account, folders=[self]))
         if not folders:
             raise ErrorFolderNotFound('Folder %s disappeared' % self)
         assert len(folders) == 1
@@ -731,7 +746,7 @@ class Root(Folder):
         try:
             for f in self.get_folders(
                     account=self.account,
-                    ids=[cls(account=self.account, name=cls.DISTINGUISHED_FOLDER_ID)
+                    folders=[cls(account=self.account, name=cls.DISTINGUISHED_FOLDER_ID)
                          for cls in WELLKNOWN_FOLDERS if cls != AdminAuditLogs]):
                 if isinstance(f, (ErrorFolderNotFound, ErrorNoPublicFolderReplicaAvailable)):
                     # This is just a distinguished folder the server does not have
@@ -739,7 +754,6 @@ class Root(Folder):
                 if isinstance(f, ErrorInvalidOperation) and f.value == 'The distinguished folder name is unrecognized.':
                     # This is just a distinguished folder the server does not have
                     continue
-                f.is_distinguished = True
                 folders_map[f.folder_id] = f
             for f in self.find_folders(depth=DEEP):
                 if isinstance(f, Exception):
@@ -763,7 +777,7 @@ class Root(Folder):
             log.debug('Testing default %s folder with GetFolder', folder_cls)
             # Use cached instance if available
             for f in self._folders_map.values():
-                if isinstance(f, folder_cls) and f.is_distinguished:
+                if isinstance(f, folder_cls) and f.has_distinguished_name:
                     return f
             return folder_cls.get_distinguished(account=self.account)
         except ErrorAccessDenied:
