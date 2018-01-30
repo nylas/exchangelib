@@ -175,9 +175,11 @@ def discover(email, credentials):
     # should be safe.
     autodiscover_key = (domain, credentials)
     # Use lock to guard against multiple threads competing to cache information
+    log.debug('Waiting for _autodiscover_cache_lock')
     with _autodiscover_cache_lock:
+        # Don't recurse while holding the lock!
+        log.debug('_autodiscover_cache_lock acquired')
         if autodiscover_key in _autodiscover_cache:
-            # Python dict() is thread safe, so accessing _autodiscover_cache without a lock should be OK
             protocol = _autodiscover_cache[autodiscover_key]
             assert isinstance(protocol, AutodiscoverProtocol)
             log.debug('Cache hit for domain %s credentials %s: %s', domain, credentials, protocol.server)
@@ -189,23 +191,14 @@ def discover(email, credentials):
                 assert isinstance(protocol, Protocol)
                 return primary_smtp_address, protocol
             except AutoDiscoverFailed:
-                # Autodiscover no longer works with this domain. Clear cache and try again
+                # Autodiscover no longer works with this domain. Clear cache and try again after releasing the lock
                 del _autodiscover_cache[autodiscover_key]
-                return discover(email=email, credentials=credentials)
             except AutoDiscoverRedirect as e:
                 log.debug('%s redirects to %s', email, e.redirect_email)
                 if email.lower() == e.redirect_email.lower():
                     raise_from(AutoDiscoverCircularRedirect('Redirect to same email address: %s' % email), None)
-                # Start over with the new email address
-                return discover(email=e.redirect_email, credentials=credentials)
-
-    log.debug('Waiting for _autodiscover_cache_lock')
-    with _autodiscover_cache_lock:
-        log.debug('_autodiscover_cache_lock acquired')
-        # Don't recurse while holding the lock!
-        if autodiscover_key in _autodiscover_cache:
-            # Cache was primed by some other thread while we were waiting for the lock.
-            log.debug('Cache filled for domain %s while we were waiting', domain)
+                # Start over with the new email address after releasing the lock
+                email = e.redirect_email
         else:
             log.debug('Cache miss for domain %s credentials %s', domain, credentials)
             log.debug('Cache contents: %s', _autodiscover_cache)
@@ -220,11 +213,11 @@ def discover(email, credentials):
                 if email.lower() == e.redirect_email.lower():
                     raise_from(AutoDiscoverCircularRedirect('Redirect to same email address: %s' % email), None)
                 log.debug('%s redirects to %s', email, e.redirect_email)
+                # Start over with the new email address after releasing the lock
                 email = e.redirect_email
-            finally:
-                log.debug('Releasing_autodiscover_cache_lock')
+    log.debug('Released autodiscover_cache_lock')
     # We fell out of the with statement, so either cache was filled by someone else, or autodiscover redirected us to
-    # another email address. Start over.
+    # another email address. Start over after releasing the lock.
     return discover(email=email, credentials=credentials)
 
 
