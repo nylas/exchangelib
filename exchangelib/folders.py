@@ -9,7 +9,7 @@ from future.utils import python_2_unicode_compatible
 from six import text_type, string_types
 
 from .errors import ErrorAccessDenied, ErrorFolderNotFound, ErrorCannotEmptyFolder, ErrorCannotDeleteObject, \
-    ErrorNoPublicFolderReplicaAvailable, ErrorInvalidOperation
+    ErrorNoPublicFolderReplicaAvailable, ErrorInvalidOperation, ErrorDeleteDistinguishedFolder
 from .fields import IntegerField, TextField, DateTimeField, FieldPath, EffectiveRightsField, MailboxField, IdField, \
     EWSElementField
 from .items import Item, CalendarItem, Contact, Message, Task, MeetingRequest, MeetingResponse, MeetingCancellation, \
@@ -120,6 +120,10 @@ class Folder(RegisterMixIn):
                 assert parent.id == kwargs['parent_folder_id']
             kwargs['parent_folder_id'] = ParentFolderId(id=parent.folder_id, changekey=parent.changekey)
         super(Folder, self).__init__(**kwargs)
+
+    @property
+    def is_deleteable(self):
+        return not self.is_distinguished
 
     def clean(self, version=None):
         super(Folder, self).clean(version=version)
@@ -237,12 +241,20 @@ class Folder(RegisterMixIn):
     def has_distinguished_name(self):
         return self.name and self.DISTINGUISHED_FOLDER_ID and self.name.lower() == self.DISTINGUISHED_FOLDER_ID.lower()
 
+    @classmethod
+    def localized_names(cls, locale):
+        # Return localized names for a specific locale. If no locale-specific names exist, return the default names,
+        # if any.
+        return {s.lower() for s in cls.LOCALIZED_NAMES.get(locale, cls.LOCALIZED_NAMES.get(None, []))}
+
     @staticmethod
     def folder_cls_from_container_class(container_class):
         """Returns a reasonable folder class given a container class, e.g. 'IPF.Note'. Don't iterate WELLKNOWN_FOLDERS
         because many folder classes have the same CONTAINER_CLASS.
         """
-        for folder_cls in (Messages, Tasks, Calendar, Contacts, GALContacts, RecipientCache):
+        for folder_cls in (
+                Messages, Tasks, Calendar, ConversationSettings, Contacts, GALContacts, Reminders, RecipientCache,
+                RSSFeeds):
             if folder_cls.CONTAINER_CLASS == container_class:
                 return folder_cls
         raise KeyError()
@@ -253,9 +265,8 @@ class Folder(RegisterMixIn):
 
         locale is a string, e.g. 'da_DK'
         """
-        for folder_cls in WELLKNOWN_FOLDERS:
-            localized_names = {s.lower() for s in folder_cls.LOCALIZED_NAMES.get(locale, [])}
-            if folder_name.lower() in localized_names:
+        for folder_cls in WELLKNOWN_FOLDERS + NON_DELETEABLE_FOLDERS:
+            if folder_name.lower() in folder_cls.localized_names(locale):
                 return folder_cls
         raise KeyError()
 
@@ -512,7 +523,7 @@ class Folder(RegisterMixIn):
                     raise  # We already tried this
                 self.empty(delete_sub_folders=False)
             except (ErrorAccessDenied, ErrorCannotEmptyFolder):
-                log.warning('Not allowed to empty %s', self)
+                log.warning('Not allowed to empty %s. Trying to delete items instead', self)
                 try:
                     self.all().delete()
                 except (ErrorAccessDenied, ErrorCannotDeleteObject):
@@ -520,8 +531,12 @@ class Folder(RegisterMixIn):
         for f in self.children:
             f.wipe()
             # Remove non-distinguished children that are empty and have no subfolders
-            if not f.is_distinguished and not f.children:
-                f.delete()
+            if f.is_deleteable and not f.children:
+                log.warning('Deleting folder %s', f)
+                try:
+                    f.delete()
+                except ErrorDeleteDistinguishedFolder:
+                    log.warning('Tried to delete a distinguished folder (%s)', f)
 
     def test_access(self):
         """
@@ -560,14 +575,14 @@ class Folder(RegisterMixIn):
             try:
                 # TODO: fld_class.LOCALIZED_NAMES is most definitely neither complete nor authoritative
                 folder_cls = cls.folder_cls_from_folder_name(folder_name=kwargs['name'], locale=account.locale)
-                log.error('Folder class %s matches localized folder name %s', folder_cls, kwargs['name'])
+                log.debug('Folder class %s matches localized folder name %s', folder_cls, kwargs['name'])
             except KeyError:
                 try:
                     folder_cls = cls.folder_cls_from_container_class(kwargs['folder_class'])
-                    log.error('Folder class %s matches container class %s (%s)', folder_cls, kwargs['folder_class'],
+                    log.debug('Folder class %s matches container class %s (%s)', folder_cls, kwargs['folder_class'],
                               kwargs['name'])
                 except KeyError:
-                    log.error('Fallback to container class %s (%s)', kwargs['folder_class'], kwargs['name'])
+                    log.debug('Fallback to container class %s (%s)', kwargs['folder_class'], kwargs['name'])
                     folder_cls = cls
         else:
             folder_cls = cls
@@ -732,8 +747,9 @@ class Root(Folder):
         try:
             for f in self.get_folders(
                     account=self.account,
-                    folders=[cls(account=self.account, name=cls.DISTINGUISHED_FOLDER_ID)
-                         for cls in WELLKNOWN_FOLDERS if cls != AdminAuditLogs]):
+                    folders=[
+                        cls(account=self.account, name=cls.DISTINGUISHED_FOLDER_ID)
+                        for cls in WELLKNOWN_FOLDERS if cls != AdminAuditLogs]):
                 if isinstance(f, (ErrorFolderNotFound, ErrorNoPublicFolderReplicaAvailable)):
                     # This is just a distinguished folder the server does not have
                     continue
@@ -785,8 +801,7 @@ class Root(Folder):
             if are_distinguished:
                 candidates = are_distinguished
             else:
-                localized_names = {s.lower() for s in folder_cls.LOCALIZED_NAMES.get(self.account.locale, [])}
-                candidates = [f for f in same_type if f.name.lower() in localized_names]
+                candidates = [f for f in same_type if f.name.lower() in folder_cls.localized_names(self.account.locale)]
         except ErrorFolderNotFound:
             pass
 
@@ -804,8 +819,7 @@ class Root(Folder):
         if are_distinguished:
             candidates = are_distinguished
         else:
-            localized_names = {s.lower() for s in folder_cls.LOCALIZED_NAMES.get(self.account.locale, [])}
-            candidates = [f for f in same_type if f.name.lower() in localized_names]
+            candidates = [f for f in same_type if f.name.lower() in folder_cls.localized_names(self.account.locale)]
 
         if candidates:
             if len(candidates) > 1:
@@ -984,20 +998,6 @@ class Contacts(Folder):
     }
 
 
-class GALContacts(Contacts):
-    DISTINGUISHED_FOLDER_ID = None
-    CONTAINER_CLASS = 'IPF.Contact.GalContacts'
-
-    LOCALIZED_NAMES = {}
-
-
-class RecipientCache(Contacts):
-    DISTINGUISHED_FOLDER_ID = 'recipientcache'
-    CONTAINER_CLASS = 'IPF.Contact.RecipientCache'
-
-    LOCALIZED_NAMES = {}
-
-
 class WellknownFolder(Folder):
     # Use this class until we have specific folder implementations
     supported_item_models = ITEM_CLASSES
@@ -1091,6 +1091,13 @@ class QuickContacts(WellknownFolder):
     DISTINGUISHED_FOLDER_ID = 'quickcontacts'
 
 
+class RecipientCache(Contacts):
+    DISTINGUISHED_FOLDER_ID = 'recipientcache'
+    CONTAINER_CLASS = 'IPF.Contact.RecipientCache'
+
+    LOCALIZED_NAMES = {}
+
+
 class RecoverableItemsDeletions(WellknownFolder):
     DISTINGUISHED_FOLDER_ID = 'recoverableitemsdeletions'
 
@@ -1172,4 +1179,199 @@ WELLKNOWN_FOLDERS = [
     Tasks,
     ToDoSearch,
     VoiceMail,
+]
+
+
+class NonDeleteableFolderMixin:
+    @property
+    def is_deleteable(self):
+        return False
+
+
+class AllContacts(NonDeleteableFolderMixin, Contacts):
+    CONTAINER_CLASS = 'IPF.Note'
+
+    LOCALIZED_NAMES = {
+        None: (u'AllContacts',),
+    }
+
+
+class AllItems(NonDeleteableFolderMixin, Folder):
+    CONTAINER_CLASS = 'IPF'
+
+    LOCALIZED_NAMES = {
+        None: (u'AllItems',),
+    }
+
+
+class CalendarLogging(NonDeleteableFolderMixin, Folder):
+    LOCALIZED_NAMES = {
+        None: ('Calendar Logging',),
+    }
+
+
+class CommonViews(NonDeleteableFolderMixin, Folder):
+    LOCALIZED_NAMES = {
+        None: ('Common Views',),
+    }
+
+
+class ConversationSettings(NonDeleteableFolderMixin, Folder):
+    CONTAINER_CLASS = 'IPF.Configuration'
+    LOCALIZED_NAMES = {
+        'da_DK': (u'Indstillinger for samtalehandlinger',),
+    }
+
+
+class DeferredAction(NonDeleteableFolderMixin, Folder):
+    LOCALIZED_NAMES = {
+        None: ('Deferred Action',),
+    }
+
+
+class ExchangeSyncData(NonDeleteableFolderMixin, Folder):
+    LOCALIZED_NAMES = {
+        None: (u'ExchangeSyncData',),
+    }
+
+
+class FreebusyData(NonDeleteableFolderMixin, Folder):
+    LOCALIZED_NAMES = {
+        None: (u'Freebusy Data',),
+    }
+
+
+class Friends(NonDeleteableFolderMixin, Contacts):
+    CONTAINER_CLASS = 'IPF.Note'
+
+    LOCALIZED_NAMES = {
+        'de_DE': (u'Bekannte',),
+    }
+
+
+class GALContacts(NonDeleteableFolderMixin, Contacts):
+    DISTINGUISHED_FOLDER_ID = None
+    CONTAINER_CLASS = 'IPF.Contact.GalContacts'
+
+    LOCALIZED_NAMES = {
+        None: ('GAL Contacts',),
+    }
+
+
+class Location(NonDeleteableFolderMixin, Folder):
+    LOCALIZED_NAMES = {
+        None: (u'Location',),
+    }
+
+
+class MailboxAssociations(NonDeleteableFolderMixin, Folder):
+    LOCALIZED_NAMES = {
+        None: (u'MailboxAssociations',),
+    }
+
+
+class MyContactsExtended(NonDeleteableFolderMixin, Contacts):
+    CONTAINER_CLASS = 'IPF.Note'
+    LOCALIZED_NAMES = {
+        None: (u'MyContactsExtended',),
+    }
+
+
+class ParkedMessages(NonDeleteableFolderMixin, Contacts):
+    CONTAINER_CLASS = 'IPF.Note'
+    LOCALIZED_NAMES = {
+        None: (u'ParkedMessages',),
+    }
+
+
+class Reminders(NonDeleteableFolderMixin, Folder):
+    CONTAINER_CLASS = 'Outlook.Reminder'
+    LOCALIZED_NAMES = {
+        'da_DK': (u'Påmindelser',),
+    }
+
+
+class RSSFeeds(NonDeleteableFolderMixin, Folder):
+    CONTAINER_CLASS = 'IPF.Note.OutlookHomepage'
+    LOCALIZED_NAMES = {
+        None: (u'RSS Feeds',),
+    }
+
+
+class Schedule(NonDeleteableFolderMixin, Folder):
+    LOCALIZED_NAMES = {
+        None: (u'Schedule',),
+    }
+
+
+class Sharing(NonDeleteableFolderMixin, Folder):
+    CONTAINER_CLASS = 'IPF.Note'
+    LOCALIZED_NAMES = {
+        None: (u'Sharing',),
+    }
+
+
+class Shortcuts(NonDeleteableFolderMixin, Folder):
+    LOCALIZED_NAMES = {
+        None: (u'Shortcuts',),
+    }
+
+
+class SpoolerQueue(NonDeleteableFolderMixin, Folder):
+    LOCALIZED_NAMES = {
+        None: (u'Spooler Queue',),
+    }
+
+
+class System(NonDeleteableFolderMixin, Folder):
+    LOCALIZED_NAMES = {
+        None: (u'System',),
+    }
+
+
+class TemporarySaves(NonDeleteableFolderMixin, Folder):
+    LOCALIZED_NAMES = {
+        None: (u'TemporarySaves',),
+    }
+
+
+class Views(NonDeleteableFolderMixin, Folder):
+    LOCALIZED_NAMES = {
+        None: (u'Views',),
+    }
+
+
+class WorkingSet(NonDeleteableFolderMixin, Folder):
+    LOCALIZED_NAMES = {
+        None: (u'Working Set',),
+    }
+
+
+# Folders that return 'ErrorDeleteDistinguishedFolder' when we try to delete them. I can't find any official docs
+# listing these folders.
+NON_DELETEABLE_FOLDERS = [
+    AllContacts,
+    AllItems,
+    CalendarLogging,
+    CommonViews,
+    ConversationSettings,
+    DeferredAction,
+    ExchangeSyncData,
+    FreebusyData,
+    Friends,
+    GALContacts,
+    Location,
+    MailboxAssociations,
+    MyContactsExtended,
+    ParkedMessages,
+    Reminders,
+    RSSFeeds,
+    Schedule,
+    Sharing,
+    Shortcuts,
+    SpoolerQueue,
+    System,
+    TemporarySaves,
+    Views,
+    WorkingSet,
 ]
