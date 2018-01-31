@@ -1052,14 +1052,17 @@ class Directory(WellknownFolder):
 
 
 class Favorites(WellknownFolder):
+    CONTAINER_CLASS = 'IPF.Note'
     DISTINGUISHED_FOLDER_ID = 'favorites'
 
 
 class IMContactList(WellknownFolder):
+    CONTAINER_CLASS = 'IPF.Contact.MOC.ImContactList'
     DISTINGUISHED_FOLDER_ID = 'imcontactlist'
 
 
 class Journal(WellknownFolder):
+    CONTAINER_CLASS = 'IPF.Journal'
     DISTINGUISHED_FOLDER_ID = 'journal'
 
 
@@ -1072,11 +1075,16 @@ class MsgFolderRoot(WellknownFolder):
 
 
 class MyContacts(WellknownFolder):
+    CONTAINER_CLASS = 'IPF.Note'
     DISTINGUISHED_FOLDER_ID = 'mycontacts'
 
 
 class Notes(WellknownFolder):
+    CONTAINER_CLASS = 'IPF.StickyNote'
     DISTINGUISHED_FOLDER_ID = 'notes'
+    LOCALIZED_NAMES = {
+        'da_DK': (u'Noter',),
+    }
 
 
 class PeopleConnect(WellknownFolder):
@@ -1088,6 +1096,7 @@ class PublicFoldersRoot(WellknownFolder):
 
 
 class QuickContacts(WellknownFolder):
+    CONTAINER_CLASS = 'IPF.Contact.MOC.QuickContacts'
     DISTINGUISHED_FOLDER_ID = 'quickcontacts'
 
 
@@ -1123,11 +1132,16 @@ class ServerFailures(WellknownFolder):
 
 
 class SyncIssues(WellknownFolder):
+    CONTAINER_CLASS = 'IPF.Note'
     DISTINGUISHED_FOLDER_ID = 'syncissues'
 
 
 class ToDoSearch(WellknownFolder):
+    CONTAINER_CLASS = 'IPF.Task'
     DISTINGUISHED_FOLDER_ID = 'todosearch'
+    LOCALIZED_NAMES = {
+        None: (u'To-Do Search',),
+    }
 
 
 class VoiceMail(WellknownFolder):
@@ -1277,8 +1291,8 @@ class MyContactsExtended(NonDeleteableFolderMixin, Contacts):
     }
 
 
-class ParkedMessages(NonDeleteableFolderMixin, Contacts):
-    CONTAINER_CLASS = 'IPF.Note'
+class ParkedMessages(NonDeleteableFolderMixin, Folder):
+    CONTAINER_CLASS = None
     LOCALIZED_NAMES = {
         None: (u'ParkedMessages',),
     }

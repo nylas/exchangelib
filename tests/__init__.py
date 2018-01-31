@@ -49,7 +49,9 @@ from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextFie
     MailboxListField, Choice, FieldPath, EWSElementField, CultureField, DateField, EnumField, EnumListField, IdField, \
     CharField, TextListField
 from exchangelib.folders import Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Messages, Tasks, \
-    Contacts, Folder, RecipientCache, GALContacts, System
+    Contacts, Folder, RecipientCache, GALContacts, System, AllContacts, MyContactsExtended, Reminders, Favorites, \
+    AllItems, ConversationSettings, Friends, RSSFeeds, Sharing, IMContactList, QuickContacts, Journal, Notes, \
+    SyncIssues, MyContacts, ToDoSearch
 from exchangelib.indexed_properties import IndexedElement, EmailAddress, PhysicalAddress, PhoneNumber, \
     SingleFieldIndexedElement, MultiFieldIndexedElement
 from exchangelib.items import Item, CalendarItem, Message, Contact, Task, DistributionList
@@ -2458,12 +2460,12 @@ class FolderTest(EWSTest):
 
     def test_find_folders(self):
         folders = list(self.account.root.find_folders())
-        self.assertGreater(len(folders), 50, sorted(f.name for f in folders))
+        self.assertGreater(len(folders), 40, sorted(f.name for f in folders))
 
     def test_folder_grouping(self):
         # If you get errors here, you probably need to fill out [folder class].LOCALIZED_NAMES for your locale.
         for f in self.account.root.walk():
-            if isinstance(f, (Messages, DeletedItems)):
+            if isinstance(f, (Messages, DeletedItems, AllContacts, MyContactsExtended, Sharing, Favorites, SyncIssues, MyContacts)):
                 self.assertEqual(f.folder_class, 'IPF.Note')
             elif isinstance(f, GALContacts):
                 self.assertEqual(f.folder_class, 'IPF.Contact.GalContacts')
@@ -2473,9 +2475,28 @@ class FolderTest(EWSTest):
                 self.assertEqual(f.folder_class, 'IPF.Contact')
             elif isinstance(f, Calendar):
                 self.assertEqual(f.folder_class, 'IPF.Appointment')
-            elif isinstance(f, Tasks):
+            elif isinstance(f, (Tasks, ToDoSearch)):
                 self.assertEqual(f.folder_class, 'IPF.Task')
+            elif isinstance(f, Reminders):
+                self.assertEqual(f.folder_class, 'Outlook.Reminder')
+            elif isinstance(f, AllItems):
+                self.assertEqual(f.folder_class, 'IPF')
+            elif isinstance(f, ConversationSettings):
+                self.assertEqual(f.folder_class, 'IPF.Configuration')
+            elif isinstance(f, Friends):
+                self.assertEqual(f.folder_class, 'IPF.Note')
+            elif isinstance(f, RSSFeeds):
+                self.assertEqual(f.folder_class, 'IPF.Note.OutlookHomepage')
+            elif isinstance(f, IMContactList):
+                self.assertEqual(f.folder_class, 'IPF.Contact.MOC.ImContactList')
+            elif isinstance(f, QuickContacts):
+                self.assertEqual(f.folder_class, 'IPF.Contact.MOC.QuickContacts')
+            elif isinstance(f, Journal):
+                self.assertEqual(f.folder_class, 'IPF.Journal')
+            elif isinstance(f, Notes):
+                self.assertEqual(f.folder_class, 'IPF.StickyNote')
             else:
+                self.assertEqual(f.folder_class, None, (f.name, f.__class__.__name__, f.folder_class))
                 self.assertIsInstance(f, Folder)
 
     def test_counts(self):
