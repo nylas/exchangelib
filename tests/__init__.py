@@ -954,11 +954,8 @@ class QuerySetTest(unittest.TestCase):
         self.assertEqual(qs._cache, new_qs._cache)
         self.assertNotEqual(id(qs.q), id(new_qs.q))
         self.assertEqual(qs.q, new_qs.q)
-        self.assertNotEqual(id(qs.only_fields), id(new_qs.only_fields))
         self.assertEqual(qs.only_fields, new_qs.only_fields)
-        self.assertNotEqual(id(qs.order_fields), id(new_qs.order_fields))
         self.assertEqual(qs.order_fields, new_qs.order_fields)
-        self.assertEqual(id(qs.return_format), id(new_qs.return_format))  # String literals are also singletons
         self.assertEqual(qs.return_format, new_qs.return_format)
 
         # Set the new values, forcing a new id()
