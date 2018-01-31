@@ -49,7 +49,7 @@ from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextFie
     MailboxListField, Choice, FieldPath, EWSElementField, CultureField, DateField, EnumField, EnumListField, IdField, \
     CharField, TextListField
 from exchangelib.folders import Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Messages, Tasks, \
-    Contacts, Folder, RecipientCache, GALContacts
+    Contacts, Folder, RecipientCache, GALContacts, System
 from exchangelib.indexed_properties import IndexedElement, EmailAddress, PhysicalAddress, PhoneNumber, \
     SingleFieldIndexedElement, MultiFieldIndexedElement
 from exchangelib.items import Item, CalendarItem, Message, Contact, Task, DistributionList
@@ -2014,7 +2014,7 @@ class AccountTest(EWSTest):
         folder = self.account.root.get_default_folder(Calendar)
         self.assertIsInstance(folder, Calendar)
         self.assertNotEqual(folder.folder_id, None)
-        self.assertEqual(folder.name, Calendar.LOCALIZED_NAMES[self.account.locale][0])
+        self.assertEqual(folder.name, Calendar.localized_names(self.account.locale)[0])
 
         class MockCalendar(Calendar):
             @classmethod
@@ -2043,7 +2043,7 @@ class AccountTest(EWSTest):
             folder = self.account.root.get_default_folder(Calendar)
             self.assertIsInstance(folder, Calendar)
             self.assertNotEqual(folder.folder_id, None)
-            self.assertEqual(folder.name, MockCalendar.LOCALIZED_NAMES[self.account.locale][0])
+            self.assertEqual(folder.name, MockCalendar.localized_names(self.account.locale)[0])
         finally:
             Calendar.get_distinguished = _orig
 
@@ -2433,7 +2433,7 @@ r5p9FrBgavAw5bKO54C0oQKpN/5fta5l6Ws0
 class FolderTest(EWSTest):
     def test_folders(self):
         for f in self.account.root.walk():
-            if f.name == 'System':
+            if isinstance(f, System):
                 # No access to system folder, apparently
                 continue
             f.test_access()
@@ -2512,7 +2512,7 @@ class FolderTest(EWSTest):
     def test_refresh(self):
         # Test that we can refresh folders
         for f in self.account.root.walk():
-            if f.name == 'System':
+            if isinstance(f, System):
                 # Can't refresh the 'System' folder for some reason
                         continue
             old_values = {}
