@@ -245,7 +245,7 @@ class Folder(RegisterMixIn):
     def localized_names(cls, locale):
         # Return localized names for a specific locale. If no locale-specific names exist, return the default names,
         # if any.
-        return {s.lower() for s in cls.LOCALIZED_NAMES.get(locale, cls.LOCALIZED_NAMES.get(None, []))}
+        return tuple(s.lower() for s in cls.LOCALIZED_NAMES.get(locale, cls.LOCALIZED_NAMES.get(None, [])))
 
     @staticmethod
     def folder_cls_from_container_class(container_class):
