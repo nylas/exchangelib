@@ -560,14 +560,14 @@ class Folder(RegisterMixIn):
             try:
                 # TODO: fld_class.LOCALIZED_NAMES is most definitely neither complete nor authoritative
                 folder_cls = cls.folder_cls_from_folder_name(folder_name=kwargs['name'], locale=account.locale)
-                log.error('Folder class %s matches localized folder name %s', folder_cls, kwargs['name'])
+                log.debug('Folder class %s matches localized folder name %s', folder_cls, kwargs['name'])
             except KeyError:
                 try:
                     folder_cls = cls.folder_cls_from_container_class(kwargs['folder_class'])
-                    log.error('Folder class %s matches container class %s (%s)', folder_cls, kwargs['folder_class'],
+                    log.debug('Folder class %s matches container class %s (%s)', folder_cls, kwargs['folder_class'],
                               kwargs['name'])
                 except KeyError:
-                    log.error('Fallback to container class %s (%s)', kwargs['folder_class'], kwargs['name'])
+                    log.debug('Fallback to container class %s (%s)', kwargs['folder_class'], kwargs['name'])
                     folder_cls = cls
         else:
             folder_cls = cls
