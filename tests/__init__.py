@@ -2016,7 +2016,7 @@ class AccountTest(EWSTest):
         folder = self.account.root.get_default_folder(Calendar)
         self.assertIsInstance(folder, Calendar)
         self.assertNotEqual(folder.folder_id, None)
-        self.assertEqual(folder.name, Calendar.localized_names(self.account.locale)[0])
+        self.assertEqual(folder.name.lower(), Calendar.localized_names(self.account.locale)[0])
 
         class MockCalendar(Calendar):
             @classmethod
@@ -2045,7 +2045,7 @@ class AccountTest(EWSTest):
             folder = self.account.root.get_default_folder(Calendar)
             self.assertIsInstance(folder, Calendar)
             self.assertNotEqual(folder.folder_id, None)
-            self.assertEqual(folder.name, MockCalendar.localized_names(self.account.locale)[0])
+            self.assertEqual(folder.name.lower(), MockCalendar.localized_names(self.account.locale)[0])
         finally:
             Calendar.get_distinguished = _orig
 
