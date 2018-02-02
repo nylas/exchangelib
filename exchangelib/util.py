@@ -90,15 +90,14 @@ def peek(iterable):
     assert not isinstance(iterable, QuerySet)
     if hasattr(iterable, '__len__'):
         # tuple, list, set
-        return len(iterable) == 0, iterable
-    else:
-        # generator
-        try:
-            first = next(iterable)
-        except StopIteration:
-            return True, iterable
-        # We can't rewind a generator. Instead, chain the first element and the rest of the generator
-        return False, itertools.chain([first], iterable)
+        return not iterable, iterable
+    # generator
+    try:
+        first = next(iterable)
+    except StopIteration:
+        return True, iterable
+    # We can't rewind a generator. Instead, chain the first element and the rest of the generator
+    return False, itertools.chain([first], iterable)
 
 
 def xml_to_str(tree, encoding=None, xml_declaration=False):
@@ -312,8 +311,10 @@ class PrettyXmlHandler(logging.StreamHandler):
 
     def is_tty(self):
         # Check if we're outputting to a terminal
-        isatty = getattr(self.stream, 'isatty', None)
-        return isatty and isatty()
+        try:
+            return self.stream.isatty()
+        except AttributeError:
+            return False
 
 
 class DummyRequest(object):
@@ -424,8 +425,8 @@ def post_ratelimited(protocol, session, url, headers, data, allow_redirects=Fals
     wait = 10  # seconds
     retry = 0
     redirects = 0
-    # In Python 2, we want this to be a 'str' object so logging doesn't break (all formatting arguments are 'str'). 
-    # We activated 'unicode_literals' at the top of this file, so it would be a 'unicode' object unless we convert 
+    # In Python 2, we want this to be a 'str' object so logging doesn't break (all formatting arguments are 'str').
+    # We activated 'unicode_literals' at the top of this file, so it would be a 'unicode' object unless we convert
     # to 'str' explicitly. This is a no-op for Python 3.
     log_msg = str('''\
 Retry: %(retry)s

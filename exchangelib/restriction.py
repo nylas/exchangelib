@@ -85,7 +85,7 @@ class Q(object):
                 raise ValueError("Non-keyword arg '%s' must be a Q object" % q)
             if q.query_string:
                 raise ValueError(
-                    'A query string cannot be combined with other restrictions (args: %s, kwargs: %s)', args, kwargs
+                    'A query string cannot be combined with other restrictions (args: %s, kwargs: %s)' % (args, kwargs)
                 )
             self.children.append(q)
 

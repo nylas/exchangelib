@@ -12,7 +12,7 @@ from .fields import BooleanField, IntegerField, DecimalField, Base64Field, TextF
     URIField, BodyField, DateTimeField, MessageHeaderField, PhoneNumberField, EmailAddressField, PhysicalAddressField, \
     ExtendedPropertyField, AttachmentField, RecurrenceField, MailboxField,  MailboxListField, AttendeesField, Choice, \
     OccurrenceField, OccurrenceListField, MemberListField, EWSElementField, EffectiveRightsField, TimeZoneField, \
-    CultureField, TextBodyField, IdField, CharField, TextListField, EnumAsIntField, EmailField
+    CultureField, IdField, CharField, TextListField, EnumAsIntField, EmailField
 from .properties import EWSElement, ItemId, ConversationId, ParentFolderId, Attendee
 from .recurrence import FirstOccurrence, LastOccurrence, Occurrence, DeletedOccurrence
 from .util import is_iterable
@@ -138,7 +138,7 @@ class Item(RegisterMixIn):
         ChoiceField('sensitivity', field_uri='item:Sensitivity', choices={
             Choice('Normal'), Choice('Personal'), Choice('Private'), Choice('Confidential')
         }, is_required=True, default='Normal'),
-        TextBodyField('text_body', field_uri='item:TextBody', is_read_only=True, supported_from=EXCHANGE_2013),
+        TextField('text_body', field_uri='item:TextBody', is_read_only=True, supported_from=EXCHANGE_2013),
         BodyField('body', field_uri='item:Body'),  # Accepts and returns Body or HTMLBody instances
         AttachmentField('attachments', field_uri='item:Attachments'),  # ItemAttachment or FileAttachment
         DateTimeField('datetime_received', field_uri='item:DateTimeReceived', is_read_only=True),
@@ -253,13 +253,12 @@ class Item(RegisterMixIn):
             items=[self], folder=self.folder, message_disposition=message_disposition,
             send_meeting_invitations=send_meeting_invitations)
         if message_disposition in (SEND_ONLY, SEND_AND_SAVE_COPY):
-            assert len(res) == 0
+            assert not res
             return None
-        else:
-            assert len(res) == 1, res
-            if isinstance(res[0], Exception):
-                raise res[0]
-            return res[0]
+        assert len(res) == 1
+        if isinstance(res[0], Exception):
+            raise res[0]
+        return res[0]
 
     def _update(self, update_fieldnames, message_disposition, conflict_resolution, send_meeting_invitations):
         if not self.account:
@@ -292,13 +291,12 @@ class Item(RegisterMixIn):
             conflict_resolution=conflict_resolution,
             send_meeting_invitations_or_cancellations=send_meeting_invitations)
         if message_disposition == SEND_AND_SAVE_COPY:
-            assert len(res) == 0
+            assert not res
             return None
-        else:
-            assert len(res) == 1, res
-            if isinstance(res[0], Exception):
-                raise res[0]
-            return res[0]
+        assert len(res) == 1
+        if isinstance(res[0], Exception):
+            raise res[0]
+        return res[0]
 
     def refresh(self):
         # Updates the item based on fresh data from EWS
@@ -536,7 +534,7 @@ class CalendarItem(Item):
         # pylint: disable=access-member-before-definition
         super(CalendarItem, self).clean(version=version)
         if self.start and self.end and self.end < self.start:
-            raise ValueError("'end' must be greater than 'start' (%s -> %s)", self.start, self.end)
+            raise ValueError("'end' must be greater than 'start' (%s -> %s)" % (self.start, self.end))
         if version:
             self.clean_timezone_fields(version=version)
 
@@ -580,31 +578,35 @@ class Message(Item):
             raise ValueError('Item must have an account')
         if self.item_id:
             res = self.account.bulk_send(ids=[self], save_copy=save_copy, copy_to_folder=copy_to_folder)
-            assert len(res) == 1, res
+            assert len(res) == 1
             if isinstance(res[0], Exception):
                 raise res[0]
             # The item will be deleted from the original folder
             self.item_id, self.changekey = None, None
             self.folder = copy_to_folder
-        else:
-            # New message
-            if copy_to_folder:
-                if not save_copy:
-                    raise AttributeError("'save_copy' must be True when 'copy_to_folder' is set")
-                # This would better be done via send_and_save() but lets just support it here
-                self.folder = copy_to_folder
-                return self.send_and_save(conflict_resolution=conflict_resolution,
-                                          send_meeting_invitations=send_meeting_invitations)
-            assert copy_to_folder is None
-            if self.account.version.build < EXCHANGE_2010 and self.attachments:
-                # Exchange 2007 can't send attachments immediately. You need to first save, then attach, then send.
-                # This is done in send_and_save(). Delete to fully emulate send-only behavior.
-                self.send_and_save(conflict_resolution=conflict_resolution,
-                                   send_meeting_invitations=send_meeting_invitations)
-                self.delete()
-            else:
-                res = self._create(message_disposition=SEND_ONLY, send_meeting_invitations=send_meeting_invitations)
-                assert res is None
+            return None
+
+        # New message
+        if copy_to_folder:
+            if not save_copy:
+                raise AttributeError("'save_copy' must be True when 'copy_to_folder' is set")
+            # This would better be done via send_and_save() but lets just support it here
+            self.folder = copy_to_folder
+            return self.send_and_save(conflict_resolution=conflict_resolution,
+                                      send_meeting_invitations=send_meeting_invitations)
+
+        assert copy_to_folder is None
+        if self.account.version.build < EXCHANGE_2010 and self.attachments:
+            # Exchange 2007 can't send attachments immediately. You need to first save, then attach, then send.
+            # This is done in send_and_save(). Delete to fully emulate send-only behavior.
+            self.send_and_save(conflict_resolution=conflict_resolution,
+                               send_meeting_invitations=send_meeting_invitations)
+            self.delete()
+            return None
+
+        res = self._create(message_disposition=SEND_ONLY, send_meeting_invitations=send_meeting_invitations)
+        assert res is None
+        return None
 
     def send_and_save(self, update_fields=None, conflict_resolution=AUTO_RESOLVE,
                       send_meeting_invitations=SEND_TO_NONE):

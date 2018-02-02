@@ -81,7 +81,7 @@ class Account(object):
         except (ValueError, UnknownTimeZone) as e:
             # There is no translation from local timezone name to Windows timezone name, or e failed to find the
             # local timezone.
-            log.warning(e.args[0] + '. Fallback to UTC')
+            log.warning('%s. Fallback to UTC', e.args[0])
             self.default_timezone = UTC
         assert isinstance(self.default_timezone, EWSTimeZone)
         # We may need to override the default server version on a per-account basis because Microsoft may report one
