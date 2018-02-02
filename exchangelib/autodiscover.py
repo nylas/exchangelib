@@ -285,15 +285,15 @@ def _get_auth_type_or_raise(url, email, hostname):
     except RedirectError as e:
         redirect_url, redirect_hostname, redirect_has_ssl = e.url, e.server, e.has_ssl
         log.debug('We were redirected to %s', redirect_url)
+        if redirect_hostname.startswith('www.'):
+            # Try the process on the new host, without 'www'. This is beyond the autodiscover protocol and an attempt to
+            # work around seriously misconfigured Exchange servers. It's probably better to just show the Exchange
+            # admins the report from https://testconnectivity.microsoft.com
+            redirect_hostname = redirect_hostname[4:]
         canonical_hostname = _get_canonical_name(redirect_hostname)
         if canonical_hostname:
             log.debug('Canonical hostname is %s', canonical_hostname)
             redirect_hostname = canonical_hostname
-        # Try the process on the new host, without 'www'. This is beyond the autodiscover protocol and an attempt to
-        # work around seriously misconfigured Exchange servers. It's probably better to just show the Exchange
-        # admins the report from https://testconnectivity.microsoft.com
-        if redirect_hostname.startswith('www.'):
-            redirect_hostname = redirect_hostname[4:]
         if redirect_hostname == hostname:
             log.debug('We were redirected to the same host')
             raise_from(AutoDiscoverFailed('We were redirected to the same host'), None)
