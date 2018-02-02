@@ -349,7 +349,7 @@ def get_redirect_url(response, allow_relative=True, require_relative=False):
     # require_relative=True throws RelativeRedirect error if scheme and hostname are not equal to the request
     redirect_url = response.headers.get('location', None)
     if not redirect_url:
-        raise TransportError('302 redirect but no location header')
+        raise TransportError('HTTP redirect but no location header')
     # At least some servers are kind enough to supply a new location. It may be relative
     redirect_has_ssl, redirect_server, redirect_path = split_url(redirect_url)
     # The response may have been redirected already. Get the original URL
@@ -506,10 +506,8 @@ def _may_retry_on_error(r, protocol, wait):
             or (r.status_code == 302 and r.headers.get('location', '').lower() ==
                 '/ews/genericerrorpage.htm?aspxerrorpath=/ews/exchange.asmx') \
             or (r.status_code == 503):
-        # Maybe stale session. Get brand new one. But wait a bit, since the server may be rate-limiting us.
-        # This can be 302 redirect to error page, 401 authentication error or 503 service unavailable
-        if r.status_code not in (302, 401, 503):
-            # Only retry if we didn't get a useful response
+        if r.status_code not in (301, 302, 401, 503):
+            # Don't retry if we didn't get a status code that we can hope to recover from
             return False
         if protocol.credentials.fail_fast:
             return False
@@ -530,7 +528,7 @@ def _redirect_or_fail(r, redirects, allow_redirects):
         raise RedirectError(url=e.value)
     if not allow_redirects:
         raise TransportError('Redirect not allowed but we were redirected (%s -> %s)' % (r.url, redirect_url))
-    log.debug('302 Redirected to %s', redirect_url)
+    log.debug('HTTP redirected to %s', redirect_url)
     redirects += 1
     if redirects > MAX_REDIRECTS:
         raise TransportError('Max redirect count exceeded')
