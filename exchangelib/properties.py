@@ -40,7 +40,7 @@ class EWSElement(object):
         for f in self.FIELDS:
             setattr(self, f.name, kwargs.pop(f.name, None))
         if kwargs:
-            raise AttributeError("%s are invalid kwargs for this class" % ', '.join("'%s'" % k for k in kwargs.keys()))
+            raise AttributeError("%s are invalid kwargs for this class" % ', '.join("'%s'" % k for k in kwargs))
 
     def clean(self, version=None):
         # Validate attribute values using the field validator

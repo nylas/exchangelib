@@ -456,6 +456,7 @@ class Folder(RegisterMixIn):
 
     def save(self, update_fields=None):
         if self.folder_id is None:
+            # New folder
             if update_fields:
                 raise ValueError("'update_fields' is only valid for updates")
             res = list(CreateFolder(account=self.account).call(parent_folder=self.parent, folders=[self]))
@@ -465,28 +466,30 @@ class Folder(RegisterMixIn):
             self.folder_id, self.changekey = res[0].folder_id, res[0].changekey
             self.account.root.add_folder(self)  # Add this folder to the cache
             return self
-        else:
-            if not update_fields:
-                # The fields to update was not specified explicitly. Update all fields where update is possible
-                update_fields = []
-                for f in self.supported_fields(version=self.account.version):
-                    if f.is_read_only:
-                        # These cannot be changed
+
+        # Update folder
+        if not update_fields:
+            # The fields to update was not specified explicitly. Update all fields where update is possible
+            update_fields = []
+            for f in self.supported_fields(version=self.account.version):
+                if f.is_read_only:
+                    # These cannot be changed
+                    continue
+                if f.is_required or f.is_required_after_save:
+                    if getattr(self, f.name) is None or (f.is_list and not getattr(self, f.name)):
+                        # These are required and cannot be deleted
                         continue
-                    if f.is_required or f.is_required_after_save:
-                        if getattr(self, f.name) is None or (f.is_list and not getattr(self, f.name)):
-                            # These are required and cannot be deleted
-                            continue
-                    update_fields.append(f.name)
-            res = list(UpdateFolder(account=self.account).call(folders=[(self, update_fields)]))
-            assert len(res) == 1, res
-            if isinstance(res[0], Exception):
-                raise res[0]
-            folder_id, changekey = res[0].folder_id, res[0].changekey
-            assert self.folder_id == folder_id
-            assert self.changekey != changekey
-            self.changekey = changekey
-            self.account.root.update_folder(self)  # Update the folder in the cache
+                update_fields.append(f.name)
+        res = list(UpdateFolder(account=self.account).call(folders=[(self, update_fields)]))
+        assert len(res) == 1, res
+        if isinstance(res[0], Exception):
+            raise res[0]
+        folder_id, changekey = res[0].folder_id, res[0].changekey
+        assert self.folder_id == folder_id
+        assert self.changekey != changekey
+        self.changekey = changekey
+        self.account.root.update_folder(self)  # Update the folder in the cache
+        return None
 
     def delete(self):
         res = list(DeleteFolder(account=self.account).call(folders=[self]))

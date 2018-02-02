@@ -80,7 +80,7 @@ class Build(object):
         self.major_build = major_build
         self.minor_build = minor_build
         if major_version < 8:
-            raise ValueError("Exchange major versions below 8 don't support EWS (%s)", text_type(self))
+            raise ValueError("Exchange major versions below 8 don't support EWS (%s)" % text_type(self))
 
     @classmethod
     def from_xml(cls, elem):

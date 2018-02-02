@@ -68,7 +68,7 @@ class ExtendedProperty(EWSElement):
     property_tag = None  # hex integer (e.g. 0x8000) or string ('0x8000')
     property_name = None
     property_id = None  # integer as hex-formatted int (e.g. 0x8000) or normal int (32768)
-    property_type = None
+    property_type = ''
 
     __slots__ = ('value',)
 
@@ -176,11 +176,10 @@ class ExtendedProperty(EWSElement):
             values = elem.find('{%s}Values' % TNS)
             if cls.is_binary_type():
                 return [base64.b64decode(val) for val in get_xml_attrs(values, '{%s}Value' % TNS)]
-            else:
-                return [
-                    xml_text_to_value(value=val, value_type=python_type)
-                    for val in get_xml_attrs(values, '{%s}Value' % TNS)
-                ]
+            return [
+                xml_text_to_value(value=val, value_type=python_type)
+                for val in get_xml_attrs(values, '{%s}Value' % TNS)
+            ]
         if cls.is_binary_type():
             return base64.b64decode(get_xml_attr(elem, '{%s}Value' % TNS))
         extended_field_value = xml_text_to_value(value=get_xml_attr(elem, '{%s}Value' % TNS), value_type=python_type)
@@ -205,12 +204,12 @@ class ExtendedProperty(EWSElement):
 
     @classmethod
     def is_array_type(cls):
-        return cls.property_type and cls.property_type.endswith('Array')
+        return cls.property_type.endswith('Array')
 
     @classmethod
     def is_binary_type(cls):
         # We can't just test python_type() == bytes, because str == bytes in Python2
-        return cls.property_type and 'Binary' in cls.property_type
+        return 'Binary' in cls.property_type
 
     @classmethod
     def property_tag_as_int(cls):

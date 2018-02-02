@@ -244,7 +244,7 @@ class EWSService(object):
         # Raise any non-acceptable errors in the container, or return the container or the acceptable exception instance
         if response_class == 'Warning':
             try:
-                self._raise_errors(code=response_code, text=msg_text, msg_xml=msg_xml)
+                raise self._get_exception(code=response_code, text=msg_text, msg_xml=msg_xml)
             except self.WARNINGS_TO_CATCH_IN_RESPONSE as e:
                 return e
             except self.WARNINGS_TO_IGNORE_IN_RESPONSE as e:
@@ -255,14 +255,14 @@ class EWSService(object):
                 return container
         # rspclass == 'Error', or 'Success' and not 'NoError'
         try:
-            self._raise_errors(code=response_code, text=msg_text, msg_xml=msg_xml)
+            raise self._get_exception(code=response_code, text=msg_text, msg_xml=msg_xml)
         except self.ERRORS_TO_CATCH_IN_RESPONSE as e:
             return e
 
     @classmethod
-    def _raise_errors(cls, code, text, msg_xml):
+    def _get_exception(cls, code, text, msg_xml):
         if not code:
-            raise TransportError('Empty ResponseCode in ResponseMessage (MessageText: %s, MessageXml: %s)' % (
+            return TransportError('Empty ResponseCode in ResponseMessage (MessageText: %s, MessageXml: %s)' % (
                 text, msg_xml))
         if msg_xml is not None:
             # If this is an ErrorInvalidPropertyRequest error, the xml may contain a specific FieldURI
@@ -272,10 +272,10 @@ class EWSService(object):
                     text += ' (field: %s)' % xml_to_str(field_uri_elem)
         try:
             # Raise the error corresponding to the ResponseCode
-            raise vars(errors)[code](text)
+            return vars(errors)[code](text)
         except KeyError:
             # Should not happen
-            raise TransportError('Unknown ResponseCode in ResponseMessage: %s (MessageText: %s, MessageXml: %s)' % (
+            return TransportError('Unknown ResponseCode in ResponseMessage: %s (MessageText: %s, MessageXml: %s)' % (
                     code, text, msg_xml))
 
     def _get_elements_in_response(self, response):
@@ -1421,7 +1421,7 @@ class BaseUserOofSettings(EWSAccountService):
         # Raise any non-acceptable errors in the container, or return the container or the acceptable exception instance
         if response_class == 'Warning':
             try:
-                self._raise_errors(code=response_code, text=msg_text, msg_xml=msg_xml)
+                raise self._get_exception(code=response_code, text=msg_text, msg_xml=msg_xml)
             except self.WARNINGS_TO_CATCH_IN_RESPONSE as e:
                 return e
             except self.WARNINGS_TO_IGNORE_IN_RESPONSE as e:
@@ -1432,7 +1432,7 @@ class BaseUserOofSettings(EWSAccountService):
                 return container
         # rspclass == 'Error', or 'Success' and not 'NoError'
         try:
-            self._raise_errors(code=response_code, text=msg_text, msg_xml=msg_xml)
+            raise self._get_exception(code=response_code, text=msg_text, msg_xml=msg_xml)
         except self.ERRORS_TO_CATCH_IN_RESPONSE as e:
             return e
 

@@ -11,7 +11,7 @@ from six import string_types
 from .errors import ErrorInvalidServerVersion
 from .ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, NaiveDateTimeNotAllowed, UnknownTimeZone
 from .services import TNS
-from .util import create_element, get_xml_attrs, set_xml_value, value_to_xml_text, is_iterable
+from .util import create_element, get_xml_attrs, set_xml_value, value_to_xml_text, is_iterable, xml_to_str
 from .version import Build
 
 string_type = string_types[0]
@@ -387,7 +387,7 @@ class EnumField(IntegerField):
                         raise ValueError(
                             "List value '%s' on field '%s' must be one of %s" % (v, self.name, self.enum))
                     value[i] = self.enum.index(v) + 1
-            if not len(value):
+            if not value:
                 raise ValueError("Value '%s' on field '%s' must not be empty" % (value, self.name))
             if len(value) > len(set(value)):
                 raise ValueError("List entries '%s' on field '%s' must be unique" % (value, self.name))
@@ -406,8 +406,7 @@ class EnumField(IntegerField):
             try:
                 if self.is_list:
                     return [self.enum.index(v) + 1 for v in val.split(' ')]
-                else:
-                    return self.enum.index(val) + 1
+                return self.enum.index(val) + 1
             except ValueError:
                 log.warning("Cannot convert value '%s' on field '%s' to type %s", val, self.name, self.value_cls)
                 return None
@@ -417,8 +416,7 @@ class EnumField(IntegerField):
         field_elem = create_element(self.request_tag())
         if self.is_list:
             return set_xml_value(field_elem, ' '.join(self.enum[v - 1] for v in sorted(value)), version=version)
-        else:
-            return set_xml_value(field_elem, self.enum[value - 1], version=version)
+        return set_xml_value(field_elem, self.enum[value - 1], version=version)
 
 
 class EnumListField(EnumField):
@@ -645,11 +643,6 @@ class ChoiceField(CharField):
         return {c.value for c in self.choices if c.supports_version(version)}
 
 
-class TextBodyField(TextField):
-    def __init__(self, *args, **kwargs):
-        super(TextBodyField, self).__init__(*args, **kwargs)
-
-
 class BodyField(TextField):
     def __init__(self, *args, **kwargs):
         from .properties import Body
@@ -767,8 +760,7 @@ class MailboxField(EWSElementField):
             if self.field_uri is not None:
                 # We want the nested Mailbox, not the wrapper element
                 return self.value_cls.from_xml(elem=sub_elem.find(self.value_cls.response_tag()), account=account)
-            else:
-                return self.value_cls.from_xml(elem=sub_elem, account=account)
+            return self.value_cls.from_xml(elem=sub_elem, account=account)
         return self.default
 
 
@@ -1036,9 +1028,6 @@ class ExtendedPropertyField(Field):
 
 
 class ItemField(FieldURIField):
-    def __init__(self, *args, **kwargs):
-        super(ItemField, self).__init__(*args, **kwargs)
-
     @property
     def value_cls(self):
         # This is a workaround for circular imports. Item
@@ -1051,6 +1040,8 @@ class ItemField(FieldURIField):
             item_elem = elem.find(item_cls.response_tag())
             if item_elem is not None:
                 return item_cls.from_xml(elem=item_elem, account=account)
+        else:
+            return None
 
     def to_xml(self, value, version):
         # We don't want to wrap in an Item element

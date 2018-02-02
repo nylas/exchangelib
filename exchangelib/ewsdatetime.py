@@ -39,8 +39,8 @@ class EWSDate(datetime.date):
         return self.from_date(dt)  # We want to return EWSDate objects
 
     @classmethod
-    def fromordinal(cls, ordinal):
-        dt = super(EWSDate, cls).fromordinal(ordinal)
+    def fromordinal(cls, n):
+        dt = super(EWSDate, cls).fromordinal(n)
         return cls.from_date(dt)  # We want to return EWSDate objects
 
     @classmethod

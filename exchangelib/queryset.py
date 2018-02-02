@@ -212,8 +212,7 @@ class QuerySet(object):
         # service expose the 'offset' value, so we don't need to get the first 999 items.
         if isinstance(idx_or_slice, int):
             return self._getitem_idx(idx_or_slice)
-        else:
-            return self._getitem_slice(idx_or_slice)
+        return self._getitem_slice(idx_or_slice)
 
     def _getitem_idx(self, idx):
         from .services import FindItem
@@ -451,7 +450,7 @@ class QuerySet(object):
         else:
             new_qs = self.filter(*args, **kwargs)
             items = list(new_qs.__iter__())
-        if len(items) == 0:
+        if not items:
             raise DoesNotExist()
         if len(items) != 1:
             raise MultipleObjectsReturned()
