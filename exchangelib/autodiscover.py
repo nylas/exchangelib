@@ -227,27 +227,48 @@ def _try_autodiscover(hostname, credentials, email):
     try:
         return _autodiscover_hostname(hostname=hostname, credentials=credentials, email=email, has_ssl=True)
     except RedirectError as e:
+        if not e.has_ssl:
+            raise_from(AutoDiscoverFailed(
+                '%s redirected us to %s but only HTTPS redirects allowed' % (hostname, e.url)
+            ), None)
+        log.info('%s redirected us to %s', hostname, e.server)
         return _try_autodiscover(e.server, credentials, email)
-    except AutoDiscoverFailed:
+    except AutoDiscoverFailed as e:
+        log.info('Autodiscover on %s failed (%s). Trying autodiscover.%s', hostname, e, hostname)
         try:
             return _autodiscover_hostname(hostname='autodiscover.%s' % hostname, credentials=credentials, email=email,
                                           has_ssl=True)
         except RedirectError as e:
+            if not e.has_ssl:
+                raise_from(AutoDiscoverFailed(
+                    'autodiscover.%s redirected us to %s but only HTTPS redirects allowed' % (hostname, e.url)
+                ), None)
+            log.info('%s redirected us to %s', hostname, e.server)
             return _try_autodiscover(e.server, credentials, email)
         except AutoDiscoverFailed:
+            log.info('Autodiscover on %s failed (%s). Trying autodiscover.%s (plain HTTP)', hostname, e, hostname)
             try:
                 return _autodiscover_hostname(hostname='autodiscover.%s' % hostname, credentials=credentials,
                                               email=email, has_ssl=False)
             except RedirectError as e:
+                if not e.has_ssl:
+                    raise_from(AutoDiscoverFailed(
+                        'autodiscover.%s redirected us to %s but only HTTPS redirects allowed' % (hostname, e.url)
+                    ), None)
+                log.info('autodiscover.%s redirected us to %s', hostname, e.server)
                 return _try_autodiscover(e.server, credentials, email)
-            except AutoDiscoverFailed:
+            except AutoDiscoverFailed as e:
+                log.info('Autodiscover on autodiscover.%s (no SSL) failed (%s). Trying DNS records', hostname, e)
+                hostname_from_dns = _get_canonical_name(hostname='autodiscover.%s' % hostname)
                 try:
-                    hostname_from_dns = _get_canonical_name(hostname='autodiscover.%s' % hostname)
                     if not hostname_from_dns:
+                        log.info('No canonical name on autodiscover.%s Trying SRV record', hostname)
                         hostname_from_dns = _get_hostname_from_srv(hostname='autodiscover.%s' % hostname)
                     # Start over with new hostname
                     return _try_autodiscover(hostname=hostname_from_dns, credentials=credentials, email=email)
-                except AutoDiscoverFailed:
+                except AutoDiscoverFailed as e:
+                    log.info('Autodiscover on %s failed (%s). Trying _autodiscover._tcp.%s', hostname_from_dns, e,
+                             hostname)
                     # Start over with new hostname
                     try:
                         hostname_from_dns = _get_hostname_from_srv(hostname='_autodiscover._tcp.%s' % hostname)
@@ -257,9 +278,10 @@ def _try_autodiscover(hostname, credentials, email):
 
 
 def _get_auth_type_or_raise(url, email, hostname):
-    # Returns the auth type of the URL. Raises any redirection errors
+    # Returns the auth type of the URL. Raises any redirection errors. This tests host DNS, port availability, and SSL
+    # validation (if applicable).
     try:
-        return _get_autodiscover_auth_type(url=url, email=email)
+        return _get_auth_type(url=url, email=email)
     except RedirectError as e:
         redirect_url, redirect_hostname, redirect_has_ssl = e.url, e.server, e.has_ssl
         log.debug('We were redirected to %s', redirect_url)
@@ -282,10 +304,10 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl):
     # Tries to get autodiscover data on a specific host. If we are HTTP redirected, we restart the autodiscover dance on
     # the new host.
     url = '%s://%s/Autodiscover/Autodiscover.xml' % ('https' if has_ssl else 'http', hostname)
-    log.debug('Trying autodiscover on %s', url)
+    log.info('Trying autodiscover on %s', url)
     auth_type = _get_auth_type_or_raise(url=url, email=email, hostname=hostname)
     autodiscover_protocol = AutodiscoverProtocol(service_endpoint=url, credentials=credentials, auth_type=auth_type)
-    r = _get_autodiscover_response(protocol=autodiscover_protocol, email=email)
+    r = _get_response(protocol=autodiscover_protocol, email=email)
     domain = get_domain(email)
     try:
         ews_url, primary_smtp_address = _parse_response(r.text)
@@ -309,7 +331,7 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl):
 
 
 def _autodiscover_quick(credentials, email, protocol):
-    r = _get_autodiscover_response(protocol=protocol, email=email)
+    r = _get_response(protocol=protocol, email=email)
     ews_url, primary_smtp_address = _parse_response(r.text)
     if not primary_smtp_address:
         primary_smtp_address = email
@@ -319,9 +341,19 @@ def _autodiscover_quick(credentials, email, protocol):
     return primary_smtp_address, Protocol(service_endpoint=ews_url, credentials=credentials, auth_type=None)
 
 
-def _get_autodiscover_auth_type(url, email):
+def _get_payload(email):
+    # Builds a full Autodiscover XML request
+    payload = create_element('Autodiscover', xmlns=REQUEST_NS)
+    request = create_element('Request')
+    add_xml_child(request, 'EMailAddress', email)
+    add_xml_child(request, 'AcceptableResponseSchema', RESPONSE_NS)
+    payload.append(request)
+    return xml_to_str(payload, encoding=DEFAULT_ENCODING, xml_declaration=True)
+
+
+def _get_auth_type(url, email):
     try:
-        data = _get_autodiscover_payload(email=email)
+        data = _get_payload(email=email)
         return transport.get_autodiscover_authtype(service_endpoint=url, data=data)
     except TransportError as e:
         if isinstance(e, RedirectError):
@@ -333,18 +365,8 @@ def _get_autodiscover_auth_type(url, email):
         raise_from(AutoDiscoverFailed('Error guessing auth type: %s' % e), None)
 
 
-def _get_autodiscover_payload(email):
-    # Builds a full Autodiscover XML request
-    payload = create_element('Autodiscover', xmlns=REQUEST_NS)
-    request = create_element('Request')
-    add_xml_child(request, 'EMailAddress', email)
-    add_xml_child(request, 'AcceptableResponseSchema', RESPONSE_NS)
-    payload.append(request)
-    return xml_to_str(payload, encoding=DEFAULT_ENCODING, xml_declaration=True)
-
-
-def _get_autodiscover_response(protocol, email):
-    data = _get_autodiscover_payload(email=email)
+def _get_response(protocol, email):
+    data = _get_payload(email=email)
     try:
         # Rate-limiting is an issue with autodiscover if the same setup is hosting EWS and autodiscover and we just
         # hammered the server with requests. We allow redirects since some autodiscover servers will issue different
@@ -453,12 +475,11 @@ def _get_hostname_from_srv(hostname):
                 # pylint: disable=expression-not-assigned
                 int(vals[0]), int(vals[1]), int(vals[2])  # Just to raise errors if these are not ints
                 svr = vals[3]
-            except (ValueError, KeyError):
+                return svr
+            except (ValueError, IndexError):
                 raise_from(
                     AutoDiscoverFailed('Incompatible SRV record for %s (%s)' % (hostname, rdata.to_text())), None
                 )
-            else:
-                return svr
     except dns.resolver.NoNameservers:
         raise_from(AutoDiscoverFailed('No name servers for %s' % hostname), None)
     except dns.resolver.NoAnswer:
