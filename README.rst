@@ -209,7 +209,7 @@ EWS has some special requirements on datetimes and timezones. You need to use th
 
     right_now_in_utc = UTC.localize(EWSDateTime.now())
     right_now_in_utc = UTC_NOW()
-    
+
     # Already have a Python datetime object you want to use? Make sure it's localized. Then pass it to from_datetime()
     pytz_tz = pytz.timezone('Europe/Copenhagen')
     py_dt = pytz_tz.localize(datetime(2017, 12, 11, 10, 9, 8))
@@ -490,17 +490,17 @@ description of the possibilities, but we do intend to support all the possibilit
 
     Folder.register('size', FolderSize)
     print(my_folder.size)
-    
-    # In general, here's how to work with any MAPI property as listed in e.g. 
-    # https://msdn.microsoft.com/EN-US/library/office/cc815517.aspx. Let's take `PidLidTaskDueDate` as an 
+
+    # In general, here's how to work with any MAPI property as listed in e.g.
+    # https://msdn.microsoft.com/EN-US/library/office/cc815517.aspx. Let's take `PidLidTaskDueDate` as an
     # example. This is the due date for a message maked with the follow-up flag in Microsoft Outlook.
     #
-    # The PidLidTaskDueDate is documented here: https://msdn.microsoft.com/en-us/library/office/cc839641.aspx. 
-    # The property ID is `0x00008105` and the property set is `PSETID_Task`. But EWS wants the UUID for 
-    # `PSETID_Task`, so we look that up in the MS-OXPROPS pdf: 
-    # https://msdn.microsoft.com/en-us/library/cc433490(v=exchg.80).aspx. The UUID is 
-    # `00062003-0000-0000-C000-000000000046`. The property type is `PT_SYSTIME` which is also called 
-    # `SystemTime` (see 
+    # The PidLidTaskDueDate is documented here: https://msdn.microsoft.com/en-us/library/office/cc839641.aspx.
+    # The property ID is `0x00008105` and the property set is `PSETID_Task`. But EWS wants the UUID for
+    # `PSETID_Task`, so we look that up in the MS-OXPROPS pdf:
+    # https://msdn.microsoft.com/en-us/library/cc433490(v=exchg.80).aspx. The UUID is
+    # `00062003-0000-0000-C000-000000000046`. The property type is `PT_SYSTIME` which is also called
+    # `SystemTime` (see
     # https://msdn.microsoft.com/en-us/library/microsoft.exchange.webservices.data.mapipropertytype(v=exchg.80).aspx).
     #
     # In conclusion, the definition for the due date becomes:
