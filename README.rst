@@ -654,7 +654,7 @@ the ``Account`` model:
 .. code-block:: python
 
     data = a.export(items)  # Pass a list of Item instances or (item_id, changekey) tuples
-    a.upload(data)  # Restore the items
+    a.upload((a.inbox, d) for d in data))  # Restore the items. Expects a list of (folder, data) tuples
 
 
 Troubleshooting
