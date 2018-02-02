@@ -646,6 +646,17 @@ You can get and set OOF messages using the ``Account.oof_settings`` property:
     )
 
 
+Export and upload
+^^^^^^^^^^^^^^^^^
+Exchange supports backup and restore of folder contents using special export and upload services. They are available on
+the ``Account`` model:
+
+.. code-block:: python
+
+    data = a.export(items)  # Pass a list of Item instances or (item_id, changekey) tuples
+    a.upload(data)  # Restore the items
+
+
 Troubleshooting
 ^^^^^^^^^^^^^^^
 If you are having trouble using this library, the first thing to try is to enable debug logging. This will output a huge
@@ -672,7 +683,5 @@ Most class definitions have a docstring containing at least a URL to the MSDN  p
 
 Notes
 ^^^^^
-
-Item export and upload is supported, for efficient backup, restore and migration. See `Account.export()` and `Account.upload()`.
 
 Almost all item fields are supported. The remaining ones are tracked in https://github.com/ecederstrand/exchangelib/issues/203.
