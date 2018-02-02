@@ -11,7 +11,7 @@ from six import string_types
 from .errors import ErrorInvalidServerVersion
 from .ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, NaiveDateTimeNotAllowed, UnknownTimeZone
 from .services import TNS
-from .util import create_element, get_xml_attrs, set_xml_value, value_to_xml_text, is_iterable, xml_to_str
+from .util import create_element, get_xml_attrs, set_xml_value, value_to_xml_text, is_iterable
 from .version import Build
 
 string_type = string_types[0]
@@ -1040,8 +1040,7 @@ class ItemField(FieldURIField):
             item_elem = elem.find(item_cls.response_tag())
             if item_elem is not None:
                 return item_cls.from_xml(elem=item_elem, account=account)
-        else:
-            return None
+        return None
 
     def to_xml(self, value, version):
         # We don't want to wrap in an Item element

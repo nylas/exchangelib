@@ -164,6 +164,7 @@ class EWSTimeZone(object):
         return self.ms_id == other.ms_id
 
     def __hash__(self):
+        # We're shuffling around with base classes in from_pytz(). Make sure we have __hash__() implementation.
         return super(EWSTimeZone, self).__hash__()
 
     @classmethod
