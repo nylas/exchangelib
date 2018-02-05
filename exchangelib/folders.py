@@ -849,6 +849,7 @@ class Folder(RegisterMixIn, SearchableMixIn):
             raise folder
         if folder.__class__ != cls:
             raise ValueError("Expected 'folder' %r to be a %s instance" % (folder, cls))
+
         return folder
 
     def refresh(self):
