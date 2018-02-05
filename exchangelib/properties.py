@@ -58,7 +58,8 @@ class EWSElement(object):
     def from_xml(cls, elem, account):
         if elem is None:
             return None
-        assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
+        if elem.tag != cls.response_tag():
+            raise ValueError('Unexpected element tag in class %s: %s vs %s' % (cls, elem.tag, cls.response_tag()))
         kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.FIELDS}
         elem.clear()
         return cls(**kwargs)
@@ -92,7 +93,8 @@ class EWSElement(object):
 
     @classmethod
     def request_tag(cls):
-        assert cls.ELEMENT_NAME
+        if not cls.ELEMENT_NAME:
+            raise ValueError('Class %s is missing the ELEMENT_NAME attribute' % cls)
         return {
             TNS: 't:%s' % cls.ELEMENT_NAME,
             MNS: 'm:%s' % cls.ELEMENT_NAME,
@@ -100,7 +102,10 @@ class EWSElement(object):
 
     @classmethod
     def response_tag(cls):
-        assert cls.NAMESPACE and cls.ELEMENT_NAME
+        if not cls.NAMESPACE:
+            raise ValueError('Class %s is missing the NAMESPACE attribute' % cls)
+        if not cls.ELEMENT_NAME:
+            raise ValueError('Class %s is missing the ELEMENT_NAME attribute' % cls)
         return '{%s}%s' % (cls.NAMESPACE, cls.ELEMENT_NAME)
 
     @classmethod
@@ -283,7 +288,8 @@ class AvailabilityMailbox(EWSElement):
 
     @classmethod
     def from_mailbox(cls, mailbox):
-        assert isinstance(mailbox, Mailbox)
+        if not isinstance(mailbox, Mailbox):
+            raise ValueError("'mailbox' %s must be a Mailbox instance" % mailbox)
         return cls(name=mailbox.name, email_address=mailbox.email_address, routing_type=mailbox.routing_type)
 
 
@@ -331,7 +337,8 @@ class Room(Mailbox):
     def from_xml(cls, elem, account):
         if elem is None:
             return None
-        assert elem.tag == cls.response_tag(), (elem.tag, cls.response_tag())
+        if elem.tag != cls.response_tag():
+            raise ValueError('Unexpected element tag in class %s: %s vs %s' % (cls, elem.tag, cls.response_tag()))
         id_elem = elem.find('{%s}Id' % TNS)
         res = cls(
             name=get_xml_attr(id_elem, '{%s}Name' % TNS),

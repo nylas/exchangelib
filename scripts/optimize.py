@@ -6,7 +6,7 @@ import logging
 import os
 import time
 
-from yaml import load
+from yaml import safe_load
 
 from exchangelib import DELEGATE, services, ServiceAccount, Configuration, Account, EWSDateTime, EWSTimeZone, \
     CalendarItem
@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.WARNING)
 
 try:
     with open(os.path.join(os.path.dirname(__file__), '../settings.yml')) as f:
-        settings = load(f)
+        settings = safe_load(f)
 except FileNotFoundError:
     print('Copy settings.yml.sample to settings.yml and enter values for your test server')
     raise

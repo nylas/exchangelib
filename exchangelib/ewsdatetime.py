@@ -95,7 +95,8 @@ class EWSDateTime(datetime.datetime):
 
     @classmethod
     def from_datetime(cls, d):
-        assert type(d) == datetime.datetime, (type(d), d)
+        if type(d) != datetime.datetime:
+            raise ValueError("'%s' must be a datetime instance" % d)
         if d.tzinfo is None:
             tz = None
         elif isinstance(d.tzinfo, EWSTimeZone):

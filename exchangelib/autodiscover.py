@@ -169,7 +169,8 @@ def discover(email, credentials):
     and return a hopefully-cached Protocol to the callee.
     """
     log.debug('Attempting autodiscover on email %s', email)
-    assert isinstance(credentials, Credentials)
+    if not isinstance(credentials, Credentials):
+        raise ValueError("'credentials' %s must be a Credentials instance" % credentials)
     domain = get_domain(email)
     # We may be using multiple different credentials and changing our minds on SSL verification. This key combination
     # should be safe.
@@ -181,15 +182,12 @@ def discover(email, credentials):
         log.debug('_autodiscover_cache_lock acquired')
         if autodiscover_key in _autodiscover_cache:
             protocol = _autodiscover_cache[autodiscover_key]
-            assert isinstance(protocol, AutodiscoverProtocol)
+            if not isinstance(protocol, AutodiscoverProtocol):
+                raise ValueError('Unexpected autodiscover cache contents: %s' % protocol)
             log.debug('Cache hit for domain %s credentials %s: %s', domain, credentials, protocol.server)
             try:
                 # This is the main path when the cache is primed
-                primary_smtp_address, protocol = _autodiscover_quick(credentials=credentials, email=email,
-                                                                     protocol=protocol)
-                assert primary_smtp_address
-                assert isinstance(protocol, Protocol)
-                return primary_smtp_address, protocol
+                return _autodiscover_quick(credentials=credentials, email=email, protocol=protocol)
             except AutoDiscoverFailed:
                 # Autodiscover no longer works with this domain. Clear cache and try again after releasing the lock
                 del _autodiscover_cache[autodiscover_key]
@@ -204,11 +202,7 @@ def discover(email, credentials):
             log.debug('Cache contents: %s', _autodiscover_cache)
             try:
                 # This eventually fills the cache in _autodiscover_hostname
-                primary_smtp_address, protocol = _try_autodiscover(hostname=domain, credentials=credentials,
-                                                                   email=email)
-                assert primary_smtp_address
-                assert isinstance(protocol, Protocol)
-                return primary_smtp_address, protocol
+                return _try_autodiscover(hostname=domain, credentials=credentials, email=email)
             except AutoDiscoverRedirect as e:
                 if email.lower() == e.redirect_email.lower():
                     raise_from(AutoDiscoverCircularRedirect('Redirect to same email address: %s' % email), None)
@@ -419,10 +413,12 @@ def _parse_response(response):
         # This is redirection to e.g. Office365
         raise AutoDiscoverRedirect(redirect_email)
     # The AccountType element is only available if we are not redirecting
-    assert get_xml_attr(account, '{%s}AccountType' % RESPONSE_NS) == 'email'
+    account_type = get_xml_attr(account, '{%s}AccountType' % RESPONSE_NS)
+    if account_type != 'email':
+        raise ValueError("'Unexpected AccountType '%s'" % account_type)
+    user = resp.find('{%s}User' % RESPONSE_NS)
     # AutoDiscoverSMTPAddress might not be present in the XML, so primary_smtp_address might be None. In this
     # case, the original email address IS the primary address
-    user = resp.find('{%s}User' % RESPONSE_NS)
     primary_smtp_address = get_xml_attr(user, '{%s}AutoDiscoverSMTPAddress' % RESPONSE_NS)
     protocols = {get_xml_attr(p, '{%s}Type' % RESPONSE_NS): p for p in account.findall('{%s}Protocol' % RESPONSE_NS)}
     # There are three possible protocol types: EXCH, EXPR and WEB.
@@ -438,8 +434,9 @@ def _parse_response(response):
             raise_from(AutoDiscoverFailed('Invalid AutoDiscover response: %s' % xml_to_str(autodiscover)), None)
 
     ews_url = get_xml_attr(protocol, '{%s}EwsUrl' % RESPONSE_NS)
+    if not ews_url:
+        raise ValueError("Required element 'EwsUrl' not found in response")
     log.debug('Primary SMTP: %s, EWS endpoint: %s', primary_smtp_address, ews_url)
-    assert ews_url and primary_smtp_address
     return ews_url, primary_smtp_address
 
 

@@ -76,7 +76,8 @@ def resolve_field_path(field_path, folder, strict=True):
                         % (subfieldname, field_path, fnames)
                     )
         else:
-            assert issubclass(field.value_cls, SingleFieldIndexedElement)
+            if not issubclass(field.value_cls, SingleFieldIndexedElement):
+                raise ValueError("'field.value_cls' %s must be an SingleFieldIndexedElement instance" % field.value_cls)
             if subfieldname:
                 raise ValueError(
                     "IndexedField path '%s' must not specify subfield, e.g. just '%s__%s'"
@@ -98,11 +99,12 @@ class FieldPath(object):
     property with a specific label, or a particular subfield field on that property. """
     def __init__(self, field, label=None, subfield=None):
         # 'label' and 'subfield' are only used for IndexedField fields
-        assert isinstance(field, (FieldURIField, ExtendedPropertyField))
+        if not isinstance(field, (FieldURIField, ExtendedPropertyField)):
+            raise ValueError("'field' %s must be an FieldURIField, of ExtendedPropertyField instance" % field)
         if label:
-            assert isinstance(label, string_types)
+            raise ValueError("'label' %s must be an %s instance" % (label, string_types))
         if subfield:
-            assert isinstance(subfield, SubField)
+            raise ValueError("'subfield' %s must be a Subfield instance" % subfield)
         self.field = field
         self.label = label
         self.subfield = subfield
@@ -214,12 +216,12 @@ class Field(object):
         # The Exchange build when this field was introduced. When talking with versions prior to this version,
         # we will ignore this field.
         if supported_from is not None:
-            assert isinstance(supported_from, Build)
+            raise ValueError("'supported_from' %s must be a Build instance" % supported_from)
         self.supported_from = supported_from
         # The Exchange build when this field was deprecated. When talking with versions at or later than this version,
         # we will ignore this field.
         if deprecated_from is not None:
-            assert isinstance(deprecated_from, Build)
+            raise ValueError("'deprecated_from' %s must be a Build instance" % deprecated_from)
         self.deprecated_from = deprecated_from
 
     def clean(self, value, version=None):
@@ -293,15 +295,18 @@ class FieldURIField(Field):
         return set_xml_value(field_elem, value, version=version)
 
     def field_uri_xml(self):
-        assert self.field_uri
+        if not self.field_uri:
+            raise ValueError("'field_uri' value is missing")
         return create_element('t:FieldURI', FieldURI=self.field_uri)
 
     def request_tag(self):
-        assert self.field_uri_postfix
+        if not self.field_uri_postfix:
+            raise ValueError("'field_uri_postfix' value is missing")
         return 't:%s' % self.field_uri_postfix
 
     def response_tag(self):
-        assert self.field_uri_postfix
+        if not self.field_uri_postfix:
+            raise ValueError("'field_uri_postfix' value is missing")
         return '{%s}%s' % (TNS, self.field_uri_postfix)
 
     def __hash__(self):
@@ -372,8 +377,9 @@ class EnumField(IntegerField):
     # stored internally as integers but output in XML as strings.
     def __init__(self, *args, **kwargs):
         self.enum = kwargs.pop('enum')
-        # Set difference min/max defaults than IntegerField
-        assert 'max' not in kwargs
+        # Set different min/max defaults than IntegerField
+        if 'max' not in kwargs:
+            raise AttributeError("EnumField does not support the 'max' attribute")
         kwargs['min'] = kwargs.pop('min', 1)
         kwargs['max'] = kwargs['min'] + len(self.enum) - 1
         super(EnumField, self).__init__(*args, **kwargs)
@@ -555,7 +561,9 @@ class CharField(TextField):
 
     def __init__(self, *args, **kwargs):
         self.max_length = kwargs.pop('max_length', 255)
-        assert 0 < self.max_length < 256  # A field supporting messages longer than 255 chars should be TextField
+        if not 1 <= self.max_length <= 255:
+            # A field supporting messages longer than 255 chars should be TextField
+            raise ValueError("'max_length' must be in the range 1-255")
         super(CharField, self).__init__(*args, **kwargs)
 
     def clean(self, value, version=None):
@@ -874,7 +882,8 @@ class NamedSubField(SubField):
 
     def __init__(self, *args, **kwargs):
         self.field_uri = kwargs.pop('field_uri')
-        assert ':' not in self.field_uri
+        if ':' in self.field_uri:
+            raise ValueError("'field_uri' value must not contain a colon")
         super(NamedSubField, self).__init__(*args, **kwargs)
 
     def from_xml(self, elem, account):

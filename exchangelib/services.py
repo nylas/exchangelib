@@ -71,7 +71,8 @@ class EWSService(object):
     #     raise NotImplementedError()
 
     def _get_elements(self, payload):
-        assert isinstance(payload, ElementType)
+        if not isinstance(payload, ElementType):
+            raise ValueError("'payload' %s must be an ElementType" % payload)
         try:
             # Send the request, get the response and do basic sanity checking on the SOAP XML
             response = self._get_response_xml(payload=payload)
@@ -117,7 +118,8 @@ class EWSService(object):
 
     def _get_response_xml(self, payload):
         # Takes an XML tree and returns SOAP payload as an XML tree
-        assert isinstance(payload, ElementType)
+        if not isinstance(payload, ElementType):
+            raise ValueError("'payload' %s must be an ElementType" % payload)
         # Microsoft really doesn't want to make our lives easy. The server may report one version in our initial version
         # guessing tango, but then the server may decide that any arbitrary legacy backend server may actually process
         # the request for an account. Prepare to handle ErrorInvalidSchemaVersionForMailboxVersion errors and set the
@@ -149,7 +151,9 @@ class EWSService(object):
             try:
                 res = self._get_soap_payload(soap_response=soap_response_payload)
             except (ErrorInvalidSchemaVersionForMailboxVersion, ErrorInvalidServerVersion):
-                assert account  # This should never happen for non-account services
+                if not account:
+                    # This should never happen for non-account services
+                    raise ValueError("'account' should not be None")
                 # The guessed server version is wrong for this account. Try the next version
                 log.debug('API version %s was invalid for account %s', api_version, account)
                 continue
@@ -182,7 +186,8 @@ class EWSService(object):
 
     @classmethod
     def _get_soap_payload(cls, soap_response):
-        assert isinstance(soap_response, ElementType)
+        if not isinstance(soap_response, ElementType):
+            raise ValueError("'soap_response' %s must be an ElementType" % soap_response)
         body = soap_response.find('{%s}Body' % SOAPNS)
         if body is None:
             raise TransportError('No Body element in SOAP response')
@@ -201,7 +206,8 @@ class EWSService(object):
 
     @classmethod
     def _raise_soap_errors(cls, fault):
-        assert isinstance(fault, ElementType)
+        if not isinstance(fault, ElementType):
+            raise ValueError("'fault' %s must be an ElementType" % fault)
         # Fault: See http://www.w3.org/TR/2000/NOTE-SOAP-20000508/#_Toc478383507
         faultcode = get_xml_attr(fault, 'faultcode')
         faultstring = get_xml_attr(fault, 'faultstring')
@@ -225,7 +231,8 @@ class EWSService(object):
             faultcode, faultstring, faultactor, detail))
 
     def _get_element_container(self, message, name=None):
-        assert isinstance(message, ElementType)
+        if not isinstance(message, ElementType):
+            raise ValueError("'message' %s must be an ElementType" % message)
         # ResponseClass: See http://msdn.microsoft.com/en-us/library/aa566424(v=EXCHG.140).aspx
         response_class = message.get('ResponseClass')
         # ResponseCode, MessageText: See http://msdn.microsoft.com/en-us/library/aa580757(v=EXCHG.140).aspx
@@ -279,9 +286,9 @@ class EWSService(object):
                     code, text, msg_xml))
 
     def _get_elements_in_response(self, response):
-        assert isinstance(response, list)
         for msg in response:
-            assert isinstance(msg, ElementType)
+            if not isinstance(msg, ElementType):
+                raise ValueError("'msg' %s must be an ElementType" % msg)
             container_or_exc = self._get_element_container(message=msg, name=self.element_container_name)
             if isinstance(container_or_exc, ElementType):
                 for c in self._get_elements_in_container(container=container_or_exc):
@@ -337,7 +344,8 @@ class PagingEWSMixIn(EWSService):
                 raise TransportError('Unexpected next offset: %s -> %s' % (item_count, next_offset))
 
     def _get_page(self, response):
-        assert len(response) == 1
+        if len(response) != 1:
+            raise ValueError("Expected single item in 'response', got %s" % response)
         rootfolder = self._get_element_container(message=response[0], name='{%s}RootFolder' % MNS)
         is_last_page = rootfolder.get('IncludesLastItemInRange').lower() in ('true', '0')
         offset = rootfolder.get('IndexedPagingOffset')
@@ -347,7 +355,8 @@ class PagingEWSMixIn(EWSService):
         next_offset = None if is_last_page else int(offset)
         item_count = int(rootfolder.get('TotalItemsInView'))
         if not item_count:
-            assert next_offset is None
+            if next_offset is not None:
+                raise ValueError("Expected empty 'next_offset' when 'item_count' is 0")
             rootfolder = None
         log.debug('%s: Got page with next offset %s (last_page %s)', self.SERVICE_NAME, next_offset, is_last_page)
         return rootfolder, next_offset
@@ -500,7 +509,8 @@ class GetItem(EWSAccountService, EWSPooledMixIn):
             item_id = ItemId(*(item if isinstance(item, tuple) else (item.item_id, item.changekey)))
             log.debug('Getting item %s', item)
             set_xml_value(item_ids, item_id, self.account.version)
-        assert not is_empty, '"items" must not be empty'
+        if is_empty:
+            raise ValueError('"items" must not be empty')
         getitem.append(item_ids)
         return getitem
 
@@ -549,7 +559,8 @@ class CreateItem(EWSAccountService, EWSPooledMixIn):
             is_empty = False
             log.debug('Adding item %s', item)
             set_xml_value(item_elems, item, self.account.version)
-        assert not is_empty, '"items" must not be empty'
+        if is_empty:
+            raise ValueError('"items" must not be empty')
         createitem.append(item_elems)
         return createitem
 
@@ -696,7 +707,8 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
                 updates.append(elem)
             itemchange.append(updates)
             itemchanges.append(itemchange)
-        assert not is_empty, '"items" must not be empty'
+        if is_empty:
+            raise ValueError('"items" must not be empty')
         updateitem.append(itemchanges)
         return updateitem
 
@@ -749,7 +761,8 @@ class DeleteItem(EWSAccountService, EWSPooledMixIn):
             item_id = ItemId(*(item if isinstance(item, tuple) else (item.item_id, item.changekey)))
             log.debug('Deleting item %s', item)
             set_xml_value(item_ids, item_id, self.account.version)
-        assert not is_empty, '"items" must not be empty'
+        if is_empty:
+            raise ValueError('"items" must not be empty')
         deleteitem.append(item_ids)
         return deleteitem
 
@@ -867,7 +880,8 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
                                                  Offset=text_type(offset), BasePoint='Beginning')
             findfolder.append(indexedpageviewitem)
         else:
-            assert offset == 0, 'Offset is %s' % offset
+            if offset != 0:
+                raise ValueError('Offsets are only supported from Exchange 2010')
         parentfolderids = create_element('m:ParentFolderIds')
         set_xml_value(parentfolderids, self.folders, version=self.account.version)
         findfolder.append(parentfolderids)
@@ -929,7 +943,8 @@ class GetFolder(EWSAccountService):
                 set_xml_value(folder_ids, FolderId(*folder), self.account.version)
                 continue
             set_xml_value(folder_ids, folder, version=self.account.version)
-        assert not is_empty, '"folders" must not be empty'
+        if is_empty:
+            raise ValueError('"folders" must not be empty')
         getfolder.append(folder_ids)
         return getfolder
 
@@ -958,7 +973,8 @@ class CreateFolder(EWSAccountService):
 
     def get_payload(self, parent_folder, folders):
         from .folders import Folder
-        assert isinstance(parent_folder, Folder)
+        if not isinstance(parent_folder, ElementType):
+            raise ValueError("'parent_folder' %s must be a Folder instance" % parent_folder)
         create_folder = create_element('m:%s' % self.SERVICE_NAME)
         parentfolderid = create_element('m:ParentFolderId')
         set_xml_value(parentfolderid, parent_folder, version=self.account.version)
@@ -969,7 +985,8 @@ class CreateFolder(EWSAccountService):
             is_empty = False
             log.debug('Creating folder %s', folder)
             set_xml_value(folders_elem, folder, self.account.version)
-        assert not is_empty, '"folders" must not be empty'
+        if is_empty:
+            raise ValueError('"folders" must not be empty')
         create_folder.append(folders_elem)
         return create_folder
 
@@ -1049,7 +1066,8 @@ class UpdateFolder(EWSAccountService):
                 updates.append(elem)
             folderchange.append(updates)
             folderchanges.append(folderchange)
-        assert not is_empty, '"folders" must not be empty'
+        if is_empty:
+            raise ValueError('"folders" must not be empty')
         updatefolder.append(folderchanges)
         return updatefolder
 
@@ -1077,7 +1095,8 @@ class DeleteFolder(EWSAccountService):
                               version=self.account.version)
                 continue
             set_xml_value(folder_ids, folder, version=self.account.version)
-        assert not is_empty, '"folders" must not be empty'
+        if is_empty:
+            raise ValueError('"folders" must not be empty')
         deletefolder.append(folder_ids)
         return deletefolder
 
@@ -1107,7 +1126,8 @@ class EmptyFolder(EWSAccountService):
                               version=self.account.version)
                 continue
             set_xml_value(folder_ids, folder, version=self.account.version)
-        assert not is_empty, '"folders" must not be empty'
+        if is_empty:
+            raise ValueError('"folders" must not be empty')
         emptyfolder.append(folder_ids)
         return emptyfolder
 
@@ -1135,7 +1155,8 @@ class SendItem(EWSAccountService):
             item_id = ItemId(*(item if isinstance(item, tuple) else (item.item_id, item.changekey)))
             log.debug('Sending item %s', item)
             set_xml_value(item_ids, item_id, self.account.version)
-        assert not is_empty, '"items" must not be empty'
+        if is_empty:
+            raise ValueError('"items" must not be empty')
         senditem.append(item_ids)
         if saved_item_folder:
             saveditemfolderid = create_element('m:SavedItemFolderId')
@@ -1172,7 +1193,8 @@ class MoveItem(EWSAccountService):
             item_id = ItemId(*(item if isinstance(item, tuple) else (item.item_id, item.changekey)))
             log.debug('Moving item %s to %s', item, to_folder)
             set_xml_value(item_ids, item_id, self.account.version)
-        assert not is_empty, '"items" must not be empty'
+        if is_empty:
+            raise ValueError('"items" must not be empty')
         moveeitem.append(item_ids)
         return moveeitem
 
@@ -1224,7 +1246,8 @@ class ResolveNames(EWSService):
         for entry in unresolved_entries:
             is_empty = False
             add_xml_child(payload, 'm:UnresolvedEntry', entry)
-        assert not is_empty, '"unresolvedentries" must not be empty'
+        if is_empty:
+            raise ValueError('"unresolved_entries" must not be empty')
         return payload
 
 
@@ -1256,7 +1279,8 @@ class GetAttachment(EWSAccountService):
             is_empty = False
             attachment_id = item if isinstance(item, AttachmentId) else AttachmentId(id=item)
             set_xml_value(attachment_ids, attachment_id, self.account.version)
-        assert not is_empty, '"items" must not be empty'
+        if is_empty:
+            raise ValueError('"items" must not be empty')
         payload.append(attachment_ids)
         return payload
 
@@ -1285,7 +1309,8 @@ class CreateAttachment(EWSAccountService):
         for item in items:
             is_empty = False
             set_xml_value(attachments, item, self.account.version)
-        assert not is_empty, '"items" must not be empty'
+        if is_empty:
+            raise ValueError('"items" must not be empty')
         payload.append(attachments)
         return payload
 
@@ -1322,7 +1347,8 @@ class DeleteAttachment(EWSAccountService):
             is_empty = False
             attachment_id = item if isinstance(item, AttachmentId) else AttachmentId(id=item)
             set_xml_value(attachment_ids, attachment_id, self.account.version)
-        assert not is_empty, '"items" must not be empty'
+        if is_empty:
+            raise ValueError('"items" must not be empty')
         payload.append(attachment_ids)
         return payload
 
@@ -1401,7 +1427,8 @@ class UploadItems(EWSAccountService, EWSPooledMixIn):
 class BaseUserOofSettings(EWSAccountService):
     # Common response parsing for non-standard OOF services
     def _get_element_container(self, message, name=None):
-        assert isinstance(message, ElementType)
+        if not isinstance(message, ElementType):
+            raise ValueError("'message' %s must be an ElementType" % message)
         # ResponseClass: See http://msdn.microsoft.com/en-us/library/aa566424(v=EXCHG.140).aspx
         response_message = message.find('{%s}ResponseMessage' % MNS)
         response_class = response_message.get('ResponseClass')
@@ -1455,9 +1482,11 @@ class GetUserOofSettings(BaseUserOofSettings):
     def _get_elements_in_response(self, response):
         # This service only returns one result, but 'response' is a list
         from .settings import OofSettings
-        assert len(response) == 1
+        if len(response) != 1:
+            raise ValueError("Expected 'response' length 1, got %s" % response)
         response = response[0]
-        assert isinstance(response, ElementType), response
+        if not isinstance(response, ElementType):
+            raise ValueError("'response' %s must be an ElementType" % response)
         container_or_exc = self._get_element_container(message=response, name=self.element_container_name)
         if isinstance(container_or_exc, Exception):
             # pylint: disable=raising-bad-type
@@ -1474,7 +1503,8 @@ class SetUserOofSettings(BaseUserOofSettings):
 
     def call(self, oof_settings, mailbox):
         res = list(self._get_elements(payload=self.get_payload(oof_settings=oof_settings, mailbox=mailbox)))
-        assert len(res) == 1
+        if len(res) != 1:
+            raise ValueError("Expected 'res' length 1, got %s" % res)
         return res[0]
 
     def get_payload(self, oof_settings, mailbox):

@@ -50,9 +50,11 @@ class BaseProtocol(object):
     HTTP_ADAPTER_CLS = requests.adapters.HTTPAdapter
 
     def __init__(self, service_endpoint, credentials, auth_type):
-        assert isinstance(credentials, Credentials)
+        if not isinstance(credentials, Credentials):
+            raise ValueError("'credentials' %s must be a Credentials instance" % credentials)
         if auth_type is not None:
-            assert auth_type in AUTH_TYPE_MAP, 'Unsupported auth type %s' % auth_type
+            if auth_type not in AUTH_TYPE_MAP:
+                raise ValueError("'auth_type' %s must be one if %s" % (auth_type, AUTH_TYPE_MAP.keys()))
         self.has_ssl, self.server, _ = split_url(service_endpoint)
         self.credentials = credentials
         self.service_endpoint = service_endpoint
@@ -244,9 +246,11 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
     def resolve_names(self, names, return_full_contact_data=False, search_scope=None, shape=None):
         from .items import SHAPE_CHOICES, SEARCH_SCOPE_CHOICES
         if search_scope:
-            assert search_scope in SEARCH_SCOPE_CHOICES
+            if search_scope not in SEARCH_SCOPE_CHOICES:
+                raise ValueError("'search_scope' %s must be one if %s" % (search_scope, SEARCH_SCOPE_CHOICES))
         if shape:
-            assert shape in SHAPE_CHOICES
+            if shape not in AUTH_TYPE_MAP:
+                raise ValueError("'shape' %s must be one if %s" % (shape, SHAPE_CHOICES))
         return list(ResolveNames(protocol=self).call(
             unresolved_entries=names, return_full_contact_data=return_full_contact_data, search_scope=search_scope,
             contact_data_shape=shape,

@@ -276,7 +276,8 @@ class Occurrence(EWSElement):
 
     @classmethod
     def from_xml(cls, elem, account):
-        assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
+        if elem.tag != cls.response_tag():
+            raise ValueError('Unexpected element tag in class %s: %s vs %s' % (cls, elem.tag, cls.response_tag()))
         item_id, changekey = cls.id_from_xml(elem)
         kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.supported_fields()}
         elem.clear()

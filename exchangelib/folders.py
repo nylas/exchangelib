@@ -113,11 +113,13 @@ class Folder(RegisterMixIn):
         parent = kwargs.pop('parent', None)
         if parent:
             if self.account:
-                assert parent.account == self.account
+                if parent.account != self.account:
+                    raise ValueError("'parent.account' must match 'account'")
             else:
                 self.account = parent.account
             if 'parent_folder_id' in kwargs:
-                assert parent.id == kwargs['parent_folder_id']
+                if parent.id != kwargs['parent_folder_id']:
+                    raise ValueError("'parent_folder_id' must match 'parent' ID")
             kwargs['parent_folder_id'] = ParentFolderId(id=parent.folder_id, changekey=parent.changekey)
         super(Folder, self).__init__(**kwargs)
 
@@ -129,7 +131,8 @@ class Folder(RegisterMixIn):
         super(Folder, self).clean(version=version)
         if self.account is not None:
             from .account import Account
-            assert isinstance(self.account, Account)
+            if not isinstance(self.account, Account):
+                raise ValueError("'account' must be an Account instance" % self.account)
 
     @property
     def parent(self):
@@ -145,7 +148,8 @@ class Folder(RegisterMixIn):
         if value is None:
             self.parent_folder_id = None
         else:
-            assert isinstance(value, Folder)
+            if not isinstance(value, Folder):
+                raise ValueError("'parent' must be a Folder instance")
             self.parent_folder_id = ParentFolderId(id=value.folder_id, changekey=value.changekey)
             self.account = value.account
 
@@ -389,8 +393,10 @@ class Folder(RegisterMixIn):
         :param max_items: the max number of items to return
         :return: a generator for the returned item IDs or items
         """
-        assert shape in SHAPE_CHOICES
-        assert depth in ITEM_TRAVERSAL_CHOICES
+        if shape not in SHAPE_CHOICES:
+            raise ValueError("'shape' %s must be one of %s" % (shape, SHAPE_CHOICES))
+        if depth not in ITEM_TRAVERSAL_CHOICES:
+            raise ValueError("'depth' %s must be one of %s" % (depth, ITEM_TRAVERSAL_CHOICES))
         if additional_fields:
             allowed_fields = self.allowed_fields()
             complex_fields = self.complex_fields()
@@ -399,12 +405,13 @@ class Folder(RegisterMixIn):
                     raise ValueError("'%s' is not a valid field on %s" % (f.field.name, self.supported_item_models))
                 if f.field in complex_fields:
                     raise ValueError("find_items() does not support field '%s'. Use fetch() instead" % f.field.name)
-        if calendar_view is not None:
-            assert isinstance(calendar_view, CalendarView)
+        if calendar_view is not None and not isinstance(calendar_view, CalendarView):
+            raise ValueError("'calendar_view' must be a CalendarView instance")
         if page_size is None:
             # Set a sane default
             page_size = FindItem.CHUNKSIZE
-        assert isinstance(page_size, int)
+        if not isinstance(page_size, int):
+            raise ValueError("'page_size' must be an integer")
 
         # Build up any restrictions
         if q.is_empty():
@@ -460,7 +467,8 @@ class Folder(RegisterMixIn):
             if update_fields:
                 raise ValueError("'update_fields' is only valid for updates")
             res = list(CreateFolder(account=self.account).call(parent_folder=self.parent, folders=[self]))
-            assert len(res) == 1, res
+            if len(res) != 1:
+                raise ValueError('Expected result length 1, but got %s' % res)
             if isinstance(res[0], Exception):
                 raise res[0]
             self.folder_id, self.changekey = res[0].folder_id, res[0].changekey
@@ -481,29 +489,34 @@ class Folder(RegisterMixIn):
                         continue
                 update_fields.append(f.name)
         res = list(UpdateFolder(account=self.account).call(folders=[(self, update_fields)]))
-        assert len(res) == 1, res
+        if len(res) != 1:
+            raise ValueError('Expected result length 1, but got %s' % res)
         if isinstance(res[0], Exception):
             raise res[0]
         folder_id, changekey = res[0].folder_id, res[0].changekey
-        assert self.folder_id == folder_id
-        assert self.changekey != changekey
+        if self.folder_id != folder_id:
+            raise ValueError('folder_id mismatch')
+        # Don't check changekey value. It may not change on no-op updates
         self.changekey = changekey
         self.account.root.update_folder(self)  # Update the folder in the cache
         return None
 
     def delete(self):
         res = list(DeleteFolder(account=self.account).call(folders=[self]))
-        assert len(res) == 1, res
+        if len(res) != 1:
+            raise ValueError('Expected result length 1, but got %s' % res)
         if isinstance(res[0], Exception):
             raise res[0]
         self.account.root.remove_folder(self)  # Remove the updated folder from the cache
         self.folder_id, self.changekey = None, None
 
     def empty(self, delete_type=HARD_DELETE, delete_sub_folders=False):
-        assert delete_type in DELETE_TYPE_CHOICES
+        if delete_type not in DELETE_TYPE_CHOICES:
+            raise ValueError("'delete_type' %s must be one of %s" % (delete_type, DELETE_TYPE_CHOICES))
         res = list(EmptyFolder(account=self.account).call(folders=[self], delete_type=delete_type,
                                                           delete_sub_folders=delete_sub_folders))
-        assert len(res) == 1, res
+        if len(res) != 1:
+            raise ValueError('Expected result length 1, but got %s' % res)
         if isinstance(res[0], Exception):
             raise res[0]
         if delete_sub_folders:
@@ -611,8 +624,10 @@ class Folder(RegisterMixIn):
         # 'depth' controls whether to return direct children or recurse into sub-folders
         if not self.account:
             raise ValueError('Folder must have an account')
-        assert shape in SHAPE_CHOICES
-        assert depth in FOLDER_TRAVERSAL_CHOICES
+        if shape not in SHAPE_CHOICES:
+            raise ValueError("'shape' %s must be one of %s" % (shape, SHAPE_CHOICES))
+        if depth not in FOLDER_TRAVERSAL_CHOICES:
+            raise ValueError("'depth' %s must be one of %s" % (depth, FOLDER_TRAVERSAL_CHOICES))
         additional_fields = [FieldPath(field=f) for f in self.supported_fields(version=self.account.version)]
         # TODO: Support the Restriction class for folders, too
         return FindFolder(account=self.account, folders=[self]).call(
@@ -640,17 +655,20 @@ class Folder(RegisterMixIn):
     @classmethod
     def get_distinguished(cls, account):
         """Gets the distinguished folder for this folder class"""
-        assert cls.DISTINGUISHED_FOLDER_ID
+        if not cls.DISTINGUISHED_FOLDER_ID:
+            raise ValueError('Class %s must have a DISTINGUISHED_FOLDER_ID value' % cls)
         folders = list(cls.get_folders(
             account=account, folders=[cls(account=account, name=cls.DISTINGUISHED_FOLDER_ID)])
         )
         if not folders:
             raise ErrorFolderNotFound('Could not find distinguished folder %s' % cls.DISTINGUISHED_FOLDER_ID)
-        assert len(folders) == 1
+        if len(folders) != 1:
+            raise ValueError('Expected result length 1, but got %s' % folders)
         folder = folders[0]
         if isinstance(folder, Exception):
             raise folder
-        assert isinstance(folder, cls)
+        if not isinstance(folder, cls):
+            raise ValueError("'folder' %s must be a %s instance" % (folder, cls))
         return folder
 
     def refresh(self):
@@ -661,11 +679,13 @@ class Folder(RegisterMixIn):
         folders = list(self.get_folders(account=self.account, folders=[self]))
         if not folders:
             raise ErrorFolderNotFound('Folder %s disappeared' % self)
-        assert len(folders) == 1
+        if len(folders) != 1:
+            raise ValueError('Expected result length 1, but got %s' % folders)
         fresh_folder = folders[0]
         if isinstance(fresh_folder, Exception):
             raise fresh_folder
-        assert self.folder_id == fresh_folder.folder_id
+        if self.folder_id != fresh_folder.folder_id:
+            raise ValueError('folder_id mismatch')
         # Apparently, the changekey may get updated
         for f in self.FIELDS:
             setattr(self, f.name, getattr(fresh_folder, f.name))
@@ -715,15 +735,18 @@ class Root(Folder):
         return self._folders_map.get(folder_id, None)
 
     def add_folder(self, folder):
-        assert folder.folder_id
+        if not folder.folder_id:
+            raise ValueError("'folder' must have a folder_id")
         self._folders_map[folder.folder_id] = folder
 
     def update_folder(self, folder):
-        assert folder.folder_id
+        if not folder.folder_id:
+            raise ValueError("'folder' must have a folder_id")
         self._folders_map[folder.folder_id] = folder
 
     def remove_folder(self, folder):
-        assert folder.folder_id
+        if not folder.folder_id:
+            raise ValueError("'folder' must have a folder_id")
         try:
             del self._folders_map[folder.folder_id]
         except KeyError:
@@ -776,7 +799,8 @@ class Root(Folder):
     def get_default_folder(self, folder_cls):
         # Returns the distinguished folder instance of type folder_cls belonging to this account. If no distinguished
         # folder was found, try as best we can to return the default folder of type 'folder_cls'
-        assert folder_cls.DISTINGUISHED_FOLDER_ID
+        if not folder_cls.DISTINGUISHED_FOLDER_ID:
+            raise ValueError("'folder_cls' %s must have a DISTINGUISHED_FOLDER_ID value" % folder_cls)
         try:
             # Get the default folder
             log.debug('Testing default %s folder with GetFolder', folder_cls)
@@ -788,9 +812,9 @@ class Root(Folder):
         except ErrorAccessDenied:
             # Maybe we just don't have GetFolder access? Try FindItems instead
             log.debug('Testing default %s folder with FindItem', folder_cls)
-            f = folder_cls(account=self.account, name=folder_cls.DISTINGUISHED_FOLDER_ID)
-            f.test_access()
-            return self._folders_map.get(f.folder_id, f)  # Use cached instance if available
+            fld = folder_cls(account=self.account, name=folder_cls.DISTINGUISHED_FOLDER_ID)
+            fld.test_access()
+            return self._folders_map.get(fld.folder_id, fld)  # Use cached instance if available
         except ErrorFolderNotFound:
             # There's no folder named fld_class.DISTINGUISHED_FOLDER_ID. Try to guess which folder is the default.
             # Exchange makes this unnecessarily difficult.

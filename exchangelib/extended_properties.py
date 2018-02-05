@@ -164,9 +164,10 @@ class ExtendedProperty(EWSElement):
             if not is_iterable(self.value):
                 raise ValueError("'%s' value '%s' must be a list" % (self.__class__.__name__, self.value))
             for v in self.value:
-                assert isinstance(v, python_type)
+                if not isinstance(v, python_type):
+                    raise ValueError("'value' element %s must be an instance of %s" % (v, python_type))
         else:
-            assert isinstance(self.value, python_type)
+            raise ValueError("'value' %s must be an instance of %s" % (self.value, python_type))
 
     @classmethod
     def from_xml(cls, elem, account):

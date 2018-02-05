@@ -87,7 +87,8 @@ class RegisterMixIn(EWSElement):
         """
         Register a custom extended property in this item class so they can be accessed just like any other attribute
         """
-        assert cls.INSERT_AFTER_FIELD
+        if not cls.INSERT_AFTER_FIELD:
+            raise ValueError('Class %s is missing INSERT_AFTER_FIELD value' % cls)
         try:
             cls.get_field_by_fieldname(attr_name)
         except ValueError:
@@ -193,22 +194,24 @@ class Item(RegisterMixIn):
         from .folders import Folder
         from .account import Account
         self.account = kwargs.pop('account', None)
-        if self.account is not None:
-            assert isinstance(self.account, Account)
+        if self.account is not None and not isinstance(self.account, Account):
+            raise ValueError("'account' %s must be an Account instance" % self.account)
         self.folder = kwargs.pop('folder', None)
         if self.folder is not None:
-            assert isinstance(self.folder, Folder)
+            if not isinstance(self.folder, Folder):
+                raise ValueError("'folder' %s must be a Folder instance" % self.folder)
             if self.folder.account is not None:
                 if self.account is not None:
                     # Make sure the account from kwargs matches the folder account
-                    assert self.account == self.folder.account
+                    if self.account != self.folder.account:
+                        raise ValueError("'account' does not match 'folder.account'")
                 self.account = self.folder.account
         super(Item, self).__init__(**kwargs)
         # pylint: disable=access-member-before-definition
         if self.attachments:
             for a in self.attachments:
-                if a.parent_item:
-                    assert a.parent_item is self  # An attachment cannot refer to 'self' in __init__
+                if a.parent_item and a.parent_item is not self:
+                    raise ValueError("'parent_item' of attachment %s must point to this item" % a)
                 else:
                     a.parent_item = self
                 self.attach(self.attachments)
@@ -223,8 +226,9 @@ class Item(RegisterMixIn):
                 conflict_resolution=conflict_resolution,
                 send_meeting_invitations=send_meeting_invitations
             )
-            assert self.item_id == item_id
-            # Don't assert that changekeys are different. No-op saves will sometimes leave the changekey intact
+            if self.item_id != item_id:
+                raise ValueError("'item_id' mismatch in returned update response")
+            # Don't check that changekeys are different. No-op saves will sometimes leave the changekey intact
             self.changekey = changekey
         else:
             if update_fields:
@@ -237,8 +241,10 @@ class Item(RegisterMixIn):
             item = self._create(message_disposition=SAVE_ONLY, send_meeting_invitations=send_meeting_invitations)
             self.item_id, self.changekey = item.item_id, item.changekey
             for old_att, new_att in zip(self.attachments, item.attachments):
-                assert old_att.attachment_id is None
-                assert new_att.attachment_id is not None
+                if old_att.attachment_id is not None:
+                    raise ValueError("Old 'attachment_id' is not empty")
+                if new_att.attachment_id is None:
+                    raise ValueError("New 'attachment_id' is empty")
                 old_att.attachment_id = new_att.attachment_id
             if tmp_attachments:
                 # Exchange 2007 workaround. See above
@@ -253,9 +259,11 @@ class Item(RegisterMixIn):
             items=[self], folder=self.folder, message_disposition=message_disposition,
             send_meeting_invitations=send_meeting_invitations)
         if message_disposition in (SEND_ONLY, SEND_AND_SAVE_COPY):
-            assert not res
+            if res:
+                raise ValueError('Got a response in non-save mode')
             return None
-        assert len(res) == 1
+        if len(res) != 1:
+            raise ValueError('Expected result length 1, but got %s' % res)
         if isinstance(res[0], Exception):
             raise res[0]
         return res[0]
@@ -263,7 +271,8 @@ class Item(RegisterMixIn):
     def _update(self, update_fieldnames, message_disposition, conflict_resolution, send_meeting_invitations):
         if not self.account:
             raise ValueError('Item must have an account')
-        assert self.changekey
+        if not self.changekey:
+            raise ValueError('Item must have changekey')
         if not update_fieldnames:
             # The fields to update was not specified explicitly. Update all fields where update is possible
             update_fieldnames = []
@@ -291,9 +300,11 @@ class Item(RegisterMixIn):
             conflict_resolution=conflict_resolution,
             send_meeting_invitations_or_cancellations=send_meeting_invitations)
         if message_disposition == SEND_AND_SAVE_COPY:
-            assert not res
+            if res:
+                raise ValueError('Got a response in non-save mode')
             return None
-        assert len(res) == 1
+        if len(res) != 1:
+            raise ValueError('Expected result length 1, but got %s' % res)
         if isinstance(res[0], Exception):
             raise res[0]
         return res[0]
@@ -305,12 +316,13 @@ class Item(RegisterMixIn):
         if not self.item_id:
             raise ValueError('Item must have an ID')
         res = list(self.account.fetch(ids=[self]))
-        assert len(res) == 1, res
+        if len(res) != 1:
+            raise ValueError('Expected result length 1, but got %s' % res)
         if isinstance(res[0], Exception):
             raise res[0]
         fresh_item = res[0]
-        assert self.item_id == fresh_item.item_id
-        assert self.changekey == fresh_item.changekey
+        if self.item_id != fresh_item.item_id:
+            raise ValueError('Unexpected item_id of fresh item')
         for f in self.FIELDS:
             setattr(self, f.name, getattr(fresh_item, f.name))
 
@@ -320,7 +332,8 @@ class Item(RegisterMixIn):
         if not self.item_id:
             raise ValueError('Item must have an ID')
         res = self.account.bulk_move(ids=[self], to_folder=to_folder)
-        assert len(res) == 1, res
+        if len(res) != 1:
+            raise ValueError('Expected result length 1, but got %s' % res)
         if isinstance(res[0], Exception):
             raise res[0]
         self.item_id, self.changekey = res[0]
@@ -357,7 +370,8 @@ class Item(RegisterMixIn):
         res = self.account.bulk_delete(
             ids=[self], delete_type=delete_type, send_meeting_cancellations=send_meeting_cancellations,
             affected_task_occurrences=affected_task_occurrences, suppress_read_receipts=suppress_read_receipts)
-        assert len(res) == 1, res
+        if len(res) != 1:
+            raise ValueError('Expected result length 1, but got %s' % res)
         if isinstance(res[0], Exception):
             raise res[0]
 
@@ -389,7 +403,8 @@ class Item(RegisterMixIn):
         if not is_iterable(attachments, generators_allowed=True):
             attachments = [attachments]
         for a in attachments:
-            assert a.parent_item is self
+            if a.parent_item is not self:
+                raise ValueError('Attachment does not belong to this item')
             if self.item_id:
                 # Item is already created. Detach  the attachment server-side now
                 a.detach()
@@ -405,7 +420,8 @@ class Item(RegisterMixIn):
 
     @classmethod
     def from_xml(cls, elem, account):
-        assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
+        if elem.tag != cls.response_tag():
+            raise ValueError('Unexpected element tag in class %s: %s vs %s' % (cls, elem.tag, cls.response_tag()))
         item_id, changekey = cls.id_from_xml(elem=elem)
         kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.supported_fields()}
         elem.clear()
@@ -578,7 +594,8 @@ class Message(Item):
             raise ValueError('Item must have an account')
         if self.item_id:
             res = self.account.bulk_send(ids=[self], save_copy=save_copy, copy_to_folder=copy_to_folder)
-            assert len(res) == 1
+            if len(res) != 1:
+                raise ValueError('Expected result length 1, but got %s' % res)
             if isinstance(res[0], Exception):
                 raise res[0]
             # The item will be deleted from the original folder
@@ -595,7 +612,6 @@ class Message(Item):
             return self.send_and_save(conflict_resolution=conflict_resolution,
                                       send_meeting_invitations=send_meeting_invitations)
 
-        assert copy_to_folder is None
         if self.account.version.build < EXCHANGE_2010 and self.attachments:
             # Exchange 2007 can't send attachments immediately. You need to first save, then attach, then send.
             # This is done in send_and_save(). Delete to fully emulate send-only behavior.
@@ -605,7 +621,8 @@ class Message(Item):
             return None
 
         res = self._create(message_disposition=SEND_ONLY, send_meeting_invitations=send_meeting_invitations)
-        assert res is None
+        if res:
+            raise ValueError('Unexpected response in send-only mode')
         return None
 
     def send_and_save(self, update_fields=None, conflict_resolution=AUTO_RESOLVE,
@@ -631,7 +648,8 @@ class Message(Item):
                     message_disposition=SEND_AND_SAVE_COPY,
                     send_meeting_invitations=send_meeting_invitations
                 )
-                assert res is None
+                if res:
+                    raise ValueError('Unexpected response in send-only mode')
 
 
 class Task(Item):
@@ -695,7 +713,8 @@ class Task(Item):
                             self.complete_date, self.start_date)
                 self.complete_date = self.start_date
         if self.percent_complete is not None:
-            assert Decimal(0) <= self.percent_complete <= Decimal(100), self.percent_complete
+            if not Decimal(0) <= self.percent_complete <= Decimal(100):
+                raise ValueError("'percent_complete' must be in range 0.0 - 100.0")
             if self.status == self.COMPLETED and self.percent_complete != Decimal(100):
                 # percent_complete must be 100% if task is complete
                 log.warning("'percent_complete' must be 100 when 'status' is '%s' (%s). Resetting",

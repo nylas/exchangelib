@@ -56,8 +56,8 @@ class Attachment(EWSElement):
 
     def clean(self, version=None):
         from .items import Item
-        if self.parent_item is not None:
-            assert isinstance(self.parent_item, Item)
+        if self.parent_item is not None and not isinstance(self.parent_item, Item):
+            raise ValueError("self.parent_item value '%s' must be an Item instance" % self.parent_item)
         # pylint: disable=access-member-before-definition
         if self.content_type is None and self.name is not None:
             self.content_type = mimetypes.guess_type(self.name)[0] or 'application/octet-stream'
@@ -73,13 +73,16 @@ class Attachment(EWSElement):
             i if isinstance(i, Exception) else self.from_xml(elem=i, account=self.parent_item.account)
             for i in CreateAttachment(account=self.parent_item.account).call(parent_item=self.parent_item, items=[self])
         )
-        assert len(items) == 1
+        if len(items) != 1:
+            raise ValueError('Expected single item, got %s' % items)
         root_item_id = items[0]
         if isinstance(root_item_id, Exception):
             raise root_item_id
         attachment_id = root_item_id.attachment_id
-        assert attachment_id.root_id == self.parent_item.item_id
-        assert attachment_id.root_changekey != self.parent_item.changekey
+        if attachment_id.root_id != self.parent_item.item_id:
+            raise ValueError('root_id vs. item_id mismatch')
+        if attachment_id.root_changekey == self.parent_item.changekey:
+            raise ValueError('root_id changekey match')
         self.parent_item.changekey = attachment_id.root_changekey
         # EWS does not like receiving root_id and root_changekey on subsequent requests
         attachment_id.root_id = None
@@ -96,12 +99,15 @@ class Attachment(EWSElement):
             i if isinstance(i, Exception) else RootItemId.from_xml(elem=i, account=self.parent_item.account)
             for i in DeleteAttachment(account=self.parent_item.account).call(items=[self.attachment_id])
         )
-        assert len(items) == 1
+        if len(items) != 1:
+            raise ValueError('Expected single item, got %s' % items)
         root_item_id = items[0]
         if isinstance(root_item_id, Exception):
             raise root_item_id
-        assert root_item_id.id == self.parent_item.item_id
-        assert root_item_id.changekey != self.parent_item.changekey
+        if root_item_id.id != self.parent_item.item_id:
+            raise ValueError('root_item_id vs. item_id mismatch')
+        if root_item_id.changekey == self.parent_item.changekey:
+            raise ValueError('root_item_id changekey match')
         self.parent_item.changekey = root_item_id.changekey
         self.parent_item = None
         self.attachment_id = None
@@ -146,11 +152,11 @@ class FileAttachment(Attachment):
             raise ValueError('%s must have an account' % self.__class__.__name__)
         elems = list(GetAttachment(account=self.parent_item.account).call(
             items=[self.attachment_id], include_mime_content=False))
-        assert len(elems) == 1
+        if len(elems) != 1:
+            raise ValueError('Expected single item, got %s' % elems)
         elem = elems[0]
         if isinstance(elem, Exception):
             raise elem
-        assert not isinstance(elem, tuple), elem
         # Don't use get_xml_attr() here because we want to handle empty file content as '', not None
         val = elem.find('{%s}Content' % TNS)
         if val is None:
@@ -162,14 +168,16 @@ class FileAttachment(Attachment):
 
     @content.setter
     def content(self, value):
-        assert isinstance(value, bytes)
+        if not isinstance(value, bytes):
+            raise ValueError("'value' %s must be a bytes object" % value)
         self._content = value
 
     @classmethod
     def from_xml(cls, elem, account):
         if elem is None:
             return None
-        assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
+        if elem.tag != cls.response_tag():
+            raise ValueError('Unexpected element tag in class %s: %s vs %s' % (cls, elem.tag, cls.response_tag()))
         kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.FIELDS}
         kwargs['content'] = kwargs.pop('_content')
         elem.clear()
@@ -210,25 +218,29 @@ class ItemAttachment(Attachment):
             for i in GetAttachment(account=self.parent_item.account).call(
                 items=[self.attachment_id], include_mime_content=True)
         )
-        assert len(items) == 1
+        if len(items) != 1:
+            raise ValueError('Expected single item, got %s' % items)
         attachment = items[0]
         if isinstance(attachment, Exception):
             raise attachment
-        assert attachment.item is not None, 'GetAttachment returned no item'
+        if attachment.item is None:
+            raise ValueError('GetAttachment returned no item')
         self._item = attachment.item
         return self._item
 
     @item.setter
     def item(self, value):
         from .items import Item
-        assert isinstance(value, Item)
+        if not isinstance(value, Item):
+            raise ValueError("'value' %s must be an Item object" % value)
         self._item = value
 
     @classmethod
     def from_xml(cls, elem, account):
         if elem is None:
             return None
-        assert elem.tag == cls.response_tag(), (cls, elem.tag, cls.response_tag())
+        if elem.tag != cls.response_tag():
+            raise ValueError('Unexpected element tag in class %s: %s vs %s' % (cls, elem.tag, cls.response_tag()))
         kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.FIELDS}
         kwargs['item'] = kwargs.pop('_item')
         elem.clear()

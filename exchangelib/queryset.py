@@ -59,10 +59,14 @@ class QuerySet(object):
         # items = list(qs)
         # new_qs = qs.exclude(bar='baz')  # This should work, and should fetch from the server
         #
-        assert isinstance(self.q, (type(None), Q))
-        assert isinstance(self.only_fields, (type(None), tuple))
-        assert isinstance(self.order_fields, (type(None), tuple))
-        assert self.return_format in self.RETURN_TYPES
+        if not isinstance(self.q, (type(None), Q)):
+            raise ValueError("self.q value '%s' must be None or a Q instance" % self.q)
+        if not isinstance(self.only_fields, (type(None), tuple)):
+            raise ValueError("self.only_fields value '%s' must be None or a tuple" % self.only_fields)
+        if not isinstance(self.order_fields, (type(None), tuple)):
+            raise ValueError("self.order_fields value '%s' must be None or a tuple" % self.order_fields)
+        if self.return_format not in self.RETURN_TYPES:
+            raise ValueError("self.return_value '%s' must be one of %s" % (self.return_format, self.RETURN_TYPES))
         # Only mutable objects need to be deepcopied. Folder should be the same object
         new_qs = self.__class__(self.folder)
         new_qs.q = None if self.q is None else deepcopy(self.q)
@@ -85,7 +89,8 @@ class QuerySet(object):
         return FieldPath.from_string('changekey', folder=self.folder)
 
     def _additional_fields(self):
-        assert isinstance(self.only_fields, tuple)
+        if not isinstance(self.only_fields, tuple):
+            raise ValueError("self.only_fields value '%s' must be a tuple" % self.only_fields)
         # Remove ItemId and ChangeKey. We get them unconditionally
         additional_fields = {f for f in self.only_fields if not f.field.is_attribute}
 
@@ -216,7 +221,6 @@ class QuerySet(object):
 
     def _getitem_idx(self, idx):
         from .services import FindItem
-        assert isinstance(idx, int)
         if self.is_cached:
             return self._cache[idx]
         if idx < 0:
@@ -237,7 +241,6 @@ class QuerySet(object):
 
     def _getitem_slice(self, s):
         from .services import FindItem
-        assert isinstance(s, slice)
         if ((s.start or 0) < 0) or ((s.stop or 0) < 0) or ((s.step or 0) < 0):
             # islice() does not support negative start, stop and step. Make sure cache is full by iterating the full
             # query result, and then slice on the cache.
@@ -272,7 +275,8 @@ class QuerySet(object):
             yield i
 
     def _as_values(self, iterable):
-        assert self.only_fields, 'values() requires at least one field name'
+        if not self.only_fields:
+            raise ValueError('values() requires at least one field name')
         has_non_attribute_fields = bool({f for f in self.only_fields if not f.field.is_attribute})
         if not has_non_attribute_fields:
             # _query() will return an iterator of (item_id, changekey) tuples
@@ -290,7 +294,8 @@ class QuerySet(object):
             yield {f.path: f.get_value(i) for f in self.only_fields}
 
     def _as_values_list(self, iterable):
-        assert self.only_fields, 'values_list() requires at least one field name'
+        if not self.only_fields:
+            raise ValueError('values_list() requires at least one field name')
         has_non_attribute_fields = bool({f for f in self.only_fields if not f.field.is_attribute})
         if not has_non_attribute_fields:
             # _query() will return an iterator of (item_id, changekey) tuples
@@ -308,7 +313,8 @@ class QuerySet(object):
             yield tuple(f.get_value(i) for f in self.only_fields)
 
     def _as_flat_values_list(self, iterable):
-        assert self.only_fields and len(self.only_fields) == 1, 'flat=True requires exactly one field name'
+        if not self.only_fields or len(self.only_fields) != 1:
+            raise ValueError('flat=True requires exactly one field name')
         flat_field_path = self.only_fields[0]
         if flat_field_path == self._item_id_field:
             # _query() will return an iterator of (item_id, changekey) tuples

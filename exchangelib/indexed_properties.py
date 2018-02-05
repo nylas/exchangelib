@@ -23,7 +23,8 @@ class SingleFieldIndexedElement(IndexedElement):
     @classmethod
     def value_field(cls, version=None):
         fields = cls.supported_fields(version=version)
-        assert len(fields) == 1
+        if len(fields) != 1:
+            raise ValueError('This class must have only one field (found %s)' % fields)
         return fields[0]
 
 

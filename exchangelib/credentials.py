@@ -15,6 +15,7 @@ log = logging.getLogger(__name__)
 
 IMPERSONATION = 'impersonation'
 DELEGATE = 'delegate'
+ACCESS_TYPES = (IMPERSONATION, DELEGATE)
 
 
 @python_2_unicode_compatible

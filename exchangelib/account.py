@@ -12,7 +12,7 @@ from six import string_types
 from exchangelib.services import GetUserOofSettings, SetUserOofSettings
 from exchangelib.settings import OofSettings
 from .autodiscover import discover
-from .credentials import DELEGATE, IMPERSONATION
+from .credentials import DELEGATE, IMPERSONATION, ACCESS_TYPES
 from .errors import ErrorAccessDenied, UnknownTimeZone
 from .ewsdatetime import EWSTimeZone, UTC
 from .fields import FieldPath
@@ -61,10 +61,12 @@ class Account(object):
         self.fullname = fullname
         self.locale = locale or getlocale()[0] or None  # get_locale() might not be able to determine the locale
         if self.locale is not None:
-            assert isinstance(self.locale, string_types)
+            if not isinstance(self.locale, string_types):
+                raise ValueError("Expected 'locale' to be a string, got %s" % self.locale)
         # Assume delegate access if individual credentials are provided. Else, assume service user with impersonation
         self.access_type = access_type or (DELEGATE if credentials else IMPERSONATION)
-        assert self.access_type in (DELEGATE, IMPERSONATION)
+        if self.access_type not in ACCESS_TYPES:
+            raise ValueError("'access_type' %s must be one of %s" % (self.access_type, ACCESS_TYPES))
         if autodiscover:
             if not credentials:
                 raise AttributeError('autodiscover requires credentials')
@@ -83,7 +85,8 @@ class Account(object):
             # local timezone.
             log.warning('%s. Fallback to UTC', e.args[0])
             self.default_timezone = UTC
-        assert isinstance(self.default_timezone, EWSTimeZone)
+        if not isinstance(self.default_timezone, EWSTimeZone):
+            raise ValueError("Expected 'default_timezone' to be an EWSTimeZone, got %s" % self.default_timezone)
         # We may need to override the default server version on a per-account basis because Microsoft may report one
         # server version up-front but delegate account requests to an older backend server.
         self.version = self.protocol.version
@@ -95,7 +98,8 @@ class Account(object):
             log.warning('Access denied to root folder')
             self.root = Root(account=self)
 
-        assert isinstance(self.protocol, Protocol)
+        if not isinstance(self.protocol, Protocol):
+            raise ValueError("Expected 'protocol' to be a Protocol, got %s" % self.protocol)
         log.debug('Added account: %s', self)
 
     @property
@@ -288,7 +292,8 @@ class Account(object):
 
     @oof_settings.setter
     def oof_settings(self, value):
-        assert isinstance(value, OofSettings)
+        if not isinstance(value, OofSettings):
+            raise ValueError("'value' must be an OofSettings instance")
         SetUserOofSettings(self).call(mailbox=Mailbox(email_address=self.primary_smtp_address), oof_settings=value)
 
     def export(self, items):
@@ -346,10 +351,17 @@ class Account(object):
                  BulkCreateResult objects are normal Item objects except they only contain the 'item_id' and 'changekey'
                  of the created item, and the 'item_id' on any attachments that were also created.
         """
-        assert message_disposition in MESSAGE_DISPOSITION_CHOICES
-        assert send_meeting_invitations in SEND_MEETING_INVITATIONS_CHOICES
+        if message_disposition not in MESSAGE_DISPOSITION_CHOICES:
+            raise ValueError("'message_disposition' %s must be one of %s" % (
+                message_disposition, MESSAGE_DISPOSITION_CHOICES
+            ))
+        if send_meeting_invitations not in SEND_MEETING_INVITATIONS_CHOICES:
+            raise ValueError("'send_meeting_invitations' %s must be one of %s" % (
+                send_meeting_invitations, SEND_MEETING_INVITATIONS_CHOICES
+            ))
         if folder is not None:
-            assert isinstance(folder, Folder)
+            if not isinstance(folder, Folder):
+                raise ValueError("'folder' %s must be a Folder instence" % folder)
             if folder.account != self:
                 raise ValueError('"Folder must belong to this account')
         if message_disposition == SAVE_ONLY and folder is None:
@@ -358,8 +370,9 @@ class Account(object):
             folder = self.sent  # 'Sent' is default EWS behaviour
         if message_disposition == SEND_ONLY and folder is not None:
             raise AttributeError("Folder must be None in send-ony mode")
-        # bulk_create() on a queryset does not make sense because it returns items that have already been created
-        assert not isinstance(items, QuerySet)
+        if isinstance(items, QuerySet):
+            # bulk_create() on a queryset does not make sense because it returns items that have already been created
+            raise ValueError('Cannot bulk create items from a QuerySet')
         log.debug(
             'Adding items for %s (folder %s, message_disposition: %s, send_meeting_invitations: %s)',
             self,
@@ -398,10 +411,20 @@ class Account(object):
         :param suppress_read_receipts: nly supported from Exchange 2013. True or False
         :return: a list of either (item_id, changekey) tuples or exception instances in the same order as the input.
         """
-        assert conflict_resolution in CONFLICT_RESOLUTION_CHOICES
-        assert message_disposition in MESSAGE_DISPOSITION_CHOICES
-        assert send_meeting_invitations_or_cancellations in SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES
-        assert suppress_read_receipts in (True, False)
+        if conflict_resolution not in CONFLICT_RESOLUTION_CHOICES:
+            raise ValueError("'conflict_resolution' %s must be one of %s" % (
+                conflict_resolution, CONFLICT_RESOLUTION_CHOICES
+            ))
+        if message_disposition not in MESSAGE_DISPOSITION_CHOICES:
+            raise ValueError("'message_disposition' %s must be one of %s" % (
+                message_disposition, MESSAGE_DISPOSITION_CHOICES
+            ))
+        if send_meeting_invitations_or_cancellations not in SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES:
+            raise ValueError("'send_meeting_invitations_or_cancellations' %s must be one of %s" % (
+                send_meeting_invitations_or_cancellations, SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES
+            ))
+        if suppress_read_receipts not in (True, False):
+            raise ValueError("'suppress_read_receipts' %s must be True or False" % suppress_read_receipts)
         if message_disposition == SEND_ONLY:
             raise ValueError('Cannot send-only existing objects. Use SendItem service instead')
         # bulk_update() on a queryset does not make sense because there would be no opportunity to alter the items. In
@@ -446,10 +469,20 @@ class Account(object):
         :param suppress_read_receipts: only supported from Exchange 2013. True or False.
         :return: a list of either True or exception instances in the same order as the input.
         """
-        assert delete_type in DELETE_TYPE_CHOICES
-        assert send_meeting_cancellations in SEND_MEETING_CANCELLATIONS_CHOICES
-        assert affected_task_occurrences in AFFECTED_TASK_OCCURRENCES_CHOICES
-        assert suppress_read_receipts in (True, False)
+        if delete_type not in DELETE_TYPE_CHOICES:
+            raise ValueError("'delete_type' %s must be one of %s" % (
+                delete_type, DELETE_TYPE_CHOICES
+            ))
+        if send_meeting_cancellations not in SEND_MEETING_CANCELLATIONS_CHOICES:
+            raise ValueError("'send_meeting_cancellations' %s must be one of %s" % (
+                send_meeting_cancellations, SEND_MEETING_CANCELLATIONS_CHOICES
+            ))
+        if affected_task_occurrences not in AFFECTED_TASK_OCCURRENCES_CHOICES:
+            raise ValueError("'affected_task_occurrences' %s must be one of %s" % (
+                affected_task_occurrences, AFFECTED_TASK_OCCURRENCES_CHOICES
+            ))
+        if suppress_read_receipts not in (True, False):
+            raise ValueError("'suppress_read_receipts' %s must be True or False" % suppress_read_receipts)
         log.debug(
             'Deleting items for %s (delete_type: %s, send_meeting_invitations: %s, affected_task_occurences: %s)',
             self,
@@ -495,7 +528,8 @@ class Account(object):
 
     def bulk_move(self, ids, to_folder):
         # Move items to another folder. Returns new IDs for the items that were moved
-        assert isinstance(to_folder, Folder)
+        if not isinstance(to_folder, Folder):
+            raise ValueError("'to_folder' %s must be a Folder instence" % to_folder)
         # 'ids' could be an unevaluated QuerySet, e.g. if we ended up here via `bulk_move(some_folder.filter(...))`. In
         # that case, we want to use its iterator. Otherwise, peek() will start a count() which is wasteful because we
         # need the item IDs immediately afterwards. iterator() will only do the bare minimum.

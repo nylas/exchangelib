@@ -20,12 +20,12 @@ import warnings
 from xml.etree.ElementTree import ParseError
 
 from dateutil.relativedelta import relativedelta
-import pytz
 import psutil
+import pytz
 import requests
 import requests_mock
 from six import PY2, string_types
-from yaml import load
+from yaml import safe_load
 
 from exchangelib import close_connections
 from exchangelib.account import Account, SAVE_ONLY, SEND_ONLY, SEND_AND_SAVE_COPY
@@ -52,7 +52,7 @@ from exchangelib.folders import Calendar, DeletedItems, Drafts, Inbox, Outbox, S
     Contacts, Folder, RecipientCache, GALContacts, System, AllContacts, MyContactsExtended, Reminders, Favorites, \
     AllItems, ConversationSettings, Friends, RSSFeeds, Sharing, IMContactList, QuickContacts, Journal, Notes, \
     SyncIssues, MyContacts, ToDoSearch
-from exchangelib.indexed_properties import IndexedElement, EmailAddress, PhysicalAddress, PhoneNumber, \
+from exchangelib.indexed_properties import EmailAddress, PhysicalAddress, PhoneNumber, \
     SingleFieldIndexedElement, MultiFieldIndexedElement
 from exchangelib.items import Item, CalendarItem, Message, Contact, Task, DistributionList
 from exchangelib.properties import Attendee, Mailbox, RoomList, MessageHeader, Room, ItemId, Member, EWSElement
@@ -60,7 +60,7 @@ from exchangelib.protocol import BaseProtocol, Protocol, NoVerifyHTTPAdapter
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.recurrence import Recurrence, AbsoluteYearlyPattern, RelativeYearlyPattern, AbsoluteMonthlyPattern, \
     RelativeMonthlyPattern, WeeklyPattern, DailyPattern, FirstOccurrence, LastOccurrence, Occurrence, \
-    DeletedOccurrence, NoEndPattern, EndDatePattern, NumberedPattern, ExtraWeekdaysField, DAY, WEEK_DAY, WEEKEND_DAY, \
+    NoEndPattern, EndDatePattern, NumberedPattern, ExtraWeekdaysField, DAY, WEEK_DAY, WEEKEND_DAY, \
     MONDAY, WEDNESDAY, FEBRUARY, AUGUST, SECOND, LAST
 from exchangelib.restriction import Restriction, Q
 from exchangelib.settings import OofSettings
@@ -68,7 +68,7 @@ from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, Get
 from exchangelib.transport import NOAUTH, BASIC, DIGEST, NTLM, wrap, _get_auth_method_from_response
 from exchangelib.util import chunkify, peek, get_redirect_url, to_xml, BOM, get_domain, value_to_xml_text, \
     post_ratelimited, create_element, CONNECTION_ERRORS, PrettyXmlHandler, xml_to_str
-from exchangelib.version import Build, Version, EXCHANGE_2007, EXCHANGE_2010, EXCHANGE_2013, EXCHANGE_2016
+from exchangelib.version import Build, Version, EXCHANGE_2007, EXCHANGE_2010, EXCHANGE_2013
 from exchangelib.winzone import generate_map, CLDR_TO_MS_TIMEZONE_MAP
 
 if PY2:
@@ -361,7 +361,6 @@ class EWSDateTimeTest(unittest.TestCase):
             EWSTimeZone.timezone('UNKNOWN')
 
         # Test timezone known by pytz but with no Winzone mapping
-        import pytz
         tz = pytz.timezone('Africa/Tripoli')
         # This hack smashes the pytz timezone cache. Don't reuse the original timezone name for other tests
         tz.zone = 'UNKNOWN'
@@ -1175,7 +1174,9 @@ class UtilTest(unittest.TestCase):
         stream.isatty = lambda: True
         h = PrettyXmlHandler(stream=stream)
         self.assertTrue(h.is_tty())
-        r = logging.LogRecord(name='baz', level=logging.INFO, pathname='/foo/bar', lineno=1, msg='hello', args=(), exc_info=None)
+        r = logging.LogRecord(
+            name='baz', level=logging.INFO, pathname='/foo/bar', lineno=1, msg='hello', args=(), exc_info=None
+        )
         h.emit(r)
         h.stream.seek(0)
         self.assertEqual(h.stream.read(), 'hello\n')
@@ -1184,12 +1185,15 @@ class UtilTest(unittest.TestCase):
         stream = io.BytesIO() if PY2 else io.StringIO()
         stream.isatty = lambda: True
         h = PrettyXmlHandler(stream=stream)
-        r = logging.LogRecord(name='baz', level=logging.DEBUG, pathname='/foo/bar', lineno=1, msg='hello %(xml_foo)s', args=({'xml_foo': b'<?xml version="1.0" encoding="UTF-8"?><foo>bar</foo>'},), exc_info=None)
+        r = logging.LogRecord(
+            name='baz', level=logging.DEBUG, pathname='/foo/bar', lineno=1, msg='hello %(xml_foo)s',
+            args=({'xml_foo': b'<?xml version="1.0" encoding="UTF-8"?><foo>bar</foo>'},), exc_info=None)
         h.emit(r)
         h.stream.seek(0)
         self.assertEqual(
             h.stream.read(),
-            "hello \x1b[36m<?xml version='1.0' encoding='utf-8'?>\x1b[39;49;00m\n\x1b[34;01m<foo\x1b[39;49;00m\x1b[34;01m>\x1b[39;49;00mbar\x1b[34;01m</foo>\x1b[39;49;00m\n\n"
+            "hello \x1b[36m<?xml version='1.0' encoding='utf-8'?>\x1b[39;49;00m\n\x1b[34;01m"
+            "<foo\x1b[39;49;00m\x1b[34;01m>\x1b[39;49;00mbar\x1b[34;01m</foo>\x1b[39;49;00m\n\n"
         )
 
 
@@ -1203,7 +1207,7 @@ class EWSTest(unittest.TestCase):
         # that server. 'settings.yml.sample' is provided as a template.
         try:
             with open(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'settings.yml')) as f:
-                settings = load(f)
+                settings = safe_load(f)
         except FileNotFoundError:
             print('Skipping %s - no settings.yml file found' % cls.__name__)
             print('Copy settings.yml.sample to settings.yml and enter values for your test server')
@@ -1256,7 +1260,7 @@ class EWSTest(unittest.TestCase):
                 # In the test_extended_distinguished_property test, EWS rull return 4 NULL bytes after char 16 if we
                 # send a longer bytes sequence.
                 return get_random_string(16).encode()
-            assert False, (field.name, field, field.value_cls.python_type())
+            raise ValueError('Unsupported field %s' % field)
         if isinstance(field, URIField):
             return get_random_url()
         if isinstance(field, EmailField):
@@ -1350,7 +1354,7 @@ class EWSTest(unittest.TestCase):
                     return EWSTimeZone.timezone(random.choice(pytz.all_timezones))
                 except UnknownTimeZone:
                     pass
-        assert False, 'Unknown field %s' % field
+        raise ValueError('Unknown field %s' % field)
 
 
 class CommonTest(EWSTest):
@@ -3910,7 +3914,7 @@ class BaseItemTest(EWSTest):
         ids = self.test_folder.filter(categories__contains=item.categories)
         items = list(self.account.fetch(ids=ids))
         for item in items:
-            assert isinstance(item, self.ITEM_CLASS)
+            self.assertIsInstance(item, self.ITEM_CLASS)
         self.assertEqual(len(items), 2)
 
         items = list(self.account.fetch(ids=ids, only_fields=['subject']))
@@ -3956,7 +3960,6 @@ class BaseItemTest(EWSTest):
                     # Some fields throw this error when updated to a huge value
                     self.assertIn(f.name, ['given_name', 'middle_name', 'surname'])
                     continue
-                continue
                 # is_complex=True forces the query to use GetItems which will always get the full value
                 f.is_complex = True
                 new_full_item = self.test_folder.all().only(f.name).get(categories__contains=self.categories)
@@ -3975,7 +3978,7 @@ class BaseItemTest(EWSTest):
                         self.test_folder.all().only(f.name).get(categories__contains=self.categories)
                     continue
                 new_short_item = self.test_folder.all().only(f.name).get(categories__contains=self.categories)
-                old, new_short = getattr(item, f.name), getattr(new_short_item, f.name)
+                new_short = getattr(new_short_item, f.name)
 
                 if not old_is_complex:
                     self.assertEqual(new_short, new_full, (f.name, new_short, new_full))
@@ -4036,7 +4039,7 @@ class BaseItemTest(EWSTest):
         self.test_folder.bulk_create(items=[item, item])
         items = self.test_folder.filter(categories__contains=item.categories)
         for item in items:
-            assert isinstance(item, self.ITEM_CLASS)
+            self.assertIsInstance(item, self.ITEM_CLASS)
             for f in self.ITEM_CLASS.FIELDS:
                 self.assertTrue(hasattr(item, f.name))
                 if not f.supports_version(self.account.version):
@@ -4054,7 +4057,7 @@ class BaseItemTest(EWSTest):
         only_fields = ('subject', 'body', 'categories')
         items = self.test_folder.filter(categories__contains=item.categories).only(*only_fields)
         for item in items:
-            assert isinstance(item, self.ITEM_CLASS)
+            self.assertIsInstance(item, self.ITEM_CLASS)
             for f in self.ITEM_CLASS.FIELDS:
                 self.assertTrue(hasattr(item, f.name))
                 if not f.supports_version(self.account.version):
@@ -4247,7 +4250,7 @@ class BaseItemTest(EWSTest):
         # Test with generator as argument
         insert_ids = self.test_folder.bulk_create(items=(i for i in [item]))
         self.assertEqual(len(insert_ids), 1)
-        assert isinstance(insert_ids[0], Item)
+        self.assertIsInstance(insert_ids[0], Item)
         find_ids = self.test_folder.filter(categories__contains=item.categories).values_list('item_id', 'changekey')
         self.assertEqual(len(find_ids), 1)
         self.assertEqual(len(find_ids[0]), 2, find_ids[0])

@@ -170,7 +170,10 @@ class Q(object):
 
     def _promote(self):
         # Flatten by taking over the only child
-        assert len(self.children) == 1 and self.field_path is None
+        if len(self.children) != 1:
+            raise ValueError('Can only flatten when child count is 1')
+        if self.field_path is not None:
+            raise ValueError("Can only flatten when 'field_path' is not set")
         q = self.children[0]
         self.conn_type = q.conn_type
         self.field_path = q.field_path
@@ -183,15 +186,20 @@ class Q(object):
         if self.is_empty():
             return
         if self.query_string:
-            assert not any([self.field_path, self.op, self.value, self.children])
+            if any([self.field_path, self.op, self.value, self.children]):
+                raise ValueError('Query strings cannot be combined with other settings')
             return
-        assert self.conn_type in self.CONN_TYPES
+        if self.conn_type not in self.CONN_TYPES:
+            raise ValueError("'conn_type' %s must be one of %s" % (self.conn_type, self.CONN_TYPES))
         if not self.is_leaf():
             return
-        assert self.field_path
-        assert self.op in self.OP_TYPES
+        if not self.field_path:
+            raise ValueError("'field_path' must be set")
+        if self.op not in self.OP_TYPES:
+            raise ValueError("'op' %s must be one of %s" % (self.op, self.OP_TYPES))
         if self.op == self.EXISTS:
-            assert self.value is True
+            if self.value is not True:
+                raise ValueError("'value' must be True when operator is EXISTS")
         if self.value is None:
             raise ValueError('Value for filter on field path "%s" cannot be None' % self.field_path)
         if is_iterable(self.value, generators_allowed=True):
@@ -242,7 +250,9 @@ class Q(object):
         }
         if op in xml_tag_map:
             return create_element(xml_tag_map[op])
-        assert op in (cls.EXACT, cls.IEXACT, cls.CONTAINS, cls.ICONTAINS, cls.STARTSWITH, cls.ISTARTSWITH)
+        valid_ops = cls.EXACT, cls.IEXACT, cls.CONTAINS, cls.ICONTAINS, cls.STARTSWITH, cls.ISTARTSWITH
+        if op not in valid_ops:
+            raise ValueError("'op' %s must be one of %s" % (op, valid_ops))
 
         # For description of Contains attribute values, see
         #     https://msdn.microsoft.com/en-us/library/office/aa580702(v=exchg.150).aspx
@@ -272,7 +282,7 @@ class Q(object):
         elif op in (cls.STARTSWITH, cls.ISTARTSWITH):
             match_mode = 'Prefixed'
         else:
-            assert False
+            raise ValueError('Unsupported op: %s' % op)
         if op in (cls.IEXACT, cls.ICONTAINS, cls.ISTARTSWITH):
             compare_mode = 'IgnoreCase'
         else:
@@ -450,11 +460,13 @@ class Restriction(object):
     """
 
     def __init__(self, q, folder):
-        assert isinstance(q, Q)
+        if not isinstance(q, Q):
+            raise ValueError("'q' value %s must be a Q instance" % q)
         if q.is_empty():
             raise ValueError("Q object must not be empty")
         from .folders import Folder
-        assert isinstance(folder, Folder)
+        if not isinstance(folder, Folder):
+            raise ValueError("'folder' value %s must be a Folder instance" % folder)
         self.q = q
         self.folder = folder
 

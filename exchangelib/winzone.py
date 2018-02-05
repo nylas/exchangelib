@@ -10,7 +10,8 @@ def generate_map():
     from xml.etree.ElementTree import fromstring
 
     r = requests.get(CLDR_WINZONE_URL)
-    assert r.status_code == 200
+    if r.status_code != 200:
+        raise ValueError('Unexpected response: %s' % r)
     tz_map = {}
     for e in fromstring(r.content).find('windowsZones').find('mapTimezones').findall('mapZone'):
         for location in e.get('type').split(' '):

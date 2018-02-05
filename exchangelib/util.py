@@ -87,7 +87,6 @@ def peek(iterable):
         # QuerySet has __len__ but that evaluates the entire query greedily. We don't want that here. Instead, peek()
         # should be called on QuerySet.iterator()
         raise ValueError('Cannot peek on a QuerySet')
-    assert not isinstance(iterable, QuerySet)
     if hasattr(iterable, '__len__'):
         # tuple, list, set
         return not iterable, iterable
@@ -105,7 +104,8 @@ def xml_to_str(tree, encoding=None, xml_declaration=False):
     # tostring() returns bytecode unless encoding is 'unicode', and does not reliably produce an XML declaration. We
     # ALWAYS want bytecode so we can convert to unicode explicitly.
     if encoding is None:
-        assert not xml_declaration
+        if xml_declaration:
+            raise ValueError("'xml_declaration' is not supported when 'encoding' is None")
         if PY2:
             stream = io.BytesIO()
         else:
@@ -172,9 +172,10 @@ def xml_text_to_value(value, value_type):
 
 
 def set_xml_value(elem, value, version):
+    from .ewsdatetime import EWSDateTime, EWSDate
     from .fields import FieldPath, FieldOrder
     from .folders import EWSElement
-    from .ewsdatetime import EWSDateTime, EWSDate
+    from .version import Version
     if isinstance(value, string_types + (bool, bytes, int, Decimal, EWSDate, EWSDateTime)):
         elem.text = value_to_xml_text(value)
     elif is_iterable(value, generators_allowed=True):
@@ -182,7 +183,8 @@ def set_xml_value(elem, value, version):
             if isinstance(v, (FieldPath, FieldOrder)):
                 elem.append(v.to_xml())
             elif isinstance(v, EWSElement):
-                assert version
+                if not isinstance(version, Version):
+                    raise ValueError("'version' must be a Version instance")
                 elem.append(v.to_xml(version=version))
             elif isinstance(v, ElementType):
                 elem.append(v)
@@ -193,7 +195,8 @@ def set_xml_value(elem, value, version):
     elif isinstance(value, (FieldPath, FieldOrder)):
         elem.append(value.to_xml())
     elif isinstance(value, EWSElement):
-        assert version
+        if not isinstance(version, Version):
+            raise ValueError("'version' must be a Version instance")
         elem.append(value.to_xml(version=version))
     elif isinstance(value, ElementType):
         elem.append(value)
