@@ -840,8 +840,8 @@ class Folder(RegisterMixIn, SearchableMixIn):
         folder = folders[0]
         if isinstance(folder, Exception):
             raise folder
-        if type(folder) != cls:
-            raise ValueError("Expected 'folder' %r to be a %s instance" % (folder, cls))
+        if not isinstance(folder, cls):
+            raise ValueError("'folder' %r must be a %s instance" % (folder, cls))
         return folder
 
     def refresh(self):
