@@ -1217,6 +1217,50 @@ class UpdateFolder(EWSAccountService):
         return updatefolder
 
 
+class SyncFolderHierarchy(EWSAccountService):
+    """
+    https://msdn.microsoft.com/en-us/library/office/aa564829(v=exchg.150).aspx
+    """
+    SERVICE_NAME = 'SyncFolderHierarchy'
+    element_container_name = '{%s}Changes' % MNS
+
+    def call(self, shape, sync_state=None):
+        from .changes import CreateFolderChange, UpdateFolderChange, DeleteFolderChange
+
+        folder_change_classes_by_tag = {
+            CreateFolderChange.response_tag: CreateFolderChange,
+            UpdateFolderChange.response_tag: UpdateFolderChange,
+            DeleteFolderChange.response_tag: DeleteFolderChange
+        }
+
+        for change in self._get_elements(payload=self.get_payload(shape, sync_state)):
+            cls = folder_change_classes_by_tag.get(change.tag)
+            if not cls:
+                raise ValueError('Unknown Change tag: {}'.format(change.tag))
+            yield cls.from_xml(change, self.account)
+        if self.sync_state is None:
+            yield None
+        else:
+            yield self.sync_state.text
+
+    def get_payload(self, shape, sync_state=None):
+        sync_folder_hierarchy = create_element('m:%s' % self.SERVICE_NAME)
+        foldershape = create_element('m:FolderShape')
+        add_xml_child(foldershape, 't:BaseShape', shape)
+        sync_folder_hierarchy.append(foldershape)
+        if sync_state is not None:
+            syncstate = create_element('m:SyncState')
+            syncstate.text = sync_state
+            sync_folder_hierarchy.append(syncstate)
+        return sync_folder_hierarchy
+
+    def _get_elements_in_response(self, response):
+        result = super(SyncFolderHierarchy, self)._get_elements_in_response(response)
+        for elem in response:
+            self.sync_state = self._get_element_container(elem, name='{%s}SyncState' % MNS)
+        return result
+
+
 class DeleteFolder(EWSAccountService):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa564767(v=exchg.150).aspx

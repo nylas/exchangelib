@@ -9,7 +9,7 @@ from cached_property import threaded_cached_property
 from future.utils import python_2_unicode_compatible
 from six import string_types
 
-from exchangelib.services import GetUserOofSettings, SetUserOofSettings
+from exchangelib.services import GetUserOofSettings, SetUserOofSettings, SyncFolderHierarchy
 from exchangelib.settings import OofSettings
 from .autodiscover import discover
 from .credentials import DELEGATE, IMPERSONATION, ACCESS_TYPES
@@ -116,6 +116,9 @@ class Account(object):
         for f in self.root.walk():
             folders_map[f.__class__].append(f)
         return folders_map
+
+    def sync_folder_hierarchy(self, shape, sync_state=None):
+        return SyncFolderHierarchy(account=self).call(shape, sync_state)
 
     @threaded_cached_property
     def admin_audit_logs(self):

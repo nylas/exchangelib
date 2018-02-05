@@ -717,3 +717,8 @@ class FailedMailbox(EWSElement):
     ]
 
     __slots__ = tuple(f.name for f in FIELDS)
+
+
+class SyncState(EWSElement):
+    ELEMENT_NAME = 'SyncState'
+    NAMESPACE = MNS
