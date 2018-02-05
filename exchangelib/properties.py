@@ -386,3 +386,9 @@ class EffectiveRights(EWSElement):
 
     def __contains__(self, item):
         return getattr(self, item, False)
+
+
+class SyncState(EWSElement):
+    ELEMENT_NAME = 'SyncState'
+    NAMESPACE = MNS
+
