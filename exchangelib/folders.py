@@ -1064,6 +1064,7 @@ class Calendar(Folder):
     """
     An interface for the Exchange calendar
     """
+    ELEMENT_NAME = 'CalendarFolder'
     DISTINGUISHED_FOLDER_ID = 'calendar'
     CONTAINER_CLASS = 'IPF.Appointment'
     supported_item_models = (CalendarItem,)
@@ -1181,6 +1182,7 @@ class JunkEmail(Messages):
 
 
 class Tasks(Folder):
+    ELEMENT_NAME = 'TasksFolder'
     DISTINGUISHED_FOLDER_ID = 'tasks'
     CONTAINER_CLASS = 'IPF.Task'
     supported_item_models = (Task,)
@@ -1198,6 +1200,7 @@ class Tasks(Folder):
 
 
 class Contacts(Folder):
+    ELEMENT_NAME = 'ContactsFolder'
     DISTINGUISHED_FOLDER_ID = 'contacts'
     CONTAINER_CLASS = 'IPF.Contact'
     supported_item_models = (Contact, DistributionList)

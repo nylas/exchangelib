@@ -35,6 +35,7 @@ from exchangelib.account import Account, SAVE_ONLY, SEND_ONLY, SEND_AND_SAVE_COP
 from exchangelib.attachments import FileAttachment, ItemAttachment
 from exchangelib.autodiscover import AutodiscoverProtocol, discover
 import exchangelib.autodiscover
+from exchangelib.changes import Change
 from exchangelib.configuration import Configuration
 from exchangelib.credentials import DELEGATE, IMPERSONATION, Credentials, ServiceAccount
 from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalidOperation, AutoDiscoverRedirect, \
@@ -2208,6 +2209,17 @@ class AccountTest(EWSTest):
             self.assertEqual(folder.name.lower(), MockCalendar.localized_names(self.account.locale)[0])
         finally:
             Calendar.get_distinguished = _orig
+
+    def test_sync_folder_hierarchy(self):
+        for change in self.account.sync_folder_hierarchy(shape='AllProperties'):
+            if isinstance(change, Change):
+                assert change.folder is not None
+            else:
+                sync_state = change
+        assert sync_state is not None
+
+        for change in self.account.sync_folder_hierarchy(shape='AllProperties', sync_state=sync_state):
+            assert not isinstance(change, Change)
 
 
 class AutodiscoverTest(EWSTest):
