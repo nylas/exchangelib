@@ -293,7 +293,7 @@ class Account(object):
     @oof_settings.setter
     def oof_settings(self, value):
         if not isinstance(value, OofSettings):
-            raise ValueError("'value' must be an OofSettings instance")
+            raise ValueError("'value' %r must be an OofSettings instance" % value)
         SetUserOofSettings(self).call(mailbox=Mailbox(email_address=self.primary_smtp_address), oof_settings=value)
 
     def export(self, items):
@@ -361,7 +361,7 @@ class Account(object):
             ))
         if folder is not None:
             if not isinstance(folder, Folder):
-                raise ValueError("'folder' %s must be a Folder instence" % folder)
+                raise ValueError("'folder' %r must be a Folder instence" % folder)
             if folder.account != self:
                 raise ValueError('"Folder must belong to this account')
         if message_disposition == SAVE_ONLY and folder is None:
@@ -529,7 +529,7 @@ class Account(object):
     def bulk_move(self, ids, to_folder):
         # Move items to another folder. Returns new IDs for the items that were moved
         if not isinstance(to_folder, Folder):
-            raise ValueError("'to_folder' %s must be a Folder instence" % to_folder)
+            raise ValueError("'to_folder' %r must be a Folder instence" % to_folder)
         # 'ids' could be an unevaluated QuerySet, e.g. if we ended up here via `bulk_move(some_folder.filter(...))`. In
         # that case, we want to use its iterator. Otherwise, peek() will start a count() which is wasteful because we
         # need the item IDs immediately afterwards. iterator() will only do the bare minimum.

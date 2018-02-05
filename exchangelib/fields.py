@@ -26,7 +26,7 @@ def split_field_path(field_path):
         'physical_addresses__Home__street' -> ('physical_addresses', 'Home', 'street')
     """
     if not isinstance(field_path, string_types):
-        raise ValueError("Field path '%s' must be a string" % field_path)
+        raise ValueError("Field path %r must be a string" % field_path)
     search_parts = field_path.split('__')
     field = search_parts[0]
     try:
@@ -77,7 +77,7 @@ def resolve_field_path(field_path, folder, strict=True):
                     )
         else:
             if not issubclass(field.value_cls, SingleFieldIndexedElement):
-                raise ValueError("'field.value_cls' %s must be an SingleFieldIndexedElement instance" % field.value_cls)
+                raise ValueError("'field.value_cls' %r must be an SingleFieldIndexedElement instance" % field.value_cls)
             if subfieldname:
                 raise ValueError(
                     "IndexedField path '%s' must not specify subfield, e.g. just '%s__%s'"
@@ -100,11 +100,11 @@ class FieldPath(object):
     def __init__(self, field, label=None, subfield=None):
         # 'label' and 'subfield' are only used for IndexedField fields
         if not isinstance(field, (FieldURIField, ExtendedPropertyField)):
-            raise ValueError("'field' %s must be an FieldURIField, of ExtendedPropertyField instance" % field)
-        if label:
-            raise ValueError("'label' %s must be an %s instance" % (label, string_types))
-        if subfield:
-            raise ValueError("'subfield' %s must be a Subfield instance" % subfield)
+            raise ValueError("'field' %r must be an FieldURIField, of ExtendedPropertyField instance" % field)
+        if label and not isinstance(label, string_types):
+            raise ValueError("'label' %r must be a %s instance" % (label, string_types))
+        if subfield and not isinstance(subfield, SubField):
+            raise ValueError("'subfield' %r must be a SubField instance" % subfield)
         self.field = field
         self.label = label
         self.subfield = subfield
@@ -215,13 +215,13 @@ class Field(object):
         self.is_attribute = is_attribute
         # The Exchange build when this field was introduced. When talking with versions prior to this version,
         # we will ignore this field.
-        if supported_from is not None:
-            raise ValueError("'supported_from' %s must be a Build instance" % supported_from)
+        if supported_from is not None and not isinstance(supported_from, Build):
+            raise ValueError("'supported_from' %r must be a Build instance" % supported_from)
         self.supported_from = supported_from
         # The Exchange build when this field was deprecated. When talking with versions at or later than this version,
         # we will ignore this field.
-        if deprecated_from is not None:
-            raise ValueError("'deprecated_from' %s must be a Build instance" % deprecated_from)
+        if deprecated_from is not None and not isinstance(deprecated_from, Build):
+            raise ValueError("'deprecated_from' %r must be a Build instance" % deprecated_from)
         self.deprecated_from = deprecated_from
 
     def clean(self, value, version=None):
@@ -234,15 +234,15 @@ class Field(object):
             return self.default
         if self.is_list:
             if not is_iterable(value):
-                raise ValueError("Field '%s' value '%s' must be a list" % (self.name, value))
+                raise ValueError("Field '%s' value %r must be a list" % (self.name, value))
             for v in value:
                 if not isinstance(v, self.value_cls):
-                    raise TypeError('Field %s value "%s" must be of type %s' % (self.name, v, self.value_cls))
+                    raise TypeError('Field %s value "%r must be of type %s' % (self.name, v, self.value_cls))
                 if hasattr(v, 'clean'):
                     v.clean(version=version)
         else:
             if not isinstance(value, self.value_cls):
-                raise TypeError("Field '%s' value '%s' must be of type %s" % (self.name, value, self.value_cls))
+                raise TypeError("Field '%s' value %r must be of type %s" % (self.name, value, self.value_cls))
             if hasattr(value, 'clean'):
                 value.clean(version=version)
         return value
@@ -378,7 +378,7 @@ class EnumField(IntegerField):
     def __init__(self, *args, **kwargs):
         self.enum = kwargs.pop('enum')
         # Set different min/max defaults than IntegerField
-        if 'max' not in kwargs:
+        if 'max' in kwargs:
             raise AttributeError("EnumField does not support the 'max' attribute")
         kwargs['min'] = kwargs.pop('min', 1)
         kwargs['max'] = kwargs['min'] + len(self.enum) - 1

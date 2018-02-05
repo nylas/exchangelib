@@ -51,7 +51,7 @@ class BaseProtocol(object):
 
     def __init__(self, service_endpoint, credentials, auth_type):
         if not isinstance(credentials, Credentials):
-            raise ValueError("'credentials' %s must be a Credentials instance" % credentials)
+            raise ValueError("'credentials' %r must be a Credentials instance" % credentials)
         if auth_type is not None:
             if auth_type not in AUTH_TYPE_MAP:
                 raise ValueError("'auth_type' %s must be one if %s" % (auth_type, AUTH_TYPE_MAP.keys()))

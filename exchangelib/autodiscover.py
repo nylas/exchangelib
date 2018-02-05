@@ -170,7 +170,7 @@ def discover(email, credentials):
     """
     log.debug('Attempting autodiscover on email %s', email)
     if not isinstance(credentials, Credentials):
-        raise ValueError("'credentials' %s must be a Credentials instance" % credentials)
+        raise ValueError("'credentials' %r must be a Credentials instance" % credentials)
     domain = get_domain(email)
     # We may be using multiple different credentials and changing our minds on SSL verification. This key combination
     # should be safe.
