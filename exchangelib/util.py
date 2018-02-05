@@ -184,7 +184,7 @@ def set_xml_value(elem, value, version):
                 elem.append(v.to_xml())
             elif isinstance(v, EWSElement):
                 if not isinstance(version, Version):
-                    raise ValueError("'version' %r must be a Version instance" % r)
+                    raise ValueError("'version' %r must be a Version instance" % version)
                 elem.append(v.to_xml(version=version))
             elif isinstance(v, ElementType):
                 elem.append(v)

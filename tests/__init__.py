@@ -3963,7 +3963,7 @@ class BaseItemTest(EWSTest):
                 # is_complex=True forces the query to use GetItems which will always get the full value
                 f.is_complex = True
                 new_full_item = self.test_folder.all().only(f.name).get(categories__contains=self.categories)
-                old, new_full = getattr(item, f.name), getattr(new_full_item, f.name)
+                new_full = getattr(new_full_item, f.name)
                 if old_max_length:
                     if f.is_list:
                         for s in new_full:

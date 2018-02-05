@@ -520,8 +520,10 @@ class TimeZoneField(FieldURIField):
             try:
                 return self.value_cls.from_ms_id(ms_id or ms_name)
             except UnknownTimeZone:
-                log.warning("Cannot convert value '%s' on field '%s' to type %s (unknown timezone ID)", (ms_id or ms_name),
-                            self.name, self.value_cls)
+                log.warning(
+                    "Cannot convert value '%s' on field '%s' to type %s (unknown timezone ID)",
+                    (ms_id or ms_name), self.name, self.value_cls
+                )
                 return None
         return self.default
 

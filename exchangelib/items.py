@@ -10,7 +10,7 @@ from .ewsdatetime import UTC_NOW
 from .extended_properties import ExtendedProperty
 from .fields import BooleanField, IntegerField, DecimalField, Base64Field, TextField, CharListField, ChoiceField, \
     URIField, BodyField, DateTimeField, MessageHeaderField, PhoneNumberField, EmailAddressField, PhysicalAddressField, \
-    ExtendedPropertyField, AttachmentField, RecurrenceField, MailboxField,  MailboxListField, AttendeesField, Choice, \
+    ExtendedPropertyField, AttachmentField, RecurrenceField, MailboxField, MailboxListField, AttendeesField, Choice, \
     OccurrenceField, OccurrenceListField, MemberListField, EWSElementField, EffectiveRightsField, TimeZoneField, \
     CultureField, IdField, CharField, TextListField, EnumAsIntField, EmailField
 from .properties import EWSElement, ItemId, ConversationId, ParentFolderId, Attendee
