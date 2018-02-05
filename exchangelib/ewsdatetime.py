@@ -78,8 +78,7 @@ class EWSDateTime(datetime.datetime):
         # Some internal methods still need to set tzinfo in the constructor. Use a magic kwarg for that.
         if 'ewstzinfo' in kwargs:
             kwargs['tzinfo'] = kwargs.pop('ewstzinfo')
-        self = super(EWSDateTime, cls).__new__(cls, *args, **kwargs)
-        return self
+        return super(EWSDateTime, cls).__new__(cls, *args, **kwargs)
 
     def ewsformat(self):
         """
@@ -96,7 +95,7 @@ class EWSDateTime(datetime.datetime):
     @classmethod
     def from_datetime(cls, d):
         if type(d) != datetime.datetime:
-            raise ValueError("'%s' must be a datetime instance" % d)
+            raise ValueError("%r must be a datetime instance" % d)
         if d.tzinfo is None:
             tz = None
         elif isinstance(d.tzinfo, EWSTimeZone):

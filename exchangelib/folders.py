@@ -132,7 +132,7 @@ class Folder(RegisterMixIn):
         if self.account is not None:
             from .account import Account
             if not isinstance(self.account, Account):
-                raise ValueError("'account' must be an Account instance" % self.account)
+                raise ValueError("'account' %r must be an Account instance" % self.account)
 
     @property
     def parent(self):
@@ -149,7 +149,7 @@ class Folder(RegisterMixIn):
             self.parent_folder_id = None
         else:
             if not isinstance(value, Folder):
-                raise ValueError("'parent' must be a Folder instance")
+                raise ValueError("'value' %r must be a Folder instance" % value)
             self.parent_folder_id = ParentFolderId(id=value.folder_id, changekey=value.changekey)
             self.account = value.account
 
@@ -305,9 +305,9 @@ class Folder(RegisterMixIn):
                 field_path = FieldPath.from_string(field_path, folder=self)
                 fields[i] = field_path
             if not isinstance(field_path, FieldPath):
-                raise ValueError("Field '%s' must be a string or FieldPath object" % field_path)
+                raise ValueError("Field %r must be a string or FieldPath object" % field_path)
             if field_path.field not in allowed_fields:
-                raise ValueError("'%s' is not a valid field on %s" % (field_path.field, self.supported_item_models))
+                raise ValueError("%r is not a valid field on %s" % (field_path.field, self.supported_item_models))
             if field_path.field.name == 'start':
                 has_start = True
             elif field_path.field.name == 'end':
@@ -406,12 +406,12 @@ class Folder(RegisterMixIn):
                 if f.field in complex_fields:
                     raise ValueError("find_items() does not support field '%s'. Use fetch() instead" % f.field.name)
         if calendar_view is not None and not isinstance(calendar_view, CalendarView):
-            raise ValueError("'calendar_view' must be a CalendarView instance")
+            raise ValueError("'calendar_view' %s must be a CalendarView instance" % calendar_view)
         if page_size is None:
             # Set a sane default
             page_size = FindItem.CHUNKSIZE
         if not isinstance(page_size, int):
-            raise ValueError("'page_size' must be an integer")
+            raise ValueError("'page_size' %r must be an integer" % page_size)
 
         # Build up any restrictions
         if q.is_empty():
@@ -668,7 +668,7 @@ class Folder(RegisterMixIn):
         if isinstance(folder, Exception):
             raise folder
         if not isinstance(folder, cls):
-            raise ValueError("'folder' %s must be a %s instance" % (folder, cls))
+            raise ValueError("'folder' %r must be a %s instance" % (folder, cls))
         return folder
 
     def refresh(self):

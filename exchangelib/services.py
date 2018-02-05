@@ -72,7 +72,7 @@ class EWSService(object):
 
     def _get_elements(self, payload):
         if not isinstance(payload, ElementType):
-            raise ValueError("'payload' %s must be an ElementType" % payload)
+            raise ValueError("'payload' %r must be an ElementType" % payload)
         try:
             # Send the request, get the response and do basic sanity checking on the SOAP XML
             response = self._get_response_xml(payload=payload)
@@ -119,7 +119,7 @@ class EWSService(object):
     def _get_response_xml(self, payload):
         # Takes an XML tree and returns SOAP payload as an XML tree
         if not isinstance(payload, ElementType):
-            raise ValueError("'payload' %s must be an ElementType" % payload)
+            raise ValueError("'payload' %r must be an ElementType" % payload)
         # Microsoft really doesn't want to make our lives easy. The server may report one version in our initial version
         # guessing tango, but then the server may decide that any arbitrary legacy backend server may actually process
         # the request for an account. Prepare to handle ErrorInvalidSchemaVersionForMailboxVersion errors and set the
@@ -187,7 +187,7 @@ class EWSService(object):
     @classmethod
     def _get_soap_payload(cls, soap_response):
         if not isinstance(soap_response, ElementType):
-            raise ValueError("'soap_response' %s must be an ElementType" % soap_response)
+            raise ValueError("'soap_response' %r must be an ElementType" % soap_response)
         body = soap_response.find('{%s}Body' % SOAPNS)
         if body is None:
             raise TransportError('No Body element in SOAP response')
@@ -207,7 +207,7 @@ class EWSService(object):
     @classmethod
     def _raise_soap_errors(cls, fault):
         if not isinstance(fault, ElementType):
-            raise ValueError("'fault' %s must be an ElementType" % fault)
+            raise ValueError("'fault' %r must be an ElementType" % fault)
         # Fault: See http://www.w3.org/TR/2000/NOTE-SOAP-20000508/#_Toc478383507
         faultcode = get_xml_attr(fault, 'faultcode')
         faultstring = get_xml_attr(fault, 'faultstring')
@@ -232,7 +232,7 @@ class EWSService(object):
 
     def _get_element_container(self, message, name=None):
         if not isinstance(message, ElementType):
-            raise ValueError("'message' %s must be an ElementType" % message)
+            raise ValueError("'message' %r must be an ElementType" % message)
         # ResponseClass: See http://msdn.microsoft.com/en-us/library/aa566424(v=EXCHG.140).aspx
         response_class = message.get('ResponseClass')
         # ResponseCode, MessageText: See http://msdn.microsoft.com/en-us/library/aa580757(v=EXCHG.140).aspx
@@ -288,7 +288,7 @@ class EWSService(object):
     def _get_elements_in_response(self, response):
         for msg in response:
             if not isinstance(msg, ElementType):
-                raise ValueError("'msg' %s must be an ElementType" % msg)
+                raise ValueError("'msg' %r must be an ElementType" % msg)
             container_or_exc = self._get_element_container(message=msg, name=self.element_container_name)
             if isinstance(container_or_exc, ElementType):
                 for c in self._get_elements_in_container(container=container_or_exc):
@@ -972,9 +972,6 @@ class CreateFolder(EWSAccountService):
             yield f
 
     def get_payload(self, parent_folder, folders):
-        from .folders import Folder
-        if not isinstance(parent_folder, ElementType):
-            raise ValueError("'parent_folder' %s must be a Folder instance" % parent_folder)
         create_folder = create_element('m:%s' % self.SERVICE_NAME)
         parentfolderid = create_element('m:ParentFolderId')
         set_xml_value(parentfolderid, parent_folder, version=self.account.version)
@@ -1428,7 +1425,7 @@ class BaseUserOofSettings(EWSAccountService):
     # Common response parsing for non-standard OOF services
     def _get_element_container(self, message, name=None):
         if not isinstance(message, ElementType):
-            raise ValueError("'message' %s must be an ElementType" % message)
+            raise ValueError("'message' %r must be an ElementType" % message)
         # ResponseClass: See http://msdn.microsoft.com/en-us/library/aa566424(v=EXCHG.140).aspx
         response_message = message.find('{%s}ResponseMessage' % MNS)
         response_class = response_message.get('ResponseClass')
@@ -1486,7 +1483,7 @@ class GetUserOofSettings(BaseUserOofSettings):
             raise ValueError("Expected 'response' length 1, got %s" % response)
         response = response[0]
         if not isinstance(response, ElementType):
-            raise ValueError("'response' %s must be an ElementType" % response)
+            raise ValueError("'response' %r must be an ElementType" % response)
         container_or_exc = self._get_element_container(message=response, name=self.element_container_name)
         if isinstance(container_or_exc, Exception):
             # pylint: disable=raising-bad-type

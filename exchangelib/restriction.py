@@ -82,10 +82,10 @@ class Q(object):
         # Parse args which must be Q objects
         for q in args:
             if not isinstance(q, self.__class__):
-                raise ValueError("Non-keyword arg '%s' must be a Q object" % q)
+                raise ValueError("Non-keyword arg %r must be a Q object" % q)
             if q.query_string:
                 raise ValueError(
-                    'A query string cannot be combined with other restrictions (args: %s, kwargs: %s)' % (args, kwargs)
+                    'A query string cannot be combined with other restrictions (args: %r, kwargs: %r)' % (args, kwargs)
                 )
             self.children.append(q)
 
@@ -127,7 +127,7 @@ class Q(object):
                 # EWS doesn't have an '__in' operator. Allow '__in' lookups on list and non-list field types,
                 # specifying a list value. We'll emulate it as a set of OR'ed exact matches.
                 if not is_iterable(value, generators_allowed=True):
-                    raise ValueError("Value for lookup '%s' must be a list" % key)
+                    raise ValueError("Value for lookup %r must be a list" % key)
                 children = [self.__class__(**{field_path: v}) for v in value]
                 return [self.__class__(*children, conn_type=self.OR)]
 
@@ -204,12 +204,12 @@ class Q(object):
             raise ValueError('Value for filter on field path "%s" cannot be None' % self.field_path)
         if is_iterable(self.value, generators_allowed=True):
             raise ValueError(
-                'Value "%s" for filter on field path "%s" must be a single value' % (self.value, self.field_path)
+                'Value %r for filter on field path "%s" must be a single value' % (self.value, self.field_path)
             )
         try:
             value_to_xml_text(self.value)
         except NotImplementedError:
-            raise ValueError('Value "%s" for filter on field path "%s" is unsupported' % (self.value, self.field_path))
+            raise ValueError('Value %r for filter on field path "%s" is unsupported' % (self.value, self.field_path))
 
     @classmethod
     def _lookup_to_op(cls, lookup):
@@ -461,12 +461,12 @@ class Restriction(object):
 
     def __init__(self, q, folder):
         if not isinstance(q, Q):
-            raise ValueError("'q' value %s must be a Q instance" % q)
+            raise ValueError("'q' value %r must be a Q instance" % q)
         if q.is_empty():
             raise ValueError("Q object must not be empty")
         from .folders import Folder
         if not isinstance(folder, Folder):
-            raise ValueError("'folder' value %s must be a Folder instance" % folder)
+            raise ValueError("'folder' value %r must be a Folder instance" % folder)
         self.q = q
         self.folder = folder
 

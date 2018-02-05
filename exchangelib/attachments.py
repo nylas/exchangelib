@@ -57,7 +57,7 @@ class Attachment(EWSElement):
     def clean(self, version=None):
         from .items import Item
         if self.parent_item is not None and not isinstance(self.parent_item, Item):
-            raise ValueError("self.parent_item value '%s' must be an Item instance" % self.parent_item)
+            raise ValueError("'parent_item' value %r must be an Item instance" % self.parent_item)
         # pylint: disable=access-member-before-definition
         if self.content_type is None and self.name is not None:
             self.content_type = mimetypes.guess_type(self.name)[0] or 'application/octet-stream'
@@ -169,7 +169,7 @@ class FileAttachment(Attachment):
     @content.setter
     def content(self, value):
         if not isinstance(value, bytes):
-            raise ValueError("'value' %s must be a bytes object" % value)
+            raise ValueError("'value' %r must be a bytes object" % value)
         self._content = value
 
     @classmethod
@@ -232,7 +232,7 @@ class ItemAttachment(Attachment):
     def item(self, value):
         from .items import Item
         if not isinstance(value, Item):
-            raise ValueError("'value' %s must be an Item object" % value)
+            raise ValueError("'value' %r must be an Item object" % value)
         self._item = value
 
     @classmethod

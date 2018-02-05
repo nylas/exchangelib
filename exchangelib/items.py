@@ -96,7 +96,7 @@ class RegisterMixIn(EWSElement):
         else:
             raise ValueError("'%s' is already registered" % attr_name)
         if not issubclass(attr_cls, ExtendedProperty):
-            raise ValueError("'%s' must be a subclass of ExtendedProperty" % attr_cls)
+            raise ValueError("%r must be a subclass of ExtendedProperty" % attr_cls)
         # Check if class attributes are properly defined
         attr_cls.validate_cls()
         # ExtendedProperty is not a real field, but a placeholder in the fields list. See
@@ -195,11 +195,11 @@ class Item(RegisterMixIn):
         from .account import Account
         self.account = kwargs.pop('account', None)
         if self.account is not None and not isinstance(self.account, Account):
-            raise ValueError("'account' %s must be an Account instance" % self.account)
+            raise ValueError("'account' %r must be an Account instance" % self.account)
         self.folder = kwargs.pop('folder', None)
         if self.folder is not None:
             if not isinstance(self.folder, Folder):
-                raise ValueError("'folder' %s must be a Folder instance" % self.folder)
+                raise ValueError("'folder' %r must be a Folder instance" % self.folder)
             if self.folder.account is not None:
                 if self.account is not None:
                     # Make sure the account from kwargs matches the folder account
@@ -762,7 +762,7 @@ class Contact(Item):
         TextField('assistant_name', field_uri='contacts:AssistantName'),
         DateTimeField('birthday', field_uri='contacts:Birthday'),
         URIField('business_homepage', field_uri='contacts:BusinessHomePage'),
-        CharListField('children', field_uri='contacts:Children'),
+        TextListField('children', field_uri='contacts:Children'),
         TextListField('companies', field_uri='contacts:Companies', is_searchable=False),
         ChoiceField('contact_source', field_uri='contacts:ContactSource', choices={
             Choice('Store'), Choice('ActiveDirectory')
@@ -773,11 +773,11 @@ class Contact(Item):
         TextField('job_title', field_uri='contacts:JobTitle'),
         TextField('manager', field_uri='contacts:Manager'),
         TextField('mileage', field_uri='contacts:Mileage'),
-        CharField('office', field_uri='contacts:OfficeLocation'),
+        TextField('office', field_uri='contacts:OfficeLocation'),
         ChoiceField('postal_address_index', field_uri='contacts:PostalAddressIndex', choices={
             Choice('Business'), Choice('Home'), Choice('Other'), Choice('None')
         }, default='None', is_required_after_save=True),
-        CharField('profession', field_uri='contacts:Profession'),
+        TextField('profession', field_uri='contacts:Profession'),
         TextField('spouse_name', field_uri='contacts:SpouseName'),
         CharField('surname', field_uri='contacts:Surname'),
         DateTimeField('wedding_anniversary', field_uri='contacts:WeddingAnniversary'),

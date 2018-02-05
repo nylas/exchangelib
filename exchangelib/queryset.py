@@ -90,7 +90,7 @@ class QuerySet(object):
 
     def _additional_fields(self):
         if not isinstance(self.only_fields, tuple):
-            raise ValueError("self.only_fields value '%s' must be a tuple" % self.only_fields)
+            raise ValueError("'only_fields' value %r must be a tuple" % self.only_fields)
         # Remove ItemId and ChangeKey. We get them unconditionally
         additional_fields = {f for f in self.only_fields if not f.field.is_attribute}
 

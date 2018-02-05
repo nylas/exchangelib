@@ -289,7 +289,7 @@ class AvailabilityMailbox(EWSElement):
     @classmethod
     def from_mailbox(cls, mailbox):
         if not isinstance(mailbox, Mailbox):
-            raise ValueError("'mailbox' %s must be a Mailbox instance" % mailbox)
+            raise ValueError("'mailbox' %r must be a Mailbox instance" % mailbox)
         return cls(name=mailbox.name, email_address=mailbox.email_address, routing_type=mailbox.routing_type)
 
 
