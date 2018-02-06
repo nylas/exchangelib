@@ -34,8 +34,7 @@ from exchangelib import close_connections
 from exchangelib.account import Account, SAVE_ONLY, SEND_ONLY, SEND_AND_SAVE_COPY
 from exchangelib.attachments import FileAttachment, ItemAttachment
 from exchangelib.autodiscover import AutodiscoverProtocol, discover
-import exchangelib.autodiscover
-from exchangelib.changes import Change
+from exchangelib.changes import Change, ItemChange, FolderChange
 from exchangelib.configuration import Configuration
 from exchangelib.credentials import DELEGATE, IMPERSONATION, Credentials, ServiceAccount
 from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalidOperation, AutoDiscoverRedirect, \
@@ -2212,7 +2211,7 @@ class AccountTest(EWSTest):
 
     def test_sync_folder_hierarchy(self):
         for change in self.account.sync_folder_hierarchy(shape='AllProperties'):
-            if isinstance(change, Change):
+            if isinstance(change, FolderChange):
                 assert change.folder is not None
             else:
                 sync_state = change
@@ -2904,6 +2903,21 @@ class FolderTest(EWSTest):
         f.name = get_random_string(16)
         f.save()
         f.delete()
+
+    def test_sync_folder_items(self):
+        changes_seen = set()
+        for change in self.account.inbox.sync_folder_items(shape='Default'):
+            if isinstance(change, ItemChange):
+                assert change.item is not None
+                changes_seen.add((change.item.item_id, change.item.changekey))
+            else:
+                sync_state = change
+        assert sync_state is not None
+
+        for change in self.account.inbox.sync_folder_items(shape='Default', sync_state=sync_state):
+            if isinstance(change, ItemChange):
+                assert change.item is not None
+                assert (change.item.item_id, change.item.changekey) not in changes_seen
 
 
 class BaseItemTest(EWSTest):
@@ -5510,6 +5524,21 @@ class CalendarTest(BaseItemTest):
         fresh_item = self.test_folder.get(id=item.id, changekey=item.changekey)
         self.assertEqual(len(fresh_item.modified_occurrences), 4)
         self.assertEqual(len(fresh_item.deleted_occurrences), 3)
+
+    def test_sync_folder_items_calendar(self):
+        changes_seen = set()
+        for change in self.test_folder.sync_folder_items(shape='Default'):
+            if isinstance(change, ItemChange):
+                assert change.item is not None
+                changes_seen.add((change.item.item_id, change.item.changekey))
+            else:
+                sync_state = change
+        assert sync_state is not None
+
+        for change in self.test_folder.sync_folder_items(shape='Default', sync_state=sync_state):
+            if isinstance(change, ItemChange):
+                assert change.item is not None
+                assert (change.item.item_id, change.item.changekey) not in changes_seen
 
 
 class MessagesTest(BaseItemTest):

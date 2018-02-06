@@ -1260,6 +1260,64 @@ class SyncFolderHierarchy(EWSAccountService):
         return result
 
 
+class SyncFolderItems(EWSFolderService):
+    """
+    https://msdn.microsoft.com/en-us/library/office/aa563967(v=exchg.150).aspx
+    """
+    SERVICE_NAME = 'SyncFolderItems'
+    element_container_name = '{%s}Changes' % MNS
+
+    def call(self, shape, sync_state=None, ignore=None, max_changes=100):
+        from .changes import CreateItemChange, UpdateItemChange, DeleteItemChange, ReadFlagChange
+
+        assert len(self.folders) == 1
+        for change in self._get_elements(self.get_payload(self.folders[0], shape, sync_state, ignore, max_changes)):
+            c = None
+            for cls in [CreateItemChange, UpdateItemChange, DeleteItemChange, ReadFlagChange]:
+                if change.tag == cls.response_tag():
+                    c = cls.from_xml(change, self.account)
+                    break
+            if c is None:
+                raise ValueError('Unknown Change tag: {}'.format(change.tag))
+            yield c
+        yield self.sync_state.text
+
+    def get_payload(self, folder, shape, sync_state=None, ignore=None, max_changes=100):
+        if ignore is None:
+            ignore = []
+
+        sync_folder_items = create_element('m:%s' % self.SERVICE_NAME)
+        item_shape = create_element('m:ItemShape')
+        add_xml_child(item_shape, 't:BaseShape', shape)
+        sync_folder_items.append(item_shape)
+
+        sync_folder_id = create_element('m:SyncFolderId')
+        sync_folder_id.append(folder.to_xml(version=self.account.version))
+        sync_folder_items.append(sync_folder_id)
+
+        if sync_state is not None:
+            syncstate = create_element('m:SyncState')
+            syncstate.text = sync_state
+            sync_folder_items.append(syncstate)
+
+        ignore_elem = create_element('m:Ignore')
+        for i in ignore:
+            ignore_elem.append(i)
+
+        max_changes_elem = create_element('m:MaxChangesReturned')
+        max_changes_elem.text = str(max_changes)
+        sync_folder_items.append(max_changes_elem)
+        return sync_folder_items
+
+    def _get_elements_in_response(self, response):
+        result = super(SyncFolderItems, self)._get_elements_in_response(response)
+        for msg in response:
+            sync_state = self._get_element_container(message=msg, name='{%s}SyncState' % MNS)
+            if sync_state is not None:
+                self.sync_state = sync_state
+        return result
+
+
 class DeleteFolder(EWSAccountService):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa564767(v=exchg.150).aspx
