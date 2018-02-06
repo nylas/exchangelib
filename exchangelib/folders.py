@@ -20,7 +20,8 @@ from .items import Item, CalendarItem, Contact, Message, Task, MeetingRequest, M
 from .properties import ItemId, Mailbox, EWSElement, ParentFolderId
 from .queryset import QuerySet, SearchableMixIn
 from .restriction import Restriction
-from .services import FindFolder, GetFolder, FindItem, CreateFolder, UpdateFolder, DeleteFolder, EmptyFolder, FindPeople
+from .services import FindFolder, GetFolder, FindItem, CreateFolder, UpdateFolder, DeleteFolder, EmptyFolder, FindPeople, \
+    SyncFolderItems
 from .util import TNS, MNS
 from .version import EXCHANGE_2007_SP1, EXCHANGE_2010_SP1, EXCHANGE_2013, EXCHANGE_2013_SP1
 
@@ -658,6 +659,9 @@ class Folder(RegisterMixIn, SearchableMixIn):
             if isinstance(p, Exception):
                 raise p
             yield p
+
+    def sync_folder_items(self, shape, sync_state=None, ignore=None, max_changes=100):
+        return SyncFolderItems(self.account, folders=[self]).call(shape, sync_state, ignore)
 
     def bulk_create(self, items, *args, **kwargs):
         return self.account.bulk_create(folder=self, items=items, *args, **kwargs)
