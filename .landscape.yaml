@@ -6,6 +6,7 @@ ignore-paths:
   - optimize.py
   - perf.py
   - notifier.py
+  - tests/__init__.py
 
 pylint:
   disable:
