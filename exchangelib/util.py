@@ -9,12 +9,14 @@ from multiprocessing import Lock
 import re
 import socket
 import time
-from xml.etree.ElementTree import Element, fromstring, ParseError
+from xml.etree.ElementTree import ElementTree, Element
 
-from lxml.etree import XMLParser, parse, tostring
+from defusedxml.ElementTree import fromstring, ParseError
+from defusedxml.lxml import parse, tostring, RestrictedElement
 from future.moves.urllib.parse import urlparse
 from future.moves._thread import get_ident
 from future.utils import PY2
+from lxml.etree import XMLParser, ElementDefaultClassLookup
 from pygments import highlight
 from pygments.lexers import XmlLexer
 from pygments.formatters import TerminalFormatter
@@ -29,7 +31,7 @@ time_func = time.time if PY2 else time.monotonic
 
 log = logging.getLogger(__name__)
 
-ElementType = type(Element('x'))  # Type is auto-generated inside cElementTree
+ElementType = type(Element('x'))  # Type is auto-generated inside ElementTree
 string_type = string_types[0]
 
 # Regex of UTF-8 control characters that are illegal in XML 1.0 (and XML 1.1)
@@ -100,7 +102,6 @@ def peek(iterable):
 
 
 def xml_to_str(tree, encoding=None, xml_declaration=False):
-    from xml.etree.ElementTree import ElementTree
     # tostring() returns bytecode unless encoding is 'unicode', and does not reliably produce an XML declaration. We
     # ALWAYS want bytecode so we can convert to unicode explicitly.
     if encoding is None:
@@ -241,9 +242,13 @@ def to_xml(text):
     except ParseError:
         # Exchange servers may spit out the weirdest XML. lxml is pretty good at recovering from errors
         log.warning('Fallback to lxml processing of faulty XML')
-        magical_parser = XMLParser(recover=True)
+        magical_parser = XMLParser(recover=True, resolve_entities=False)
+        magical_parser.set_element_class_lookup(ElementDefaultClassLookup(element=RestrictedElement))
         no_bom_text = text[BOM_LEN:] if text.startswith(BOM) else text
-        root = parse(io.BytesIO(no_bom_text.encode('utf-8')), magical_parser)
+        try:
+            root = parse(io.BytesIO(no_bom_text.encode('utf-8')), parser=magical_parser)
+        except AssertionError as e:
+            raise ParseError(*e.args)
         try:
             return fromstring(tostring(root))
         except ParseError as e:

@@ -2,10 +2,10 @@
 from __future__ import unicode_literals
 
 import logging
-from xml.etree.ElementTree import ParseError
 
-import requests.sessions
+from defusedxml.ElementTree import ParseError
 from future.utils import python_2_unicode_compatible
+import requests.sessions
 from six import text_type
 
 from .errors import TransportError, ErrorInvalidSchemaVersionForMailboxVersion, ErrorInvalidServerVersion, \

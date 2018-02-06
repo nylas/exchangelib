@@ -17,9 +17,11 @@ import tempfile
 import time
 import unittest
 import warnings
-from xml.etree.ElementTree import ParseError
 
 from dateutil.relativedelta import relativedelta
+from defusedxml.ElementTree import ParseError
+from defusedxml.lxml import parse, tostring
+import dns.resolver
 import psutil
 import pytz
 import requests
@@ -31,6 +33,7 @@ from exchangelib import close_connections
 from exchangelib.account import Account, SAVE_ONLY, SEND_ONLY, SEND_AND_SAVE_COPY
 from exchangelib.attachments import FileAttachment, ItemAttachment
 from exchangelib.autodiscover import AutodiscoverProtocol, discover
+import exchangelib.autodiscover
 from exchangelib.configuration import Configuration
 from exchangelib.credentials import DELEGATE, IMPERSONATION, Credentials, ServiceAccount
 from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalidOperation, AutoDiscoverRedirect, \
@@ -81,7 +84,7 @@ mock_protocol = namedtuple('mock_protocol', ('version', 'service_endpoint'))
 mock_version = namedtuple('mock_version', ('build',))
 
 
-def mock_post(url, status_code, headers, text):
+def mock_post(url, status_code, headers, text=''):
     req = namedtuple('request', ['headers'])(headers={})
     c = text.encode('utf-8')
     return lambda **kwargs: namedtuple(
@@ -149,7 +152,7 @@ class VersionTest(unittest.TestCase):
         MajorBuildNumber="845" MajorVersion="15" MinorBuildNumber="22" MinorVersion="1" Version="V2016_10_10"
         xmlns:h="http://schemas.microsoft.com/exchange/services/2006/types"/>
 </s:Header>
-</s:Envelope'''
+</s:Envelope>'''
         )
         self.assertEqual(version.api_version, EXCHANGE_2007.api_version())
         self.assertEqual(version.api_version, 'Exchange2007')
@@ -166,7 +169,7 @@ class VersionTest(unittest.TestCase):
         MajorBuildNumber="845" MajorVersion="15" MinorBuildNumber="22" MinorVersion="1" Version="HELLO_FROM_EXCHANGELIB"
         xmlns:h="http://schemas.microsoft.com/exchange/services/2006/types"/>
 </s:Header>
-</s:Envelope'''
+</s:Envelope>'''
         )
         self.assertEqual(version.api_version, 'HELLO_FROM_EXCHANGELIB')
 
@@ -182,7 +185,7 @@ class VersionTest(unittest.TestCase):
         MajorBuildNumber="845" MajorVersion="15" MinorBuildNumber="22" MinorVersion="1"
         xmlns:h="http://schemas.microsoft.com/exchange/services/2006/types"/>
 </s:Header>
-</s:Envelope'''
+</s:Envelope>'''
         )
         self.assertEqual(version.api_version, 'Exchange2016')
 
@@ -198,7 +201,7 @@ class VersionTest(unittest.TestCase):
         MajorBuildNumber="845" MajorVersion="15" MinorBuildNumber="22" MinorVersion="1"
         xmlns:h="http://schemas.microsoft.com/exchange/services/2006/types"/>
 </s:Header>
-</s:Envelope'''
+</s:Envelope>'''
         )
         self.assertEqual(version.api_version, 'Exchange2016')
 
@@ -214,7 +217,7 @@ class VersionTest(unittest.TestCase):
                 '''\
 <?xml version="1.0" ?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
-</s:Envelope'''
+</s:Envelope>'''
             )
         with self.assertRaises(TransportError):
             Version.from_response(
@@ -224,7 +227,7 @@ class VersionTest(unittest.TestCase):
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
 <s:Header>
 </s:Header>
-</s:Envelope'''
+</s:Envelope>'''
             )
         with self.assertRaises(TransportError):
             Version.from_response(
@@ -236,7 +239,7 @@ class VersionTest(unittest.TestCase):
     <h:ServerVersionInfo MajorBuildNumber="845" MajorVersion="15" Version="V2016_10_10"
         xmlns:h="http://schemas.microsoft.com/exchange/services/2006/types"/>
 </s:Header>
-</s:Envelope'''
+</s:Envelope>'''
             )
 
 
@@ -758,7 +761,8 @@ class RecurrenceTest(unittest.TestCase):
         pattern = RelativeMonthlyPattern(interval=2, week_number=LAST, weekdays=[5, 7])
         self.assertEqual(str(pattern), 'Occurs on weekdays Friday, Sunday in the Last week of every 2 month(s)')
         pattern = WeeklyPattern(interval=4, weekdays=WEEKEND_DAY, first_day_of_week=7)
-        self.assertEqual(str(pattern), 'Occurs on weekdays WeekendDay of every 4 week(s) where the first day of the week is Sunday')
+        self.assertEqual(str(pattern),
+                         'Occurs on weekdays WeekendDay of every 4 week(s) where the first day of the week is Sunday')
         pattern = DailyPattern(interval=6)
         self.assertEqual(str(pattern), 'Occurs every 6 day(s)')
 
@@ -1331,7 +1335,8 @@ class EWSTest(unittest.TestCase):
             return addrs
         if isinstance(field, PhysicalAddressField):
             addrs = []
-            for label in PhysicalAddress.get_field_by_fieldname('label').supported_choices(version=self.account.version):
+            for label in PhysicalAddress.get_field_by_fieldname('label')\
+                    .supported_choices(version=self.account.version):
                 addr = PhysicalAddress(street=get_random_string(32), city=get_random_string(32),
                                        state=get_random_string(32), country=get_random_string(32),
                                        zipcode=get_random_string(8))
@@ -1360,7 +1365,6 @@ class EWSTest(unittest.TestCase):
 class CommonTest(EWSTest):
     @staticmethod
     def pprint(xml_str):
-        from lxml.etree import parse, tostring
         return tostring(parse(
             io.BytesIO(xml_str)),
             xml_declaration=True,
@@ -1800,45 +1804,45 @@ class CommonTest(EWSTest):
                 r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
 
         # Test bad exit codes and headers
-        session.post = mock_post(url, 401, {}, '')
+        session.post = mock_post(url, 401, {})
         with self.assertRaises(UnauthorizedError):
             r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
-        session.post = mock_post(url, 999, {'connection': 'close'}, '')
+        session.post = mock_post(url, 999, {'connection': 'close'})
         with self.assertRaises(TransportError):
             r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
-        session.post = mock_post(url, 302, {'location': '/ews/genericerrorpage.htm?aspxerrorpath=/ews/exchange.asmx'}, '')
+        session.post = mock_post(url, 302, {'location': '/ews/genericerrorpage.htm?aspxerrorpath=/ews/exchange.asmx'})
         with self.assertRaises(TransportError):
             r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
-        session.post = mock_post(url, 503, {}, '')
+        session.post = mock_post(url, 503, {})
         with self.assertRaises(TransportError):
             r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
 
         # No redirect header
-        session.post = mock_post(url, 302, {}, '')
+        session.post = mock_post(url, 302, {})
         with self.assertRaises(TransportError):
             r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
         # Redirect header to same location
-        session.post = mock_post(url, 302, {'location': url}, '')
+        session.post = mock_post(url, 302, {'location': url})
         with self.assertRaises(TransportError):
             r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
         # Redirect header to relative location
-        session.post = mock_post(url, 302, {'location': url + '/foo'}, '')
+        session.post = mock_post(url, 302, {'location': url + '/foo'})
         with self.assertRaises(RedirectError):
             r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
         # Redirect header to other location and allow_redirects=False
-        session.post = mock_post(url, 302, {'location': 'https://contoso.com'}, '')
+        session.post = mock_post(url, 302, {'location': 'https://contoso.com'})
         with self.assertRaises(TransportError):
             r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
         # Redirect header to other location and allow_redirects=True
         import exchangelib.util
         exchangelib.util.MAX_REDIRECTS = 0
-        session.post = mock_post(url, 302, {'location': 'https://contoso.com'}, '')
+        session.post = mock_post(url, 302, {'location': 'https://contoso.com'})
         with self.assertRaises(TransportError):
             r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='',
                                           allow_redirects=True)
 
         # CAS error
-        session.post = mock_post(url, 999, {'X-CasErrorCode': 'AAARGH!'}, '')
+        session.post = mock_post(url, 999, {'X-CasErrorCode': 'AAARGH!'})
         with self.assertRaises(CASError):
             r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
 
@@ -1848,19 +1852,19 @@ class CommonTest(EWSTest):
         self.assertEqual(r.text, '<?xml version="1.0" ?><foo></foo>')
 
         # Bad status_code and bad text
-        session.post = mock_post(url, 999, {}, '')
+        session.post = mock_post(url, 999, {})
         with self.assertRaises(TransportError):
             r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
 
         # Rate limit exceeded
         protocol.credentials = ServiceAccount(username=credentials.username, password=credentials.password, max_wait=1)
-        session.post = mock_post(url, 503, {'connection': 'close'}, '')
+        session.post = mock_post(url, 503, {'connection': 'close'})
         protocol.renew_session = lambda s: s  # Return the same session so it's still mocked
         with self.assertRaises(RateLimitError):
             r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
         # Test something larger than the default wait, so we retry at least once
         protocol.credentials.max_wait = 15
-        session.post = mock_post(url, 503, {'connection': 'close'}, '')
+        session.post = mock_post(url, 503, {'connection': 'close'})
         with self.assertRaises(RateLimitError):
             r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
 
@@ -2056,8 +2060,8 @@ class AccountTest(EWSTest):
 
 class AutodiscoverTest(EWSTest):
     def test_magic(self):
-        from exchangelib.autodiscover import _autodiscover_cache
         # Just test we don't fail
+        from exchangelib.autodiscover import _autodiscover_cache
         discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
         str(_autodiscover_cache)
         repr(_autodiscover_cache)
@@ -2073,8 +2077,8 @@ class AutodiscoverTest(EWSTest):
         self.assertEqual(protocol.version.build, self.account.protocol.version.build)
 
     def test_autodiscover_failure(self):
-        from exchangelib.autodiscover import _autodiscover_cache
         # Empty the cache
+        from exchangelib.autodiscover import _autodiscover_cache
         _autodiscover_cache.clear()
         with self.assertRaises(ErrorNonExistentMailbox):
             # Test that error is raised with an empty cache
@@ -2088,23 +2092,21 @@ class AutodiscoverTest(EWSTest):
         close_connections()
 
     def test_autodiscover_gc(self):
-        from exchangelib.autodiscover import _autodiscover_cache
         # This is what Python garbage collection does
+        from exchangelib.autodiscover import _autodiscover_cache
         discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
         del _autodiscover_cache
 
     def test_autodiscover_direct_gc(self):
-        from exchangelib.autodiscover import _autodiscover_cache
         # This is what Python garbage collection does
+        from exchangelib.autodiscover import _autodiscover_cache
         discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
         _autodiscover_cache.__del__()
 
     @requests_mock.mock(real_http=True)
     def test_autodiscover_cache(self, m):
-        from exchangelib.autodiscover import _autodiscover_cache
-        import exchangelib.autodiscover
-
         # Empty the cache
+        from exchangelib.autodiscover import _autodiscover_cache
         _autodiscover_cache.clear()
         cache_key = (self.account.domain, self.account.protocol.credentials)
         # Not cached
@@ -2147,8 +2149,8 @@ class AutodiscoverTest(EWSTest):
         del _autodiscover_cache[cache_key]
 
     def test_corrupt_autodiscover_cache(self):
-        from exchangelib.autodiscover import _autodiscover_cache
         # Insert a fake Protocol instance into the cache
+        from exchangelib.autodiscover import _autodiscover_cache
         key = (2, 'foo', 4)
         _autodiscover_cache[key] = namedtuple('P', ['service_endpoint', 'auth_type'])(1, 'bar')
         # Check that it exists. 'in' goes directly to the file
@@ -2184,7 +2186,6 @@ class AutodiscoverTest(EWSTest):
         del _autodiscover_cache
 
     def test_autodiscover_redirect(self):
-        import exchangelib.autodiscover
         # Prime the cache
         email, p = discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
         _orig = exchangelib.autodiscover._autodiscover_quick
@@ -2249,7 +2250,6 @@ class AutodiscoverTest(EWSTest):
             # No SRV record
             _get_hostname_from_srv('example.com.')
         # Finding a real server that has a correct SRV record is not easy. Mock it
-        import dns.resolver
         _orig = dns.resolver.Resolver
 
         class _Mock1:
@@ -2278,7 +2278,6 @@ class AutodiscoverTest(EWSTest):
 
     def test_parse_response(self):
         from exchangelib.autodiscover import _parse_response
-
         with self.assertRaises(AutoDiscoverFailed):
             _parse_response('XXX')  # Invalid response
 
@@ -2469,7 +2468,9 @@ class FolderTest(EWSTest):
     def test_folder_grouping(self):
         # If you get errors here, you probably need to fill out [folder class].LOCALIZED_NAMES for your locale.
         for f in self.account.root.walk():
-            if isinstance(f, (Messages, DeletedItems, AllContacts, MyContactsExtended, Sharing, Favorites, SyncIssues, MyContacts)):
+            if isinstance(f, (
+                    Messages, DeletedItems, AllContacts, MyContactsExtended, Sharing, Favorites, SyncIssues, MyContacts
+            )):
                 self.assertEqual(f.folder_class, 'IPF.Note')
             elif isinstance(f, GALContacts):
                 self.assertEqual(f.folder_class, 'IPF.Contact.GalContacts')
@@ -2746,7 +2747,8 @@ class BaseItemTest(EWSTest):
                 continue
             if f.name == 'due_date':
                 # start_date must be before due_date
-                insert_kwargs['start_date'], insert_kwargs[f.name] = get_random_datetime_range(tz=self.account.default_timezone)
+                insert_kwargs['start_date'], insert_kwargs[f.name] = \
+                    get_random_datetime_range(tz=self.account.default_timezone)
                 continue
             if f.name == 'start_date':
                 continue
@@ -2833,8 +2835,8 @@ class BaseItemTest(EWSTest):
         if update_kwargs.get('is_all_day', False):
             # For is_all_day items, EWS will remove the time part of start and end values
             update_kwargs['start'] = update_kwargs['start'].replace(hour=0, minute=0, second=0, microsecond=0)
-            update_kwargs['end'] = update_kwargs['end'].replace(hour=0, minute=0, second=0, microsecond=0) \
-                                   + datetime.timedelta(days=1)
+            update_kwargs['end'] = \
+                update_kwargs['end'].replace(hour=0, minute=0, second=0, microsecond=0) + datetime.timedelta(days=1)
         if self.ITEM_CLASS == CalendarItem:
             # EWS always sets due date to 'start'
             update_kwargs['reminder_due_by'] = update_kwargs['start']
@@ -4579,7 +4581,7 @@ class BaseItemTest(EWSTest):
         try:
             # Test item creation, refresh, and update
             item = self.get_test_item(folder=self.test_folder)
-            # MyMeeting is an extended prop version of the CalendarItem 'uid' field. We don't want 'uid' to overwrite that.
+            # MyMeeting is an extended prop version of the 'uid' field. We don't want 'uid' to overwrite that.
             # overwriting each other.
             item.uid = None
             prop_val = item.my_meeting
@@ -4589,7 +4591,7 @@ class BaseItemTest(EWSTest):
             self.assertEqual(prop_val, item.my_meeting, (prop_val, item.my_meeting))
             new_prop_val = self.random_val(self.ITEM_CLASS.get_field_by_fieldname(attr_name))
             item.my_meeting = new_prop_val
-            # MyMeeting is an extended prop version of the CalendarItem 'uid' field. We don't want 'uid' to overwrite that.
+            # MyMeeting is an extended prop version of the 'uid' field. We don't want 'uid' to overwrite that.
             item.uid = None
             item.save()
             item = list(self.account.fetch(ids=[(item.item_id, item.changekey)]))[0]
@@ -5033,15 +5035,18 @@ class CalendarTest(BaseItemTest):
     def test_all_day_datetimes(self):
         # Test that start and end datetimes for all-day items are returned in the datetime of the account.
         start = get_random_date()
-        start_dt, end_dt = \
-            get_random_datetime_range(start_date=start, end_date=start + datetime.timedelta(days=365), tz=self.account.default_timezone)
+        start_dt, end_dt = get_random_datetime_range(
+            start_date=start,
+            end_date=start + datetime.timedelta(days=365),
+            tz=self.account.default_timezone
+        )
         item = self.ITEM_CLASS(folder=self.test_folder, start=start_dt, end=end_dt, is_all_day=True,
                                categories=self.categories)
         item.save()
 
         item = self.test_folder.all().only('start', 'end').get(item_id=item.item_id, changekey=item.changekey)
-        self.assertEqual(item.start.astimezone(self.account.default_timezone).time(), datetime.time(0, 0), (item.start, item.end))
-        self.assertEqual(item.end.astimezone(self.account.default_timezone).time(), datetime.time(0, 0), (item.start, item.end))
+        self.assertEqual(item.start.astimezone(self.account.default_timezone).time(), datetime.time(0, 0))
+        self.assertEqual(item.end.astimezone(self.account.default_timezone).time(), datetime.time(0, 0))
         item.delete()
 
     def test_view(self):
