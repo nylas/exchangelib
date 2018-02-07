@@ -5,6 +5,7 @@ from fnmatch import fnmatch
 import logging
 from operator import attrgetter
 
+import math
 from future.utils import python_2_unicode_compatible
 from six import text_type, string_types
 
@@ -19,7 +20,7 @@ from .properties import ItemId, Mailbox, EWSElement, ParentFolderId
 from .queryset import QuerySet
 from .restriction import Restriction
 from .services import FindFolder, GetFolder, FindItem, CreateFolder, UpdateFolder, DeleteFolder, EmptyFolder, \
-    SyncFolderItems
+    SyncFolderItems, Subscribe, Unsubscribe, GetStreamingEvents
 from .transport import TNS, MNS
 
 string_type = string_types[0]
@@ -457,7 +458,17 @@ class Folder(RegisterMixIn):
                     yield item
 
     def sync_folder_items(self, shape, sync_state=None, ignore=None, max_changes=100):
-        return SyncFolderItems(self.account, folders=[self]).call(shape, sync_state, ignore)
+        return SyncFolderItems(self.account, folders=[self]).call(shape, sync_state, ignore, max_changes)
+
+    def subscribe_for_notifications(self, event_types):
+        return Subscribe(self.account, [self]).call(event_types)
+
+    def listen_for_notifications(self, subscription_id, timeout_s=30*60):
+        timeout_minutes = int(math.ceil(float(timeout_s) / 60.0))
+        return GetStreamingEvents(self.account, [subscription_id]).call(timeout_minutes)
+
+    def unsubscribe_from_notifications(self, subscription_id):
+        return Unsubscribe(self.account, [subscription_id]).call()
 
     def bulk_create(self, items, *args, **kwargs):
         return self.account.bulk_create(folder=self, items=items, *args, **kwargs)

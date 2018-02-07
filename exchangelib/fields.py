@@ -5,6 +5,7 @@ import base64
 import binascii
 from decimal import Decimal, InvalidOperation
 import logging
+from xml.etree.ElementTree import Element
 
 from six import string_types
 
@@ -589,6 +590,18 @@ class IdField(CharField):
         self.is_attribute = True
 
 
+class IdAndChangekeyField(FieldURIField):
+    def from_xml(self, elem, account):
+        result = elem.find(self.response_tag()) # type: Element
+        if result is None and self.is_required:
+            raise ValueError("'%s' missing" % self.response_tag())
+        elem_id = result.get('Id')
+        elem_changekey = result.get('ChangeKey')
+        if elem_id is None:
+            raise ValueError("'%s' is missing 'Id'" % self.response_tag())
+        return elem_id, elem_changekey
+
+
 class CharListField(CharField):
     is_list = True
 
@@ -1072,6 +1085,23 @@ class FolderField(FieldURIField):
                 return folder_cls.from_xml(elem=folder_elem, account=account)
             classes_to_check.extend(folder_cls.__subclasses__())
         return None
+
+
+class EventListField(FieldURIField):
+    is_list = True
+
+    def from_xml(self, elem, account):
+        from .events import CONCRETE_EVENT_CLASSES
+        results = []
+        for event_cls in CONCRETE_EVENT_CLASSES:
+            event_elems = elem.findall(event_cls.response_tag())
+            for e in event_elems:
+                # We can't distinguish between Item*Event and Folder*Event
+                # by tag, only by the fields they have.
+                if not event_cls.has_all_required_xml_fields(e):
+                    continue
+                results.append(event_cls.from_xml(e, account))
+        return results
 
 
 class EffectiveRightsField(EWSElementField):
