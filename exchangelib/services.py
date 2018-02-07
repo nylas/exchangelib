@@ -58,6 +58,36 @@ class EWSService(object):
     WARNINGS_TO_CATCH_IN_RESPONSE = ErrorBatchProcessingStopped
     # Define the warnings we want to ignore, to let response processing proceed
     WARNINGS_TO_IGNORE_IN_RESPONSE = ()
+    # These are known and understood, and don't require a backtrace.
+    # TODO: ErrorTooManyObjectsOpened means there are too many connections to the database.
+    # We should be able to act on this by lowering the self.protocol connection pool size.
+    ERRORS_TO_CATCH_AND_RERAISE = (
+        ErrorAccessDenied,
+        ErrorADUnavailable,
+        ErrorBatchProcessingStopped,
+        ErrorCannotDeleteObject,
+        ErrorConnectionFailed,
+        ErrorCreateItemAccessDenied,
+        ErrorFolderNotFound,
+        ErrorImpersonateUserDenied,
+        ErrorImpersonationFailed,
+        ErrorInternalServerError,
+        ErrorInternalServerTransientError,
+        ErrorInvalidChangeKey,
+        ErrorInvalidLicense,
+        ErrorItemNotFound,
+        ErrorMailboxMoveInProgress,
+        ErrorMailboxStoreUnavailable,
+        ErrorNonExistentMailbox,
+        ErrorNoPublicFolderReplicaAvailable,
+        ErrorNoRespondingCASInDestinationSite,
+        ErrorQuotaExceeded,
+        ErrorServerBusy,
+        ErrorTimeoutExpired,
+        ErrorTooManyObjectsOpened,
+        RateLimitError,
+        UnauthorizedError,
+    )
 
     def __init__(self, protocol, chunk_size=None):
         self.chunk_size = chunk_size or CHUNK_SIZE  # The number of items to send in a single request
@@ -78,7 +108,9 @@ class EWSService(object):
     # def get_payload(self, **kwargs):
     #     raise NotImplementedError()
 
-    def _get_elements(self, payload):
+    def _get_elements(self, payload, headers=None):
+        if not isinstance(payload, ElementType):
+            raise ValueError("'payload' %r must be an ElementType" % payload)
         while True:
             try:
                 # Send the request, get the response and do basic sanity checking on the SOAP XML
@@ -129,20 +161,103 @@ class EWSService(object):
                             account, traceback.format_exc(20))
                 raise
 
-    def _get_response_xml(self, payload):
-        # Takes an XML tree and returns SOAP payload as an XML tree
+    def _stream_elements(self, payload, timeout, headers=None):
+        if not isinstance(payload, ElementType):
+            raise ValueError("'payload' %r must be an ElementType" % payload)
+        try:
+            # Send the request, get the response and do basic sanity checking on the SOAP XML
+            for response in self._stream_response_xml(payload=payload, timeout=timeout, headers=headers):
+                # Read the XML and throw any SOAP or general EWS error messages.
+                # Return a generator over the result elements.
+                for elem in self._get_elements_in_response(response=response):
+                    yield elem
+        except self.ERRORS_TO_CATCH_AND_RERAISE:
+            raise
+        except Exception:
+            # This may run from a thread pool, which obfuscates the stack trace. Print trace immediately.
+            account = self.account if isinstance(self, EWSAccountService) else None
+            log.warning('EWS %s, account %s: Exception in _get_elements: %s', self.protocol.service_endpoint, account,
+                        traceback.format_exc(20))
+            raise
+
+    def _get_account_and_version_hint(self):
         # Microsoft really doesn't want to make our lives easy. The server may report one version in our initial version
         # guessing tango, but then the server may decide that any arbitrary legacy backend server may actually process
         # the request for an account. Prepare to handle ErrorInvalidSchemaVersionForMailboxVersion errors and set the
         # server version per-account.
-        from .version import API_VERSIONS
         if isinstance(self, EWSAccountService):
-            account = self.account
-            hint = self.account.version
+            return self.account, self.account.version
         else:
-            account = None
-            hint = self.protocol.version
-        api_versions = [hint.api_version] + [v for v in API_VERSIONS if v != hint.api_version]
+            return None, self.protocol.version
+
+    def _get_versions_to_try(self, hint):
+        from .version import API_VERSIONS
+        return [hint.api_version] + [v for v in API_VERSIONS if v != hint.api_version]
+
+    def _stream_response_xml(self, payload, timeout, headers=None):
+        # Takes an XML tree and returns SOAP payload as an XML tree
+        if not isinstance(payload, ElementType):
+            raise ValueError("'payload' %r must be an ElementType" % payload)
+
+        account, hint = self._get_account_and_version_hint()
+        api_versions = self._get_versions_to_try(hint)
+
+        got_envelopes = False
+        for api_version in api_versions:
+            session = self.protocol.get_session()
+            try:
+                soap_payload = wrap(content=payload, version=api_version, account=account)
+                r, session = post_ratelimited(
+                    protocol=self.protocol,
+                    session=session,
+                    url=self.protocol.service_endpoint,
+                    headers=headers,
+                    data=soap_payload,
+                    allow_redirects=False,
+                    stream=True,
+                    timeout=timeout)
+                got_envelopes = False
+                for envelope in self._parse_envelopes(r):
+                    result = self._handle_xml_response(r, envelope, account, api_version, hint)
+                    if result is None:
+                        break
+                    got_envelopes = True
+                    yield result
+            finally:
+                self.protocol.release_session(session)
+
+            if got_envelopes:
+                break
+
+        if not got_envelopes:
+            raise ErrorInvalidSchemaVersionForMailboxVersion(
+                'Tried versions %s but all were invalid for account %s' % (api_versions, account))
+
+    def _parse_envelopes(self, response):
+        try:
+            envelope_str = '</Envelope>'
+            curr_envelope = ''
+            for chunk in response.iter_content():
+                if not chunk:
+                    continue
+                curr_envelope += chunk
+                index = curr_envelope.find(envelope_str)
+                if index == -1:
+                    continue
+                yield curr_envelope[0:index + len(envelope_str)]
+                curr_envelope = curr_envelope[index + len(envelope_str):]
+        except Exception as e:
+            print('Error parsing envelopes: {}'.format(e))
+            raise
+
+    def _get_response_xml(self, payload, headers=None):
+        # Takes an XML tree and returns SOAP payload as an XML tree
+        if not isinstance(payload, ElementType):
+            raise ValueError("'payload' %r must be an ElementType" % payload)
+
+        account, hint = self._get_account_and_version_hint()
+        api_versions = self._get_versions_to_try(hint)
+
         for api_version in api_versions:
             log.debug('Trying API version %s for account %s', api_version, account)
             r, session = post_ratelimited(
@@ -151,7 +266,8 @@ class EWSService(object):
                 url=self.protocol.service_endpoint,
                 headers=extra_headers(account=account),
                 data=wrap(content=payload, version=api_version, account=account),
-                allow_redirects=False)
+                allow_redirects=False,
+                stream=False)
             self.protocol.release_session(session)
             try:
                 soap_response_payload = to_xml(r.content)
@@ -184,6 +300,29 @@ class EWSService(object):
             raise ErrorInvalidSchemaVersionForMailboxVersion('Tried versions %s but all were invalid for account %s' %
                                                              (api_versions, account))
         raise ErrorInvalidServerVersion('Tried versions %s but all were invalid' % api_versions)
+
+    def _handle_xml_response(self, response, text, account, api_version, hint):
+        log.debug('Trying API version %s for account %s', api_version, account)
+        try:
+            soap_response_payload = to_xml(text)
+        except ParseError as e:
+            raise SOAPError('Bad SOAP response: %s' % e)
+        try:
+            res = self._get_soap_payload(soap_response=soap_response_payload)
+        except (ErrorInvalidSchemaVersionForMailboxVersion, ErrorInvalidServerVersion):
+            if not account:
+                # This should never happen for non-account services
+                raise ValueError("'account' should not be None")
+            # The guessed server version is wrong for this account. Try the next version
+            log.debug('API version %s was invalid for account %s', api_version, account)
+            return None
+        except ResponseMessageError:
+            # We got an error message from Exchange, but we still want to get any new version info from the response
+            self._update_api_version(hint=hint, api_version=api_version, response=response)
+            raise
+        else:
+            self._update_api_version(hint=hint, api_version=api_version, response=response)
+        return res
 
     def _update_api_version(self, hint, api_version, response):
         if api_version == hint.api_version and hint.build is not None:
@@ -336,6 +475,13 @@ class EWSFolderService(EWSAccountService):
         if not self.folders:
             raise ValueError('"folders" must not be empty')
         super(EWSFolderService, self).__init__(*args, **kwargs)
+
+
+class EWSSubscriptionService(EWSAccountService):
+
+    def __init__(self, account, subscription_ids):
+        self.subscription_ids = subscription_ids
+        super(EWSSubscriptionService, self).__init__(account=account)
 
 
 class PagingEWSMixIn(EWSService):
@@ -1281,7 +1427,10 @@ class SyncFolderItems(EWSFolderService):
             if c is None:
                 raise ValueError('Unknown Change tag: {}'.format(change.tag))
             yield c
-        yield self.sync_state.text
+        if self.sync_state is None:
+            yield None
+        else:
+            yield self.sync_state.text
 
     def get_payload(self, folder, shape, sync_state=None, ignore=None, max_changes=100):
         if ignore is None:
@@ -1313,10 +1462,145 @@ class SyncFolderItems(EWSFolderService):
     def _get_elements_in_response(self, response):
         result = super(SyncFolderItems, self)._get_elements_in_response(response)
         for msg in response:
-            sync_state = self._get_element_container(message=msg, name='{%s}SyncState' % MNS)
-            if sync_state is not None:
-                self.sync_state = sync_state
+            self.sync_state = self._get_element_container(message=msg, name='{%s}SyncState' % MNS)
         return result
+
+
+class Subscribe(EWSFolderService):
+    """
+    https://msdn.microsoft.com/en-us/library/office/aa566188(v=exchg.150).aspx
+
+    Currently we only support doing Subscribe for StreamingSubscriptionRequest.
+    """
+    SERVICE_NAME = 'Subscribe'
+    element_container_name = '{%s}SubscriptionId' % MNS
+
+    def call(self, event_types):
+        # Read about server affinity here: https://msdn.microsoft.com/en-us/library/office/dn458789(v=exchg.150).aspx
+        for subscription_id in self._get_elements(self.get_payload(self.folders, event_types), headers={
+            'X-AnchorMailbox': self.account.primary_smtp_address,
+            'X-PreferServerAffinity': 'True',
+        }):
+            return subscription_id
+        raise ValueError('No valid response')
+
+    def get_payload(self, folders, event_types):
+        from .events import CONCRETE_EVENT_CLASSES
+
+        subscription = create_element('m:Subscribe')
+        streaming_request = create_element('m:StreamingSubscriptionRequest')
+        subscription.append(streaming_request)
+
+        folder_ids = create_element('t:FolderIds')
+        for folder in folders:
+            folder_elem = folder.to_xml(version=self.account.version)
+            folder_ids.append(folder_elem)
+        streaming_request.append(folder_ids)
+
+        event_types_elem = create_element('t:EventTypes')
+        deduped_event_types = set()
+        # If the client only specifies either Folder*Event or Item*Event
+        # we currently don't filter them out during GetStreamingEvents
+        # because they map to the same element tag name.
+        for event_type in event_types:
+            assert event_type in CONCRETE_EVENT_CLASSES
+            deduped_event_types.add(event_type.ELEMENT_NAME)
+
+        for event_type_name in deduped_event_types:
+            if event_type_name == 'StatusEvent':
+                continue
+            event_type_elem = create_element('t:EventType')
+            event_type_elem.text = event_type_name
+            event_types_elem.append(event_type_elem)
+        streaming_request.append(event_types_elem)
+        return subscription
+
+    def _get_elements_in_container(self, container):
+        return [container.text]
+
+
+class GetStreamingEvents(EWSSubscriptionService):
+    """
+    https://msdn.microsoft.com/en-us/library/office/ff406172(v=exchg.150).aspx
+    """
+    SERVICE_NAME = 'GetStreamingEvents'
+    element_container_name = None
+
+    def call(self, timeout_minutes):
+        assert len(self.subscription_ids) == 1
+        headers = {
+            'X-PreferServerAffinity': 'True',
+            'X-AnchorMailbox': self.account.primary_smtp_address,
+        }
+        return self._stream_elements(self.get_payload(self.subscription_ids[0], timeout_minutes),
+                                     timeout=timeout_minutes * 60,
+                                     headers=headers)
+
+    def get_payload(self, subscription_id, timeout_minutes):
+        get_streaming_events = create_element('{%s}GetStreamingEvents' % MNS)
+        subscription_ids_elem = create_element('{%s}SubscriptionIds' % MNS)
+        subscription_id_elem = create_element('{%s}SubscriptionId' % TNS)
+        subscription_id_elem.text = subscription_id
+        subscription_ids_elem.append(subscription_id_elem)
+        get_streaming_events.append(subscription_ids_elem)
+
+        timeout_elem = create_element('{%s}ConnectionTimeout' % MNS)
+        timeout_elem.text = str(timeout_minutes)
+        get_streaming_events.append(timeout_elem)
+        return get_streaming_events
+
+    def _get_elements_in_response(self, response):
+        from exchangelib.notifications import Notification, ConnectionStatus
+
+        if len(response) != 1:
+            raise ValueError("Expected 'response' length 1, got %s" % response)
+        response = response[0]
+        if not isinstance(response, ElementType):
+            raise ValueError("'response' %r must be an ElementType" % response)
+
+        container_or_exc = None
+        elem_cls = None
+        for cls, name in [(Notification, '{%s}Notifications' % MNS), (ConnectionStatus, '{%s}ConnectionStatus' % MNS)]:
+            try:
+                container_or_exc = self._get_element_container(message=response, name=name)
+                elem_cls = cls
+            except TransportError as e:
+                continue
+            if isinstance(container_or_exc, Exception):
+                # pylint: disable=raising-bad-type
+                raise container_or_exc
+
+        if container_or_exc is None:
+            raise TransportError('Unable to find elements in response')
+
+        for elem in self._get_elements_in_container(container_or_exc):
+            yield elem_cls.from_xml(elem, account=self.account)
+
+    def _get_elements_in_container(self, container):
+        from exchangelib.notifications import ConnectionStatus
+        if container.tag == ConnectionStatus.response_tag():
+            return [container]
+        return [elem for elem in container]
+
+
+class Unsubscribe(EWSSubscriptionService):
+    """
+    https://msdn.microsoft.com/en-us/library/office/aa564263(v=exchg.150).aspx
+    """
+    SERVICE_NAME = 'Unsubscribe'
+    element_container_name = None
+
+    def call(self):
+        assert len(self.subscription_ids) == 1
+        for _ in self._get_elements(self.get_payload(self.subscription_ids[0])):
+            pass
+
+    def get_payload(self, subscription_id):
+        unsubscribe = create_element('{%s}Unsubscribe' % MNS)
+        subscription_id_elem = create_element('{%s}SubscriptionId' % MNS)
+        subscription_id_elem.text = subscription_id
+        unsubscribe.append(subscription_id_elem)
+        return unsubscribe
 
 
 class DeleteFolder(EWSAccountService):

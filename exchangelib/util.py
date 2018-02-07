@@ -428,7 +428,7 @@ except ImportError:
     pass
 
 
-def post_ratelimited(protocol, session, url, headers, data, allow_redirects=False):
+def post_ratelimited(protocol, session, url, headers, data, allow_redirects=False, stream=False, timeout=None):
     """
     There are two error-handling policies implemented here: a fail-fast policy intended for stand-alone scripts which
     fails on all responses except HTTP 200. The other policy is intended for long-running tasks that need to respect
@@ -504,7 +504,12 @@ Response data: %(xml_response)s
             # Always create a dummy response for logging purposes, in case we fail in the following
             r = DummyResponse(url=url, headers={}, request_headers=headers)
             try:
-                r = session.post(url=url, headers=headers, data=data, allow_redirects=False, timeout=protocol.TIMEOUT)
+                r = session.post(url=url,
+                                 headers=headers,
+                                 data=data,
+                                 allow_redirects=False,
+                                 timeout=(timeout or protocol.TIMEOUT),
+                                 stream=stream)
             except CONNECTION_ERRORS as e:
                 log.debug('Session %s thread %s: connection error POST\'ing to %s', session.session_id, thread_id, url)
                 r = DummyResponse(url=url, headers={'TimeoutException': e}, request_headers=headers)
@@ -512,12 +517,14 @@ Response data: %(xml_response)s
                 log_vals.update(
                     retry=retry,
                     wait=wait,
+                    timeout=(timeout or protocol.TIMEOUT),
                     session_id=session.session_id,
                     url=str(r.url),
                     response_time=time_func() - d_start,
                     status_code=r.status_code,
                     request_headers=r.request.headers,
-                    response_headers=r.headers,
+                    response_headers=None if stream else r.headers,
+                    xml_request=data,
                     xml_response=r.content,
                 )
             log.debug(log_msg, log_vals)

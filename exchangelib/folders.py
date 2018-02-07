@@ -6,6 +6,8 @@ import logging
 from operator import attrgetter
 import warnings
 
+import math
+
 from cached_property import threaded_cached_property
 from future.utils import python_2_unicode_compatible
 from six import text_type, string_types
@@ -22,7 +24,7 @@ from .queryset import QuerySet, SearchableMixIn
 from .restriction import Restriction
 from .services import FindFolder, GetFolder, FindItem, CreateFolder, UpdateFolder, DeleteFolder, EmptyFolder, FindPeople, \
     SyncFolderItems
-from .util import TNS, MNS
+from .transport import TNS, MNS
 from .version import EXCHANGE_2007_SP1, EXCHANGE_2010_SP1, EXCHANGE_2013, EXCHANGE_2013_SP1
 
 log = logging.getLogger(__name__)
@@ -661,7 +663,17 @@ class Folder(RegisterMixIn, SearchableMixIn):
             yield p
 
     def sync_folder_items(self, shape, sync_state=None, ignore=None, max_changes=100):
-        return SyncFolderItems(self.account, folders=[self]).call(shape, sync_state, ignore)
+        return SyncFolderItems(account=self.account, folders=[self]).call(shape, sync_state, ignore, max_changes)
+
+    def subscribe_for_notifications(self, event_types):
+        return Subscribe(account=self.account, folders=[self]).call(event_types)
+
+    def listen_for_notifications(self, subscription_id, timeout_s=30*60):
+        timeout_minutes = int(math.ceil(float(timeout_s) / 60.0))
+        return GetStreamingEvents(self.account, [subscription_id]).call(timeout_minutes)
+
+    def unsubscribe_from_notifications(self, subscription_id):
+        return Unsubscribe(self.account, [subscription_id]).call()
 
     def bulk_create(self, items, *args, **kwargs):
         return self.account.bulk_create(folder=self, items=items, *args, **kwargs)

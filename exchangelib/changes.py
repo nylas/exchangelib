@@ -1,7 +1,6 @@
 from __future__ import unicode_literals
 
-from exchangelib import Folder
-from exchangelib.fields import EWSElementField, ItemField, FolderField
+from exchangelib.fields import ItemField, FolderField
 from exchangelib.properties import EWSElement
 from exchangelib.transport import TNS
 
