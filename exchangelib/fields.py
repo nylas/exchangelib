@@ -1056,6 +1056,24 @@ class ItemField(FieldURIField):
         return value.to_xml(version=version)
 
 
+class FolderField(FieldURIField):
+    @property
+    def value_cls(self):
+        from .folders import Folder
+        return Folder
+
+    def from_xml(self, elem, account):
+        from .folders import Folder
+        classes_to_check = [Folder]
+        while len(classes_to_check) > 0:
+            folder_cls = classes_to_check.pop()
+            folder_elem = elem.find(folder_cls.response_tag())
+            if folder_elem is not None:
+                return folder_cls.from_xml(elem=folder_elem, account=account)
+            classes_to_check.extend(folder_cls.__subclasses__())
+        return None
+
+
 class EffectiveRightsField(EWSElementField):
     def __init__(self, *args, **kwargs):
         from .properties import EffectiveRights
