@@ -18,7 +18,8 @@ from .items import Item, CalendarItem, Contact, Message, Task, MeetingRequest, M
 from .properties import ItemId, Mailbox, EWSElement, ParentFolderId
 from .queryset import QuerySet
 from .restriction import Restriction
-from .services import FindFolder, GetFolder, FindItem, CreateFolder, UpdateFolder, DeleteFolder, EmptyFolder
+from .services import FindFolder, GetFolder, FindItem, CreateFolder, UpdateFolder, DeleteFolder, EmptyFolder, \
+    SyncFolderItems
 from .transport import TNS, MNS
 
 string_type = string_types[0]
@@ -454,6 +455,9 @@ class Folder(RegisterMixIn):
                     item = self.item_model_from_tag(i.tag).from_xml(elem=i, account=self.account)
                     item.folder = self
                     yield item
+
+    def sync_folder_items(self, shape, sync_state=None, ignore=None, max_changes=100):
+        return SyncFolderItems(self.account, folders=[self]).call(shape, sync_state, ignore)
 
     def bulk_create(self, items, *args, **kwargs):
         return self.account.bulk_create(folder=self, items=items, *args, **kwargs)
