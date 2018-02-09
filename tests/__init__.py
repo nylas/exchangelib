@@ -42,6 +42,7 @@ from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalid
     AmbiguousTimeError, NonExistentTimeError, ErrorUnsupportedPathForQuery, ErrorInvalidPropertyForOperation, \
     ErrorInvalidValueForProperty, ErrorPropertyUpdate, ErrorDeleteDistinguishedFolder, \
     ErrorNoPublicFolderReplicaAvailable
+from exchangelib.events import CONCRETE_EVENT_CLASSES
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.extended_properties import ExtendedProperty, ExternId
 from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextField, EmailField, URIField, ChoiceField, \
@@ -56,6 +57,7 @@ from exchangelib.folders import Calendar, DeletedItems, Drafts, Inbox, Outbox, S
 from exchangelib.indexed_properties import EmailAddress, PhysicalAddress, PhoneNumber, \
     SingleFieldIndexedElement, MultiFieldIndexedElement
 from exchangelib.items import Item, CalendarItem, Message, Contact, Task, DistributionList
+from exchangelib.notifications import ConnectionStatus
 from exchangelib.properties import Attendee, Mailbox, RoomList, MessageHeader, Room, ItemId, Member, EWSElement
 from exchangelib.protocol import BaseProtocol, Protocol, NoVerifyHTTPAdapter
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
@@ -2713,6 +2715,17 @@ class FolderTest(EWSTest):
             if isinstance(change, ItemChange):
                 assert change.item is not None
                 assert (change.item.item_id, change.item.changekey) not in changes_seen
+
+    def test_streaming_subscription(self):
+        subscription_id = self.account.inbox.subscribe_for_notifications(CONCRETE_EVENT_CLASSES)
+        try:
+            for event in self.account.inbox.listen_for_notifications(subscription_id, timeout_s=60):
+                if isinstance(event, ConnectionStatus):
+                    print('ConnectionStatus: {}'.format(event.status))
+                else:
+                    print(event)
+        finally:
+            self.account.inbox.unsubscribe_from_notifications(subscription_id)
 
 
 class BaseItemTest(EWSTest):
