@@ -32,7 +32,7 @@ from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, 
     ErrorCannotDeleteTaskOccurrence, ErrorMimeContentConversionFailed, ErrorRecurrenceHasNoOccurrence, \
     ErrorNameResolutionMultipleResults, ErrorNameResolutionNoResults, ErrorNoPublicFolderReplicaAvailable, \
     ErrorInvalidOperation
-from .transport import wrap, SOAPNS, TNS, MNS, ENS
+from .transport import wrap, extra_headers, SOAPNS, TNS, MNS, ENS
 from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, ElementType, \
     xml_to_str, set_xml_value
 from .version import EXCHANGE_2010, EXCHANGE_2010_SP2, EXCHANGE_2013_SP1
@@ -135,6 +135,7 @@ class EWSService(object):
         for api_version in api_versions:
             session = self.protocol.get_session()
             soap_payload = wrap(content=payload, version=api_version, account=account)
+            http_headers = extra_headers(account=account)
             r, session = post_ratelimited(
                 protocol=self.protocol,
                 session=session,

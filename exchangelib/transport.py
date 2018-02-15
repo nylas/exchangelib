@@ -36,6 +36,16 @@ DEFAULT_ENCODING = 'utf-8'
 DEFAULT_HEADERS = {'Content-Type': 'text/xml; charset=%s' % DEFAULT_ENCODING, 'Accept-Encoding': 'compress, gzip'}
 
 
+def extra_headers(account):
+    """
+    Generate extra headers for impersonation requests. See
+    https://blogs.msdn.microsoft.com/webdav_101/2015/05/11/best-practices-ews-authentication-and-access-issues/
+    """
+    if account and account.access_type == IMPERSONATION:
+        return {'X-AnchorMailbox': account.primary_smtp_address}
+    return None
+
+
 def wrap(content, version, account=None):
     """
     Generate the necessary boilerplate XML for a raw SOAP request. The XML is specific to the server version.
