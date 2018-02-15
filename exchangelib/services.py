@@ -1176,9 +1176,9 @@ class SyncFolderHierarchy(EWSAccountService):
         from .changes import CreateFolderChange, UpdateFolderChange, DeleteFolderChange
 
         folder_change_classes_by_tag = {
-            CreateFolderChange.response_tag: CreateFolderChange,
-            UpdateFolderChange.response_tag: UpdateFolderChange,
-            DeleteFolderChange.response_tag: DeleteFolderChange
+            CreateFolderChange.response_tag(): CreateFolderChange,
+            UpdateFolderChange.response_tag(): UpdateFolderChange,
+            DeleteFolderChange.response_tag(): DeleteFolderChange,
         }
 
         for change in self._get_elements(payload=self.get_payload(shape, sync_state)):
