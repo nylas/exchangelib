@@ -140,7 +140,7 @@ class EWSService(object):
                 protocol=self.protocol,
                 session=session,
                 url=self.protocol.service_endpoint,
-                headers=None,
+                headers=http_headers,
                 data=soap_payload,
                 allow_redirects=False)
             self.protocol.release_session(session)
