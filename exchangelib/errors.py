@@ -488,7 +488,7 @@ class ErrorSubmissionQuotaExceeded(ResponseMessageError): pass
 class ErrorSubscriptionAccessDenied(ResponseMessageError): pass
 class ErrorSubscriptionDelegateAccessNotSupported(ResponseMessageError): pass
 class ErrorSubscriptionNotFound(ResponseMessageError): pass
-class ErrorSubscriptionUnsubsribed(ResponseMessageError): pass
+class ErrorSubscriptionUnsubscribed(ResponseMessageError): pass
 class ErrorSyncFolderNotFound(ResponseMessageError): pass
 class ErrorTimeIntervalTooBig(ResponseMessageError): pass
 class ErrorTimeoutExpired(ResponseMessageError): pass

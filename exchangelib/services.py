@@ -31,7 +31,7 @@ from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, 
     ErrorItemSave, ErrorInvalidIdMalformed, ErrorMessageSizeExceeded, UnauthorizedError, \
     ErrorCannotDeleteTaskOccurrence, ErrorMimeContentConversionFailed, ErrorRecurrenceHasNoOccurrence, \
     ErrorNameResolutionMultipleResults, ErrorNameResolutionNoResults, ErrorNoPublicFolderReplicaAvailable, \
-    ErrorInvalidOperation, MalformedResponseError
+    ErrorInvalidOperation, ErrorSubscriptionUnsubscribed, MalformedResponseError
 from .ewsdatetime import EWSDateTime, NaiveDateTimeNotAllowed
 from .transport import wrap, extra_headers
 from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, \
@@ -171,6 +171,7 @@ class EWSService(object):
                 # Return a generator over the result elements.
                 for elem in self._get_elements_in_response(response=response):
                     yield elem
+
         except self.ERRORS_TO_CATCH_AND_RERAISE:
             raise
         except Exception:
@@ -1564,7 +1565,9 @@ class GetStreamingEvents(EWSSubscriptionService):
             try:
                 container_or_exc = self._get_element_container(message=response, name=name)
                 elem_cls = cls
-            except TransportError as e:
+            except ErrorSubscriptionUnsubscribed:
+                raise
+            except TransportError:
                 continue
             if isinstance(container_or_exc, Exception):
                 # pylint: disable=raising-bad-type
