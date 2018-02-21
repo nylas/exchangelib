@@ -2727,6 +2727,21 @@ class FolderTest(EWSTest):
         finally:
             self.account.inbox.unsubscribe_from_notifications(subscription_id)
 
+    def test_multifolder_streaming_subscription(self):
+        folders = []
+        for folder in self.account.root.walk():
+            folders.append(folder)
+
+        subscription_id = self.account.subscribe_for_notifications(folders, CONCRETE_EVENT_CLASSES)
+        try:
+            for event in self.account.listen_for_notifications(subscription_id, timeout_s=60):
+                if isinstance(event, ConnectionStatus):
+                    print('ConnectionStatus: {}'.format(event.status))
+                else:
+                    print(event)
+        finally:
+            self.account.unsubscribe_from_notifications(subscription_id)
+
 
 class BaseItemTest(EWSTest):
     TEST_FOLDER = None
