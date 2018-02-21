@@ -5,11 +5,13 @@ from collections import defaultdict
 from locale import getlocale
 from logging import getLogger
 
+import math
 from cached_property import threaded_cached_property
 from future.utils import python_2_unicode_compatible
 from six import string_types
 
-from exchangelib.services import GetUserOofSettings, SetUserOofSettings, SyncFolderHierarchy
+from exchangelib.services import GetUserOofSettings, SetUserOofSettings, SyncFolderHierarchy, Subscribe, \
+    GetStreamingEvents, Unsubscribe
 from exchangelib.settings import OofSettings
 from .autodiscover import discover
 from .credentials import DELEGATE, IMPERSONATION, ACCESS_TYPES
@@ -119,6 +121,16 @@ class Account(object):
 
     def sync_folder_hierarchy(self, shape, sync_state=None):
         return SyncFolderHierarchy(account=self).call(shape, sync_state)
+
+    def subscribe_for_notifications(self, folders, event_types):
+        return Subscribe(account=self, folders=folders).call(event_types)
+
+    def listen_for_notifications(self, subscription_id, timeout_s=30*60):
+        timeout_minutes = int(math.ceil(float(timeout_s) / 60.0))
+        return GetStreamingEvents(self, [subscription_id]).call(timeout_minutes)
+
+    def unsubscribe_from_notifications(self, subscription_id):
+        return Unsubscribe(self, [subscription_id]).call()
 
     @threaded_cached_property
     def admin_audit_logs(self):
