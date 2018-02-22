@@ -41,7 +41,7 @@ from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalid
     ErrorFolderNotFound, ErrorInvalidRequest, SOAPError, ErrorInvalidServerVersion, NaiveDateTimeNotAllowed, \
     AmbiguousTimeError, NonExistentTimeError, ErrorUnsupportedPathForQuery, ErrorInvalidPropertyForOperation, \
     ErrorInvalidValueForProperty, ErrorPropertyUpdate, ErrorDeleteDistinguishedFolder, \
-    ErrorNoPublicFolderReplicaAvailable
+    ErrorNoPublicFolderReplicaAvailable, ErrorSubscriptionUnsubscribed
 from exchangelib.events import CONCRETE_EVENT_CLASSES
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.extended_properties import ExtendedProperty, ExternId
@@ -2741,6 +2741,23 @@ class FolderTest(EWSTest):
                     print(event)
         finally:
             self.account.unsubscribe_from_notifications(subscription_id)
+
+    def test_canceling_streaming_subscription(self):
+        subscription_id = self.account.inbox.subscribe_for_notifications(CONCRETE_EVENT_CLASSES)
+        unsubscribed_successfully = False
+        caught_exception = False
+        try:
+            for event in self.account.inbox.listen_for_notifications(subscription_id, timeout_s=60):
+                if isinstance(event, ConnectionStatus):
+                    self.account.inbox.unsubscribe_from_notifications(subscription_id)
+                    unsubscribed_successfully = True
+        except ErrorSubscriptionUnsubscribed:
+            caught_exception = True
+        finally:
+            if not unsubscribed_successfully:
+                self.account.inbox.unsubscribe_from_notifications(subscription_id)
+        assert unsubscribed_successfully
+        assert caught_exception
 
 
 class BaseItemTest(EWSTest):
