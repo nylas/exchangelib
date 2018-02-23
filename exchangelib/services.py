@@ -1288,7 +1288,7 @@ class Subscribe(EWSFolderService):
         raise ValueError('No valid response')
 
     def get_payload(self, folders, event_types):
-        from .events import CONCRETE_EVENT_CLASSES
+        from .events import CONCRETE_EVENT_TYPES
 
         subscription = create_element('m:Subscribe')
         streaming_request = create_element('m:StreamingSubscriptionRequest')
@@ -1306,7 +1306,7 @@ class Subscribe(EWSFolderService):
         # we currently don't filter them out during GetStreamingEvents
         # because they map to the same element tag name.
         for event_type in event_types:
-            assert event_type in CONCRETE_EVENT_CLASSES
+            assert event_type in CONCRETE_EVENT_TYPES
             deduped_event_types.add(event_type.ELEMENT_NAME)
 
         for event_type_name in deduped_event_types:

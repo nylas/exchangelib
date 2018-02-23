@@ -1091,9 +1091,9 @@ class EventListField(FieldURIField):
     is_list = True
 
     def from_xml(self, elem, account):
-        from .events import CONCRETE_EVENT_CLASSES
+        from .events import CONCRETE_EVENT_TYPES
         results = []
-        for event_cls in CONCRETE_EVENT_CLASSES:
+        for event_cls in CONCRETE_EVENT_TYPES:
             event_elems = elem.findall(event_cls.response_tag())
             for e in event_elems:
                 # We can't distinguish between Item*Event and Folder*Event
