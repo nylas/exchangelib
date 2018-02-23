@@ -200,7 +200,7 @@ EVENT_TYPES = [
     FreeBusyChangedEvent,
 ]
 
-CONCRETE_EVENT_CLASSES = [
+CONCRETE_EVENT_TYPES = [
     FolderCopiedEvent,
     ItemCopiedEvent,
     ItemCreatedEvent,
