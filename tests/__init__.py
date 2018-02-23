@@ -2950,7 +2950,7 @@ class FolderTest(EWSTest):
                 assert (change.item.item_id, change.item.changekey) not in changes_seen
 
     def test_streaming_subscription(self):
-        subscription_id = self.account.inbox.subscribe_for_notifications(CONCRETE_EVENT_CLASSES)
+        subscription_id = self.account.inbox.subscribe_for_notifications(CONCRETE_EVENT_TYPES)
         try:
             for event in self.account.inbox.listen_for_notifications(subscription_id, timeout_s=60):
                 if isinstance(event, ConnectionStatus):
@@ -2965,7 +2965,7 @@ class FolderTest(EWSTest):
         for folder in self.account.root.walk():
             folders.append(folder)
 
-        subscription_id = self.account.subscribe_for_notifications(folders, CONCRETE_EVENT_CLASSES)
+        subscription_id = self.account.subscribe_for_notifications(folders, CONCRETE_EVENT_TYPES)
         try:
             for event in self.account.listen_for_notifications(subscription_id, timeout_s=60):
                 if isinstance(event, ConnectionStatus):
@@ -2976,7 +2976,7 @@ class FolderTest(EWSTest):
             self.account.unsubscribe_from_notifications(subscription_id)
 
     def test_canceling_streaming_subscription(self):
-        subscription_id = self.account.inbox.subscribe_for_notifications(CONCRETE_EVENT_CLASSES)
+        subscription_id = self.account.inbox.subscribe_for_notifications(CONCRETE_EVENT_TYPES)
         unsubscribed_successfully = False
         caught_exception = False
         try:

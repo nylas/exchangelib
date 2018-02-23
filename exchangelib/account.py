@@ -11,7 +11,7 @@ from future.utils import python_2_unicode_compatible
 from six import string_types
 
 from exchangelib.services import GetUserOofSettings, SetUserOofSettings, SyncFolderHierarchy, Subscribe, \
-    GetStreamingEvents, Unsubscribe
+    GetStreamingEvents, Unsubscribe, SyncFolderItems
 from exchangelib.settings import OofSettings
 from .autodiscover import discover
 from .credentials import DELEGATE, IMPERSONATION, ACCESS_TYPES
@@ -131,6 +131,9 @@ class Account(object):
 
     def unsubscribe_from_notifications(self, subscription_id):
         return Unsubscribe(self, [subscription_id]).call()
+
+    def sync_folder_items(self, folders, shape, sync_state=None, ignore=None, max_changes=100):
+        return SyncFolderItems(account=self, folders=folders).call(shape, sync_state, ignore, max_changes)
 
     @threaded_cached_property
     def admin_audit_logs(self):
