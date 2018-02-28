@@ -81,7 +81,7 @@ class OofSettings(EWSElement):
             if value is None:
                 continue
             f = self.get_field_by_fieldname(attr)
-            set_xml_value(elem, f.to_xml(value, version=version), version)
+            set_xml_value(elem, f.to_xml(value, version=version), version=version)
         if self.start or self.end:
             duration = create_element('t:Duration')
             if self.start:
