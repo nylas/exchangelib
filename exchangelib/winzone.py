@@ -49,7 +49,7 @@ CLDR_TO_MS_TIMEZONE_MAP = {
     'Africa/Johannesburg': 'South Africa Standard Time',
     'Africa/Juba': 'E. Africa Standard Time',
     'Africa/Kampala': 'E. Africa Standard Time',
-    'Africa/Khartoum': 'E. Africa Standard Time',
+    'Africa/Khartoum': 'Sudan Standard Time',
     'Africa/Kigali': 'South Africa Standard Time',
     'Africa/Kinshasa': 'W. Central Africa Standard Time',
     'Africa/Lagos': 'W. Central Africa Standard Time',
