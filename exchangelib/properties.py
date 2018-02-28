@@ -20,6 +20,18 @@ class Body(text_type):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/jj219983(v=exchg.150).aspx
     body_type = 'Text'
 
+    def __add__(self, other):
+        # Make sure Body('') + 'foo' returns a Body type
+        return self.__class__(super(Body, self).__add__(other))
+
+    def __mod__(self, other):
+        # Make sure Body('%s') % 'foo' returns a Body type
+        return self.__class__(super(Body, self).__mod__(other))
+
+    def format(self, *args, **kwargs):
+        # Make sure Body('{}').format('foo') returns a Body type
+        return self.__class__(super(Body, self).format(*args, **kwargs))
+
 
 class HTMLBody(Body):
     # Helper to mark the 'body' field as a complex attribute.

@@ -58,7 +58,8 @@ from exchangelib.folders import Calendar, DeletedItems, Drafts, Inbox, Outbox, S
 from exchangelib.indexed_properties import EmailAddress, PhysicalAddress, PhoneNumber, \
     SingleFieldIndexedElement, MultiFieldIndexedElement
 from exchangelib.items import Item, CalendarItem, Message, Contact, Task, DistributionList
-from exchangelib.properties import Attendee, Mailbox, RoomList, MessageHeader, Room, ItemId, Member, EWSElement
+from exchangelib.properties import Attendee, Mailbox, RoomList, MessageHeader, Room, ItemId, Member, EWSElement, Body, \
+    HTMLBody
 from exchangelib.protocol import BaseProtocol, Protocol, NoVerifyHTTPAdapter
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.recurrence import Recurrence, AbsoluteYearlyPattern, RelativeYearlyPattern, AbsoluteMonthlyPattern, \
@@ -545,6 +546,32 @@ class PropertiesTest(unittest.TestCase):
         self.assertEqual(hash(mbx), hash('xxx'))
         mbx.item_id = 'YYY'
         self.assertEqual(hash(mbx), hash('YYY'))  # If we have an item_id, use that for uniqueness
+
+    def test_body(self):
+        # Test that string formatting a Body and HTMLBody instance works and keeps the type
+        self.assertEqual(str(Body('foo')), 'foo')
+        self.assertEqual(str(Body('%s') % 'foo'), 'foo')
+        self.assertEqual(str(Body('{}').format('foo')), 'foo')
+
+        self.assertIsInstance(Body('foo'), Body)
+        self.assertIsInstance(Body('') + 'foo', Body)
+        foo = Body('')
+        foo += 'foo'
+        self.assertIsInstance(foo, Body)
+        self.assertIsInstance(Body('%s') % 'foo', Body)
+        self.assertIsInstance(Body('{}').format('foo'), Body)
+
+        self.assertEqual(str(HTMLBody('foo')), 'foo')
+        self.assertEqual(str(HTMLBody('%s') % 'foo'), 'foo')
+        self.assertEqual(str(HTMLBody('{}').format('foo')), 'foo')
+
+        self.assertIsInstance(HTMLBody('foo'), HTMLBody)
+        self.assertIsInstance(HTMLBody('') + 'foo', HTMLBody)
+        foo = HTMLBody('')
+        foo += 'foo'
+        self.assertIsInstance(foo, HTMLBody)
+        self.assertIsInstance(HTMLBody('%s') % 'foo', HTMLBody)
+        self.assertIsInstance(HTMLBody('{}').format('foo'), HTMLBody)
 
 
 class FieldTest(unittest.TestCase):
