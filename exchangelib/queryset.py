@@ -164,13 +164,36 @@ class QuerySet(object):
         # Resort to client-side sorting of the order_by fields. This is greedy. Sorting in Python is stable, so when
         # sorting on multiple fields, we can just do a sort on each of the requested fields in reverse order. Reverse
         # each sort operation if the field was marked as such.
+        def get_value_or_default(item, field_order):
+            # Python can only sort values when <, > and = are implemented for the two types. Try as best we can to sort
+            # items, even when the item may have a None value for the field in question, or when the item is an
+            # Exception. If the field to be sorted by does not have a default value, there's really nothing we can do
+            # about it; we'll eventually raise a TypeError. If it does, we sort all None values and exceptions as the
+            # default value.
+            if isinstance(item, Exception):
+                return field_order.field_path.field.default
+            val = field_order.field_path.get_value(item)
+            if val is None:
+                return field_order.field_path.field.default
+            return val
+
         for f in reversed(self.order_fields):
-            items = sorted(items, key=f.field_path.get_value, reverse=f.reverse)
+            try:
+                items = sorted(items, key=lambda i: get_value_or_default(i, f), reverse=f.reverse)
+            except TypeError as e:
+                if 'unorderable types' not in e.args[0]:
+                    raise
+                raise ValueError((
+                    "Cannot sort on field '%s'. The field has no default value defined, and there are either items "
+                    "with None values for this field, or the query contains exception instances (original error: %s).")
+                                 % (f.field_path, e))
         if not extra_order_fields:
             return items
 
-        # Nullify the fields we only needed for sorting
+        # Nullify the fields we only needed for sorting. Make sure to handle exceptions.
         def clean_item(i):
+            if isinstance(i, Exception):
+                return i
             for f in extra_order_fields:
                 setattr(i, f.field.name, None)
             return i
@@ -262,13 +285,25 @@ class QuerySet(object):
             if not has_non_attribute_fields:
                 # _query() will return an iterator of (item_id, changekey) tuples
                 if self._changekey_field not in self.only_fields:
-                    for item_id, changekey in iterable:
+                    for i in iterable:
+                        if isinstance(i, Exception):
+                            yield i
+                            continue
+                        item_id, changekey = i
                         yield Item(item_id=item_id)
                 elif self._item_id_field not in self.only_fields:
-                    for item_id, changekey in iterable:
+                    for i in iterable:
+                        if isinstance(i, Exception):
+                            yield i
+                            continue
+                        item_id, changekey = i
                         yield Item(changekey=changekey)
                 else:
-                    for item_id, changekey in iterable:
+                    for i in iterable:
+                        if isinstance(i, Exception):
+                            yield i
+                            continue
+                        item_id, changekey = i
                         yield Item(item_id=item_id, changekey=changekey)
                 return
         for i in iterable:
@@ -281,16 +316,31 @@ class QuerySet(object):
         if not has_non_attribute_fields:
             # _query() will return an iterator of (item_id, changekey) tuples
             if self._changekey_field not in self.only_fields:
-                for item_id, changekey in iterable:
+                for i in iterable:
+                    if isinstance(i, Exception):
+                        yield i
+                        continue
+                    item_id, changekey = i
                     yield {'item_id': item_id}
             elif self._item_id_field not in self.only_fields:
-                for item_id, changekey in iterable:
+                for i in iterable:
+                    if isinstance(i, Exception):
+                        yield i
+                        continue
+                    item_id, changekey = i
                     yield {'changekey': changekey}
             else:
-                for item_id, changekey in iterable:
+                for i in iterable:
+                    if isinstance(i, Exception):
+                        yield i
+                        continue
+                    item_id, changekey = i
                     yield {'item_id': item_id, 'changekey': changekey}
             return
         for i in iterable:
+            if isinstance(i, Exception):
+                yield i
+                continue
             yield {f.path: f.get_value(i) for f in self.only_fields}
 
     def _as_values_list(self, iterable):
@@ -300,16 +350,31 @@ class QuerySet(object):
         if not has_non_attribute_fields:
             # _query() will return an iterator of (item_id, changekey) tuples
             if self._changekey_field not in self.only_fields:
-                for item_id, changekey in iterable:
+                for i in iterable:
+                    if isinstance(i, Exception):
+                        yield i
+                        continue
+                    item_id, changekey = i
                     yield (item_id,)
             elif self._item_id_field not in self.only_fields:
-                for item_id, changekey in iterable:
+                for i in iterable:
+                    if isinstance(i, Exception):
+                        yield i
+                        continue
+                    item_id, changekey = i
                     yield (changekey,)
             else:
-                for item_id, changekey in iterable:
+                for i in iterable:
+                    if isinstance(i, Exception):
+                        yield i
+                        continue
+                    item_id, changekey = i
                     yield (item_id, changekey)
             return
         for i in iterable:
+            if isinstance(i, Exception):
+                yield i
+                continue
             yield tuple(f.get_value(i) for f in self.only_fields)
 
     def _as_flat_values_list(self, iterable):
@@ -318,15 +383,26 @@ class QuerySet(object):
         flat_field_path = self.only_fields[0]
         if flat_field_path == self._item_id_field:
             # _query() will return an iterator of (item_id, changekey) tuples
-            for item_id, changekey in iterable:
+            for i in iterable:
+                if isinstance(i, Exception):
+                    yield i
+                    continue
+                item_id, changekey = i
                 yield item_id
             return
         if flat_field_path == self._changekey_field:
             # _query() will return an iterator of (item_id, changekey) tuples
-            for item_id, changekey in iterable:
+            for i in iterable:
+                if isinstance(i, Exception):
+                    yield i
+                    continue
+                item_id, changekey = i
                 yield changekey
             return
         for i in iterable:
+            if isinstance(i, Exception):
+                yield i
+                continue
             yield flat_field_path.get_value(i)
 
     ###############################
