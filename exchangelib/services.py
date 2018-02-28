@@ -35,7 +35,7 @@ from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, 
     ErrorInvalidOperation
 from .transport import wrap, extra_headers, SOAPNS, TNS, MNS, ENS
 from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, ElementType, \
-    xml_to_str, set_xml_value
+    xml_to_str, set_xml_value, peek
 from .version import EXCHANGE_2010, EXCHANGE_2010_SP2, EXCHANGE_2013_SP1
 
 log = logging.getLogger(__name__)
@@ -1552,4 +1552,28 @@ class SetUserOofSettings(BaseUserOofSettings):
         payload = create_element('m:%sRequest' % self.SERVICE_NAME)
         set_xml_value(payload, AvailabilityMailbox.from_mailbox(mailbox), version=self.account.version)
         set_xml_value(payload, oof_settings, version=self.account.version)
+        return payload
+
+
+class GetUserAvailability(EWSService):
+    """
+     Get detailed availability information for a list of users
+     MSDN: https://msdn.microsoft.com/en-us/library/office/aa564001(v=exchg.150).aspx
+    """
+    SERVICE_NAME = 'GetUserAvailability'
+
+    def call(self, mailbox_data, free_busy_view_options):
+        # TODO: Also supports SuggestionsViewOptions, see
+        # https://msdn.microsoft.com/en-us/library/office/aa564990(v=exchg.150).aspx
+        return self._get_elements(payload=self.get_payload(
+            mailbox_data=mailbox_data,
+            free_busy_view_options=free_busy_view_options
+        ))
+
+    def get_payload(self, mailbox_data, free_busy_view_options):
+        payload = create_element('m:%sRequest' % self.SERVICE_NAME)
+        mailbox_data_array = create_element('m:MailboxDataArray')
+        payload.append(mailbox_data_array)
+        set_xml_value(mailbox_data_array, mailbox_data, version=self.protocol.version)
+        set_xml_value(mailbox_data_array, free_busy_view_options, version=self.protocol.version)
         return payload

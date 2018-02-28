@@ -6,7 +6,7 @@ import logging
 from six import text_type, string_types
 
 from .fields import SubField, TextField, EmailField, ChoiceField, DateTimeField, EWSElementField, MailboxField, \
-    Choice, BooleanField, IdField, ExtendedPropertyField
+    Choice, BooleanField, IdField, ExtendedPropertyField, IntegerField
 from .services import MNS, TNS
 from .util import get_xml_attr, create_element, set_xml_value, value_to_xml_text
 from .version import EXCHANGE_2013
@@ -303,6 +303,70 @@ class AvailabilityMailbox(EWSElement):
         if not isinstance(mailbox, Mailbox):
             raise ValueError("'mailbox' %r must be a Mailbox instance" % mailbox)
         return cls(name=mailbox.name, email_address=mailbox.email_address, routing_type=mailbox.routing_type)
+
+
+class Email(AvailabilityMailbox):
+    # Like AvailabilityMailbox, but with a different tag name
+    #
+    # MSDN: https://msdn.microsoft.com/en-us/library/office/aa565868(v=exchg.150).aspx
+    ELEMENT_NAME = 'Email'
+    FIELDS = [
+        TextField('name', field_uri='Name'),
+        EmailField('email_address', field_uri='Address', is_required=True),
+        ChoiceField('routing_type', field_uri='RoutingType', choices={Choice('SMTP')}, default='SMTP'),
+    ]
+
+    __slots__ = ('name', 'email_address', 'routing_type')
+
+    def __hash__(self):
+        # Exchange may add 'name' on insert. We're satisfied if the email address matches.
+        return hash(self.email_address.lower())
+
+
+class MailboxData(EWSElement):
+    # MSDN: https://msdn.microsoft.com/en-us/library/office/aa566036(v=exchg.150).aspx
+    ELEMENT_NAME = 'MailboxData'
+    FIELDS = [
+        EWSElementField('email', value_cls=Email),
+        ChoiceField('attendee_type', field_uri='AttendeeType', choices={
+            Choice('Optional'), Choice('Organizer'), Choice('Required'), Choice('Resource'), Choice('Room')
+        }),
+        BooleanField('exclude_conflicts', field_uri='ExcludeConflicts'),
+    ]
+
+    __slots__ = ('email', 'attendee_type', 'exclude_conflicts')
+
+    def __hash__(self):
+        # Exchange may add 'name' on insert. We're satisfied if the email address matches.
+        return hash((self.email.email_address.lower(), self.attendee_type, self.exclude_conflicts))
+
+
+class TimeWindow(EWSElement):
+    # MSDN: https://msdn.microsoft.com/en-us/library/office/aa580740(v=exchg.150).aspx
+    ELEMENT_NAME = 'TimeWindow'
+    FIELDS = [
+        DateTimeField('start', field_uri='StartTime', is_required=True, is_attribute=True),
+        DateTimeField('end', field_uri='EndTime', is_required=True, is_attribute=True),
+    ]
+
+    __slots__ = ('start', 'end')
+
+
+class FreeBusyViewOptions(EWSElement):
+    # MSDN: https://msdn.microsoft.com/en-us/library/office/aa565063(v=exchg.150).aspx
+    ELEMENT_NAME = 'FreeBusyViewOptions'
+    FIELDS = [
+        EWSElementField('time_window', value_cls=TimeWindow, is_required=True),
+        # Interval value is in minutes
+        IntegerField('merged_free_busy_interval', field_uri='MergedFreeBusyIntervalInMinutes', min=6, max=1440,
+                     default=30, is_required=True),
+        ChoiceField('requested_view', field_uri='RequestedView', choices={
+            Choice('MergedOnly'), Choice('FreeBusy'), Choice('FreeBusyMerged'), Choice('Detailed'),
+            Choice('DetailedMerged'),
+        }, is_required=True),  # Choice('None') is also valid, but only for responses
+    ]
+
+    __slots__ = ('time_window', 'merged_free_busy_interval', 'requested_view')
 
 
 class Attendee(EWSElement):
