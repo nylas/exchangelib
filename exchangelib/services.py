@@ -18,6 +18,7 @@ import logging
 import traceback
 
 from defusedxml.ElementTree import ParseError
+import isodate
 from six import text_type
 
 from . import errors
@@ -370,23 +371,60 @@ class GetServerTimeZones(EWSService):
     SERVICE_NAME = 'GetServerTimeZones'
     element_container_name = '{%s}TimeZoneDefinitions' % MNS
 
-    def call(self, returnfulltimezonedata=False):
+    def call(self, timezones=None, return_full_timezone_data=False):
         if self.protocol.version.build < EXCHANGE_2010:
             raise NotImplementedError('%s is only supported for Exchange 2010 servers and later' % self.SERVICE_NAME)
-        return self._get_elements(payload=self.get_payload(returnfulltimezonedata=returnfulltimezonedata))
+        return self._get_elements(payload=self.get_payload(
+            timezones=timezones,
+            return_full_timezone_data=return_full_timezone_data
+        ))
 
-    def get_payload(self, returnfulltimezonedata):
-        return create_element(
+    def get_payload(self, timezones, return_full_timezone_data):
+        payload = create_element(
             'm:%s' % self.SERVICE_NAME,
-            ReturnFullTimeZoneData='true' if returnfulltimezonedata else 'false',
+            ReturnFullTimeZoneData='true' if return_full_timezone_data else 'false',
         )
+        if timezones is not None:
+            is_empty, timezones = peek(timezones)
+            if not is_empty:
+                tz_ids = create_element('m:Ids')
+                for timezone in timezones:
+                    tz_id = set_xml_value(create_element('t:Id'), timezone.ms_id, version=self.protocol.version)
+                    tz_ids.append(tz_id)
+                payload.append(tz_ids)
+        return payload
 
     def _get_elements_in_container(self, container):
+        from .recurrence import WEEKDAY_NAMES
         timezones = []
         for timezonedef in container:
             tz_id = timezonedef.get('Id')
             name = timezonedef.get('Name')
-            timezones.append((tz_id, name))
+            periods = timezonedef.find('{%s}Periods' % TNS)
+            if periods is None:
+                tz_periods = None
+            else:
+                tz_periods = tuple(
+                    dict(id=period.get('Id'), name=period.get('Name'), bias=isodate.parse_duration(period.get('Bias')))
+                    for period in periods.findall('{%s}Period' % TNS)
+                )
+            transitiongroups = timezonedef.find('{%s}TransitionsGroups' % TNS)
+            if transitiongroups is None:
+                tz_transitions = None
+            else:
+                tz_transitions = {}
+                for transitiongroup in transitiongroups.findall('{%s}TransitionsGroup' % TNS):
+                    tg_id = int(transitiongroup.get('Id'))
+                    tz_transitions[tg_id] = []
+                    for transition in transitiongroup.findall('{%s}RecurringDayTransition' % TNS):
+                        tz_transitions[tg_id].append(dict(
+                            to=transition.find('{%s}To' % TNS).text,
+                            offset=isodate.parse_duration(transition.find('{%s}TimeOffset' % TNS).text),
+                            iso_month=int(transition.find('{%s}Month' % TNS).text),
+                            iso_weekday=WEEKDAY_NAMES.index(transition.find('{%s}DayOfWeek' % TNS).text) + 1,
+                            occurrence=int(transition.find('{%s}Occurrence' % TNS).text),
+                        ))
+            timezones.append((tz_id, name, tz_periods, tz_transitions))
         return timezones
 
 

@@ -233,8 +233,16 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
         thread_poolsize = 4 * self.SESSION_POOLSIZE
         self.thread_pool = ThreadPool(processes=thread_poolsize)
 
-    def get_timezones(self):
-        return GetServerTimeZones(protocol=self).call()
+    def get_timezones(self, timezones=None, return_full_timezone_data=False):
+        """ Get timezone definitions from the server
+
+        :param timezones: A list of EWSDateTime instances. If None, fetches all timezones from server
+        :param return_full_timezone_data: If true, also returns periods and transitions
+        :return: A list of (tz_id, name, periods, transitions) tuples
+        """
+        return GetServerTimeZones(protocol=self).call(
+            timezones=timezones, return_full_timezone_data=return_full_timezone_data
+        )
 
     def get_roomlists(self):
         return GetRoomLists(protocol=self).call()
