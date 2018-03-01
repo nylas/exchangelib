@@ -31,7 +31,8 @@ from .items import Item, BulkCreateResult, HARD_DELETE, \
 from .properties import Mailbox
 from .protocol import Protocol
 from .queryset import QuerySet
-from .services import ExportItems, UploadItems, GetItem, CreateItem, UpdateItem, DeleteItem, MoveItem, SendItem
+from .services import ExportItems, UploadItems, GetItem, CreateItem, UpdateItem, DeleteItem, MoveItem, SendItem, \
+    CopyItem
 from .util import get_domain, peek
 
 log = getLogger(__name__)
@@ -525,6 +526,25 @@ class Account(object):
             # empty 'ids' and return early.
             return []
         return list(SendItem(account=self).call(items=ids, saved_item_folder=copy_to_folder))
+
+    def bulk_copy(self, ids, to_folder):
+        # Copy items to another folder. Returns booleans representing if the copy was successful or not
+        if not isinstance(to_folder, Folder):
+            raise ValueError("'to_folder' %r must be a Folder instence" % to_folder)
+        # 'ids' could be an unevaluated QuerySet, e.g. if we ended up here via `bulk_copy(some_folder.filter(...))`. In
+        # that case, we want to use its iterator. Otherwise, peek() will start a count() which is wasteful because we
+        # need the item IDs immediately afterwards. iterator() will only do the bare minimum.
+        if isinstance(ids, QuerySet):
+            ids = ids.iterator()
+        is_empty, ids = peek(ids)
+        if is_empty:
+            # We accept generators, so it's not always convenient for caller to know up-front if 'ids' is empty. Allow
+            # empty 'ids' and return early.
+            return []
+        return list(
+            i
+            for i in CopyItem(account=self).call(items=ids, to_folder=to_folder)
+        )
 
     def bulk_move(self, ids, to_folder):
         # Move items to another folder. Returns new IDs for the items that were moved
