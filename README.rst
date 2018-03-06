@@ -373,8 +373,9 @@ Here are some examples of using the API:
     # well just reverse the sorting.
     first_ten_emails = my_folder.all().order_by('-datetime_received')[:10]  # Efficient
     last_ten_emails = my_folder.all().order_by('-datetime_received')[:-10]  # Efficient, but convoluted
-    next_ten_emails = my_folder.all().order_by('-datetime_received')[10:20]  # Still quite efficient
+    next_ten_emails = my_folder.all().order_by('-datetime_received')[10:20]  # Still quite efficient, but we fetch 20 items
     eviction_warning = my_folder.all().order_by('-datetime_received')[34298]  # This is looking for trouble
+    eviction_warning = my_folder.all().order_by('-datetime_received')[3420:3430]  # This is also looking for trouble
     some_random_emails = my_folder.all().order_by('-datetime_received')[::3]  # This is just stupid
 
     # The syntax for filter() is modeled after Django QuerySet filters. The following filter lookup types
