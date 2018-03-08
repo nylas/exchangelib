@@ -576,7 +576,7 @@ class Message(Item):
         CharField('conversation_topic', field_uri='message:ConversationTopic', is_read_only=True),
         # Rename 'From' to 'author'. We can't use fieldname 'from' since it's a Python keyword.
         MailboxField('author', field_uri='message:From', is_read_only_after_send=True),
-        CharField('message_id', field_uri='message:InternetMessageId', is_read_only=True, is_read_only_after_send=True),
+        CharField('message_id', field_uri='message:InternetMessageId', is_read_only=False, is_read_only_after_send=True),
         BooleanField('is_read', field_uri='message:IsRead', is_required=True, default=False),
         BooleanField('is_response_requested', field_uri='message:IsResponseRequested', default=False, is_required=True),
         TextField('references', field_uri='message:References'),
