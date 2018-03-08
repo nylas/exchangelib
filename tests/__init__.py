@@ -43,7 +43,7 @@ from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalid
     ErrorFolderNotFound, ErrorInvalidRequest, SOAPError, ErrorInvalidServerVersion, NaiveDateTimeNotAllowed, \
     AmbiguousTimeError, NonExistentTimeError, ErrorUnsupportedPathForQuery, ErrorInvalidPropertyForOperation, \
     ErrorInvalidValueForProperty, ErrorPropertyUpdate, ErrorDeleteDistinguishedFolder, \
-    ErrorNoPublicFolderReplicaAvailable
+    ErrorNoPublicFolderReplicaAvailable, ErrorServerBusy
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.extended_properties import ExtendedProperty, ExternId
 from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextField, EmailField, URIField, ChoiceField, \
@@ -1453,6 +1453,30 @@ class CommonTest(EWSTest):
 
     def test_poolsize(self):
         self.assertEqual(self.account.protocol.SESSION_POOLSIZE, 4)
+
+    def test_error_server_busy(self):
+        # Test that we can parse an ErrorServerBusy response
+        ws = GetRoomLists(self.account.protocol)
+        xml = '''\
+<?xml version='1.0' encoding='utf-8'?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+  <s:Body>
+    <s:Fault>
+      <faultcode xmlns:a="http://schemas.microsoft.com/exchange/services/2006/types">a:ErrorServerBusy</faultcode>
+      <faultstring xml:lang="en-US">The server cannot service this request right now. Try again later.</faultstring>
+      <detail>
+        <e:ResponseCode xmlns:e="http://schemas.microsoft.com/exchange/services/2006/errors">ErrorServerBusy</e:ResponseCode>
+        <e:Message xmlns:e="http://schemas.microsoft.com/exchange/services/2006/errors">The server cannot service this request right now. Try again later.</e:Message>
+        <t:MessageXml xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
+          <t:Value Name="BackOffMilliseconds">297749</t:Value>
+        </t:MessageXml>
+      </detail>
+    </s:Fault>
+  </s:Body>
+</s:Envelope>'''
+        with self.assertRaises(ErrorServerBusy) as cm:
+            ws._get_elements_in_response(response=ws._get_soap_payload(soap_response=to_xml(xml)))
+        self.assertEqual(cm.exception.back_off, 297.749)
 
     def test_get_timezones(self):
         ws = GetServerTimeZones(self.account.protocol)

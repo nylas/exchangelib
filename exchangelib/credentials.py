@@ -66,7 +66,7 @@ class Credentials(object):
 class ServiceAccount(Credentials):
     def __init__(self, username, password, max_wait=3600):
         """
-        A Credentials class that enables fault-tolerance handling. Tells internal methods to do an exponential backoff
+        A Credentials class that enables fault-tolerance handling. Tells internal methods to do an exponential back off
         when requests start failing, and wait up to max_wait seconds before failing.
         """
         super(ServiceAccount, self).__init__(username, password)

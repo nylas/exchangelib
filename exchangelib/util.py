@@ -426,7 +426,7 @@ def post_ratelimited(protocol, session, url, headers, data, allow_redirects=Fals
     The contract on sessions here is to return the session that ends up being used, or retiring the session if we
     intend to raise an exception. We give up on max_wait timeout, not number of retries.
 
-    An additional resource on handling throttling policies and client backoff strategies:
+    An additional resource on handling throttling policies and client back off strategies:
         https://msdn.microsoft.com/en-us/library/office/jj945066(v=exchg.150).aspx#bk_ThrottlingBatch
     """
     thread_id = get_ident()

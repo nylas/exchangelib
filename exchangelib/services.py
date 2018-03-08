@@ -15,6 +15,7 @@ from __future__ import unicode_literals
 import abc
 from itertools import chain
 import logging
+import time
 import traceback
 
 from defusedxml.ElementTree import ParseError
@@ -74,48 +75,60 @@ class EWSService(object):
     def _get_elements(self, payload):
         if not isinstance(payload, ElementType):
             raise ValueError("'payload' %r must be an ElementType" % payload)
-        try:
-            # Send the request, get the response and do basic sanity checking on the SOAP XML
-            response = self._get_response_xml(payload=payload)
-            # Read the XML and throw any SOAP or general EWS error messages. Return a generator over the result elements
-            return self._get_elements_in_response(response=response)
-        except (
-                ErrorAccessDenied,
-                ErrorADUnavailable,
-                ErrorBatchProcessingStopped,
-                ErrorCannotDeleteObject,
-                ErrorConnectionFailed,
-                ErrorCreateItemAccessDenied,
-                ErrorFolderNotFound,
-                ErrorImpersonateUserDenied,
-                ErrorImpersonationFailed,
-                ErrorInternalServerError,
-                ErrorInternalServerTransientError,
-                ErrorInvalidChangeKey,
-                ErrorInvalidLicense,
-                ErrorItemNotFound,
-                ErrorMailboxMoveInProgress,
-                ErrorMailboxStoreUnavailable,
-                ErrorNonExistentMailbox,
-                ErrorNoPublicFolderReplicaAvailable,
-                ErrorNoRespondingCASInDestinationSite,
-                ErrorQuotaExceeded,
-                ErrorServerBusy,
-                ErrorTimeoutExpired,
-                ErrorTooManyObjectsOpened,
-                RateLimitError,
-                UnauthorizedError,
-        ):
-            # These are known and understood, and don't require a backtrace
-            # TODO: ErrorTooManyObjectsOpened means there are too many connections to the database. We should be able to
-            # act on this by lowering the self.protocol connection pool size.
-            raise
-        except Exception:
-            # This may run from a thread pool, which obfuscates the stack trace. Print trace immediately.
-            account = self.account if isinstance(self, EWSAccountService) else None
-            log.warning('EWS %s, account %s: Exception in _get_elements: %s', self.protocol.service_endpoint, account,
-                        traceback.format_exc(20))
-            raise
+        wait = 0
+        while True:
+            try:
+                # Send the request, get the response and do basic sanity checking on the SOAP XML
+                response = self._get_response_xml(payload=payload)
+                # Read the XML and throw any SOAP or general EWS error messages. Return a generator over the result
+                # elements
+                return self._get_elements_in_response(response=response)
+            except ErrorServerBusy as e:
+                if self.protocol.credentials.fail_fast:
+                    raise
+                if wait > self.protocol.credentials.max_wait:
+                    raise
+                back_off = e.back_off or 60  # Back off 60 seconds if we didn't get an explicit suggested value
+                log.warning('Got ErrorServerBusy from server (will back off %s seconds)', back_off)
+                time.sleep(back_off)
+                wait += back_off
+                continue
+            except (
+                    ErrorAccessDenied,
+                    ErrorADUnavailable,
+                    ErrorBatchProcessingStopped,
+                    ErrorCannotDeleteObject,
+                    ErrorConnectionFailed,
+                    ErrorCreateItemAccessDenied,
+                    ErrorFolderNotFound,
+                    ErrorImpersonateUserDenied,
+                    ErrorImpersonationFailed,
+                    ErrorInternalServerError,
+                    ErrorInternalServerTransientError,
+                    ErrorInvalidChangeKey,
+                    ErrorInvalidLicense,
+                    ErrorItemNotFound,
+                    ErrorMailboxMoveInProgress,
+                    ErrorMailboxStoreUnavailable,
+                    ErrorNonExistentMailbox,
+                    ErrorNoPublicFolderReplicaAvailable,
+                    ErrorNoRespondingCASInDestinationSite,
+                    ErrorQuotaExceeded,
+                    ErrorTimeoutExpired,
+                    ErrorTooManyObjectsOpened,
+                    RateLimitError,
+                    UnauthorizedError,
+            ):
+                # These are known and understood, and don't require a backtrace
+                # TODO: ErrorTooManyObjectsOpened means there are too many connections to the database. We should be able to
+                # act on this by lowering the self.protocol connection pool size.
+                raise
+            except Exception:
+                # This may run from a thread pool, which obfuscates the stack trace. Print trace immediately.
+                account = self.account if isinstance(self, EWSAccountService) else None
+                log.warning('EWS %s, account %s: Exception in _get_elements: %s', self.protocol.service_endpoint, account,
+                            traceback.format_exc(20))
+                raise
 
     def _get_response_xml(self, payload):
         # Takes an XML tree and returns SOAP payload as an XML tree
@@ -221,6 +234,16 @@ class EWSService(object):
                 code = get_xml_attr(detail, '{%s}ResponseCode' % ENS)
             if detail.find('{%s}Message' % ENS) is not None:
                 msg = get_xml_attr(detail, '{%s}Message' % ENS)
+            msg_xml = detail.find('{%s}MessageXml' % TNS)  # Crazy. Here, it's in the TNS namespace
+            if code == 'ErrorServerBusy':
+                back_off = None
+                try:
+                    value = msg_xml.find('{%s}Value' % TNS)
+                    if value.get('Name') == 'BackOffMilliseconds':
+                        back_off = int(value.text) / 1000
+                except (TypeError, AttributeError):
+                    pass
+                raise ErrorServerBusy(msg, back_off=back_off)
             try:
                 raise vars(errors)[code](msg)
             except KeyError:
@@ -327,7 +350,19 @@ class PagingEWSMixIn(EWSService):
             kwargs['offset'] = next_offset
             payload = payload_func(**kwargs)
             response = self._get_response_xml(payload=payload)
-            rootfolder, next_offset = self._get_page(response)
+            wait = 0
+            try:
+                rootfolder, next_offset = self._get_page(response)
+            except ErrorServerBusy as e:
+                if self.protocol.credentials.fail_fast:
+                    raise
+                if wait > self.protocol.credentials.max_wait:
+                    raise
+                back_off = e.back_off or 60  # Back off 10 seconds if we didn't get an explicit suggested value
+                log.warning('Got ErrorServerBusy from server (will back off %s seconds)', back_off)
+                time.sleep(back_off)
+                wait += back_off
+                continue
             if isinstance(rootfolder, ElementType):
                 container = rootfolder.find(self.element_container_name)
                 if container is None:

@@ -458,7 +458,14 @@ class ErrorSendMeetingInvitationsOrCancellationsRequired(ResponseMessageError): 
 class ErrorSendMeetingInvitationsRequired(ResponseMessageError): pass
 class ErrorSentMeetingRequestUpdate(ResponseMessageError): pass
 class ErrorSentTaskRequestUpdate(ResponseMessageError): pass
-class ErrorServerBusy(ResponseMessageError): pass
+
+
+class ErrorServerBusy(ResponseMessageError):
+    def __init__(self, *args, **kwargs):
+        self.back_off = kwargs.pop('back_off', None)  # Requested back off value in seconds
+        super(ErrorServerBusy, self).__init__(*args, **kwargs)
+
+
 class ErrorServiceDiscoveryFailed(ResponseMessageError): pass
 class ErrorSharingNoExternalEwsAvailable(ResponseMessageError): pass
 class ErrorSharingSynchronizationFailed(ResponseMessageError): pass
