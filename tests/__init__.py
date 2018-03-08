@@ -43,7 +43,7 @@ from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalid
     ErrorFolderNotFound, ErrorInvalidRequest, SOAPError, ErrorInvalidServerVersion, NaiveDateTimeNotAllowed, \
     AmbiguousTimeError, NonExistentTimeError, ErrorUnsupportedPathForQuery, ErrorInvalidPropertyForOperation, \
     ErrorInvalidValueForProperty, ErrorPropertyUpdate, ErrorDeleteDistinguishedFolder, \
-    ErrorNoPublicFolderReplicaAvailable, ErrorServerBusy
+    ErrorNoPublicFolderReplicaAvailable, ErrorServerBusy, ErrorInvalidPropertySet
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.extended_properties import ExtendedProperty, ExternId
 from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextField, EmailField, URIField, ChoiceField, \
@@ -2830,6 +2830,9 @@ class BaseItemTest(EWSTest):
             if not item.is_draft and f.is_read_only_after_send:
                 # These cannot be changed when the item is no longer a draft
                 continue
+            if f.name == 'message_id' and f.is_read_only_after_send:
+                # Cannot be updated, regardless of draft status
+                continue
             if f.name == 'attachments':
                 # Testing attachments is heavy. Leave this to specific tests
                 update_kwargs[f.name] = []
@@ -4013,6 +4016,10 @@ class BaseItemTest(EWSTest):
                     # Some fields throw this error when updated to a huge value
                     self.assertIn(f.name, ['given_name', 'middle_name', 'surname'])
                     continue
+                except ErrorInvalidPropertySet:
+                    # Some fields can not be updated after save
+                    self.assertTrue(f.is_read_only_after_send)
+                    continue
                 # is_complex=True forces the query to use GetItems which will always get the full value
                 f.is_complex = True
                 new_full_item = self.test_folder.all().only(f.name).get(categories__contains=self.categories)
@@ -4346,7 +4353,8 @@ class BaseItemTest(EWSTest):
             if not f.supports_version(self.account.version):
                 # Cannot be used with this EWS version
                 continue
-            if f.is_read_only:
+            if f.is_read_only or f.is_read_only_after_send:
+                # These cannot be changed
                 continue
             if f.name == 'mime_content':
                 # This will change depending on other contents fields

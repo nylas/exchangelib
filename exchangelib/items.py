@@ -290,6 +290,9 @@ class Item(RegisterMixIn):
                 if not self.is_draft and f.is_read_only_after_send:
                     # These cannot be changed when the item is no longer a draft
                     continue
+                if f.name == 'message_id' and f.is_read_only_after_send:
+                    # 'message_id' doesn't support updating, no matter the draft status
+                    continue
                 if f.name == 'mime_content' and isinstance(self, (Contact, DistributionList)):
                     # Contact and DistributionList don't support updating mime_content, no matter the draft status
                     continue
@@ -576,7 +579,7 @@ class Message(Item):
         CharField('conversation_topic', field_uri='message:ConversationTopic', is_read_only=True),
         # Rename 'From' to 'author'. We can't use fieldname 'from' since it's a Python keyword.
         MailboxField('author', field_uri='message:From', is_read_only_after_send=True),
-        CharField('message_id', field_uri='message:InternetMessageId', is_read_only=False, is_read_only_after_send=True),
+        CharField('message_id', field_uri='message:InternetMessageId', is_read_only_after_send=True),
         BooleanField('is_read', field_uri='message:IsRead', is_required=True, default=False),
         BooleanField('is_response_requested', field_uri='message:IsResponseRequested', default=False, is_required=True),
         TextField('references', field_uri='message:References'),
@@ -823,7 +826,7 @@ class PostItem(Item):
         Base64Field('conversation_index', field_uri='message:ConversationIndex', is_read_only=True),
         CharField('conversation_topic', field_uri='message:ConversationTopic', is_read_only=True),
         MailboxField('author', field_uri='message:From', is_read_only_after_send=True),
-        CharField('message_id', field_uri='message:InternetMessageId', is_read_only=True, is_read_only_after_send=True),
+        CharField('message_id', field_uri='message:InternetMessageId', is_read_only_after_send=True),
         BooleanField('is_read', field_uri='message:IsRead', is_required=True, default=False),
         DateTimeField('posted_time', field_uri='postitem:PostedTime', is_read_only=True),
         MailboxField('sender', field_uri='message:Sender', is_read_only=True, is_read_only_after_send=True),
