@@ -529,6 +529,9 @@ class DateField(FieldURIField):
 class TimeField(FieldURIField):
     value_cls = datetime.time
 
+    def from_xml(self, elem, account):
+        raise NotImplementedError()
+
 
 class DateTimeField(FieldURIField):
     value_cls = EWSDateTime
