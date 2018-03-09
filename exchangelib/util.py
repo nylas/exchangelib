@@ -1,6 +1,7 @@
 from __future__ import unicode_literals
 
 from copy import deepcopy
+import datetime
 from decimal import Decimal
 import io
 import itertools
@@ -141,6 +142,8 @@ def value_to_xml_text(value):
         return '1' if value else '0'
     if isinstance(value, (int, Decimal)):
         return text_type(value)
+    if isinstance(value, datetime.time):
+        return value.isoformat()
     if isinstance(value, EWSTimeZone):
         return value.ms_id
     if isinstance(value, EWSDateTime):
@@ -177,7 +180,7 @@ def set_xml_value(elem, value, version):
     from .fields import FieldPath, FieldOrder
     from .folders import EWSElement
     from .version import Version
-    if isinstance(value, string_types + (bool, bytes, int, Decimal, EWSDate, EWSDateTime)):
+    if isinstance(value, string_types + (bool, bytes, int, Decimal, datetime.time, EWSDate, EWSDateTime)):
         elem.text = value_to_xml_text(value)
     elif is_iterable(value, generators_allowed=True):
         for v in value:

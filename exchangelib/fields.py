@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 import abc
 import base64
 import binascii
+import datetime
 from decimal import Decimal, InvalidOperation
 import logging
 
@@ -482,12 +483,16 @@ class DateField(FieldURIField):
         return self.default
 
 
+class TimeField(FieldURIField):
+    value_cls = datetime.time
+
+
 class DateTimeField(FieldURIField):
     value_cls = EWSDateTime
 
     def clean(self, value, version=None):
         if value is not None and isinstance(value, self.value_cls) and not value.tzinfo:
-            raise ValueError("Field '%s' must be timezone aware" % self.name)
+            raise ValueError("Value '%s' on field '%s' must be timezone aware" % (value, self.name))
         return super(DateTimeField, self).clean(value, version=version)
 
     def from_xml(self, elem, account):
