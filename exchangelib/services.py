@@ -436,12 +436,11 @@ class GetServerTimeZones(EWSService):
             tz_id = timezonedef.get('Id')
             name = timezonedef.get('Name')
             periods = timezonedef.find('{%s}Periods' % TNS)
-            if periods is None:
-                tz_periods = None
-            else:
-                tz_periods = tuple(
-                    dict(id=period.get('Id'), name=period.get('Name'), bias=isodate.parse_duration(period.get('Bias')))
-                    for period in periods.findall('{%s}Period' % TNS)
+            tz_periods = {}
+            for period in periods.findall('{%s}Period' % TNS):
+                tz_periods[period.get('Id')] = dict(
+                    name=period.get('Name'),
+                    bias=isodate.parse_duration(period.get('Bias'))
                 )
             transitiongroups = timezonedef.find('{%s}TransitionsGroups' % TNS)
             if transitiongroups is None:
@@ -1597,18 +1596,20 @@ class GetUserAvailability(EWSService):
     """
     SERVICE_NAME = 'GetUserAvailability'
 
-    def call(self, mailbox_data, free_busy_view_options):
+    def call(self, timezone, mailbox_data, free_busy_view_options):
         # TODO: Also supports SuggestionsViewOptions, see
         # https://msdn.microsoft.com/en-us/library/office/aa564990(v=exchg.150).aspx
         return self._get_elements(payload=self.get_payload(
+            timezone=timezone,
             mailbox_data=mailbox_data,
             free_busy_view_options=free_busy_view_options
         ))
 
-    def get_payload(self, mailbox_data, free_busy_view_options):
+    def get_payload(self, timezone, mailbox_data, free_busy_view_options):
         payload = create_element('m:%sRequest' % self.SERVICE_NAME)
+        set_xml_value(payload, timezone, version=self.protocol.version)
         mailbox_data_array = create_element('m:MailboxDataArray')
-        payload.append(mailbox_data_array)
         set_xml_value(mailbox_data_array, mailbox_data, version=self.protocol.version)
-        set_xml_value(mailbox_data_array, free_busy_view_options, version=self.protocol.version)
+        payload.append(mailbox_data_array)
+        set_xml_value(payload, free_busy_view_options, version=self.protocol.version)
         return payload

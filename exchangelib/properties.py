@@ -1,12 +1,13 @@
 from __future__ import unicode_literals
 
 import abc
+import datetime
 import logging
 
 from six import text_type, string_types
 
 from .fields import SubField, TextField, EmailField, ChoiceField, DateTimeField, EWSElementField, MailboxField, \
-    Choice, BooleanField, IdField, ExtendedPropertyField, IntegerField
+    Choice, BooleanField, IdField, ExtendedPropertyField, IntegerField, TimeField, EnumField, WEEKDAY_NAMES
 from .services import MNS, TNS
 from .util import get_xml_attr, create_element, set_xml_value, value_to_xml_text
 from .version import EXCHANGE_2013
@@ -345,8 +346,8 @@ class TimeWindow(EWSElement):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa580740(v=exchg.150).aspx
     ELEMENT_NAME = 'TimeWindow'
     FIELDS = [
-        DateTimeField('start', field_uri='StartTime', is_required=True, is_attribute=True),
-        DateTimeField('end', field_uri='EndTime', is_required=True, is_attribute=True),
+        DateTimeField('start', field_uri='StartTime', is_required=True),
+        DateTimeField('end', field_uri='EndTime', is_required=True),
     ]
 
     __slots__ = ('start', 'end')
@@ -387,6 +388,81 @@ class Attendee(EWSElement):
     def __hash__(self):
         # TODO: maybe take 'response_type' and 'last_response_time' into account?
         return hash(self.mailbox)
+
+
+class TimeZoneTransition(EWSElement):
+    # Base class for StandardTime and DaylightTime classes
+    FIELDS = [
+        IntegerField('bias', field_uri='Bias', is_required=True),  # Offset from the default bias, in minutes
+        TimeField('time', field_uri='Time', is_required=True),
+        IntegerField('occurrence', field_uri='DayOrder', is_required=True),  # n'th occurrence of weekday in iso_month
+        IntegerField('iso_month', field_uri='Month', is_required=True),
+        EnumField('weekday', field_uri='DayOfWeek', enum=WEEKDAY_NAMES, is_required=True),
+        # 'Year' is not implemented yet
+    ]
+
+    __slots__ = ('bias', 'time', 'occurrence', 'iso_month', 'weekday')
+
+
+class StandardTime(TimeZoneTransition):
+    # MSDN: https://msdn.microsoft.com/en-us/library/office/aa563445(v=exchg.150).aspx
+    ELEMENT_NAME = 'StandardTime'
+    __slots__ = TimeZoneTransition.__slots__
+
+
+class DaylightTime(TimeZoneTransition):
+    # MSDN: https://msdn.microsoft.com/en-us/library/office/aa564336(v=exchg.150).aspx
+    ELEMENT_NAME = 'DaylightTime'
+    __slots__ = TimeZoneTransition.__slots__
+
+
+class TimeZone(EWSElement):
+    # MSDN: https://msdn.microsoft.com/en-us/library/office/aa565658(v=exchg.150).aspx
+    ELEMENT_NAME = 'TimeZone'
+
+    FIELDS = [
+        IntegerField('bias', field_uri='Bias', is_required=True),  # Standard (non-DST) offset from UTC, in minutes
+        EWSElementField('standard_time', value_cls=StandardTime),
+        EWSElementField('daylight_time', value_cls=DaylightTime),
+    ]
+
+    __slots__ = ('bias', 'standard_time', 'daylight_time')
+
+    @classmethod
+    def from_server_timezone(cls, tz_periods, tz_transitions):
+        # Creates a TimeZone object from the result of a GetServerTimeZones call with full timezone data
+        kwargs = {}
+        assert len(tz_periods) <= 2, "Dont yet know how to handle +2 periods"
+        for period in tz_periods.values():
+            if period['name'] == 'Standard':
+                kwargs['bias'] = int(period['bias'].total_seconds()) // 60  # Convert to minutes
+                break
+        else:
+            raise ValueError('No standard bias found in periods %s' % tz_periods)
+
+        assert len(tz_transitions) <= 1, "Dont yet know how to handle multiple transitions"
+        for transitions in tz_transitions.values():
+            for transition in transitions:
+                period = tz_periods[transition['to']]
+                # 'offset' is the time of day to transition, as timedelta since midnight. Must be a reasonable value
+                assert datetime.timedelta(0) <= transition['offset'] < datetime.timedelta(days=1)
+                transition_kwargs = dict(
+                    time=(datetime.datetime(2000, 1, 1) + transition['offset']).time(),
+                    occurrence=transition['occurrence'] if transition['occurrence'] >= 1 else 1,  # Value can be -1
+                    iso_month=transition['iso_month'],
+                    weekday=transition['iso_weekday'],
+                )
+                if period['name'] == 'Standard':
+                    transition_kwargs['bias'] = 0
+                    kwargs['standard_time'] = StandardTime(**transition_kwargs)
+                elif period['name'] == 'Daylight':
+                    std_bias = kwargs['bias']
+                    dst_bias = int(period['bias'].total_seconds()) // 60  # Convert to minutes
+                    transition_kwargs['bias'] = dst_bias - std_bias
+                    kwargs['daylight_time'] = DaylightTime(**transition_kwargs)
+                else:
+                    assert False, 'Unknown transition: %s' % transition
+        return cls(**kwargs)
 
 
 class RoomList(Mailbox):
