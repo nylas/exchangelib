@@ -429,39 +429,59 @@ class TimeZone(EWSElement):
     __slots__ = ('bias', 'standard_time', 'daylight_time')
 
     @classmethod
-    def from_server_timezone(cls, tz_periods, tz_transitions):
+    def from_server_timezone(cls, periods, transitions, transitionsgroups, for_year):
         # Creates a TimeZone object from the result of a GetServerTimeZones call with full timezone data
         kwargs = {}
-        assert len(tz_periods) <= 2, "Dont yet know how to handle +2 periods"
-        for period in tz_periods.values():
-            if period['name'] == 'Standard':
-                kwargs['bias'] = int(period['bias'].total_seconds()) // 60  # Convert to minutes
-                break
-        else:
-            raise ValueError('No standard bias found in periods %s' % tz_periods)
 
-        assert len(tz_transitions) <= 1, "Dont yet know how to handle multiple transitions"
-        for transitions in tz_transitions.values():
-            for transition in transitions:
-                period = tz_periods[transition['to']]
-                # 'offset' is the time of day to transition, as timedelta since midnight. Must be a reasonable value
-                assert datetime.timedelta(0) <= transition['offset'] < datetime.timedelta(days=1)
-                transition_kwargs = dict(
-                    time=(datetime.datetime(2000, 1, 1) + transition['offset']).time(),
-                    occurrence=transition['occurrence'] if transition['occurrence'] >= 1 else 1,  # Value can be -1
-                    iso_month=transition['iso_month'],
-                    weekday=transition['iso_weekday'],
-                )
-                if period['name'] == 'Standard':
-                    transition_kwargs['bias'] = 0
-                    kwargs['standard_time'] = StandardTime(**transition_kwargs)
-                elif period['name'] == 'Daylight':
-                    std_bias = kwargs['bias']
-                    dst_bias = int(period['bias'].total_seconds()) // 60  # Convert to minutes
-                    transition_kwargs['bias'] = dst_bias - std_bias
-                    kwargs['daylight_time'] = DaylightTime(**transition_kwargs)
-                else:
-                    assert False, 'Unknown transition: %s' % transition
+        # Set a default bias
+        valid_period = None
+        for (year, period_type), period in sorted(periods.items()):
+            if period_type != 'Standard':
+                continue
+            if year > for_year:
+                break
+            valid_period = period
+        if valid_period is None:
+            raise ValueError('No standard bias found in periods %s' % periods)
+        kwargs['bias'] = int(valid_period['bias'].total_seconds()) // 60  # Convert to minutes
+
+        # Look through the transitions, and pick the relevant one according to the 'for_year' value
+        valid_tg_id = None
+        for tg_id, from_date in sorted(transitions.items()):
+            if from_date and from_date.year > for_year:
+                break
+            valid_tg_id = tg_id
+        if valid_tg_id is None:
+            raise ValueError('No valid transition for year %s: %s' % (for_year, transitions))
+
+        # Set or reset the 'standard_time' and 'daylight_time' kwargs. We do unnecessary work here, but it keeps
+        # code simple
+        if not 0 <= len(transitionsgroups[valid_tg_id]) <= 2:
+            raise ValueError('Expected 0-2 transitions in transitionsgroup %s' % transitionsgroups[valid_tg_id])
+        for transition in transitionsgroups[valid_tg_id]:
+            period = periods[transition['to']]
+            if len(transition.keys()) == 1:
+                # This is a simple transition to STD time. That cannot be represented by this class
+                continue
+            # 'offset' is the time of day to transition, as timedelta since midnight. Must be a reasonable value
+            assert datetime.timedelta(0) <= transition['offset'] < datetime.timedelta(days=1)
+            transition_kwargs = dict(
+                time=(datetime.datetime(2000, 1, 1) + transition['offset']).time(),
+                occurrence=transition['occurrence'] if transition['occurrence'] >= 1 else 1,  # Value can be -1
+                iso_month=transition['iso_month'],
+                weekday=transition['iso_weekday'],
+            )
+            if period['name'] == 'Standard':
+                transition_kwargs['bias'] = 0
+                kwargs['standard_time'] = StandardTime(**transition_kwargs)
+            elif period['name'] == 'Daylight':
+                std_bias = kwargs['bias']
+                dst_bias = int(period['bias'].total_seconds()) // 60  # Convert to minutes
+                transition_kwargs['bias'] = dst_bias - std_bias
+                kwargs['daylight_time'] = DaylightTime(**transition_kwargs)
+            else:
+                assert False, 'Unknown transition: %s' % transition
+
         return cls(**kwargs)
 
 

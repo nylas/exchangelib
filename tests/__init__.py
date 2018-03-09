@@ -59,7 +59,7 @@ from exchangelib.indexed_properties import EmailAddress, PhysicalAddress, PhoneN
     SingleFieldIndexedElement, MultiFieldIndexedElement
 from exchangelib.items import Item, CalendarItem, Message, Contact, Task, DistributionList
 from exchangelib.properties import Attendee, Mailbox, RoomList, MessageHeader, Room, ItemId, Member, EWSElement, Body, \
-    HTMLBody
+    HTMLBody, TimeZone
 from exchangelib.protocol import BaseProtocol, Protocol, NoVerifyHTTPAdapter
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.recurrence import Recurrence, AbsoluteYearlyPattern, RelativeYearlyPattern, AbsoluteMonthlyPattern, \
@@ -1483,6 +1483,11 @@ class CommonTest(EWSTest):
         self.assertAlmostEqual(len(list(data)), 130, delta=30, msg=data)
         # Test shortcut
         self.assertAlmostEqual(len(list(self.account.protocol.get_timezones())), 130, delta=30, msg=data)
+        # Test translation to TimeZone objects
+        for tz_id, tz_name, periods, transitions, transitionsgroups in self.account.protocol.get_timezones(
+                return_full_timezone_data=True):
+            TimeZone.from_server_timezone(periods=periods, transitions=transitions, transitionsgroups=transitionsgroups,
+                                          for_year=2018)
 
     def test_get_roomlists(self):
         # The test server is not guaranteed to have any room lists which makes this test less useful

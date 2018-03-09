@@ -13,13 +13,13 @@ Exchange EWS references:
 from __future__ import unicode_literals
 
 import abc
+import datetime
 from itertools import chain
 import logging
 import time
 import traceback
 
 from defusedxml.ElementTree import ParseError
-import isodate
 from six import text_type
 
 from . import errors
@@ -34,9 +34,10 @@ from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, 
     ErrorCannotDeleteTaskOccurrence, ErrorMimeContentConversionFailed, ErrorRecurrenceHasNoOccurrence, \
     ErrorNameResolutionMultipleResults, ErrorNameResolutionNoResults, ErrorNoPublicFolderReplicaAvailable, \
     ErrorInvalidOperation
+from .ewsdatetime import EWSDateTime, NaiveDateTimeNotAllowed
 from .transport import wrap, extra_headers, SOAPNS, TNS, MNS, ENS
 from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, ElementType, \
-    xml_to_str, set_xml_value, peek
+    xml_to_str, set_xml_value, peek, xml_text_to_value
 from .version import EXCHANGE_2010, EXCHANGE_2010_SP2, EXCHANGE_2013_SP1
 
 log = logging.getLogger(__name__)
@@ -438,27 +439,54 @@ class GetServerTimeZones(EWSService):
             periods = timezonedef.find('{%s}Periods' % TNS)
             tz_periods = {}
             for period in periods.findall('{%s}Period' % TNS):
-                tz_periods[period.get('Id')] = dict(
+                # Convert e.g. "trule:Microsoft/Registry/W. Europe Standard Time/2006-Daylight" to (2006, 'Daylight')
+                p_year, p_type = period.get('Id').rsplit('/', 1)[1].split('-')
+                tz_periods[(int(p_year), p_type)] = dict(
                     name=period.get('Name'),
-                    bias=isodate.parse_duration(period.get('Bias'))
+                    bias=xml_text_to_value(period.get('Bias'), datetime.timedelta)
                 )
+            tz_transitionsgroups = {}
             transitiongroups = timezonedef.find('{%s}TransitionsGroups' % TNS)
-            if transitiongroups is None:
-                tz_transitions = None
-            else:
-                tz_transitions = {}
+            if transitiongroups is not None:
                 for transitiongroup in transitiongroups.findall('{%s}TransitionsGroup' % TNS):
                     tg_id = int(transitiongroup.get('Id'))
-                    tz_transitions[tg_id] = []
-                    for transition in transitiongroup.findall('{%s}RecurringDayTransition' % TNS):
-                        tz_transitions[tg_id].append(dict(
-                            to=transition.find('{%s}To' % TNS).text,
-                            offset=isodate.parse_duration(transition.find('{%s}TimeOffset' % TNS).text),
-                            iso_month=int(transition.find('{%s}Month' % TNS).text),
-                            iso_weekday=WEEKDAY_NAMES.index(transition.find('{%s}DayOfWeek' % TNS).text) + 1,
-                            occurrence=int(transition.find('{%s}Occurrence' % TNS).text),
+                    tz_transitionsgroups[tg_id] = []
+                    for transition in transitiongroup.findall('{%s}Transition' % TNS):
+                        # Apply same conversion to To as for period IDs
+                        to_year, to_type = transition.find('{%s}To' % TNS).text.rsplit('/', 1)[1].split('-')
+                        tz_transitionsgroups[tg_id].append(dict(
+                            to=(int(to_year), to_type),
                         ))
-            timezones.append((tz_id, name, tz_periods, tz_transitions))
+                    for transition in transitiongroup.findall('{%s}RecurringDayTransition' % TNS):
+                        # Apply same conversion to To as for period IDs
+                        to_year, to_type = transition.find('{%s}To' % TNS).text.rsplit('/', 1)[1].split('-')
+                        tz_transitionsgroups[tg_id].append(dict(
+                            to=(int(to_year), to_type),
+                            offset=xml_text_to_value(transition.find('{%s}TimeOffset' % TNS).text, datetime.timedelta),
+                            iso_month=xml_text_to_value(transition.find('{%s}Month' % TNS).text, int),
+                            iso_weekday=WEEKDAY_NAMES.index(transition.find('{%s}DayOfWeek' % TNS).text) + 1,
+                            occurrence=xml_text_to_value(transition.find('{%s}Occurrence' % TNS).text, int),
+                        ))
+            tz_transitions = {}
+            transitions = timezonedef.find('{%s}Transitions' % TNS)
+            if transitions is not None:
+                for transition in transitions.findall('{%s}Transition' % TNS):
+                    to = transition.find('{%s}To' % TNS)
+                    assert to.get('Kind') == 'Group'
+                    tg_id = xml_text_to_value(to.text, int)
+                    tz_transitions[tg_id] = None
+                for transition in transitions.findall('{%s}AbsoluteDateTransition' % TNS):
+                    to = transition.find('{%s}To' % TNS)
+                    assert to.get('Kind') == 'Group'
+                    tg_id = xml_text_to_value(to.text, int)
+                    try:
+                        t_date = xml_text_to_value(transition.find('{%s}DateTime' % TNS).text, EWSDateTime).date()
+                    except NaiveDateTimeNotAllowed as e:
+                        # We encountered a naive datetime. Don't worry. we just need the date
+                        t_date = e.args[0].date()
+                    tz_transitions[tg_id] = t_date
+
+            timezones.append((tz_id, name, tz_periods, tz_transitions, tz_transitionsgroups))
         return timezones
 
 
