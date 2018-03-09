@@ -240,7 +240,7 @@ class EWSService(object):
                 try:
                     value = msg_xml.find('{%s}Value' % TNS)
                     if value.get('Name') == 'BackOffMilliseconds':
-                        back_off = int(value.text) / 1000
+                        back_off = int(value.text) / 1000.0  # Convert to seconds
                 except (TypeError, AttributeError):
                     pass
                 raise ErrorServerBusy(msg, back_off=back_off)
