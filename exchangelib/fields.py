@@ -530,7 +530,15 @@ class TimeField(FieldURIField):
     value_cls = datetime.time
 
     def from_xml(self, elem, account):
-        raise NotImplementedError()
+        field_elem = elem.find(self.response_tag())
+        val = None if field_elem is None else field_elem.text or None
+        if val is not None:
+            try:
+                # Assume an integer in minutes since midnight
+                return (datetime.datetime(2000, 1, 1) + datetime.timedelta(minutes=int(val))).time()
+            except ValueError:
+                pass
+        return self.default
 
 
 class DateTimeField(FieldURIField):

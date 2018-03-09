@@ -432,7 +432,6 @@ class GetServerTimeZones(EWSService):
 
     def _get_elements_in_container(self, container):
         from .recurrence import WEEKDAY_NAMES
-        timezones = []
         for timezonedef in container:
             tz_id = timezonedef.get('Id')
             name = timezonedef.get('Name')
@@ -486,8 +485,7 @@ class GetServerTimeZones(EWSService):
                         t_date = e.args[0].date()
                     tz_transitions[tg_id] = t_date
 
-            timezones.append((tz_id, name, tz_periods, tz_transitions, tz_transitionsgroups))
-        return timezones
+            yield (tz_id, name, tz_periods, tz_transitions, tz_transitionsgroups)
 
 
 class GetRoomLists(EWSService):
@@ -1627,11 +1625,16 @@ class GetUserAvailability(EWSService):
     def call(self, timezone, mailbox_data, free_busy_view_options):
         # TODO: Also supports SuggestionsViewOptions, see
         # https://msdn.microsoft.com/en-us/library/office/aa564990(v=exchg.150).aspx
-        return self._get_elements(payload=self.get_payload(
+        from .properties import FreeBusyView
+        for elem in self._get_elements(payload=self.get_payload(
             timezone=timezone,
             mailbox_data=mailbox_data,
             free_busy_view_options=free_busy_view_options
-        ))
+        )):
+            if isinstance(elem, Exception):
+                yield elem
+                continue
+            yield FreeBusyView.from_xml(elem=elem, account=None)
 
     def get_payload(self, timezone, mailbox_data, free_busy_view_options):
         payload = create_element('m:%sRequest' % self.SERVICE_NAME)
@@ -1641,3 +1644,34 @@ class GetUserAvailability(EWSService):
         payload.append(mailbox_data_array)
         set_xml_value(payload, free_busy_view_options, version=self.protocol.version)
         return payload
+
+    @classmethod
+    def _get_soap_payload(cls, soap_response):
+        if not isinstance(soap_response, ElementType):
+            raise ValueError("'soap_response' %r must be an ElementType" % soap_response)
+        body = soap_response.find('{%s}Body' % SOAPNS)
+        if body is None:
+            raise TransportError('No Body element in SOAP response')
+        response = body.find('{%s}%sResponse' % (MNS, cls.SERVICE_NAME))
+        if response is None:
+            fault = body.find('{%s}Fault' % SOAPNS)
+            if fault is None:
+                raise SOAPError('Unknown SOAP response: %s' % xml_to_str(body))
+            cls._raise_soap_errors(fault=fault)  # Will throw SOAPError or custom EWS error
+        response_messages = response.find('{%s}FreeBusyResponseArray' % MNS)
+        return response_messages.findall('{%s}FreeBusyResponse' % MNS)
+
+    def _get_elements_in_response(self, response):
+        for msg in response:
+            if not isinstance(msg, ElementType):
+                raise ValueError("'msg' %r must be an ElementType" % msg)
+            # Just check the response code and raise errors
+            self._get_element_container(message=msg.find('{%s}ResponseMessage' % MNS))
+            if isinstance(msg, ElementType):
+                for c in self._get_elements_in_container(container=msg):
+                    yield c
+            else:
+                yield msg
+
+    def _get_elements_in_container(self, container):
+            return [container.find('{%s}FreeBusyView' % MNS)]

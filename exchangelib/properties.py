@@ -7,7 +7,8 @@ import logging
 from six import text_type, string_types
 
 from .fields import SubField, TextField, EmailField, ChoiceField, DateTimeField, EWSElementField, MailboxField, \
-    Choice, BooleanField, IdField, ExtendedPropertyField, IntegerField, TimeField, EnumField, WEEKDAY_NAMES
+    Choice, BooleanField, IdField, ExtendedPropertyField, IntegerField, TimeField, EnumField, CharField, \
+    EWSElementListField, EnumListField, WEEKDAY_NAMES
 from .services import MNS, TNS
 from .util import get_xml_attr, create_element, set_xml_value, value_to_xml_text
 from .version import EXCHANGE_2013
@@ -482,6 +483,58 @@ class TimeZone(EWSElement):
             else:
                 assert False, 'Unknown transition: %s' % transition
 
+        return cls(**kwargs)
+
+
+class CalendarEvent(EWSElement):
+    # MSDN: https://msdn.microsoft.com/en-us/library/aa564053(v=exchg.80).aspx
+    FIELDS = [
+        DateTimeField('start', field_uri='StartTime'),
+        DateTimeField('end', field_uri='EndTime'),
+        ChoiceField('busy_type', field_uri='BusyType', choices={
+            Choice('Free'), Choice('Tentative'), Choice('Busy'), Choice('OOF'), Choice('NoData'),
+            Choice('WorkingElsewhere', supported_from=EXCHANGE_2013)
+        }, is_required=True, default='Busy'),
+        # CalendarEventDetails
+    ]
+
+
+class WorkingPeriod(EWSElement):
+    # MSDN: https://msdn.microsoft.com/en-us/library/office/aa580377(v=exchg.150).aspx
+    FIELDS = [
+        EnumListField('weekdays', field_uri='DayOfWeek', enum=WEEKDAY_NAMES, is_required=True),
+        TimeField('start', field_uri='StartTimeInMinutes', is_required=True),
+        TimeField('end', field_uri='EndTimeInMinutes', is_required=True),
+    ]
+
+
+class FreeBusyView(EWSElement):
+    # MSDN: https://msdn.microsoft.com/en-us/library/aa565398(v=exchg.80).aspx
+    FIELDS = [
+        ChoiceField('view_type', field_uri='FreeBusyViewType', choices={
+            Choice('None'), Choice('MergedOnly'), Choice('FreeBusy'), Choice('FreeBusyMerged'), Choice('Detailed'),
+            Choice('DetailedMerged'),
+        }, is_required=True),
+        CharField('merged', field_uri='MergedFreeBusyMergedFreeBusy'),
+        EWSElementListField('calendar_events', field_uri='CalendarEventArray', value_cls=CalendarEvent),
+        # WorkingPeriod is located inside WorkingHours element. WorkingHours also has timezone info that we
+        # hopefully don't care about.
+        EWSElementListField('working_hours', field_uri='WorkingPeriodArray', value_cls=WorkingPeriod),
+    ]
+
+    @classmethod
+    def from_xml(cls, elem, account):
+        if elem is None:
+            return None
+        if elem.tag != cls.response_tag():
+            raise ValueError('Unexpected element tag in class %s: %s vs %s' % (cls, elem.tag, cls.response_tag()))
+        kwargs = {}
+        for f in cls.FIELDS:
+            if f.name == 'working_hours':
+                kwargs[f.name] = f.from_xml(elem=elem.find('{%s}WorkingHours' % TNS), account=account)
+                continue
+            kwargs[f.name] = f.from_xml(elem=elem, account=account)
+        elem.clear()
         return cls(**kwargs)
 
 
