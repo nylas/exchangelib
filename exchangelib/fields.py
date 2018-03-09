@@ -19,6 +19,40 @@ string_type = string_types[0]
 log = logging.getLogger(__name__)
 
 
+# DayOfWeekIndex enum. See https://msdn.microsoft.com/en-us/library/office/aa581350(v=exchg.150).aspx
+FIRST = 'First'
+SECOND = 'Second'
+THIRD = 'Third'
+FOURTH = 'Fourth'
+LAST = 'Last'
+WEEK_NUMBERS = (FIRST, SECOND, THIRD, FOURTH, LAST)
+
+# Month enum
+JANUARY = 'January'
+FEBRUARY = 'February'
+MARCH = 'March'
+APRIL = 'April'
+MAY = 'May'
+JUNE = 'June'
+JULY = 'July'
+AUGUST = 'August'
+SEPTEMBER = 'September'
+OCTOBER = 'October'
+NOVEMBER = 'November'
+DECEMBER = 'December'
+MONTHS = (JANUARY, FEBRUARY, MARCH, APRIL, MAY, JUNE, JULY, AUGUST, SEPTEMBER, OCTOBER, NOVEMBER, DECEMBER)
+
+# Weekday enum
+MONDAY = 'Monday'
+TUESDAY = 'Tuesday'
+WEDNESDAY = 'Wednesday'
+THURSDAY = 'Thursday'
+FRIDAY = 'Friday'
+SATURDAY = 'Saturday'
+SUNDAY = 'Sunday'
+WEEKDAY_NAMES = (MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY)
+
+
 def split_field_path(field_path):
     """Return the individual parts of a field path that may, apart from the fieldname, have label and subfield parts.
     Examples:

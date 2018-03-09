@@ -2,44 +2,12 @@ import logging
 
 from six import string_types
 
-from .fields import IntegerField, IdField, EnumField, EnumListField, DateField, DateTimeField, EWSElementField
+from .fields import IntegerField, IdField, EnumField, EnumListField, DateField, DateTimeField, EWSElementField, \
+    WEEKDAY_NAMES, MONTHS, WEEK_NUMBERS
 from .properties import EWSElement, ItemId
 
 log = logging.getLogger(__name__)
 
-
-# DayOfWeekIndex enum. See https://msdn.microsoft.com/en-us/library/office/aa581350(v=exchg.150).aspx
-FIRST = 'First'
-SECOND = 'Second'
-THIRD = 'Third'
-FOURTH = 'Fourth'
-LAST = 'Last'
-WEEK_NUMBERS = (FIRST, SECOND, THIRD, FOURTH, LAST)
-
-# Month enum
-JANUARY = 'January'
-FEBRUARY = 'February'
-MARCH = 'March'
-APRIL = 'April'
-MAY = 'May'
-JUNE = 'June'
-JULY = 'July'
-AUGUST = 'August'
-SEPTEMBER = 'September'
-OCTOBER = 'October'
-NOVEMBER = 'November'
-DECEMBER = 'December'
-MONTHS = (JANUARY, FEBRUARY, MARCH, APRIL, MAY, JUNE, JULY, AUGUST, SEPTEMBER, OCTOBER, NOVEMBER, DECEMBER)
-
-# Weekday enum
-MONDAY = 'Monday'
-TUESDAY = 'Tuesday'
-WEDNESDAY = 'Wednesday'
-THURSDAY = 'Thursday'
-FRIDAY = 'Friday'
-SATURDAY = 'Saturday'
-SUNDAY = 'Sunday'
-WEEKDAY_NAMES = (MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY)
 
 # Used for weekday recurrences except weekly recurrences. E.g. for "First WeekendDay in March"
 DAY = 'Day'
