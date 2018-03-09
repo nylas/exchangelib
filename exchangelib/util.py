@@ -17,6 +17,7 @@ from defusedxml.lxml import parse, tostring, RestrictedElement
 from future.moves.urllib.parse import urlparse
 from future.moves._thread import get_ident
 from future.utils import PY2
+import isodate
 from lxml.etree import XMLParser, ElementDefaultClassLookup
 from pygments import highlight
 from pygments.lexers import XmlLexer
@@ -170,6 +171,7 @@ def xml_text_to_value(value, value_type):
         bool: lambda v: True if v == 'true' else False if v == 'false' else None,
         int: int,
         Decimal: Decimal,
+        datetime.timedelta: isodate.parse_duration,
         EWSDateTime: EWSDateTime.from_string,
         string_type: lambda v: v
     }[value_type](value)
