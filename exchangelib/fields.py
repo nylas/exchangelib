@@ -52,6 +52,15 @@ SATURDAY = 'Saturday'
 SUNDAY = 'Sunday'
 WEEKDAY_NAMES = (MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY)
 
+# Used for weekday recurrences except weekly recurrences. E.g. for "First WeekendDay in March"
+DAY = 'Day'
+WEEK_DAY = 'Weekday'  # Non-weekend day
+WEEKEND_DAY = 'WeekendDay'
+EXTRA_WEEKDAY_OPTIONS = (DAY, WEEK_DAY, WEEKEND_DAY)
+
+# DaysOfWeek enum: See https://msdn.microsoft.com/en-us/library/office/ee332417(v=exchg.150).aspx
+WEEKDAYS = WEEKDAY_NAMES + EXTRA_WEEKDAY_OPTIONS
+
 
 def split_field_path(field_path):
     """Return the individual parts of a field path that may, apart from the fieldname, have label and subfield parts.

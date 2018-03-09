@@ -50,7 +50,7 @@ from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextFie
     BodyField, DateTimeField, Base64Field, PhoneNumberField, EmailAddressField, TimeZoneField, \
     PhysicalAddressField, ExtendedPropertyField, MailboxField, AttendeesField, AttachmentField, CharListField, \
     MailboxListField, Choice, FieldPath, EWSElementField, CultureField, DateField, EnumField, EnumListField, IdField, \
-    CharField, TextListField
+    CharField, TextListField, MONDAY, WEDNESDAY, FEBRUARY, AUGUST, SECOND, LAST, DAY, WEEK_DAY, WEEKEND_DAY
 from exchangelib.folders import Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Messages, Tasks, \
     Contacts, Folder, RecipientCache, GALContacts, System, AllContacts, MyContactsExtended, Reminders, Favorites, \
     AllItems, ConversationSettings, Friends, RSSFeeds, Sharing, IMContactList, QuickContacts, Journal, Notes, \
@@ -64,8 +64,7 @@ from exchangelib.protocol import BaseProtocol, Protocol, NoVerifyHTTPAdapter
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.recurrence import Recurrence, AbsoluteYearlyPattern, RelativeYearlyPattern, AbsoluteMonthlyPattern, \
     RelativeMonthlyPattern, WeeklyPattern, DailyPattern, FirstOccurrence, LastOccurrence, Occurrence, \
-    NoEndPattern, EndDatePattern, NumberedPattern, ExtraWeekdaysField, DAY, WEEK_DAY, WEEKEND_DAY, \
-    MONDAY, WEDNESDAY, FEBRUARY, AUGUST, SECOND, LAST
+    NoEndPattern, EndDatePattern, NumberedPattern, ExtraWeekdaysField
 from exchangelib.restriction import Restriction, Q
 from exchangelib.settings import OofSettings
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, GetAttachment, ResolveNames, TNS
