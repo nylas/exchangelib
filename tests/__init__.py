@@ -4305,14 +4305,16 @@ class BaseItemTest(EWSTest):
         # First, empty trash bin
         self.account.trash.filter(categories__contains=self.categories).delete()
         item = self.get_test_item().save()
-        item_id = (item.item_id, item.changekey)
         # Copy to trash. We use trash because it can contain all item types.
-        item.copy(to_folder=self.account.trash)
-        # Test that the item exists in trash
-        self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 0)
+        copy_item_id, copy_changekey = item.copy(to_folder=self.account.trash)
+        # Test that the item still exists in the folder
+        self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 1)
+        # Test that the copied item exists in trash
         copied_item = self.account.trash.get(categories__contains=item.categories)
-        self.assertEqual(item.item_id, copied_item.item_id)
-        self.assertEqual(item.changekey, copied_item.changekey)
+        self.assertNotEqual(item.item_id, copied_item.item_id)
+        self.assertNotEqual(item.changekey, copied_item.changekey)
+        self.assertEqual(copy_item_id, copied_item.item_id)
+        self.assertEqual(copy_changekey, copied_item.changekey)
 
     def test_move(self):
         # First, empty trash bin
