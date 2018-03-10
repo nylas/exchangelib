@@ -330,6 +330,14 @@ class Item(RegisterMixIn):
         for f in self.FIELDS:
             setattr(self, f.name, getattr(fresh_item, f.name))
 
+    def copy(self, to_folder):
+        if not self.account:
+            raise ValueError('Item must have an account')
+        if not self.item_id:
+            raise ValueError('Item must have an ID')
+        res = self.account.bulk_copy(ids=[self], to_folder=to_folder)
+        return res[0]
+
     def move(self, to_folder):
         if not self.account:
             raise ValueError('Item must have an account')

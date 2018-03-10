@@ -2942,6 +2942,7 @@ class BaseItemTest(EWSTest):
         self.assertEqual(self.account.bulk_update(items=[]), [])
         self.assertEqual(self.account.bulk_delete(ids=[]), [])
         self.assertEqual(self.account.bulk_send(ids=[]), [])
+        self.assertEqual(self.account.bulk_copy(ids=[], to_folder=self.account.trash), [])
         self.assertEqual(self.account.bulk_move(ids=[], to_folder=self.account.trash), [])
         self.assertEqual(self.account.upload(data=[]), [])
         self.assertEqual(self.account.export(items=[]), [])
@@ -2955,6 +2956,7 @@ class BaseItemTest(EWSTest):
             self.assertEqual(self.account.bulk_update(items=qs), [])
         self.assertEqual(self.account.bulk_delete(ids=qs), [])
         self.assertEqual(self.account.bulk_send(ids=qs), [])
+        self.assertEqual(self.account.bulk_copy(ids=qs, to_folder=self.account.trash), [])
         self.assertEqual(self.account.bulk_move(ids=qs, to_folder=self.account.trash), [])
         with self.assertRaises(ValueError):
             self.assertEqual(self.account.upload(data=qs), [])
@@ -2968,6 +2970,7 @@ class BaseItemTest(EWSTest):
         self.assertEqual(self.account.bulk_update([]), [])
         self.assertEqual(self.account.bulk_delete([]), [])
         self.assertEqual(self.account.bulk_send([]), [])
+        self.assertEqual(self.account.bulk_copy([], to_folder=self.account.trash), [])
         self.assertEqual(self.account.bulk_move([], to_folder=self.account.trash), [])
         self.assertEqual(self.account.upload([]), [])
         self.assertEqual(self.account.export([]), [])
@@ -3035,6 +3038,21 @@ class BaseItemTest(EWSTest):
             item.delete()
             item.item_id, item.changekey = item_id, changekey
             item.refresh()  # Refresh an item that doesn't exist
+
+        with self.assertRaises(ValueError):
+            item = self.get_test_item()
+            item.account = None
+            item.copy(to_folder=self.test_folder)  # Must have an account on copy
+        with self.assertRaises(ValueError):
+            item = self.get_test_item()
+            item.copy(to_folder=self.test_folder)  # Must be an existing item
+        with self.assertRaises(ErrorItemNotFound):
+            item = self.get_test_item()
+            item.save()
+            item_id, changekey = item.item_id, item.changekey
+            item.delete()
+            item.item_id, item.changekey = item_id, changekey
+            item.copy(to_folder=self.test_folder)  # Item disappeared
 
         with self.assertRaises(ValueError):
             item = self.get_test_item()
@@ -4282,6 +4300,21 @@ class BaseItemTest(EWSTest):
         moved_item = list(self.account.fetch(ids=[item]))[0]
         # The item was copied, so the ItemId has changed. Let's compare the subject instead
         self.assertEqual(item.subject, moved_item.subject)
+
+    def test_copy(self):
+        # First, empty trash bin
+        self.account.trash.filter(categories__contains=self.categories).delete()
+        item = self.get_test_item().save()
+        # Copy to trash. We use trash because it can contain all item types.
+        copy_item_id, copy_changekey = item.copy(to_folder=self.account.trash)
+        # Test that the item still exists in the folder
+        self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 1)
+        # Test that the copied item exists in trash
+        copied_item = self.account.trash.get(categories__contains=item.categories)
+        self.assertNotEqual(item.item_id, copied_item.item_id)
+        self.assertNotEqual(item.changekey, copied_item.changekey)
+        self.assertEqual(copy_item_id, copied_item.item_id)
+        self.assertEqual(copy_changekey, copied_item.changekey)
 
     def test_move(self):
         # First, empty trash bin

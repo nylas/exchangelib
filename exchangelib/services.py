@@ -1299,6 +1299,39 @@ class MoveItem(EWSAccountService):
         return moveeitem
 
 
+class CopyItem(EWSAccountService):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa565012(v=exchg.150).aspx
+    """
+    SERVICE_NAME = 'CopyItem'
+    element_container_name = '{%s}Items' % MNS
+
+    def call(self, items, to_folder):
+        return self._get_elements(payload=self.get_payload(
+            items=items,
+            to_folder=to_folder,
+        ))
+
+    def get_payload(self, items, to_folder):
+        from .properties import ItemId
+        copyitem = create_element('m:%s' % self.SERVICE_NAME)
+
+        tofolderid = create_element('m:ToFolderId')
+        set_xml_value(tofolderid, to_folder, version=self.account.version)
+        copyitem.append(tofolderid)
+        item_ids = create_element('m:ItemIds')
+        is_empty = True
+        for item in items:
+            is_empty = False
+            item_id = ItemId(*(item if isinstance(item, tuple) else (item.item_id, None)))
+            log.debug('Copying item %s to %s', item, to_folder)
+            set_xml_value(item_ids, item_id, version=self.account.version)
+        if is_empty:
+            raise ValueError('"items" must not be empty')
+        copyitem.append(item_ids)
+        return copyitem
+
+
 class ResolveNames(EWSService):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa565329(v=exchg.150).aspx
