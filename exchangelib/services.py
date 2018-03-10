@@ -1304,6 +1304,7 @@ class CopyItem(EWSAccountService):
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa565012(v=exchg.150).aspx
     """
     SERVICE_NAME = 'CopyItem'
+    element_container_name = '{%s}Items' % MNS
 
     def call(self, items, to_folder):
         return self._get_elements(payload=self.get_payload(

@@ -542,7 +542,7 @@ class Account(object):
             # empty 'ids' and return early.
             return []
         return list(
-            i
+            i if isinstance(i, Exception) else Item.id_from_xml(i)
             for i in CopyItem(account=self).call(items=ids, to_folder=to_folder)
         )
 
