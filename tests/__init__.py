@@ -46,8 +46,8 @@ from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalid
     ErrorNoPublicFolderReplicaAvailable, ErrorServerBusy, ErrorInvalidPropertySet
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.extended_properties import ExtendedProperty, ExternId
-from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextField, EmailField, URIField, ChoiceField, \
-    BodyField, DateTimeField, Base64Field, PhoneNumberField, EmailAddressField, TimeZoneField, \
+from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextField, EmailAddressField, URIField, \
+    ChoiceField, BodyField, DateTimeField, Base64Field, PhoneNumberField, EmailAddressesField, TimeZoneField, \
     PhysicalAddressField, ExtendedPropertyField, MailboxField, AttendeesField, AttachmentField, CharListField, \
     MailboxListField, Choice, FieldPath, EWSElementField, CultureField, DateField, EnumField, EnumListField, IdField, \
     CharField, TextListField, MONDAY, WEDNESDAY, FEBRUARY, AUGUST, SECOND, LAST, DAY, WEEK_DAY, WEEKEND_DAY
@@ -59,7 +59,7 @@ from exchangelib.indexed_properties import EmailAddress, PhysicalAddress, PhoneN
     SingleFieldIndexedElement, MultiFieldIndexedElement
 from exchangelib.items import Item, CalendarItem, Message, Contact, Task, DistributionList
 from exchangelib.properties import Attendee, Mailbox, RoomList, MessageHeader, Room, ItemId, Member, EWSElement, Body, \
-    HTMLBody, TimeZone
+    HTMLBody, TimeZone, FreeBusyView
 from exchangelib.protocol import BaseProtocol, Protocol, NoVerifyHTTPAdapter
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.recurrence import Recurrence, AbsoluteYearlyPattern, RelativeYearlyPattern, AbsoluteMonthlyPattern, \
@@ -1293,7 +1293,7 @@ class EWSTest(unittest.TestCase):
             raise ValueError('Unsupported field %s' % field)
         if isinstance(field, URIField):
             return get_random_url()
-        if isinstance(field, EmailField):
+        if isinstance(field, EmailAddressField):
             return get_random_email()
         if isinstance(field, ChoiceField):
             return get_random_choice(field.supported_choices(version=self.account.version))
@@ -1352,7 +1352,7 @@ class EWSTest(unittest.TestCase):
                     return [Attendee(mailbox=mbx, response_type='Accept')]
                 else:
                     return [self.account.primary_smtp_address]
-        if isinstance(field, EmailAddressField):
+        if isinstance(field, EmailAddressesField):
             addrs = []
             for label in EmailAddress.get_field_by_fieldname('label').supported_choices(version=self.account.version):
                 addr = EmailAddress(email=get_random_email())
@@ -1488,6 +1488,14 @@ class CommonTest(EWSTest):
                 return_full_timezone_data=True):
             TimeZone.from_server_timezone(periods=periods, transitions=transitions, transitionsgroups=transitionsgroups,
                                           for_year=2018)
+
+    def test_get_free_busy_info(self):
+        tz = EWSTimeZone.timezone('Europe/Copenhagen')
+        start = tz.localize(EWSDateTime.now())
+        end = tz.localize(EWSDateTime.now() + datetime.timedelta(hours=6))
+        accounts = [(self.account, 'Organizer', False)]
+        for view_info in self.account.protocol.get_free_busy_info(accounts=accounts, start=start, end=end):
+            self.assertIsInstance(view_info, FreeBusyView)
 
     def test_get_roomlists(self):
         # The test server is not guaranteed to have any room lists which makes this test less useful

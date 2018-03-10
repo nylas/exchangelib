@@ -434,7 +434,7 @@ class GetServerTimeZones(EWSService):
         from .recurrence import WEEKDAY_NAMES
         for timezonedef in container:
             tz_id = timezonedef.get('Id')
-            name = timezonedef.get('Name')
+            tz_name = timezonedef.get('Name')
             periods = timezonedef.find('{%s}Periods' % TNS)
             tz_periods = {}
             for period in periods.findall('{%s}Period' % TNS):
@@ -444,22 +444,22 @@ class GetServerTimeZones(EWSService):
                     name=period.get('Name'),
                     bias=xml_text_to_value(period.get('Bias'), datetime.timedelta)
                 )
-            tz_transitionsgroups = {}
+            tz_transitions_groups = {}
             transitiongroups = timezonedef.find('{%s}TransitionsGroups' % TNS)
             if transitiongroups is not None:
                 for transitiongroup in transitiongroups.findall('{%s}TransitionsGroup' % TNS):
                     tg_id = int(transitiongroup.get('Id'))
-                    tz_transitionsgroups[tg_id] = []
+                    tz_transitions_groups[tg_id] = []
                     for transition in transitiongroup.findall('{%s}Transition' % TNS):
                         # Apply same conversion to To as for period IDs
                         to_year, to_type = transition.find('{%s}To' % TNS).text.rsplit('/', 1)[1].split('-')
-                        tz_transitionsgroups[tg_id].append(dict(
+                        tz_transitions_groups[tg_id].append(dict(
                             to=(int(to_year), to_type),
                         ))
                     for transition in transitiongroup.findall('{%s}RecurringDayTransition' % TNS):
                         # Apply same conversion to To as for period IDs
                         to_year, to_type = transition.find('{%s}To' % TNS).text.rsplit('/', 1)[1].split('-')
-                        tz_transitionsgroups[tg_id].append(dict(
+                        tz_transitions_groups[tg_id].append(dict(
                             to=(int(to_year), to_type),
                             offset=xml_text_to_value(transition.find('{%s}TimeOffset' % TNS).text, datetime.timedelta),
                             iso_month=xml_text_to_value(transition.find('{%s}Month' % TNS).text, int),
@@ -485,7 +485,7 @@ class GetServerTimeZones(EWSService):
                         t_date = e.args[0].date()
                     tz_transitions[tg_id] = t_date
 
-            yield (tz_id, name, tz_periods, tz_transitions, tz_transitionsgroups)
+            yield (tz_id, tz_name, tz_periods, tz_transitions, tz_transitions_groups)
 
 
 class GetRoomLists(EWSService):

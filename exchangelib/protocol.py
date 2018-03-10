@@ -19,7 +19,8 @@ from future.moves.queue import LifoQueue, Empty, Full
 
 from .credentials import Credentials
 from .errors import TransportError
-from .services import GetServerTimeZones, GetRoomLists, GetRooms, ResolveNames
+from .properties import FreeBusyViewOptions, MailboxData, TimeWindow, TimeZone
+from .services import GetServerTimeZones, GetRoomLists, GetRooms, ResolveNames, GetUserAvailability
 from .transport import get_auth_instance, get_service_authtype, get_docs_authtype, AUTH_TYPE_MAP, DEFAULT_HEADERS
 from .util import split_url
 from .version import Version, API_VERSIONS
@@ -242,6 +243,50 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
         """
         return GetServerTimeZones(protocol=self).call(
             timezones=timezones, return_full_timezone_data=return_full_timezone_data
+        )
+
+    def get_free_busy_info(self, accounts, start, end, merged_free_busy_interval=30, requested_view='DetailedMerged'):
+        """ Returns free/busy information for a list of accounts
+
+        :param accounts: A list of (account, attendee_type, exclude_conflicts) tuples, where account is an Account
+               object, attendee_type is a MailboxData.attendee_type choice, and exclude_conflicts is a boolean.
+        :param start: The start datetime of the request
+        :param end: The end datetime of the request
+        :param merged_free_busy_interval: The interval, in minutes, of merged free/busy information
+        :param requested_view: The type of information returned. Possible values are defined in the
+               FreeBusyViewOptions.requested_view choices.
+        :return: A generator of FreeBusyView objects
+        """
+        from .account import Account
+        for account, attendee_type, exclude_conflicts in accounts:
+            assert isinstance(account, Account)
+            assert attendee_type in {c.value for c in MailboxData.get_field_by_fieldname('attendee_type').choices}
+            assert isinstance(exclude_conflicts, bool)
+        assert end > start
+        assert isinstance(merged_free_busy_interval, int)
+        assert requested_view in {c.value for c in FreeBusyViewOptions.get_field_by_fieldname('requested_view').choices}
+        tz = start.tzinfo  # The timezone of the start and end dates
+        for_year = start.year
+        _, _, periods, transitions, transitions_groups = list(self.get_timezones(
+            timezones=[tz],
+            return_full_timezone_data=True
+        ))[0]
+        timezone = TimeZone.from_server_timezone(periods, transitions, transitions_groups, for_year=for_year)
+        mailbox_data = list(
+            MailboxData(
+                email=account.primary_smtp_address,
+                attendee_type=attendee_type,
+                exclude_conflicts=exclude_conflicts
+            ) for account, attendee_type, exclude_conflicts in accounts
+        )
+        return GetUserAvailability(self).call(
+                timezone=timezone,
+                mailbox_data=mailbox_data,
+                free_busy_view_options=FreeBusyViewOptions(
+                    time_window=TimeWindow(start=start, end=end),
+                    merged_free_busy_interval=merged_free_busy_interval,
+                    requested_view=requested_view,
+                ),
         )
 
     def get_roomlists(self):

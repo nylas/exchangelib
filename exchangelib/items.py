@@ -9,10 +9,11 @@ from six import string_types
 from .ewsdatetime import UTC_NOW
 from .extended_properties import ExtendedProperty
 from .fields import BooleanField, IntegerField, DecimalField, Base64Field, TextField, CharListField, ChoiceField, \
-    URIField, BodyField, DateTimeField, MessageHeaderField, PhoneNumberField, EmailAddressField, PhysicalAddressField, \
-    ExtendedPropertyField, AttachmentField, RecurrenceField, MailboxField, MailboxListField, AttendeesField, Choice, \
-    OccurrenceField, OccurrenceListField, MemberListField, EWSElementField, EffectiveRightsField, TimeZoneField, \
-    CultureField, IdField, CharField, TextListField, EnumAsIntField, EmailField
+    URIField, BodyField, DateTimeField, MessageHeaderField, PhoneNumberField, EmailAddressesField, \
+    PhysicalAddressField, ExtendedPropertyField, AttachmentField, RecurrenceField, MailboxField, MailboxListField, \
+    AttendeesField, Choice, OccurrenceField, OccurrenceListField, MemberListField, EWSElementField, \
+    EffectiveRightsField, TimeZoneField, CultureField, IdField, CharField, TextListField, EnumAsIntField, \
+    EmailAddressField, FreeBusyStatusField
 from .properties import EWSElement, ItemId, ConversationId, ParentFolderId, Attendee
 from .recurrence import FirstOccurrence, LastOccurrence, Occurrence, DeletedOccurrence
 from .util import is_iterable
@@ -476,10 +477,8 @@ class CalendarItem(Item):
         DateTimeField('end', field_uri='calendar:End', is_required=True),
         DateTimeField('original_start', field_uri='calendar:OriginalStart', is_read_only=True),
         BooleanField('is_all_day', field_uri='calendar:IsAllDayEvent', is_required=True, default=False),
-        ChoiceField('legacy_free_busy_status', field_uri='calendar:LegacyFreeBusyStatus', choices={
-            Choice('Free'), Choice('Tentative'), Choice('Busy'), Choice('OOF'), Choice('NoData'),
-            Choice('WorkingElsewhere', supported_from=EXCHANGE_2013)
-        }, is_required=True, default='Busy'),
+        FreeBusyStatusField('legacy_free_busy_status', field_uri='calendar:LegacyFreeBusyStatus', is_required=True,
+                            default='Busy'),
         TextField('location', field_uri='calendar:Location'),
         TextField('when', field_uri='calendar:When'),
         BooleanField('is_meeting', field_uri='calendar:IsMeeting', is_read_only=True),
@@ -759,7 +758,7 @@ class Contact(Item):
         TextField('nickname', field_uri='contacts:Nickname'),
         # Placeholder for CompleteName
         TextField('company_name', field_uri='contacts:CompanyName'),
-        EmailAddressField('email_addresses', field_uri='contacts:EmailAddress'),
+        EmailAddressesField('email_addresses', field_uri='contacts:EmailAddress'),
         PhysicalAddressField('physical_addresses', field_uri='contacts:PhysicalAddress'),
         PhoneNumberField('phone_numbers', field_uri='contacts:PhoneNumber'),
         TextField('assistant_name', field_uri='contacts:AssistantName'),
@@ -791,7 +790,7 @@ class Contact(Item):
                   is_read_only=True),
         TextField('phonetic_last_name', field_uri='contacts:PhoneticLastName', supported_from=EXCHANGE_2013,
                   is_read_only=True),
-        EmailField('email_alias', field_uri='contacts:Alias', is_read_only=True),
+        EmailAddressField('email_alias', field_uri='contacts:Alias', is_read_only=True),
         CharField('notes', field_uri='contacts:Notes', supported_from=EXCHANGE_2013, is_read_only=True),
         # Placeholder for Photo
         # Placeholder for UserSMIMECertificate

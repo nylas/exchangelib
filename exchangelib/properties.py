@@ -6,9 +6,9 @@ import logging
 
 from six import text_type, string_types
 
-from .fields import SubField, TextField, EmailField, ChoiceField, DateTimeField, EWSElementField, MailboxField, \
-    Choice, BooleanField, IdField, ExtendedPropertyField, IntegerField, TimeField, EnumField, CharField, \
-    EWSElementListField, EnumListField, WEEKDAY_NAMES
+from .fields import SubField, TextField, EmailAddressField, ChoiceField, DateTimeField, EWSElementField, MailboxField, \
+    Choice, BooleanField, IdField, ExtendedPropertyField, IntegerField, TimeField, EnumField, CharField, EmailField, \
+    EWSElementListField, EnumListField, FreeBusyStatusField, WEEKDAY_NAMES
 from .services import MNS, TNS
 from .util import get_xml_attr, create_element, set_xml_value, value_to_xml_text
 from .version import EXCHANGE_2013
@@ -259,7 +259,7 @@ class Mailbox(EWSElement):
 
     FIELDS = [
         TextField('name', field_uri='Name'),
-        EmailField('email_address', field_uri='EmailAddress'),
+        EmailAddressField('email_address', field_uri='EmailAddress'),
         ChoiceField('routing_type', field_uri='RoutingType', choices={Choice('SMTP')}, default='SMTP'),
         ChoiceField('mailbox_type', field_uri='MailboxType', choices={
             Choice('Mailbox'), Choice('PublicDL'), Choice('PrivateDL'), Choice('Contact'), Choice('PublicFolder'),
@@ -290,7 +290,7 @@ class AvailabilityMailbox(EWSElement):
     ELEMENT_NAME = 'Mailbox'
     FIELDS = [
         TextField('name', field_uri='Name'),
-        EmailField('email_address', field_uri='Address', is_required=True),
+        EmailAddressField('email_address', field_uri='Address', is_required=True),
         ChoiceField('routing_type', field_uri='RoutingType', choices={Choice('SMTP')}, default='SMTP'),
     ]
 
@@ -312,11 +312,6 @@ class Email(AvailabilityMailbox):
     #
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa565868(v=exchg.150).aspx
     ELEMENT_NAME = 'Email'
-    FIELDS = [
-        TextField('name', field_uri='Name'),
-        EmailField('email_address', field_uri='Address', is_required=True),
-        ChoiceField('routing_type', field_uri='RoutingType', choices={Choice('SMTP')}, default='SMTP'),
-    ]
 
     __slots__ = ('name', 'email_address', 'routing_type')
 
@@ -329,7 +324,7 @@ class MailboxData(EWSElement):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa566036(v=exchg.150).aspx
     ELEMENT_NAME = 'MailboxData'
     FIELDS = [
-        EWSElementField('email', value_cls=Email),
+        EmailField('email'),
         ChoiceField('attendee_type', field_uri='AttendeeType', choices={
             Choice('Optional'), Choice('Organizer'), Choice('Required'), Choice('Resource'), Choice('Room')
         }),
@@ -488,19 +483,18 @@ class TimeZone(EWSElement):
 
 class CalendarEvent(EWSElement):
     # MSDN: https://msdn.microsoft.com/en-us/library/aa564053(v=exchg.80).aspx
+    ELEMENT_NAME = 'CalendarEvent'
     FIELDS = [
         DateTimeField('start', field_uri='StartTime'),
         DateTimeField('end', field_uri='EndTime'),
-        ChoiceField('busy_type', field_uri='BusyType', choices={
-            Choice('Free'), Choice('Tentative'), Choice('Busy'), Choice('OOF'), Choice('NoData'),
-            Choice('WorkingElsewhere', supported_from=EXCHANGE_2013)
-        }, is_required=True, default='Busy'),
+        FreeBusyStatusField('busy_type', field_uri='BusyType', is_required=True, default='Busy'),
         # CalendarEventDetails
     ]
 
 
 class WorkingPeriod(EWSElement):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa580377(v=exchg.150).aspx
+    ELEMENT_NAME = 'WorkingPeriod'
     FIELDS = [
         EnumListField('weekdays', field_uri='DayOfWeek', enum=WEEKDAY_NAMES, is_required=True),
         TimeField('start', field_uri='StartTimeInMinutes', is_required=True),
@@ -510,12 +504,15 @@ class WorkingPeriod(EWSElement):
 
 class FreeBusyView(EWSElement):
     # MSDN: https://msdn.microsoft.com/en-us/library/aa565398(v=exchg.80).aspx
+    ELEMENT_NAME = 'FreeBusyView'
+    NAMESPACE = MNS
     FIELDS = [
         ChoiceField('view_type', field_uri='FreeBusyViewType', choices={
             Choice('None'), Choice('MergedOnly'), Choice('FreeBusy'), Choice('FreeBusyMerged'), Choice('Detailed'),
             Choice('DetailedMerged'),
         }, is_required=True),
-        CharField('merged', field_uri='MergedFreeBusyMergedFreeBusy'),
+        # A string of digits. Each digit points to a position in FREE_BUSY_CHOICES
+        CharField('merged', field_uri='MergedFreeBusy'),
         EWSElementListField('calendar_events', field_uri='CalendarEventArray', value_cls=CalendarEvent),
         # WorkingPeriod is located inside WorkingHours element. WorkingHours also has timezone info that we
         # hopefully don't care about.

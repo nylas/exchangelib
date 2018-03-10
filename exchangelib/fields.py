@@ -10,10 +10,10 @@ import logging
 from six import string_types
 
 from .errors import ErrorInvalidServerVersion
-from .ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, NaiveDateTimeNotAllowed, UnknownTimeZone
+from .ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, NaiveDateTimeNotAllowed, UnknownTimeZone, UTC
 from .services import TNS
 from .util import create_element, get_xml_attrs, set_xml_value, value_to_xml_text, is_iterable
-from .version import Build
+from .version import Build, EXCHANGE_2013
 
 string_type = string_types[0]
 log = logging.getLogger(__name__)
@@ -560,9 +560,9 @@ class DateTimeField(FieldURIField):
                     # We encountered a naive datetime. Convert to timezone-aware datetime using the default timezone of
                     # the account.
                     local_dt = e.args[0]
-                    log.info('Encountered naive datetime %s on field %s. Assuming timezone %s', local_dt, self.name,
-                             account.default_timezone)
-                    return account.default_timezone.localize(local_dt)
+                    tz = account.default_timezone if account else UTC
+                    log.info('Found naive datetime %s on field %s. Assuming timezone %s', local_dt, self.name, tz)
+                    return tz.localize(local_dt)
                 log.warning("Cannot convert value '%s' on field '%s' to type %s", val, self.name, self.value_cls)
                 return None
         return self.default
@@ -666,7 +666,7 @@ class URIField(TextField):
     pass
 
 
-class EmailField(CharField):
+class EmailAddressField(CharField):
     # A helper class used for email address string that we can use for email validation
     pass
 
@@ -710,6 +710,16 @@ class ChoiceField(CharField):
 
     def supported_choices(self, version=None):
         return {c.value for c in self.choices if c.supports_version(version)}
+
+
+FREE_BUSY_CHOICES = [Choice('Free'), Choice('Tentative'), Choice('Busy'), Choice('OOF'), Choice('NoData'),
+                     Choice('WorkingElsewhere', supported_from=EXCHANGE_2013)]
+
+
+class FreeBusyStatusField(ChoiceField):
+    def __init__(self, *args, **kwargs):
+        kwargs['choices'] = set(FREE_BUSY_CHOICES)
+        super(FreeBusyStatusField, self).__init__(*args, **kwargs)
 
 
 class BodyField(TextField):
@@ -807,18 +817,15 @@ class MessageHeaderField(EWSElementListField):
         super(MessageHeaderField, self).__init__(*args, **kwargs)
 
 
-class MailboxField(EWSElementField):
-    is_complex = True  # FindItem only returns the name, not the email address
+class BaseEmailField(EWSElementField):
+    # A base class for EWSElement classes that have an 'email_address' field that we want to provide helpers for
 
-    def __init__(self, *args, **kwargs):
-        from .properties import Mailbox
-        kwargs['value_cls'] = Mailbox
-        super(MailboxField, self).__init__(*args, **kwargs)
+    is_complex = True  # FindItem only returns the name, not the email address
 
     def clean(self, value, version=None):
         if isinstance(value, string_types):
             value = self.value_cls(email_address=value)
-        return super(MailboxField, self).clean(value, version=version)
+        return super(BaseEmailField, self).clean(value, version=version)
 
     def from_xml(self, elem, account):
         if self.field_uri is None:
@@ -831,6 +838,24 @@ class MailboxField(EWSElementField):
                 return self.value_cls.from_xml(elem=sub_elem.find(self.value_cls.response_tag()), account=account)
             return self.value_cls.from_xml(elem=sub_elem, account=account)
         return self.default
+
+
+class EmailField(BaseEmailField):
+    is_complex = True  # FindItem only returns the name, not the email address
+
+    def __init__(self, *args, **kwargs):
+        from .properties import Email
+        kwargs['value_cls'] = Email
+        super(EmailField, self).__init__(*args, **kwargs)
+
+
+class MailboxField(BaseEmailField):
+    is_complex = True  # FindItem only returns the name, not the email address
+
+    def __init__(self, *args, **kwargs):
+        from .properties import Mailbox
+        kwargs['value_cls'] = Mailbox
+        super(MailboxField, self).__init__(*args, **kwargs)
 
 
 class MailboxListField(EWSElementListField):
@@ -1002,7 +1027,7 @@ class IndexedField(FieldURIField):
         return hash(self.field_uri)
 
 
-class EmailAddressField(IndexedField):
+class EmailAddressesField(IndexedField):
     is_list = True
 
     PARENT_ELEMENT_NAME = 'EmailAddresses'
@@ -1010,7 +1035,7 @@ class EmailAddressField(IndexedField):
     def __init__(self, *args, **kwargs):
         from .indexed_properties import EmailAddress
         kwargs['value_cls'] = EmailAddress
-        super(EmailAddressField, self).__init__(*args, **kwargs)
+        super(EmailAddressesField, self).__init__(*args, **kwargs)
 
 
 class PhoneNumberField(IndexedField):
