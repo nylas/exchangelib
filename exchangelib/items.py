@@ -336,6 +336,10 @@ class Item(RegisterMixIn):
         if not self.item_id:
             raise ValueError('Item must have an ID')
         res = self.account.bulk_copy(ids=[self], to_folder=to_folder)
+        if len(res) != 1:
+            raise ValueError('Expected result length 1, but got %s' % res)
+        if isinstance(res[0], Exception):
+            raise res[0]
         return res[0]
 
     def move(self, to_folder):
