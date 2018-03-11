@@ -243,6 +243,7 @@ Creating, updating, deleting, sending and moving
     item.soft_delete()  # Delete, but keep a copy in the recoverable items folder
     item.move_to_trash()  # Move to the trash folder
     item.move(account.trash)  # Also moves the item to the trash folder
+    item.copy(account.trash)  # Creates a copy of the item to the trash folder
 
     # You can also send emails. If you don't want a local copy:
     m = Message(
@@ -656,6 +657,30 @@ the ``Account`` model:
 
     data = a.export(items)  # Pass a list of Item instances or (item_id, changekey) tuples
     a.upload((a.inbox, d) for d in data))  # Restore the items. Expects a list of (folder, data) tuples
+
+
+Non-account methods
+^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
+    # Get timezone information from the server
+    a.protocol.get_timezones()
+
+    # Get room lists defined on the server
+    a.protocol.get_roomlists()
+
+    # Get rooms belonging to a specific room list
+    a.protocol.get_rooms(some_roomlist)
+
+    # Get account information for a list of names or email addresses
+    a.protocol.resolve_names(['ann@example.com', 'bart@example.com'])
+
+    # Get availability information for a list of accounts
+    start = tz.localize(EWSDateTime.now())
+    end = tz.localize(EWSDateTime.now() + datetime.timedelta(hours=6))
+    # Create a list of (account, attendee_type, exclude_conflicts) tuples
+    accounts = [(account, 'Organizer', False)]
+    a.protocol.get_free_busy_info(accounts=accounts, start=start, end=end)
 
 
 Troubleshooting
