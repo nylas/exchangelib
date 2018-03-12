@@ -266,6 +266,11 @@ Creating, updating, deleting, sending and moving
     )
     m.send_and_save()
 
+    # Likewise, you can reply to and forward messages
+    m.reply(subject='Re: foo', body='I agree', to_recipients=['carl@example.com', 'denice@example.com'])
+    m.reply_all(subject='Re: foo', body='I agree')
+    m.forward(subject='Fwd: foo', body='Hey, look at this!', to_recipients=['carl@example.com', 'denice@example.com'])
+
     # EWS distinquishes between plain text and HTML body contents. If you want to send HTML body content, use
     # the HTMLBody helper. Clients will see this as HTML and display the body correctly:
     item.body = HTMLBody('<html><body>Hello happy <blink>OWA user!</blink></body></html>')

@@ -9,6 +9,7 @@ HEAD
 new item.
 * We now respect the back off value of an ``ErrorServerBusy`` server error.
 * Added support for fetching free/busy availability information ofr a list of accounts
+* Added ``Message.reply()``, ``Message.reply_all()``, and ``Message.forward()`` methods.
 
 
 1.10.7

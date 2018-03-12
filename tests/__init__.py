@@ -5342,6 +5342,81 @@ class MessagesTest(BaseItemTest):
         self.assertEqual(len(ids), 1)
         self.bulk_delete(ids)
 
+    def test_reply(self):
+        # Test that we can reply to a Message item. EWS only allows items that have been sent to receive a reply
+        item = self.get_test_item()
+        item.folder = None
+        item.send()  # get_test_item() sets the to_recipients to the test account
+        for _ in range(30):
+            try:
+                sent_item = self.account.inbox.get(subject=item.subject)
+                break
+            except DoesNotExist:
+                time.sleep(1)
+        else:
+            assert False, 'Gave up waiting for the sent item to show up in the inbox'
+        new_subject = ('Re: %s' % sent_item.subject)[:255]
+        sent_item.reply(subject=new_subject, body='Hello reply', to_recipients=[item.author])
+        for _ in range(30):
+            try:
+                reply = self.account.inbox.get(subject=new_subject)
+                break
+            except DoesNotExist:
+                time.sleep(1)
+        else:
+            assert False, 'Gave up waiting for the reply to show up in the inbox'
+        self.account.bulk_delete([sent_item, reply])
+
+    def test_reply_all(self):
+        # Test that we can reply-all a Message item. EWS only allows items that have been sent to receive a reply
+        item = self.get_test_item(folder=None)
+        item.folder = None
+        item.send()
+        for _ in range(30):
+            try:
+                sent_item = self.account.inbox.get(subject=item.subject)
+                break
+            except DoesNotExist:
+                time.sleep(1)
+        else:
+            assert False, 'Gave up waiting for the sent item to show up in the inbox'
+        new_subject = ('Re: %s' % sent_item.subject)[:255]
+        sent_item.reply_all(subject=new_subject, body='Hello reply')
+        for _ in range(30):
+            try:
+                reply = self.account.inbox.get(subject=new_subject)
+                break
+            except DoesNotExist:
+                time.sleep(1)
+        else:
+            assert False, 'Gave up waiting for the reply to show up in the inbox'
+        self.account.bulk_delete([sent_item, reply])
+
+    def test_forward(self):
+        # Test that we can forward a Message item. EWS only allows items that have been sent to receive a reply
+        item = self.get_test_item(folder=None)
+        item.folder = None
+        item.send()
+        for _ in range(30):
+            try:
+                sent_item = self.account.inbox.get(subject=item.subject)
+                break
+            except DoesNotExist:
+                time.sleep(1)
+        else:
+            assert False, 'Gave up waiting for the sent item to show up in the inbox'
+        new_subject = ('Re: %s' % sent_item.subject)[:255]
+        sent_item.forward(subject=new_subject, body='Hello reply', to_recipients=[item.author])
+        for _ in range(30):
+            try:
+                reply = self.account.inbox.get(subject=new_subject)
+                break
+            except DoesNotExist:
+                time.sleep(1)
+        else:
+            assert False, 'Gave up waiting for the reply to show up in the inbox'
+        self.account.bulk_delete([sent_item, reply])
+
     def test_mime_content(self):
         # Tests the 'mime_content' field
         subject = get_random_string(16)

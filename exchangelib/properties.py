@@ -253,6 +253,13 @@ class ParentFolderId(ItemId):
     __slots__ = ItemId.__slots__
 
 
+class ReferenceItemId(ItemId):
+    # MSDN: https://msdn.microsoft.com/en-us/library/office/aa564031(v=exchg.150).aspx
+    ELEMENT_NAME = 'ReferenceItemId'
+
+    __slots__ = ItemId.__slots__
+
+
 class Mailbox(EWSElement):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa565036(v=exchg.150).aspx
     ELEMENT_NAME = 'Mailbox'

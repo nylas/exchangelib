@@ -14,10 +14,10 @@ from .fields import BooleanField, IntegerField, DecimalField, Base64Field, TextF
     AttendeesField, Choice, OccurrenceField, OccurrenceListField, MemberListField, EWSElementField, \
     EffectiveRightsField, TimeZoneField, CultureField, IdField, CharField, TextListField, EnumAsIntField, \
     EmailAddressField, FreeBusyStatusField
-from .properties import EWSElement, ItemId, ConversationId, ParentFolderId, Attendee
+from .properties import EWSElement, ItemId, ConversationId, ParentFolderId, Attendee, ReferenceItemId
 from .recurrence import FirstOccurrence, LastOccurrence, Occurrence, DeletedOccurrence
 from .util import is_iterable
-from .version import EXCHANGE_2010, EXCHANGE_2013
+from .version import EXCHANGE_2007_SP1, EXCHANGE_2010, EXCHANGE_2013
 
 string_type = string_types[0]
 log = logging.getLogger(__name__)
@@ -665,6 +665,53 @@ class Message(Item):
                 if res:
                     raise ValueError('Unexpected response in send-only mode')
 
+    def reply(self, subject, body, to_recipients=None, cc_recipients=None, bcc_recipients=None):
+        if not self.account:
+            raise ValueError('Item must have an account')
+        if not self.item_id:
+            raise ValueError('Item must have an ID')
+        if not to_recipients and not self.author:
+            raise ValueError("'to_recipients' must be set when message has no 'author'")
+        ReplyToItem(
+            account=self.account,
+            reference_item_id=ReferenceItemId(id=self.item_id, changekey=self.changekey),
+            subject=subject,
+            new_body=body,
+            to_recipients=to_recipients or [self.author],
+            cc_recipients=cc_recipients,
+            bcc_recipients=bcc_recipients,
+        ).send()
+
+    def reply_all(self, subject, body):
+        if not self.account:
+            raise ValueError('Item must have an account')
+        if not self.item_id:
+            raise ValueError('Item must have an ID')
+        ReplyAllToItem(
+            account=self.account,
+            reference_item_id=ReferenceItemId(id=self.item_id, changekey=self.changekey),
+            subject=subject,
+            new_body=body,
+            to_recipients=self.to_recipients or [self.author],
+            cc_recipients=self.cc_recipients,
+            bcc_recipients=self.bcc_recipients,
+        ).send()
+
+    def forward(self, subject, body, to_recipients, cc_recipients=None, bcc_recipients=None):
+        if not self.account:
+            raise ValueError('Item must have an account')
+        if not self.item_id:
+            raise ValueError('Item must have an ID')
+        ForwardItem(
+            account=self.account,
+            reference_item_id=ReferenceItemId(id=self.item_id, changekey=self.changekey),
+            subject=subject,
+            new_body=body,
+            to_recipients=to_recipients,
+            cc_recipients=cc_recipients,
+            bcc_recipients=bcc_recipients,
+        ).send()
+
 
 class Task(Item):
     """
@@ -881,6 +928,64 @@ class MeetingCancellation(Message):
         DateTimeField('start', field_uri='calendar:Start', is_read_only=True, supported_from=EXCHANGE_2010),
         DateTimeField('end', field_uri='calendar:End', is_read_only=True, supported_from=EXCHANGE_2010),
     ]
+
+
+class BaseReplyItem(EWSElement):
+    # A base class for reply/forward elements that share the same fields
+    FIELDS = [
+        CharField('subject', field_uri='Subject'),
+        BodyField('body', field_uri='Body'),  # Accepts and returns Body or HTMLBody instances
+        MailboxListField('to_recipients', field_uri='ToRecipients'),
+        MailboxListField('cc_recipients', field_uri='CcRecipients'),
+        MailboxListField('bcc_recipients', field_uri='BccRecipients'),
+        BooleanField('is_read_receipt_requested', field_uri='IsReadReceiptRequested'),
+        BooleanField('is_delivery_receipt_requested', field_uri='IsDeliveryReceiptRequested'),
+        MailboxField('author', field_uri='From'),
+        EWSElementField('reference_item_id', value_cls=ReferenceItemId),
+        BodyField('new_body', field_uri='NewBodyContent'),  # Accepts and returns Body or HTMLBody instances
+        MailboxField('received_by', field_uri='ReceivedBy', supported_from=EXCHANGE_2007_SP1),
+        MailboxField('received_by_representing', field_uri='ReceivedRepresenting', supported_from=EXCHANGE_2007_SP1),
+    ]
+
+    def __init__(self, **kwargs):
+        # 'account' is optional but allows calling 'send()'
+        from .account import Account
+        self.account = kwargs.pop('account', None)
+        if self.account is not None and not isinstance(self.account, Account):
+            raise ValueError("'account' %r must be an Account instance" % self.account)
+        super(BaseReplyItem, self).__init__(**kwargs)
+
+    def send(self, save_copy=True, copy_to_folder=None):
+        if not self.account:
+            raise ValueError('Item must have an account')
+        if copy_to_folder:
+            if not save_copy:
+                raise AttributeError("'save_copy' must be True when 'copy_to_folder' is set")
+        message_disposition = SEND_AND_SAVE_COPY if save_copy else SEND_ONLY
+        res = self.account.bulk_create(items=[self], folder=copy_to_folder, message_disposition=message_disposition)
+        if res and isinstance(res[0], Exception):
+            raise res[0]
+
+
+class ReplyToItem(BaseReplyItem):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa580287(v=exchg.150).aspx
+    """
+    ELEMENT_NAME = 'ReplyToItem'
+
+
+class ReplyAllToItem(BaseReplyItem):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa563988(v=exchg.150).aspx
+    """
+    ELEMENT_NAME = 'ReplyAllToItem'
+
+
+class ForwardItem(BaseReplyItem):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa564250(v=exchg.150).aspx
+    """
+    ELEMENT_NAME = 'ForwardItem'
 
 
 ITEM_CLASSES = (CalendarItem, Contact, DistributionList, Message, PostItem, Task, MeetingRequest, MeetingResponse,
