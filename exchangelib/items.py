@@ -14,7 +14,7 @@ from .fields import BooleanField, IntegerField, DecimalField, Base64Field, TextF
     AttendeesField, Choice, OccurrenceField, OccurrenceListField, MemberListField, EWSElementField, \
     EffectiveRightsField, TimeZoneField, CultureField, IdField, CharField, TextListField, EnumAsIntField, \
     EmailAddressField, FreeBusyStatusField
-from .properties import EWSElement, ItemId, ConversationId, ParentFolderId, Attendee, ReferenceItemId
+from .properties import EWSElement, ItemId, ConversationId, ParentFolderId, Attendee, ReferenceItemId, PersonaId
 from .recurrence import FirstOccurrence, LastOccurrence, Occurrence, DeletedOccurrence
 from .util import is_iterable
 from .version import EXCHANGE_2007_SP1, EXCHANGE_2010, EXCHANGE_2013
@@ -984,6 +984,44 @@ class ForwardItem(BaseReplyItem):
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa564250(v=exchg.150).aspx
     """
     ELEMENT_NAME = 'ForwardItem'
+
+
+class Persona(EWSElement):
+    # MSDN: https://msdn.microsoft.com/en-us/library/office/jj191299(v=exchg.150).aspx
+    ELEMENT_NAME = 'Persona'
+    FIELDS = [
+        EWSElementField('persona_id', field_uri='persona:PersonaId', value_cls=PersonaId),
+        TextField('file_as', field_uri='persona:FileAs'),
+        CharField('display_name', field_uri='persona:DisplayName'),
+        CharField('given_name', field_uri='persona:GivenName'),
+        CharField('middle_name', field_uri='persona:MiddleName'),
+        CharField('surname', field_uri='persona:Surname'),
+        TextField('generation', field_uri='persona:Generation'),
+        TextField('nickname', field_uri='persona:Nickname'),
+        TextField('title', field_uri='persona:Title'),
+        TextField('department', field_uri='persona:Department'),
+        TextField('company_name', field_uri='persona:CompanyName'),
+        TextField('im_address', field_uri='persona:ImAddress'),
+        TextField('initials', field_uri='persona:Initials'),
+    ]
+
+    @classmethod
+    def id_from_xml(cls, elem):
+        id_elem = elem.find(PersonaId.response_tag())
+        if id_elem is None:
+            return None, None
+        return id_elem.get(PersonaId.ID_ATTR), id_elem.get(PersonaId.CHANGEKEY_ATTR)
+
+    def __eq__(self, other):
+        if isinstance(other, tuple):
+            return hash(self.persona_id) == hash(other)
+        return super(Persona, self).__eq__(other)
+
+    def __hash__(self):
+        # If we have an item_id and changekey, use that as key. Else return a hash of all attributes
+        if self.persona_id:
+            return hash(self.persona_id)
+        return super(Persona, self).__hash__()
 
 
 ITEM_CLASSES = (CalendarItem, Contact, DistributionList, Message, PostItem, Task, MeetingRequest, MeetingResponse,

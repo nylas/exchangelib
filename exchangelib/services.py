@@ -1332,6 +1332,128 @@ class CopyItem(EWSAccountService):
         return copyitem
 
 
+class FindPeople(EWSAccountService, PagingEWSMixIn):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/jj191039(v=exchg.150).aspx
+    """
+    SERVICE_NAME = 'FindPeople'
+    element_container_name = '{%s}People' % MNS
+    CHUNKSIZE = 100
+
+    def call(self, folder, additional_fields, restriction, order_fields, shape, query_string, depth, page_size,
+             max_items):
+        """
+        Find items in an account.
+
+        :param folder: the Folder object to query
+        :param additional_fields: the extra fields that should be returned with the item, as FieldPath objects
+        :param restriction: a Restriction object for
+        :param order_fields: the fields to sort the results by
+        :param shape: The set of attributes to return
+        :param query_string: a QueryString object
+        :param depth: How deep in the folder structure to search for items
+        :param page_size: The number of items to return per request
+        :param max_items: the max number of items to return
+        :return: XML elements for the matching items
+        """
+        from .items import Persona, IdOnly
+        personas = self._paged_call(payload_func=self.get_payload, max_items=max_items, **dict(
+            folder=folder,
+            additional_fields=additional_fields,
+            restriction=restriction,
+            order_fields=order_fields,
+            query_string=query_string,
+            shape=shape,
+            depth=depth,
+            page_size=page_size,
+        ))
+        if shape == IdOnly and additional_fields is None:
+            for p in personas:
+                yield p if isinstance(p, Exception) else Persona.id_from_xml(p)
+        else:
+            for p in personas:
+                yield p if isinstance(p, Exception) else Persona.from_xml(p, account=self.account)
+
+    def get_payload(self, folder, additional_fields, restriction, order_fields, query_string, shape, depth, page_size,
+                    offset=0):
+        findpeople = create_element('m:%s' % self.SERVICE_NAME, Traversal=depth)
+        personashape = create_element('m:PersonaShape')
+        add_xml_child(personashape, 't:BaseShape', shape)
+        if additional_fields:
+            additional_properties = create_element('t:AdditionalProperties')
+            expanded_fields = chain(*(f.expand(version=self.account.version) for f in additional_fields))
+            set_xml_value(additional_properties, sorted(expanded_fields, key=lambda f: f.path),
+                          version=self.account.version)
+            personashape.append(additional_properties)
+        findpeople.append(personashape)
+        view_type = create_element('m:IndexedPageItemView',
+                                   MaxEntriesReturned=text_type(page_size),
+                                   Offset=text_type(offset),
+                                   BasePoint='Beginning')
+        findpeople.append(view_type)
+        if restriction:
+            findpeople.append(restriction.to_xml(version=self.account.version))
+        if order_fields:
+            sort_order = create_element('m:SortOrder')
+            set_xml_value(sort_order, order_fields, version=self.account.version)
+            findpeople.append(sort_order)
+        parentfolderid = create_element('m:ParentFolderId')
+        set_xml_value(parentfolderid, folder, version=self.account.version)
+        findpeople.append(parentfolderid)
+        if query_string:
+            findpeople.append(query_string.to_xml(version=self.account.version))
+        return findpeople
+
+    def _paged_call(self, payload_func, max_items, **kwargs):
+        account = self.account if isinstance(self, EWSAccountService) else None
+        log_prefix = 'EWS %s, account %s, service %s' % (self.protocol.service_endpoint, account, self.SERVICE_NAME)
+        item_count = 0
+        while True:
+            log.debug('%s: Getting items at offset %s', log_prefix, item_count)
+            kwargs['offset'] = item_count
+            payload = payload_func(**kwargs)
+            response = self._get_response_xml(payload=payload)
+            wait = 0
+            try:
+                rootfolder, total_items = self._get_page(response)
+            except ErrorServerBusy as e:
+                if self.protocol.credentials.fail_fast:
+                    raise
+                if wait > self.protocol.credentials.max_wait:
+                    raise
+                back_off = e.back_off or 60  # Back off 10 seconds if we didn't get an explicit suggested value
+                log.warning('Got ErrorServerBusy from server (will back off %s seconds)', back_off)
+                time.sleep(back_off)
+                wait += back_off
+                continue
+            if isinstance(rootfolder, ElementType):
+                container = rootfolder.find(self.element_container_name)
+                if container is None:
+                    raise TransportError('No %s elements in ResponseMessage (%s)' % (self.element_container_name,
+                                                                                     xml_to_str(rootfolder)))
+                for elem in self._get_elements_in_container(container=container):
+                    item_count += 1
+                    yield elem
+                if max_items and item_count >= max_items:
+                    log.debug("'max_items' count reached")
+                    break
+            if total_items <= 0 or item_count >= total_items:
+                log.debug('Got all items in view')
+                break
+
+    def _get_page(self, response):
+        if len(response) != 1:
+            raise ValueError("Expected single item in 'response', got %s" % response)
+        self._get_element_container(message=response[0])  # Just raise exceptions
+        total_items = int(response[0].find('{%s}TotalNumberOfPeopleInView' % MNS).text)
+        first_matching = int(response[0].find('{%s}FirstMatchingRowIndex' % MNS).text)
+        first_loaded = int(response[0].find('{%s}FirstLoadedRowIndex' % MNS).text)
+        # TODO: Implement paging when we know how it works for this service
+        log.debug('%s: Got page with total items %s, first matching %s, first loaded %s ', self.SERVICE_NAME,
+                  total_items, first_matching, first_loaded)
+        return response[0], total_items
+
+
 class ResolveNames(EWSService):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa565329(v=exchg.150).aspx

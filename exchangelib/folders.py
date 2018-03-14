@@ -14,11 +14,11 @@ from .fields import IntegerField, TextField, DateTimeField, FieldPath, Effective
     EWSElementField
 from .items import Item, CalendarItem, Contact, Message, Task, MeetingRequest, MeetingResponse, MeetingCancellation, \
     DistributionList, RegisterMixIn, ITEM_CLASSES, ITEM_TRAVERSAL_CHOICES, SHAPE_CHOICES, IdOnly, DELETE_TYPE_CHOICES, \
-    HARD_DELETE
+    HARD_DELETE, Persona
 from .properties import ItemId, Mailbox, EWSElement, ParentFolderId
 from .queryset import QuerySet
 from .restriction import Restriction
-from .services import FindFolder, GetFolder, FindItem, CreateFolder, UpdateFolder, DeleteFolder, EmptyFolder
+from .services import FindFolder, GetFolder, FindItem, CreateFolder, UpdateFolder, DeleteFolder, EmptyFolder, FindPeople
 from .transport import TNS, MNS
 
 string_type = string_types[0]
@@ -454,6 +454,65 @@ class Folder(RegisterMixIn):
                     item = self.item_model_from_tag(i.tag).from_xml(elem=i, account=self.account)
                     item.folder = self
                     yield item
+
+    def find_people(self, q, shape=IdOnly, depth=SHALLOW, additional_fields=None, order_fields=None, page_size=None,
+                    max_items=None):
+        """
+        Private method to call the FindPeople service
+
+        :param q: a Q instance containing any restrictions
+        :param shape: controls whether to return (item_id, chanegkey) tuples or Persona objects. If additional_fields is
+               non-null, we always return Persona objects.
+        :param depth: controls the whether to return soft-deleted items or not.
+        :param additional_fields: the extra properties we want on the return objects. Default is no properties.
+        :param order_fields: the SortOrder fields, if any
+        :param page_size: the requested number of items per page
+        :param max_items: the max number of items to return
+        :return: a generator for the returned personas
+        """
+        if shape not in SHAPE_CHOICES:
+            raise ValueError("'shape' %s must be one of %s" % (shape, SHAPE_CHOICES))
+        if depth not in ITEM_TRAVERSAL_CHOICES:
+            raise ValueError("'depth' %s must be one of %s" % (depth, ITEM_TRAVERSAL_CHOICES))
+        if additional_fields:
+            allowed_fields = Persona.supported_fields(version=self.account.version)
+            complex_fields = {f for f in allowed_fields if f.is_complex}
+            for f in additional_fields:
+                if f.field not in allowed_fields:
+                    raise ValueError("'%s' is not a valid field on %s" % (f.field.name, Persona))
+                if f.field in complex_fields:
+                    raise ValueError("find_people() does not support field '%s'" % f.field.name)
+        if page_size is None:
+            # Set a sane default
+            page_size = FindItem.CHUNKSIZE
+        if not isinstance(page_size, int):
+            raise ValueError("'page_size' %r must be an integer" % page_size)
+
+        # Build up any restrictions
+        if q.is_empty():
+            restriction = None
+            query_string = None
+        elif q.query_string:
+            restriction = None
+            query_string = Restriction(q, folder=self)
+        else:
+            restriction = Restriction(q, folder=self)
+            query_string = None
+        personas = FindPeople(self.account).call(
+                folder=self,
+                additional_fields=additional_fields,
+                restriction=restriction,
+                order_fields=order_fields,
+                shape=shape,
+                query_string=query_string,
+                depth=depth,
+                page_size=page_size,
+                max_items=max_items,
+        )
+        for p in personas:
+            if isinstance(p, Exception):
+                raise p
+            yield p
 
     def bulk_create(self, items, *args, **kwargs):
         return self.account.bulk_create(folder=self, items=items, *args, **kwargs)
