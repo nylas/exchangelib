@@ -501,8 +501,10 @@ class Folder(RegisterMixIn):
         self.account.root.update_folder(self)  # Update the folder in the cache
         return None
 
-    def delete(self):
-        res = list(DeleteFolder(account=self.account).call(folders=[self]))
+    def delete(self, delete_type=HARD_DELETE):
+        if delete_type not in DELETE_TYPE_CHOICES:
+            raise ValueError("'delete_type' %s must be one of %s" % (delete_type, DELETE_TYPE_CHOICES))
+        res = list(DeleteFolder(account=self.account).call(folders=[self], delete_type=delete_type))
         if len(res) != 1:
             raise ValueError('Expected result length 1, but got %s' % res)
         if isinstance(res[0], Exception):

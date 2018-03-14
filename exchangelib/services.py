@@ -1179,12 +1179,12 @@ class DeleteFolder(EWSAccountService):
     SERVICE_NAME = 'DeleteFolder'
     element_container_name = None  # DeleteFolder doesn't return a response object, just status in XML attrs
 
-    def call(self, folders):
-        return self._get_elements(payload=self.get_payload(folders=folders))
+    def call(self, folders, delete_type):
+        return self._get_elements(payload=self.get_payload(folders=folders, delete_type=delete_type))
 
-    def get_payload(self, folders):
+    def get_payload(self, folders, delete_type):
         from .folders import FolderId
-        deletefolder = create_element('m:%s' % self.SERVICE_NAME)
+        deletefolder = create_element('m:%s' % self.SERVICE_NAME, DeleteType=delete_type)
         folder_ids = create_element('m:FolderIds')
         is_empty = True
         for folder in folders:
