@@ -385,8 +385,8 @@ class Folder(RegisterMixIn):
         :param shape: controls whether to return (item_id, chanegkey) tuples or Item objects. If additional_fields is
                non-null, we always return Item objects.
         :param depth: controls the whether to return soft-deleted items or not.
-        :param additional_fields: the extra properties we want on the return objects. If None, we'll fetch all fields.
-               Be aware that complex elements can only be fetched with fetch().
+        :param additional_fields: the extra properties we want on the return objects. Default is no properties. Be
+               aware that complex fields can only be fetched with fetch() (i.e. the GetItem service).
         :param order_fields: the SortOrder fields, if any
         :param calendar_view: a CalendarView instance, if any
         :param page_size: the requested number of items per page
