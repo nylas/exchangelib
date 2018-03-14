@@ -626,10 +626,9 @@ class Message(Item):
 
         if self.account.version.build < EXCHANGE_2010 and self.attachments:
             # Exchange 2007 can't send attachments immediately. You need to first save, then attach, then send.
-            # This is done in send_and_save(). Delete to fully emulate send-only behavior.
+            # This is done in send_and_save(). send() will delete the item again.
             self.send_and_save(conflict_resolution=conflict_resolution,
                                send_meeting_invitations=send_meeting_invitations)
-            self.delete()
             return None
 
         res = self._create(message_disposition=SEND_ONLY, send_meeting_invitations=send_meeting_invitations)
