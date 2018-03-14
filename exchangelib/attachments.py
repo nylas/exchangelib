@@ -113,9 +113,9 @@ class Attachment(EWSElement):
         self.attachment_id = None
 
     def __hash__(self):
-        if self.attachment_id is None:
-            return hash(tuple(getattr(self, f) for f in self.__slots__[1:]))
-        return hash(self.attachment_id)
+        if self.attachment_id:
+            return hash(self.attachment_id)
+        return hash(tuple(getattr(self, f) for f in self.__slots__[1:]))
 
     def __repr__(self):
         return self.__class__.__name__ + '(%s)' % ', '.join(

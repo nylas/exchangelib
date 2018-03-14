@@ -446,15 +446,13 @@ class Item(RegisterMixIn):
     def __eq__(self, other):
         if isinstance(other, tuple):
             return hash((self.item_id, self.changekey)) == hash(other)
-        return hash(self) == hash(other)
+        return super(Item, self).__eq__(other)
 
     def __hash__(self):
         # If we have an item_id and changekey, use that as key. Else return a hash of all attributes
         if self.item_id:
             return hash((self.item_id, self.changekey))
-        return hash(tuple(
-            tuple(tuple(getattr(self, f.name) or ()) if f.is_list else getattr(self, f.name) for f in self.FIELDS)
-        ))
+        return super(Item, self).__hash__()
 
 
 @python_2_unicode_compatible
