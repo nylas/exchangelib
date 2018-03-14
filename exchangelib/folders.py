@@ -610,10 +610,12 @@ class Folder(RegisterMixIn):
         if self.is_distinguished or (not self.folder_id and self.has_distinguished_name):
             # Don't add the changekey here. When modifying folder content, we usually don't care if others have changed
             # the folder content since we fetched the changekey.
-            return DistinguishedFolderId(
-                id=self.DISTINGUISHED_FOLDER_ID,
-                mailbox=Mailbox(email_address=self.account.primary_smtp_address)
-            ).to_xml(version=version)
+            if self.account:
+                return DistinguishedFolderId(
+                    id=self.DISTINGUISHED_FOLDER_ID,
+                    mailbox=Mailbox(email_address=self.account.primary_smtp_address)
+                ).to_xml(version=version)
+            return DistinguishedFolderId(id=self.DISTINGUISHED_FOLDER_ID).to_xml(version=version)
         if self.folder_id:
             return FolderId(id=self.folder_id, changekey=self.changekey).to_xml(version=version)
         return super(Folder, self).to_xml(version=version)
