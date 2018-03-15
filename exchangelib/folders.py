@@ -5,6 +5,7 @@ from fnmatch import fnmatch
 import logging
 from operator import attrgetter
 
+from cached_property import threaded_cached_property
 from future.utils import python_2_unicode_compatible
 from six import text_type, string_types
 
@@ -78,8 +79,222 @@ class CalendarView(EWSElement):
             raise ValueError("'start' must be before 'end'")
 
 
+class SearchableMixIn(object):
+    # Implements a search API for inheritance
+    def get(self, *args, **kwargs):
+        raise NotImplementedError()
+
+    def all(self):
+        raise NotImplementedError()
+
+    def none(self):
+        raise NotImplementedError()
+
+    def filter(self, *args, **kwargs):
+        raise NotImplementedError()
+
+    def exclude(self, *args, **kwargs):
+        raise NotImplementedError()
+
+    def view(self, start, end, max_items=None, *args, **kwargs):
+        raise NotImplementedError()
+
+
+class FolderCollection(SearchableMixIn):
+    def __init__(self, account, folders):
+        """ Implements a search API on a collection of folders
+
+        :param account: An Account object
+        :param folders: An iterable of folders, e.g. Folder.walk(), Folder.glob(), or [a.calendar, a.inbox]
+        """
+        self.account = account
+        self._folders = folders
+
+    @threaded_cached_property
+    def folders(self):
+        # Resolve the list of folders, in case it's a generator
+        return list(self._folders)
+
+    def __len__(self):
+        return len(self.folders)
+
+    def __iter__(self):
+        for f in self.folders:
+            yield f
+
+    def get(self, *args, **kwargs):
+        return QuerySet(self).get(*args, **kwargs)
+
+    def all(self):
+        return QuerySet(self).all()
+
+    def none(self):
+        return QuerySet(self).none()
+
+    def filter(self, *args, **kwargs):
+        """
+        Finds items in the folder(s).
+
+        Non-keyword args may be a list of Q instances.
+
+        Optional extra keyword arguments follow a Django-like QuerySet filter syntax (see
+           https://docs.djangoproject.com/en/1.10/ref/models/querysets/#field-lookups).
+
+        We don't support '__year' and other date-related lookups. We also don't support '__endswith' or '__iendswith'.
+
+        We support the additional '__not' lookup in place of Django's exclude() for simple cases. For more complicated
+        cases you need to create a Q object and use ~Q().
+
+        Examples:
+
+            my_account.inbox.filter(datetime_received__gt=EWSDateTime(2016, 1, 1))
+            my_account.calendar.filter(start__range=(EWSDateTime(2016, 1, 1), EWSDateTime(2017, 1, 1)))
+            my_account.tasks.filter(subject='Hi mom')
+            my_account.tasks.filter(subject__not='Hi mom')
+            my_account.tasks.filter(subject__contains='Foo')
+            my_account.tasks.filter(subject__icontains='foo')
+
+        'endswith' and 'iendswith' could be emulated by searching with 'contains' or 'icontains' and then
+        post-processing items. Fetch the field in question with additional_fields and remove items where the search
+        string is not a postfix.
+        """
+        return QuerySet(self).filter(*args, **kwargs)
+
+    def exclude(self, *args, **kwargs):
+        return QuerySet(self).exclude(*args, **kwargs)
+
+    def view(self, start, end, max_items=None, *args, **kwargs):
+        """ Implements the CalendarView option to FindItem. The difference between filter() and view() is that filter()
+        only returns the master CalendarItem for recurring items, while view() unfolds recurring items and returns all
+        CalendarItem occurrences as one would normally expect when presenting a calendar.
+
+        Supports the same semantics as filter, except for 'start' and 'end' keyword attributes which are both required
+        and behave differently than filter. Here, they denote the start and end of the timespan of the view. All items
+        the overlap the timespan are returned (items that end exactly on 'start' are also returned, for some reason).
+
+        EWS does not allow combining CalendarView with search restrictions (filter and exclude).
+
+        'max_items' defines the maximum number of items returned in this view. Optional.
+        """
+        qs = QuerySet(self).filter(*args, **kwargs)
+        qs.calendar_view = CalendarView(start=start, end=end, max_items=max_items)
+        return qs
+
+    def allowed_fields(self):
+        # Return non-ID fields of all item classes allowed in this folder type
+        fields = set()
+        for item_model in self.supported_item_models:
+            fields.update(set(item_model.supported_fields(version=self.account.version if self.account else None)))
+        return fields
+
+    def complex_fields(self):
+        return {f for f in self.allowed_fields() if f.is_complex}
+
+    @property
+    def supported_item_models(self):
+        return tuple(item_model for folder in self.folders for item_model in folder.supported_item_models)
+
+    def find_items(self, q, shape=IdOnly, depth=SHALLOW, additional_fields=None, order_fields=None,
+                   calendar_view=None, page_size=None, max_items=None):
+        """
+        Private method to call the FindItem service
+
+        :param q: a Q instance containing any restrictions
+        :param shape: controls whether to return (item_id, chanegkey) tuples or Item objects. If additional_fields is
+               non-null, we always return Item objects.
+        :param depth: controls the whether to return soft-deleted items or not.
+        :param additional_fields: the extra properties we want on the return objects. Default is no properties. Be
+               aware that complex fields can only be fetched with fetch() (i.e. the GetItem service).
+        :param order_fields: the SortOrder fields, if any
+        :param calendar_view: a CalendarView instance, if any
+        :param page_size: the requested number of items per page
+        :param max_items: the max number of items to return
+        :return: a generator for the returned item IDs or items
+        """
+        if shape not in SHAPE_CHOICES:
+            raise ValueError("'shape' %s must be one of %s" % (shape, SHAPE_CHOICES))
+        if depth not in ITEM_TRAVERSAL_CHOICES:
+            raise ValueError("'depth' %s must be one of %s" % (depth, ITEM_TRAVERSAL_CHOICES))
+        if additional_fields:
+            allowed_fields = self.allowed_fields()
+            complex_fields = self.complex_fields()
+            for f in additional_fields:
+                if f.field not in allowed_fields:
+                    raise ValueError("'%s' is not a valid field on %s" % (f.field.name, self.supported_item_models))
+                if f.field in complex_fields:
+                    raise ValueError("find_items() does not support field '%s'. Use fetch() instead" % f.field.name)
+        if calendar_view is not None and not isinstance(calendar_view, CalendarView):
+            raise ValueError("'calendar_view' %s must be a CalendarView instance" % calendar_view)
+        if page_size is None:
+            # Set a sane default
+            page_size = FindItem.CHUNKSIZE
+        if not isinstance(page_size, int):
+            raise ValueError("'page_size' %r must be an integer" % page_size)
+
+        # Build up any restrictions
+        if q.is_empty():
+            restriction = None
+            query_string = None
+        elif q.query_string:
+            restriction = None
+            query_string = Restriction(q, folders=self.folders)
+        else:
+            restriction = Restriction(q, folders=self.folders)
+            query_string = None
+        log.debug(
+            'Finding %s items un folders %s (shape: %s, depth: %s, additional_fields: %s, restriction: %s)',
+            self.folders,
+            self.account,
+            shape,
+            depth,
+            additional_fields,
+            restriction.q if restriction else None,
+        )
+        items = FindItem(account=self.account, folders=self.folders).call(
+            additional_fields=additional_fields,
+            restriction=restriction,
+            order_fields=order_fields,
+            shape=shape,
+            query_string=query_string,
+            depth=depth,
+            calendar_view=calendar_view,
+            page_size=page_size,
+            max_items=calendar_view.max_items if calendar_view else max_items,
+        )
+        if shape == IdOnly and additional_fields is None:
+            for i in items:
+                yield i if isinstance(i, Exception) else Item.id_from_xml(i)
+        else:
+            for i in items:
+                if isinstance(i, Exception):
+                    yield i
+                else:
+                    item = Folder.item_model_from_tag(i.tag).from_xml(elem=i, account=self.account)
+                    yield item
+
+    def find_folders(self, shape=IdOnly, depth=DEEP):
+        # 'depth' controls whether to return direct children or recurse into sub-folders
+        if not self.account:
+            raise ValueError('Folder must have an account')
+        if shape not in SHAPE_CHOICES:
+            raise ValueError("'shape' %s must be one of %s" % (shape, SHAPE_CHOICES))
+        if depth not in FOLDER_TRAVERSAL_CHOICES:
+            raise ValueError("'depth' %s must be one of %s" % (depth, FOLDER_TRAVERSAL_CHOICES))
+        additional_fields = {
+            FieldPath(field=f) for folder in self.folders for f in folder.supported_fields(version=self.account.version)
+        }
+        # TODO: Support the Restriction class for folders, too
+        return FindFolder(account=self.account, folders=self.folders).call(
+                additional_fields=additional_fields,
+                shape=shape,
+                depth=depth,
+                page_size=100,
+                max_items=None,
+        )
+
+
 @python_2_unicode_compatible
-class Folder(RegisterMixIn):
+class Folder(RegisterMixIn, SearchableMixIn):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa581334(v=exchg.150).aspx
     """
@@ -157,7 +372,7 @@ class Folder(RegisterMixIn):
     def children(self):
         # It's dangerous to return a generator here because we may then call methods on a child that result in the
         # cache being updated while it's iterated.
-        return list(self.account.root.get_children(self))
+        return FolderCollection(account=self.account, folders=self.account.root.get_children(self))
 
     @property
     def parts(self):
@@ -176,13 +391,16 @@ class Folder(RegisterMixIn):
     def absolute(self):
         return ''.join('/%s' % p.name for p in self.parts)
 
-    def walk(self):
+    def _walk(self):
         for c in self.children:
             yield c
             for f in c.walk():
                 yield f
 
-    def glob(self, pattern):
+    def walk(self):
+        return FolderCollection(account=self.account, folders=self._walk())
+
+    def _glob(self, pattern):
         split_pattern = pattern.rsplit('/', 1)
         head, tail = (split_pattern[0], None) if len(split_pattern) == 1 else split_pattern
         if head == '':
@@ -210,6 +428,9 @@ class Folder(RegisterMixIn):
                     continue
                 for f in c.glob(tail):
                     yield f
+
+    def glob(self, pattern):
+        return FolderCollection(account=self.account, folders=self._glob(pattern))
 
     def tree(self):
         """
@@ -279,8 +500,7 @@ class Folder(RegisterMixIn):
         try:
             return cls.ITEM_MODEL_MAP[tag]
         except KeyError:
-            item_model = Folder.ITEM_MODEL_MAP[tag]
-            raise ValueError('Item type %s was unexpected in a %s folder' % (item_model.__name__, cls.__name__))
+            raise ValueError('Item type %s was unexpected in a %s folder' % (cls.__name__, cls.__name__))
 
     def allowed_fields(self):
         # Return non-ID fields of all item classes allowed in this folder type
@@ -335,125 +555,20 @@ class Folder(RegisterMixIn):
                 pass
         raise ValueError("Unknown fieldname '%s' on class '%s'" % (fieldname, cls.__name__))
 
+    def get(self, *args, **kwargs):
+        return FolderCollection(account=self.account, folders=[self]).get(*args, **kwargs)
+
     def all(self):
-        return QuerySet(self).all()
+        return FolderCollection(account=self.account, folders=[self]).all()
 
     def none(self):
-        return QuerySet(self).none()
+        return FolderCollection(account=self.account, folders=[self]).none()
 
     def filter(self, *args, **kwargs):
-        """
-        Finds items in the folder.
-
-        Non-keyword args may be a list of Q instances.
-
-        Optional extra keyword arguments follow a Django-like QuerySet filter syntax (see
-           https://docs.djangoproject.com/en/1.10/ref/models/querysets/#field-lookups).
-
-        We don't support '__year' and other date-related lookups. We also don't support '__endswith' or '__iendswith'.
-
-        We support the additional '__not' lookup in place of Django's exclude() for simple cases. For more complicated
-        cases you need to create a Q object and use ~Q().
-
-        Examples:
-
-            my_account.inbox.filter(datetime_received__gt=EWSDateTime(2016, 1, 1))
-            my_account.calendar.filter(start__range=(EWSDateTime(2016, 1, 1), EWSDateTime(2017, 1, 1)))
-            my_account.tasks.filter(subject='Hi mom')
-            my_account.tasks.filter(subject__not='Hi mom')
-            my_account.tasks.filter(subject__contains='Foo')
-            my_account.tasks.filter(subject__icontains='foo')
-
-        'endswith' and 'iendswith' could be emulated by searching with 'contains' or 'icontains' and then
-        post-processing items. Fetch the field in question with additional_fields and remove items where the search
-        string is not a postfix.
-        """
-        return QuerySet(self).filter(*args, **kwargs)
+        return FolderCollection(account=self.account, folders=[self]).filter(*args, **kwargs)
 
     def exclude(self, *args, **kwargs):
-        return QuerySet(self).exclude(*args, **kwargs)
-
-    def get(self, *args, **kwargs):
-        return QuerySet(self).get(*args, **kwargs)
-
-    def find_items(self, q, shape=IdOnly, depth=SHALLOW, additional_fields=None, order_fields=None,
-                   calendar_view=None, page_size=None, max_items=None):
-        """
-        Private method to call the FindItem service
-
-        :param q: a Q instance containing any restrictions
-        :param shape: controls whether to return (item_id, chanegkey) tuples or Item objects. If additional_fields is
-               non-null, we always return Item objects.
-        :param depth: controls the whether to return soft-deleted items or not.
-        :param additional_fields: the extra properties we want on the return objects. Default is no properties. Be
-               aware that complex fields can only be fetched with fetch() (i.e. the GetItem service).
-        :param order_fields: the SortOrder fields, if any
-        :param calendar_view: a CalendarView instance, if any
-        :param page_size: the requested number of items per page
-        :param max_items: the max number of items to return
-        :return: a generator for the returned item IDs or items
-        """
-        if shape not in SHAPE_CHOICES:
-            raise ValueError("'shape' %s must be one of %s" % (shape, SHAPE_CHOICES))
-        if depth not in ITEM_TRAVERSAL_CHOICES:
-            raise ValueError("'depth' %s must be one of %s" % (depth, ITEM_TRAVERSAL_CHOICES))
-        if additional_fields:
-            allowed_fields = self.allowed_fields()
-            complex_fields = self.complex_fields()
-            for f in additional_fields:
-                if f.field not in allowed_fields:
-                    raise ValueError("'%s' is not a valid field on %s" % (f.field.name, self.supported_item_models))
-                if f.field in complex_fields:
-                    raise ValueError("find_items() does not support field '%s'. Use fetch() instead" % f.field.name)
-        if calendar_view is not None and not isinstance(calendar_view, CalendarView):
-            raise ValueError("'calendar_view' %s must be a CalendarView instance" % calendar_view)
-        if page_size is None:
-            # Set a sane default
-            page_size = FindItem.CHUNKSIZE
-        if not isinstance(page_size, int):
-            raise ValueError("'page_size' %r must be an integer" % page_size)
-
-        # Build up any restrictions
-        if q.is_empty():
-            restriction = None
-            query_string = None
-        elif q.query_string:
-            restriction = None
-            query_string = Restriction(q, folder=self)
-        else:
-            restriction = Restriction(q, folder=self)
-            query_string = None
-        log.debug(
-            'Finding %s items for %s (shape: %s, depth: %s, additional_fields: %s, restriction: %s)',
-            self.DISTINGUISHED_FOLDER_ID,
-            self.account,
-            shape,
-            depth,
-            additional_fields,
-            restriction.q if restriction else None,
-        )
-        items = FindItem(account=self.account, folders=[self]).call(
-            additional_fields=additional_fields,
-            restriction=restriction,
-            order_fields=order_fields,
-            shape=shape,
-            query_string=query_string,
-            depth=depth,
-            calendar_view=calendar_view,
-            page_size=page_size,
-            max_items=calendar_view.max_items if calendar_view else max_items,
-        )
-        if shape == IdOnly and additional_fields is None:
-            for i in items:
-                yield i if isinstance(i, Exception) else Item.id_from_xml(i)
-        else:
-            for i in items:
-                if isinstance(i, Exception):
-                    yield i
-                else:
-                    item = self.item_model_from_tag(i.tag).from_xml(elem=i, account=self.account)
-                    item.folder = self
-                    yield item
+        return FolderCollection(account=self.account, folders=[self]).exclude(*args, **kwargs)
 
     def find_people(self, q, shape=IdOnly, depth=SHALLOW, additional_fields=None, order_fields=None, page_size=None,
                     max_items=None):
@@ -494,9 +609,9 @@ class Folder(RegisterMixIn):
             query_string = None
         elif q.query_string:
             restriction = None
-            query_string = Restriction(q, folder=self)
+            query_string = Restriction(q, folders=[self])
         else:
-            restriction = Restriction(q, folder=self)
+            restriction = Restriction(q, folders=[self])
             query_string = None
         personas = FindPeople(self.account).call(
                 folder=self,
@@ -516,9 +631,6 @@ class Folder(RegisterMixIn):
 
     def bulk_create(self, items, *args, **kwargs):
         return self.account.bulk_create(folder=self, items=items, *args, **kwargs)
-
-    def fetch(self, *args, **kwargs):
-        return self.account.fetch(folder=self, *args, **kwargs)
 
     def save(self, update_fields=None):
         if self.folder_id is None:
@@ -683,24 +795,6 @@ class Folder(RegisterMixIn):
     def supported_fields(cls, version=None):
         return tuple(f for f in cls.FIELDS if f.name not in ('folder_id', 'changekey') and f.supports_version(version))
 
-    def find_folders(self, shape=IdOnly, depth=DEEP):
-        # 'depth' controls whether to return direct children or recurse into sub-folders
-        if not self.account:
-            raise ValueError('Folder must have an account')
-        if shape not in SHAPE_CHOICES:
-            raise ValueError("'shape' %s must be one of %s" % (shape, SHAPE_CHOICES))
-        if depth not in FOLDER_TRAVERSAL_CHOICES:
-            raise ValueError("'depth' %s must be one of %s" % (depth, FOLDER_TRAVERSAL_CHOICES))
-        additional_fields = [FieldPath(field=f) for f in self.supported_fields(version=self.account.version)]
-        # TODO: Support the Restriction class for folders, too
-        return FindFolder(account=self.account, folders=[self]).call(
-                additional_fields=additional_fields,
-                shape=shape,
-                depth=depth,
-                page_size=100,
-                max_items=None,
-        )
-
     @classmethod
     def get_folders(cls, account, folders, additional_fields=None):
         """ 'folders' is an iterable of Folder instances """
@@ -846,7 +940,7 @@ class Root(Folder):
                     # This is just a distinguished folder the server does not have
                     continue
                 folders_map[f.folder_id] = f
-            for f in self.find_folders(depth=DEEP):
+            for f in FolderCollection(account=self.account, folders=[self]).find_folders(depth=DEEP):
                 if isinstance(f, Exception):
                     raise f
                 if f.folder_id in folders_map:
@@ -939,22 +1033,8 @@ class Calendar(Folder):
         'sv_SE': (u'Kalender',),
     }
 
-    def view(self, start, end, max_items=None, *args, **kwargs):
-        """ Implements the CalendarView option to FindItem. The difference between filter() and view() is that filter()
-        only returns the master CalendarItem for recurring items, while view() unfolds recurring items and returns all
-        CalendarItem occurrences as one would normally expect when presenting a calendar.
-
-        Supports the same semantics as filter, except for 'start' and 'end' keyword attributes which are both required
-        and behave differently than filter. Here, they denote the start and end of the timespan of the view. All items
-        the overlap the timespan are returned (items that end exactly on 'start' are also returned, for some reason).
-
-        EWS does not allow combining CalendarView with search restrictions (filter and exclude).
-
-        'max_items' defines the maximum number of items returned in this view. Optional.
-        """
-        qs = QuerySet(self).filter(*args, **kwargs)
-        qs.calendar_view = CalendarView(start=start, end=end, max_items=max_items)
-        return qs
+    def view(self, *args, **kwargs):
+        return FolderCollection(account=self.account, folders=[self]).view(*args, **kwargs)
 
 
 class DeletedItems(Folder):

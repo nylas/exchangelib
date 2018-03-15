@@ -327,7 +327,7 @@ class Q(object):
         if issubclass(field_path.field.value_cls, MultiFieldIndexedElement) and not field_path.subfield:
             raise ValueError("Field path '%s' must contain a subfield" % self.field_path)
 
-    def to_xml(self, folder, version):
+    def to_xml(self, folders, version):
         if self.query_string:
             if version.build < EXCHANGE_2010:
                 raise NotImplementedError('QueryString filtering is only supported for Exchange 2010 servers and later')
@@ -335,14 +335,14 @@ class Q(object):
             elem.text = self.query_string
             return elem
         # Translate this Q object to a valid Restriction XML tree
-        elem = self.xml_elem(folder=folder, version=version)
+        elem = self.xml_elem(folders=folders, version=version)
         if elem is None:
             return None
         restriction = create_element('m:Restriction')
         restriction.append(elem)
         return restriction
 
-    def xml_elem(self, folder, version):
+    def xml_elem(self, folders, version):
         # Recursively build an XML tree structure of this Q object. If this is an empty leaf (the equivalent of Q()),
         # return None.
         from .fields import FieldPath
@@ -351,8 +351,15 @@ class Q(object):
             return None
         if self.is_leaf():
             elem = self._op_to_xml(self.op)
-            field_path = FieldPath.from_string(self.field_path, folder=folder)
-            self._validate_field_path(field_path=field_path, folder=folder)
+            for folder in folders:
+                try:
+                    field_path = FieldPath.from_string(self.field_path, folder=folder)
+                except ValueError:
+                    continue
+                self._validate_field_path(field_path=field_path, folder=folder)
+                break
+            else:
+                raise ValueError("Unknown fieldname '%s' on folders '%s'" % (self.field_path, folders))
             if self.op == self.EXISTS:
                 value = self.value
             else:
@@ -379,13 +386,13 @@ class Q(object):
                     elem.append(uriorconst)
         elif len(self.children) == 1:
             # We have only one child
-            elem = self.children[0].xml_elem(folder=folder, version=version)
+            elem = self.children[0].xml_elem(folders=folders, version=version)
         else:
             # We have multiple children. If conn_type is NOT, then group children with AND. We'll add the NOT later
             elem = self._conn_to_xml(self.AND if self.conn_type == self.NOT else self.conn_type)
             # Sort children by field name so we get stable output (for easier testing). Children should never be empty
             for c in sorted(self.children, key=lambda i: i.field_path or ''):
-                elem.append(c.xml_elem(folder=folder, version=version))
+                elem.append(c.xml_elem(folders=folders, version=version))
         if elem is None:
             return None  # Should not be necessary, but play safe
         if self.conn_type == self.NOT:
@@ -459,19 +466,20 @@ class Restriction(object):
 
     """
 
-    def __init__(self, q, folder):
+    def __init__(self, q, folders):
         if not isinstance(q, Q):
             raise ValueError("'q' value %r must be a Q instance" % q)
         if q.is_empty():
             raise ValueError("Q object must not be empty")
         from .folders import Folder
-        if not isinstance(folder, Folder):
-            raise ValueError("'folder' value %r must be a Folder instance" % folder)
+        for folder in folders:
+            if not isinstance(folder, Folder):
+                raise ValueError("'folder' value %r must be a Folder instance" % folder)
         self.q = q
-        self.folder = folder
+        self.folders = folders
 
     def to_xml(self, version):
-        return self.q.to_xml(folder=self.folder, version=version)
+        return self.q.to_xml(folders=self.folders, version=version)
 
     def __str__(self):
         """

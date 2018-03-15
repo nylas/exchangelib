@@ -37,8 +37,11 @@ class QuerySet(object):
     NONE = 'none'
     RETURN_TYPES = (VALUES, VALUES_LIST, FLAT, NONE)
 
-    def __init__(self, folder):
-        self.folder = folder
+    def __init__(self, folder_collection):
+        from .folders import FolderCollection
+        if not isinstance(folder_collection, FolderCollection):
+            raise ValueError("folder_collection value '%s' must be a FolderCollection instance" % folder_collection)
+        self.folder_collection = folder_collection  # A FolderCollection instance
         self.q = Q()  # Default to no restrictions. 'None' means 'return nothing'
         self.only_fields = None
         self.order_fields = None
@@ -68,25 +71,45 @@ class QuerySet(object):
         if self.return_format not in self.RETURN_TYPES:
             raise ValueError("self.return_value '%s' must be one of %s" % (self.return_format, self.RETURN_TYPES))
         # Only mutable objects need to be deepcopied. Folder should be the same object
-        new_qs = self.__class__(self.folder)
+        new_qs = self.__class__(self.folder_collection)
         new_qs.q = None if self.q is None else deepcopy(self.q)
         new_qs.only_fields = self.only_fields
         new_qs.order_fields = None if self.order_fields is None else deepcopy(self.order_fields)
         new_qs.return_format = self.return_format
         new_qs.calendar_view = self.calendar_view
+        new_qs.page_size = self.page_size
+        new_qs.max_items = self.max_items
         return new_qs
 
     @property
     def is_cached(self):
         return self._cache is not None
 
+    def _get_field_path(self, s):
+        for folder in self.folder_collection:
+            try:
+                return FieldPath.from_string(s, folder=folder)
+            except ValueError:
+                pass
+        else:
+            raise ValueError("Unknown fieldname '%s' on folders '%s'" % (s, self.folder_collection.folders))
+
+    def _get_field_order(self, s):
+        for folder in self.folder_collection:
+            try:
+                return FieldOrder.from_string(s, folder=folder)
+            except ValueError:
+                pass
+        else:
+            raise ValueError("Unknown fieldname '%s' on folders '%s'" % (s, self.folder_collection.folders))
+
     @property
     def _item_id_field(self):
-        return FieldPath.from_string('item_id', folder=self.folder)
+        return self._get_field_path('item_id')
 
     @property
     def _changekey_field(self):
-        return FieldPath.from_string('changekey', folder=self.folder)
+        return self._get_field_path('changekey')
 
     def _additional_fields(self):
         if not isinstance(self.only_fields, tuple):
@@ -98,7 +121,7 @@ class QuerySet(object):
         has_start = 'start' in {f.field.name for f in additional_fields}
         has_end = 'end' in {f.field.name for f in additional_fields}
         meeting_tz_field, start_tz_field, end_tz_field = CalendarItem.timezone_fields()
-        if self.folder.account.version.build < EXCHANGE_2010:
+        if self.folder_collection.account.version.build < EXCHANGE_2010:
             if has_start or has_end:
                 additional_fields.add(FieldPath(field=meeting_tz_field))
         else:
@@ -111,11 +134,12 @@ class QuerySet(object):
     def _query(self):
         if self.only_fields is None:
             # We didn't restrict list of field paths. Get all fields from the server, including extended properties.
-            additional_fields = {FieldPath(field=f) for f in self.folder.allowed_fields()}
+            additional_fields = {FieldPath(field=f) for f in self.folder_collection.allowed_fields()}
             complex_fields_requested = True
         else:
             additional_fields = self._additional_fields()
-            complex_fields_requested = bool(set(f.field for f in additional_fields) & self.folder.complex_fields())
+            complex_fields_requested = \
+                bool(set(f.field for f in additional_fields) & self.folder_collection.complex_fields())
 
         # EWS can do server-side sorting on multiple fields. A caveat is that server-side sorting is not supported
         # for calendar views. In this case, we do all the sorting client-side.
@@ -147,8 +171,8 @@ class QuerySet(object):
             # The FindItem service does not support complex field types. Tell find_items() to return
             # (item_id, changekey) tuples, and pass that to fetch().
             find_item_kwargs['additional_fields'] = None
-            items = self.folder.fetch(
-                ids=self.folder.find_items(self.q, **find_item_kwargs),
+            items = self.folder_collection.account.fetch(
+                ids=self.folder_collection.find_items(self.q, **find_item_kwargs),
                 only_fields=additional_fields
             )
         else:
@@ -157,7 +181,7 @@ class QuerySet(object):
                 # take a shortcut by using (shape=IdOnly, additional_fields=None) to tell find_items() to return
                 # (item_id, changekey) tuples. We'll post-process those later.
                 find_item_kwargs['additional_fields'] = None
-            items = self.folder.find_items(self.q, **find_item_kwargs)
+            items = self.folder_collection.find_items(self.q, **find_item_kwargs)
         if not must_sort_clientside:
             return items
 
@@ -444,7 +468,7 @@ class QuerySet(object):
     def only(self, *args):
         """ Fetch only the specified field names. All other item fields will be 'None' """
         try:
-            only_fields = tuple(FieldPath.from_string(arg, folder=self.folder) for arg in args)
+            only_fields = tuple(self._get_field_path(arg) for arg in args)
         except ValueError as e:
             raise ValueError("%s in only()" % e.args[0])
         new_qs = self.copy()
@@ -456,7 +480,7 @@ class QuerySet(object):
         in reverse order. EWS only supports server-side sorting on a single field. Sorting on multiple fields is
         implemented client-side and will therefore make the query greedy """
         try:
-            order_fields = tuple(FieldOrder.from_string(arg, folder=self.folder) for arg in args)
+            order_fields = tuple(self._get_field_order(arg) for arg in args)
         except ValueError as e:
             raise ValueError("%s in order_by()" % e.args[0])
         new_qs = self.copy()
@@ -475,7 +499,7 @@ class QuerySet(object):
     def values(self, *args):
         """ Return the values of the specified field names as dicts """
         try:
-            only_fields = tuple(FieldPath.from_string(arg, folder=self.folder) for arg in args)
+            only_fields = tuple(self._get_field_path(arg) for arg in args)
         except ValueError as e:
             raise ValueError("%s in values()" % e.args[0])
         new_qs = self.copy()
@@ -494,7 +518,7 @@ class QuerySet(object):
         if flat and len(args) != 1:
             raise ValueError('flat=True requires exactly one field name')
         try:
-            only_fields = tuple(FieldPath.from_string(arg, folder=self.folder) for arg in args)
+            only_fields = tuple(self._get_field_path(arg) for arg in args)
         except ValueError as e:
             raise ValueError("%s in values_list()" % e.args[0])
         new_qs = self.copy()
@@ -526,9 +550,10 @@ class QuerySet(object):
         elif not args and set(kwargs.keys()) in ({'item_id'}, {'item_id', 'changekey'}):
             # We allow calling get(item_id=..., changekey=...) to get a single item, but only if exactly these two
             # kwargs are present.
-            item_id = self._item_id_field.field.clean(kwargs['item_id'], version=self.folder.account.version)
-            changekey = self._changekey_field.field.clean(kwargs.get('changekey'), version=self.folder.account.version)
-            items = list(self.folder.fetch(ids=[(item_id, changekey)], only_fields=self.only_fields))
+            account = self.folder_collection.account
+            item_id = self._item_id_field.field.clean(kwargs['item_id'], version=account.version)
+            changekey = self._changekey_field.field.clean(kwargs.get('changekey'), version=account.version)
+            items = list(account.fetch(ids=[(item_id, changekey)], only_fields=self.only_fields))
         else:
             new_qs = self.filter(*args, **kwargs)
             items = list(new_qs.__iter__())
@@ -552,14 +577,17 @@ class QuerySet(object):
 
     def exists(self):
         """ Find out if the query contains any hits, with as little effort as possible """
-        return self.count() > 0
+        new_qs = self.copy()
+        new_qs.page_size = 1
+        new_qs.max_items = 1
+        return new_qs.count() > 0
 
     def delete(self, page_size=1000):
         """ Delete the items matching the query, with as little effort as possible. 'page_size' is the number of items
         to fetch from the server per request. We're only fetching the IDs, so keep it high"""
         from .items import ALL_OCCURRENCIES
         if self.is_cached:
-            res = self.folder.account.bulk_delete(ids=self._cache, affected_task_occurrences=ALL_OCCURRENCIES)
+            res = self.folder_collection.account.bulk_delete(ids=self._cache, affected_task_occurrences=ALL_OCCURRENCIES)
             self._cache = None  # Invalidate the cache after delete, regardless of the results
             return res
         new_qs = self.copy()
@@ -567,10 +595,10 @@ class QuerySet(object):
         new_qs.order_fields = None
         new_qs.return_format = self.NONE
         new_qs.page_size = page_size
-        return self.folder.account.bulk_delete(ids=new_qs, affected_task_occurrences=ALL_OCCURRENCIES)
+        return self.folder_collection.account.bulk_delete(ids=new_qs, affected_task_occurrences=ALL_OCCURRENCIES)
 
     def __str__(self):
-        fmt_args = [('q', self.q), ('folder', self.folder)]
+        fmt_args = [('q', self.q), ('folders', '[%s]' % ', '.join(str(f) for f in self.folder_collection.folders))]
         if self.is_cached:
             fmt_args.append(('len', len(self)))
         return self.__class__.__name__ + '(%s)' % ', '.join('%s=%s' % (k, v) for k, v in fmt_args)

@@ -54,7 +54,7 @@ from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextFie
 from exchangelib.folders import Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Messages, Tasks, \
     Contacts, Folder, RecipientCache, GALContacts, System, AllContacts, MyContactsExtended, Reminders, Favorites, \
     AllItems, ConversationSettings, Friends, RSSFeeds, Sharing, IMContactList, QuickContacts, Journal, Notes, \
-    SyncIssues, MyContacts, ToDoSearch
+    SyncIssues, MyContacts, ToDoSearch, FolderCollection
 from exchangelib.indexed_properties import EmailAddress, PhysicalAddress, PhoneNumber, \
     SingleFieldIndexedElement, MultiFieldIndexedElement
 from exchangelib.items import Item, CalendarItem, Message, Contact, Task, DistributionList
@@ -849,13 +849,13 @@ class RestrictionTest(unittest.TestCase):
     </t:And>
 </m:Restriction>'''
         q = Q(Q(categories__contains='FOO') | Q(categories__contains='BAR'), start__lt=end, end__gt=start)
-        r = Restriction(q, folder=Calendar())
+        r = Restriction(q, folders=[Calendar()])
         self.assertEqual(str(r), ''.join(l.lstrip() for l in result.split('\n')))
         # Test empty Q
         q = Q()
-        self.assertEqual(q.to_xml(folder=Calendar(), version=None), None)
+        self.assertEqual(q.to_xml(folders=[Calendar()], version=None), None)
         with self.assertRaises(ValueError):
-            Restriction(q, folder=Calendar())
+            Restriction(q, folders=[Calendar()])
         # Test validation
         with self.assertRaises(ValueError):
             Q(datetime_created__range=(1,))  # Must have exactly 2 args
@@ -923,7 +923,7 @@ class RestrictionTest(unittest.TestCase):
 </m:Restriction>'''
         q = ~(Q(subject='bar') | Q(subject='baz'))
         self.assertEqual(
-            xml_to_str(q.to_xml(folder=Calendar(), version=None)),
+            xml_to_str(q.to_xml(folders=[Calendar()], version=None)),
             ''.join(l.lstrip() for l in result.split('\n'))
         )
 
@@ -940,8 +940,10 @@ class RestrictionTest(unittest.TestCase):
 class QuerySetTest(unittest.TestCase):
     def test_magic(self):
         self.assertEqual(
-            str(QuerySet(folder=Inbox(account='XXX', name='FooBox'))),
-            'QuerySet(q=Q(), folder=Inbox (FooBox))'
+            str(QuerySet(
+                folder_collection=FolderCollection(account=None, folders=[Inbox(account='XXX', name='FooBox')]))
+            ),
+            'QuerySet(q=Q(), folders=[Inbox (FooBox)])'
         )
 
     def test_from_folder(self):
@@ -952,7 +954,7 @@ class QuerySetTest(unittest.TestCase):
         self.assertIsInstance(folder.exclude(subject='foo'), QuerySet)
 
     def test_queryset_copy(self):
-        qs = QuerySet(folder=Inbox(account='XXX'))
+        qs = QuerySet(folder_collection=FolderCollection(account=None, folders=[Inbox(account='XXX')]))
         qs.q = Q()
         qs.only_fields = ('a', 'b')
         qs.order_fields = ('c', 'd')
@@ -961,7 +963,7 @@ class QuerySetTest(unittest.TestCase):
         # Initially, immutable items have the same id()
         new_qs = qs.copy()
         self.assertNotEqual(id(qs), id(new_qs))
-        self.assertEqual(id(qs.folder), id(new_qs.folder))
+        self.assertEqual(id(qs.folder_collection), id(new_qs.folder_collection))
         self.assertEqual(id(qs._cache), id(new_qs._cache))
         self.assertEqual(qs._cache, new_qs._cache)
         self.assertNotEqual(id(qs.q), id(new_qs.q))
@@ -2525,7 +2527,7 @@ class FolderTest(EWSTest):
                 f.get_item_field_by_fieldname('XXX')
 
     def test_find_folders(self):
-        folders = list(self.account.root.find_folders())
+        folders = list(FolderCollection(account=self.account, folders=[self.account.root]).find_folders())
         self.assertGreater(len(folders), 40, sorted(f.name for f in folders))
 
     def test_folder_grouping(self):
@@ -2681,6 +2683,11 @@ class FolderTest(EWSTest):
         self.assertGreaterEqual(len(list(self.account.contacts.glob('../*'))), 5)
         self.assertEqual(len(list(self.account.root.glob('**/%s' % self.account.contacts.name))), 1)
         self.assertEqual(len(list(self.account.root.glob('Top of*/%s' % self.account.contacts.name))), 1)
+
+    def test_collection_filtering(self):
+        self.assertGreaterEqual(self.account.root.tois.children.all().exists(), 0)
+        self.assertGreaterEqual(self.account.root.tois.walk().all().exists(), 0)
+        self.assertGreaterEqual(self.account.root.tois.glob('*').all().exists(), 0)
 
     def test_div_navigation(self):
         self.assertEqual(
@@ -3118,7 +3125,9 @@ class BaseItemTest(EWSTest):
             item.subject = 'Item %s' % i
             item.save()
             test_items.append(item)
-        qs = QuerySet(self.test_folder).filter(categories__contains=self.categories)
+        qs = QuerySet(
+            folder_collection=FolderCollection(account=self.account, folders=[self.test_folder])
+        ).filter(categories__contains=self.categories)
         test_cat = self.categories[0]
         self.assertEqual(
             set((i.subject, i.categories[0]) for i in qs),
@@ -3277,7 +3286,9 @@ class BaseItemTest(EWSTest):
             item.subject = 'Item %s' % i
             item.save()
             test_items.append(item)
-        qs = QuerySet(self.test_folder).filter(categories__contains=self.categories).order_by('subject')
+        qs = QuerySet(
+            folder_collection=FolderCollection(account=self.account, folders=[self.test_folder])
+        ).filter(categories__contains=self.categories).order_by('subject')
         for _ in qs:
             # Build up the cache
             pass
@@ -3362,7 +3373,9 @@ class BaseItemTest(EWSTest):
                 f.is_searchable = False
 
     def test_queryset_failure(self):
-        qs = QuerySet(self.test_folder).filter(categories__contains=self.categories)
+        qs = QuerySet(
+            folder_collection=FolderCollection(account=self.account, folders=[self.test_folder])
+        ).filter(categories__contains=self.categories)
         with self.assertRaises(ValueError):
             qs.order_by('XXX')
         with self.assertRaises(ValueError):
@@ -3377,7 +3390,9 @@ class BaseItemTest(EWSTest):
     def test_order_by_failure(self):
         # Test error handling on indexed properties with labels and subfields
         if self.ITEM_CLASS == Contact:
-            qs = QuerySet(self.test_folder).filter(categories__contains=self.categories)
+            qs = QuerySet(
+                folder_collection=FolderCollection(account=self.account, folders=[self.test_folder])
+            ).filter(categories__contains=self.categories)
             with self.assertRaises(ValueError):
                 qs.order_by('email_addresses')  # Must have label
             with self.assertRaises(ValueError):
@@ -3397,7 +3412,9 @@ class BaseItemTest(EWSTest):
             item.subject = 'Subj %s' % i
             test_items.append(item)
         self.test_folder.bulk_create(items=test_items)
-        qs = QuerySet(self.test_folder).filter(categories__contains=self.categories)
+        qs = QuerySet(
+            folder_collection=FolderCollection(account=self.account, folders=[self.test_folder])
+        ).filter(categories__contains=self.categories)
         self.assertEqual(
             [i for i in qs.order_by('subject').values_list('subject', flat=True)],
             ['Subj 0', 'Subj 1', 'Subj 2', 'Subj 3']
@@ -3415,7 +3432,9 @@ class BaseItemTest(EWSTest):
             item.extern_id = 'ID %s' % i
             test_items.append(item)
         self.test_folder.bulk_create(items=test_items)
-        qs = QuerySet(self.test_folder).filter(categories__contains=self.categories)
+        qs = QuerySet(
+            folder_collection=FolderCollection(account=self.account, folders=[self.test_folder])
+        ).filter(categories__contains=self.categories)
         self.assertEqual(
             [i for i in qs.order_by('extern_id').values_list('extern_id', flat=True)],
             ['ID 0', 'ID 1', 'ID 2', 'ID 3']
@@ -3435,7 +3454,9 @@ class BaseItemTest(EWSTest):
                 item.email_addresses = [EmailAddress(email='%s@foo.com' % i, label=label)]
                 test_items.append(item)
             self.test_folder.bulk_create(items=test_items)
-            qs = QuerySet(self.test_folder).filter(categories__contains=self.categories)
+            qs = QuerySet(
+                folder_collection=FolderCollection(account=self.account, folders=[self.test_folder])
+            ).filter(categories__contains=self.categories)
             self.assertEqual(
                 [i[0].email for i in qs.order_by('email_addresses__%s' % label)
                     .values_list('email_addresses', flat=True)],
@@ -3455,7 +3476,9 @@ class BaseItemTest(EWSTest):
                 item.physical_addresses = [PhysicalAddress(street='Elm St %s' % i, label=label)]
                 test_items.append(item)
             self.test_folder.bulk_create(items=test_items)
-            qs = QuerySet(self.test_folder).filter(categories__contains=self.categories)
+            qs = QuerySet(
+                folder_collection=FolderCollection(account=self.account, folders=[self.test_folder])
+            ).filter(categories__contains=self.categories)
             self.assertEqual(
                 [i[0].street for i in qs.order_by('physical_addresses__%s__street' % label)
                     .values_list('physical_addresses', flat=True)],
@@ -3477,7 +3500,9 @@ class BaseItemTest(EWSTest):
                 item.extern_id = 'ID %s' % j
                 test_items.append(item)
         self.test_folder.bulk_create(items=test_items)
-        qs = QuerySet(self.test_folder).filter(categories__contains=self.categories)
+        qs = QuerySet(
+            folder_collection=FolderCollection(account=self.account, folders=[self.test_folder])
+        ).filter(categories__contains=self.categories)
         self.assertEqual(
             [i for i in qs.order_by('subject', 'extern_id').values('subject', 'extern_id')],
             [{'subject': 'Subj 0', 'extern_id': 'ID 0'},

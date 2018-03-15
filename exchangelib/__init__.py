@@ -8,7 +8,7 @@ from .configuration import Configuration
 from .credentials import DELEGATE, IMPERSONATION, Credentials, ServiceAccount
 from .ewsdatetime import EWSDate, EWSDateTime, EWSTimeZone, UTC, UTC_NOW
 from .extended_properties import ExtendedProperty, ExternId
-from .folders import Folder, SHALLOW, DEEP
+from .folders import Folder, FolderCollection, SHALLOW, DEEP
 from .items import CalendarItem, Contact, DistributionList, Message, PostItem, Task
 from .properties import Body, HTMLBody, ItemId, Mailbox, Attendee, Room, RoomList
 from .restriction import Q
@@ -27,7 +27,7 @@ __all__ = [
     'ItemId', 'Mailbox', 'Attendee', 'Room', 'RoomList', 'Body', 'HTMLBody',
     'OofSettings',
     'Q',
-    'Folder', 'SHALLOW', 'DEEP',
+    'Folder', 'FolderCollection', 'SHALLOW', 'DEEP',
     'BASIC', 'DIGEST', 'NTLM',
     'Build', 'Version',
 ]

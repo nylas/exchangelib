@@ -50,7 +50,7 @@ Setup and connecting
     from exchangelib import DELEGATE, IMPERSONATION, Account, Credentials, ServiceAccount, \
         EWSDateTime, EWSTimeZone, Configuration, NTLM, CalendarItem, Message, \
         Mailbox, Attendee, Q, ExtendedProperty, FileAttachment, ItemAttachment, \
-        HTMLBody, Build, Version
+        HTMLBody, Build, Version, FolderCollection
 
     # Specify your credentials. Username is usually in WINDOMAIN\username format, where WINDOMAIN is
     # the name of the Windows Domain your username is connected to, but some servers also
@@ -436,6 +436,13 @@ Here are some examples of using the API:
     )
     for item in items:
         print(item.start, item.end, item.subject, item.body, item.location)
+
+    # The filtering syntax also works on collections of folders, so you can search multiple folders in a single request
+    my_folder.children.filter(subject='foo')
+    my_folder.walk().filter(subject='foo')
+    my_folder.glob('foo*').filter(subject='foo')
+    # Or select the folders individually
+    FolderCollection(account=account, folders=[account.inbox, account.calendar]).filter(subject='foo')
 
 
 Extended properties

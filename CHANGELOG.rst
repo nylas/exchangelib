@@ -5,11 +5,13 @@ Change Log
 HEAD
 ----
 * Removed ``Folder.get_folder_by_name()`` which has been deprecated since version ``1.10.2``.
-* Added ``Item.copy(to_folder=some_folder)`` method which copies an item to the given folder and 
+* Added ``Item.copy(to_folder=some_folder)`` method which copies an item to the given folder and
   returns the ID of the new item.
 * We now respect the back off value of an ``ErrorServerBusy`` server error.
 * Added support for fetching free/busy availability information ofr a list of accounts.
 * Added ``Message.reply()``, ``Message.reply_all()``, and ``Message.forward()`` methods.
+* The full search API now works on single folders *and* collections of folders, e.g.
+  ``some_folder.glob('foo*').filter()``, ``some_folder.children.filter()`` and ``some_folder.walk().filter()``.
 
 
 1.10.7

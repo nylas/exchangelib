@@ -336,6 +336,8 @@ class EWSAccountService(EWSService):
 class EWSFolderService(EWSAccountService):
 
     def __init__(self, account, folders):
+        if not folders:
+            raise ValueError('"folders" must not be empty')
         self.folders = folders
         super(EWSFolderService, self).__init__(account=account)
 
