@@ -577,10 +577,11 @@ class QuerySet(object):
 
     def exists(self):
         """ Find out if the query contains any hits, with as little effort as possible """
+        if self.is_cached:
+            return len(self._cache) > 0
         new_qs = self.copy()
-        new_qs.page_size = 1
         new_qs.max_items = 1
-        return new_qs.count() > 0
+        return new_qs.count(page_size=1) > 0
 
     def delete(self, page_size=1000):
         """ Delete the items matching the query, with as little effort as possible. 'page_size' is the number of items
