@@ -527,7 +527,7 @@ class QuerySet(object):
     # Methods that end chaining
     #
     ###########################
-    def iterator(self, page_size=None):
+    def iterator(self):
         """ Return the query result as an iterator, without caching the result. 'page_size' is the number of items to
         fetch from the server per request. """
         if self.q is None:
