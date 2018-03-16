@@ -982,7 +982,7 @@ class QuerySetTest(unittest.TestCase):
         new_qs.return_format = QuerySet.NONE
 
         self.assertNotEqual(id(qs), id(new_qs))
-        self.assertEqual(id(qs.folder), id(new_qs.folder))
+        self.assertEqual(id(qs.folder_collection), id(new_qs.folder_collection))
         self.assertEqual(id(qs._cache), id(new_qs._cache))
         self.assertEqual(qs._cache, new_qs._cache)
         self.assertNotEqual(id(qs.q), id(new_qs.q))
@@ -998,7 +998,7 @@ class QuerySetTest(unittest.TestCase):
         new_qs.return_format = QuerySet.VALUES
 
         self.assertNotEqual(id(qs), id(new_qs))
-        self.assertEqual(id(qs.folder), id(new_qs.folder))
+        self.assertEqual(id(qs.folder_collection), id(new_qs.folder_collection))
         self.assertEqual(id(qs._cache), id(new_qs._cache))
         self.assertEqual(qs._cache, new_qs._cache)
         self.assertNotEqual(id(qs.q), id(new_qs.q))

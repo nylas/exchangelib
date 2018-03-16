@@ -292,6 +292,16 @@ class FolderCollection(SearchableMixIn):
                 max_items=None,
         )
 
+    def get_folders(self):
+        additional_fields = {
+            FieldPath(field=f) for folder in self.folders for f in folder.supported_fields(version=self.account.version)
+        }
+        return GetFolder(account=self.account).call(
+                folders=self.folders,
+                additional_fields=additional_fields,
+                shape=IdOnly
+        )
+
 
 @python_2_unicode_compatible
 class Folder(RegisterMixIn, SearchableMixIn):
@@ -796,26 +806,12 @@ class Folder(RegisterMixIn, SearchableMixIn):
         return tuple(f for f in cls.FIELDS if f.name not in ('folder_id', 'changekey') and f.supports_version(version))
 
     @classmethod
-    def get_folders(cls, account, folders, additional_fields=None):
-        """ 'folders' is an iterable of Folder instances """
-        if additional_fields is None:
-            additional_fields = [FieldPath(field=f) for f in cls.supported_fields(version=account.version)]
-        # We can't easily find the correct folder class from the returned XML. Instead, return objects with the same
-        # class as the folder instance it was requested with.
-        folders_list = list(folders)  # Convert to a list, in case 'folders' is a generator
-        return GetFolder(account=account).call(
-                folders=folders_list,
-                additional_fields=additional_fields,
-                shape=IdOnly
-        )
-
-    @classmethod
     def get_distinguished(cls, account):
         """Gets the distinguished folder for this folder class"""
         if not cls.DISTINGUISHED_FOLDER_ID:
             raise ValueError('Class %s must have a DISTINGUISHED_FOLDER_ID value' % cls)
-        folders = list(cls.get_folders(
-            account=account, folders=[cls(account=account, name=cls.DISTINGUISHED_FOLDER_ID)])
+        folders = list(FolderCollection(
+            account=account, folders=[cls(account=account, name=cls.DISTINGUISHED_FOLDER_ID)]).get_folders()
         )
         if not folders:
             raise ErrorFolderNotFound('Could not find distinguished folder %s' % cls.DISTINGUISHED_FOLDER_ID)
@@ -833,7 +829,7 @@ class Folder(RegisterMixIn, SearchableMixIn):
             raise ValueError('Folder must have an account')
         if not self.folder_id:
             raise ValueError('Folder must have an ID')
-        folders = list(self.get_folders(account=self.account, folders=[self]))
+        folders = list(FolderCollection(account=self.account, folders=[self]).get_folders())
         if not folders:
             raise ErrorFolderNotFound('Folder %s disappeared' % self)
         if len(folders) != 1:
@@ -928,11 +924,10 @@ class Root(Folder):
         # everything else. AdminAuditLogs folder is not retrievable and makes all other folders fail.
         folders_map = {self.folder_id: self}
         try:
-            for f in self.get_folders(
-                    account=self.account,
-                    folders=[
+            for f in FolderCollection(account=self.account, folders=[
                         cls(account=self.account, name=cls.DISTINGUISHED_FOLDER_ID)
-                        for cls in WELLKNOWN_FOLDERS if cls != AdminAuditLogs]):
+                        for cls in WELLKNOWN_FOLDERS if cls != AdminAuditLogs
+            ]).get_folders():
                 if isinstance(f, (ErrorFolderNotFound, ErrorNoPublicFolderReplicaAvailable)):
                     # This is just a distinguished folder the server does not have
                     continue
