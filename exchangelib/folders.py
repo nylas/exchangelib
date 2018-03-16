@@ -225,11 +225,6 @@ class FolderCollection(SearchableMixIn):
                     raise ValueError("find_items() does not support field '%s'. Use fetch() instead" % f.field.name)
         if calendar_view is not None and not isinstance(calendar_view, CalendarView):
             raise ValueError("'calendar_view' %s must be a CalendarView instance" % calendar_view)
-        if page_size is None:
-            # Set a sane default
-            page_size = FindItem.CHUNKSIZE
-        if not isinstance(page_size, int):
-            raise ValueError("'page_size' %r must be an integer" % page_size)
 
         # Build up any restrictions
         if q.is_empty():
@@ -250,7 +245,7 @@ class FolderCollection(SearchableMixIn):
             additional_fields,
             restriction.q if restriction else None,
         )
-        items = FindItem(account=self.account, folders=self.folders).call(
+        items = FindItem(account=self.account, folders=self.folders, chunk_size=page_size).call(
             additional_fields=additional_fields,
             restriction=restriction,
             order_fields=order_fields,
@@ -258,7 +253,6 @@ class FolderCollection(SearchableMixIn):
             query_string=query_string,
             depth=depth,
             calendar_view=calendar_view,
-            page_size=page_size,
             max_items=calendar_view.max_items if calendar_view else max_items,
         )
         if shape == IdOnly and additional_fields is None:
@@ -272,7 +266,7 @@ class FolderCollection(SearchableMixIn):
                     item = Folder.item_model_from_tag(i.tag).from_xml(elem=i, account=self.account)
                     yield item
 
-    def find_folders(self, shape=IdOnly, depth=DEEP):
+    def find_folders(self, shape=IdOnly, depth=DEEP, page_size=None):
         # 'depth' controls whether to return direct children or recurse into sub-folders
         if not self.account:
             raise ValueError('Folder must have an account')
@@ -284,11 +278,10 @@ class FolderCollection(SearchableMixIn):
             FieldPath(field=f) for folder in self.folders for f in folder.supported_fields(version=self.account.version)
         }
         # TODO: Support the Restriction class for folders, too
-        return FindFolder(account=self.account, folders=self.folders).call(
+        return FindFolder(account=self.account, folders=self.folders, chunk_size=page_size).call(
                 additional_fields=additional_fields,
                 shape=shape,
                 depth=depth,
-                page_size=100,
                 max_items=None,
         )
 
@@ -607,11 +600,6 @@ class Folder(RegisterMixIn, SearchableMixIn):
                     raise ValueError("'%s' is not a valid field on %s" % (f.field.name, Persona))
                 if f.field in complex_fields:
                     raise ValueError("find_people() does not support field '%s'" % f.field.name)
-        if page_size is None:
-            # Set a sane default
-            page_size = FindItem.CHUNKSIZE
-        if not isinstance(page_size, int):
-            raise ValueError("'page_size' %r must be an integer" % page_size)
 
         # Build up any restrictions
         if q.is_empty():
@@ -623,7 +611,7 @@ class Folder(RegisterMixIn, SearchableMixIn):
         else:
             restriction = Restriction(q, folders=[self])
             query_string = None
-        personas = FindPeople(self.account).call(
+        personas = FindPeople(account=self.account, chunk_size=page_size).call(
                 folder=self,
                 additional_fields=additional_fields,
                 restriction=restriction,
@@ -631,7 +619,6 @@ class Folder(RegisterMixIn, SearchableMixIn):
                 shape=shape,
                 query_string=query_string,
                 depth=depth,
-                page_size=page_size,
                 max_items=max_items,
         )
         for p in personas:

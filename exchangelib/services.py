@@ -59,7 +59,12 @@ class EWSService(object):
     # Define the warnings we want to ignore, to let response processing proceed
     WARNINGS_TO_IGNORE_IN_RESPONSE = ()
 
-    def __init__(self, protocol):
+    def __init__(self, protocol, chunk_size=None):
+        self.chunk_size = chunk_size or 100  # The number of items to send in a single request
+        if not isinstance(self.chunk_size, int):
+            raise ValueError("'chunk_size' %r must be an integer" % chunk_size)
+        if self.chunk_size < 1:
+            raise ValueError("'chunk_size' must be a positive number")
         self.protocol = protocol
 
     # The following two methods are the minimum required to be implemented by subclasses, but the name and number of
@@ -328,18 +333,19 @@ class EWSService(object):
 
 class EWSAccountService(EWSService):
 
-    def __init__(self, account):
-        self.account = account
-        super(EWSAccountService, self).__init__(protocol=account.protocol)
+    def __init__(self, *args, **kwargs):
+        self.account = kwargs.pop('account')
+        kwargs['protocol'] = self.account.protocol
+        super(EWSAccountService, self).__init__(*args, **kwargs)
 
 
 class EWSFolderService(EWSAccountService):
 
-    def __init__(self, account, folders):
-        if not folders:
+    def __init__(self, *args, **kwargs):
+        self.folders = kwargs.pop('folders')
+        if not self.folders:
             raise ValueError('"folders" must not be empty')
-        self.folders = folders
-        super(EWSFolderService, self).__init__(account=account)
+        super(EWSFolderService, self).__init__(*args, **kwargs)
 
 
 class PagingEWSMixIn(EWSService):
@@ -557,16 +563,14 @@ class GetRooms(EWSService):
 
 
 class EWSPooledMixIn(EWSService):
-    CHUNKSIZE = None
-
     def _pool_requests(self, payload_func, items, **kwargs):
-        log.debug('Processing items in chunks of %s', self.CHUNKSIZE)
+        log.debug('Processing items in chunks of %s', self.chunk_size)
         # Chop items list into suitable pieces and let worker threads chew on the work. The order of the output result
         # list must be the same as the input id list, so the caller knows which status message belongs to which ID.
         # Yield results as they become available.
         results = []
         n = 1
-        for chunk in chunkify(items, self.CHUNKSIZE):
+        for chunk in chunkify(items, self.chunk_size):
             log.debug('Starting %s._get_elements worker %s for %s items', self.__class__.__name__, n, len(chunk))
             n += 1
             results.append(self.protocol.thread_pool.apply_async(
@@ -600,7 +604,6 @@ class GetItem(EWSAccountService, EWSPooledMixIn):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa563775(v=exchg.150).aspx
     """
-    CHUNKSIZE = 100
     SERVICE_NAME = 'GetItem'
     element_container_name = '{%s}Items' % MNS
 
@@ -651,7 +654,6 @@ class CreateItem(EWSAccountService, EWSPooledMixIn):
 
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa565209(v=exchg.150).aspx
     """
-    CHUNKSIZE = 25
     SERVICE_NAME = 'CreateItem'
     element_container_name = '{%s}Items' % MNS
 
@@ -698,7 +700,6 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa580254(v=exchg.150).aspx
     """
-    CHUNKSIZE = 25
     SERVICE_NAME = 'UpdateItem'
     element_container_name = '{%s}Items' % MNS
 
@@ -850,7 +851,6 @@ class DeleteItem(EWSAccountService, EWSPooledMixIn):
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa562961(v=exchg.150).aspx
 
     """
-    CHUNKSIZE = 100
     SERVICE_NAME = 'DeleteItem'
     element_container_name = None  # DeleteItem doesn't return a response object, just status in XML attrs
 
@@ -902,10 +902,8 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
     """
     SERVICE_NAME = 'FindItem'
     element_container_name = '{%s}Items' % TNS
-    CHUNKSIZE = 100
 
-    def call(self, additional_fields, restriction, order_fields, shape, query_string, depth, calendar_view, page_size,
-             max_items):
+    def call(self, additional_fields, restriction, order_fields, shape, query_string, depth, calendar_view, max_items):
         """
         Find items in an account.
 
@@ -916,7 +914,6 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
         :param query_string: a QueryString object
         :param depth: How deep in the folder structure to search for items
         :param calendar_view: If set, returns recurring calendar items unfolded
-        :param page_size: The number of items to return per request
         :param max_items: the max number of items to return
         :return: XML elements for the matching items
         """
@@ -928,7 +925,7 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
             shape=shape,
             depth=depth,
             calendar_view=calendar_view,
-            page_size=page_size,
+            page_size=self.chunk_size,
         ))
 
     def get_payload(self, additional_fields, restriction, order_fields, query_string, shape, depth, calendar_view,
@@ -972,14 +969,13 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
     SERVICE_NAME = 'FindFolder'
     element_container_name = '{%s}Folders' % TNS
 
-    def call(self, additional_fields, shape, depth, page_size, max_items):
+    def call(self, additional_fields, shape, depth, max_items):
         """
         Find subfolders of a folder.
 
         :param additional_fields: the extra fields that should be returned with the folder, as FieldPath objects
         :param shape: The set of attributes to return
         :param depth: How deep in the folder structure to search for folders
-        :param page_size: The number of items to return per request
         :param max_items: The maximum number of items to return
         :return: XML elements for the matching folders
         """
@@ -988,7 +984,7 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
             additional_fields=additional_fields,
             shape=shape,
             depth=depth,
-            page_size=page_size,
+            page_size=self.chunk_size,
         )):
             if isinstance(elem, Exception):
                 yield elem
@@ -1367,10 +1363,8 @@ class FindPeople(EWSAccountService, PagingEWSMixIn):
     """
     SERVICE_NAME = 'FindPeople'
     element_container_name = '{%s}People' % MNS
-    CHUNKSIZE = 100
 
-    def call(self, folder, additional_fields, restriction, order_fields, shape, query_string, depth, page_size,
-             max_items):
+    def call(self, folder, additional_fields, restriction, order_fields, shape, query_string, depth, max_items):
         """
         Find items in an account.
 
@@ -1381,7 +1375,6 @@ class FindPeople(EWSAccountService, PagingEWSMixIn):
         :param shape: The set of attributes to return
         :param query_string: a QueryString object
         :param depth: How deep in the folder structure to search for items
-        :param page_size: The number of items to return per request
         :param max_items: the max number of items to return
         :return: XML elements for the matching items
         """
@@ -1394,7 +1387,7 @@ class FindPeople(EWSAccountService, PagingEWSMixIn):
             query_string=query_string,
             shape=shape,
             depth=depth,
-            page_size=page_size,
+            page_size=self.chunk_size,
         ))
         if shape == IdOnly and additional_fields is None:
             for p in personas:
@@ -1643,7 +1636,6 @@ class ExportItems(EWSAccountService, EWSPooledMixIn):
     MSDN: https://msdn.microsoft.com/en-us/library/office/ff709523(v=exchg.150).aspx
     """
     ERRORS_TO_CATCH_IN_RESPONSE = ResponseMessageError
-    CHUNKSIZE = 100
     SERVICE_NAME = 'ExportItems'
     element_container_name = '{%s}Data' % MNS
 
@@ -1676,7 +1668,6 @@ class UploadItems(EWSAccountService, EWSPooledMixIn):
     items that do not yet exist in the database. The full spec also allows
     actions "Update" and "UpdateOrCreate".
     """
-    CHUNKSIZE = 100
     SERVICE_NAME = 'UploadItems'
     element_container_name = '{%s}ItemId' % MNS
 

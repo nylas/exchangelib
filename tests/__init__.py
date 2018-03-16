@@ -3939,7 +3939,8 @@ class BaseItemTest(EWSTest):
             items.append(i)
         self.test_folder.bulk_create(items=items)
         ids = self.test_folder.filter(categories__contains=self.categories).values_list('item_id', 'changekey')
-        self.bulk_delete(ids.iterator(page_size=10))
+        ids.page_size = 10
+        self.bulk_delete(ids.iterator())
 
     def test_slicing(self):
         # Test that slicing works correctly

@@ -297,33 +297,29 @@ class Account(object):
             raise ValueError("'value' %r must be an OofSettings instance" % value)
         SetUserOofSettings(self).call(mailbox=Mailbox(email_address=self.primary_smtp_address), oof_settings=value)
 
-    def export(self, items):
-        """
-        Return export strings of the given items
+    def export(self, items, chunk_size=None):
+        """Return export strings of the given items
 
-        Arguments:
-        'items' is an iterable containing the Items we want to export
+        :param items: An iterable containing the Items we want to export
+        :param chunk_size: The number of items to send to the server in a single request
 
-        Returns:
-        A list of strings, the exported representation of the object
+        :return A list of strings, the exported representation of the object
         """
         is_empty, items = peek(items)
         if is_empty:
             # We accept generators, so it's not always convenient for caller to know up-front if 'items' is empty. Allow
             # empty 'items' and return early.
             return []
-        return list(ExportItems(self).call(items=items))
+        return list(ExportItems(account=self, chunk_size=chunk_size).call(items=items))
 
-    def upload(self, data):
-        """
-        Adds objects retrieved from export into the given folders
+    def upload(self, data, chunk_size=None):
+        """Adds objects retrieved from export into the given folders
 
-        Arguments:
-        'upload_data' is an iterable of tuples containing the folder we want to upload the data to and the
+        :param data: An iterable of tuples containing the folder we want to upload the data to and the
             string outputs of exports.
+        :param chunk_size: The number of items to send to the server in a single request
 
-        Returns:
-        A list of tuples with the new ids and changekeys
+        :return A list of tuples with the new ids and changekeys
 
         Example:
         account.upload([(account.inbox, "AABBCC..."),
@@ -336,11 +332,11 @@ class Account(object):
             # We accept generators, so it's not always convenient for caller to know up-front if 'upload_data' is empty.
             # Allow empty 'upload_data' and return early.
             return []
-        return list(UploadItems(self).call(data=data))
+        return list(UploadItems(account=self, chunk_size=chunk_size).call(data=data))
 
-    def bulk_create(self, folder, items, message_disposition=SAVE_ONLY, send_meeting_invitations=SEND_TO_NONE):
-        """
-        Creates new items in 'folder'
+    def bulk_create(self, folder, items, message_disposition=SAVE_ONLY, send_meeting_invitations=SEND_TO_NONE,
+                    chunk_size=None):
+        """Creates new items in 'folder'
 
         :param folder: the folder to create the items in
         :param items: an iterable of Item objects
@@ -348,6 +344,7 @@ class Account(object):
                MESSAGE_DISPOSITION_CHOICES
         :param send_meeting_invitations: only applicable to CalendarItem items. Possible values are specified in
                SEND_MEETING_INVITATIONS_CHOICES
+        :param chunk_size: The number of items to send to the server in a single request
         :return: a list of either BulkCreateResult or exception instances in the same order as the input. The returned
                  BulkCreateResult objects are normal Item objects except they only contain the 'item_id' and 'changekey'
                  of the created item, and the 'item_id' on any attachments that were also created.
@@ -389,7 +386,7 @@ class Account(object):
         return list(
             i if isinstance(i, Exception)
             else BulkCreateResult.from_xml(elem=i, account=self)
-            for i in CreateItem(account=self).call(
+            for i in CreateItem(account=self, chunk_size=chunk_size).call(
                 items=items,
                 folder=folder,
                 message_disposition=message_disposition,
@@ -398,7 +395,8 @@ class Account(object):
         )
 
     def bulk_update(self, items, conflict_resolution=AUTO_RESOLVE, message_disposition=SAVE_ONLY,
-                    send_meeting_invitations_or_cancellations=SEND_TO_NONE, suppress_read_receipts=True):
+                    send_meeting_invitations_or_cancellations=SEND_TO_NONE, suppress_read_receipts=True,
+                    chunk_size=None):
         """
         Bulk updates existing items
 
@@ -410,7 +408,9 @@ class Account(object):
         :param send_meeting_invitations_or_cancellations: only applicable to CalendarItem items. Possible values are
                specified in SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES
         :param suppress_read_receipts: nly supported from Exchange 2013. True or False
-        :return: a list of either (item_id, changekey) tuples or exception instances in the same order as the input.
+        :param chunk_size: The number of items to send to the server in a single request
+
+        :return: a list of either (item_id, changekey) tuples or exception instances, in the same order as the input
         """
         if conflict_resolution not in CONFLICT_RESOLUTION_CHOICES:
             raise ValueError("'conflict_resolution' %s must be one of %s" % (
@@ -447,7 +447,7 @@ class Account(object):
             return []
         return list(
             i if isinstance(i, Exception) else Item.id_from_xml(i)
-            for i in UpdateItem(account=self).call(
+            for i in UpdateItem(account=self, chunk_size=chunk_size).call(
                 items=items,
                 conflict_resolution=conflict_resolution,
                 message_disposition=message_disposition,
@@ -457,7 +457,7 @@ class Account(object):
         )
 
     def bulk_delete(self, ids, delete_type=HARD_DELETE, send_meeting_cancellations=SEND_TO_NONE,
-                    affected_task_occurrences=ALL_OCCURRENCIES, suppress_read_receipts=True):
+                    affected_task_occurrences=ALL_OCCURRENCIES, suppress_read_receipts=True, chunk_size=None):
         """
         Bulk deletes items.
 
@@ -468,7 +468,9 @@ class Account(object):
         :param affected_task_occurrences: only applicable for recurring Task items. Possible values are specified in
                AFFECTED_TASK_OCCURRENCES_CHOICES.
         :param suppress_read_receipts: only supported from Exchange 2013. True or False.
-        :return: a list of either True or exception instances in the same order as the input.
+        :param chunk_size: The number of items to send to the server in a single request
+
+        :return: a list of either True or exception instances, in the same order as the input
         """
         if delete_type not in DELETE_TYPE_CHOICES:
             raise ValueError("'delete_type' %s must be one of %s" % (
@@ -501,7 +503,7 @@ class Account(object):
             # We accept generators, so it's not always convenient for caller to know up-front if 'ids' is empty. Allow
             # empty 'ids' and return early.
             return []
-        return list(DeleteItem(account=self).call(
+        return list(DeleteItem(account=self, chunk_size=chunk_size).call(
             items=ids,
             delete_type=delete_type,
             send_meeting_cancellations=send_meeting_cancellations,
@@ -509,8 +511,15 @@ class Account(object):
             suppress_read_receipts=suppress_read_receipts,
         ))
 
-    def bulk_send(self, ids, save_copy=True, copy_to_folder=None):
-        # Send existing draft messages. If requested, save a copy in 'copy_to_folder'
+    def bulk_send(self, ids, save_copy=True, copy_to_folder=None, chunk_size=None):
+        """ Send existing draft messages. If requested, save a copy in 'copy_to_folder'
+
+        :param ids: an iterable of either (item_id, changekey) tuples or Item objects.
+        :param save_copy: If true, saves a copy of the message
+        :param copy_to_folder: If requested, save a copy of the message in this folder. Default is the Sent folder
+        :param chunk_size: The number of items to send to the server in a single request
+        :return: Status for each send operation, in the same order as the input
+        """
         if copy_to_folder and not save_copy:
             raise AttributeError("'save_copy' must be True when 'copy_to_folder' is set")
         if save_copy and not copy_to_folder:
@@ -525,10 +534,16 @@ class Account(object):
             # We accept generators, so it's not always convenient for caller to know up-front if 'ids' is empty. Allow
             # empty 'ids' and return early.
             return []
-        return list(SendItem(account=self).call(items=ids, saved_item_folder=copy_to_folder))
+        return list(SendItem(account=self, chunk_size=chunk_size).call(items=ids, saved_item_folder=copy_to_folder))
 
-    def bulk_copy(self, ids, to_folder):
-        # Copy items to another folder. Returns booleans representing if the copy was successful or not
+    def bulk_copy(self, ids, to_folder, chunk_size=None):
+        """ Copy items to another folder
+
+        :param ids: an iterable of either (item_id, changekey) tuples or Item objects.
+        :param to_folder: The destination folder of the copy operation
+        :param chunk_size: The number of items to send to the server in a single request
+        :return: Status for each send operation, in the same order as the input
+        """
         if not isinstance(to_folder, Folder):
             raise ValueError("'to_folder' %r must be a Folder instence" % to_folder)
         # 'ids' could be an unevaluated QuerySet, e.g. if we ended up here via `bulk_copy(some_folder.filter(...))`. In
@@ -543,11 +558,17 @@ class Account(object):
             return []
         return list(
             i if isinstance(i, Exception) else Item.id_from_xml(i)
-            for i in CopyItem(account=self).call(items=ids, to_folder=to_folder)
+            for i in CopyItem(account=self, chunk_size=chunk_size).call(items=ids, to_folder=to_folder)
         )
 
-    def bulk_move(self, ids, to_folder):
-        # Move items to another folder. Returns new IDs for the items that were moved
+    def bulk_move(self, ids, to_folder, chunk_size=None):
+        """Move items to another folder
+
+        :param ids: an iterable of either (item_id, changekey) tuples or Item objects.
+        :param to_folder: The destination folder of the copy operation
+        :param chunk_size: The number of items to send to the server in a single request
+        :return: The new IDs of the moved items, in the same order as the input
+        """
         if not isinstance(to_folder, Folder):
             raise ValueError("'to_folder' %r must be a Folder instence" % to_folder)
         # 'ids' could be an unevaluated QuerySet, e.g. if we ended up here via `bulk_move(some_folder.filter(...))`. In
@@ -562,12 +583,18 @@ class Account(object):
             return []
         return list(
             i if isinstance(i, Exception) else Item.id_from_xml(i)
-            for i in MoveItem(account=self).call(items=ids, to_folder=to_folder)
+            for i in MoveItem(account=self, chunk_size=chunk_size).call(items=ids, to_folder=to_folder)
         )
 
-    def fetch(self, ids, folder=None, only_fields=None):
-        # 'folder' is used for validating only_fields
-        # 'only_fields' specifies which fields to fetch, instead of all possible fields, as strings or FieldPaths.
+    def fetch(self, ids, folder=None, only_fields=None, chunk_size=None):
+        """ Fetch items by ID
+
+        :param ids: an iterable of either (item_id, changekey) tuples or Item objects.
+        :param folder: used for validating 'only_fields'
+        :param only_fields: A list of string or FieldPath items specifying the fields to fetch. Default to all fields
+        :param chunk_size: The number of items to send to the server in a single request
+        :return: A generator of Item objects, in the same order as the input
+        """
         validation_folder = folder or Folder(account=self)  # Default to a folder type that supports all item types
         # 'ids' could be an unevaluated QuerySet, e.g. if we ended up here via `fetch(ids=some_folder.filter(...))`. In
         # that case, we want to use its iterator. Otherwise, peek() will start a count() which is wasteful because we
@@ -585,12 +612,15 @@ class Account(object):
         else:
             additional_fields = validation_folder.validate_fields(fields=only_fields)
         # Always use IdOnly here, because AllProperties doesn't actually get *all* properties
-        for i in GetItem(account=self).call(items=ids, additional_fields=additional_fields, shape=IdOnly):
+        for i in GetItem(account=self, chunk_size=chunk_size).call(
+                items=ids,
+                additional_fields=additional_fields,
+                shape=IdOnly,
+        ):
             if isinstance(i, Exception):
                 yield i
             else:
                 item = validation_folder.item_model_from_tag(i.tag).from_xml(elem=i, account=self)
-                item.folder = folder
                 yield item
 
     def __str__(self):

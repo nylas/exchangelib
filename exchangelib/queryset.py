@@ -173,7 +173,8 @@ class QuerySet(object):
             find_item_kwargs['additional_fields'] = None
             items = self.folder_collection.account.fetch(
                 ids=self.folder_collection.find_items(self.q, **find_item_kwargs),
-                only_fields=additional_fields
+                only_fields=additional_fields,
+                chunk_size=self.page_size,
             )
         else:
             if not additional_fields:
@@ -267,7 +268,6 @@ class QuerySet(object):
         return self._getitem_slice(idx_or_slice)
 
     def _getitem_idx(self, idx):
-        from .services import FindItem
         if self.is_cached:
             return self._cache[idx]
         if idx < 0:
@@ -275,10 +275,9 @@ class QuerySet(object):
             reverse_idx = -(idx+1)
             return self.reverse()[reverse_idx]
         else:
-            if not self.is_cached and idx < FindItem.CHUNKSIZE:
+            if not self.is_cached and idx < 100:
                 # If idx is small, optimize a bit by setting self.page_size to only get as many items as strictly needed
-                if idx < 100:
-                    self.page_size = idx + 1
+                self.page_size = idx + 1
                 self.max_items = idx + 1
             # Support non-negative indexes by consuming the iterator up to the index
             for i, val in enumerate(self.__iter__()):
@@ -287,18 +286,15 @@ class QuerySet(object):
             raise IndexError()
 
     def _getitem_slice(self, s):
-        from .services import FindItem
         if ((s.start or 0) < 0) or ((s.stop or 0) < 0) or ((s.step or 0) < 0):
             # islice() does not support negative start, stop and step. Make sure cache is full by iterating the full
             # query result, and then slice on the cache.
             list(self.__iter__())
             return self._cache[s]
-        if not self.is_cached and s.stop is not None and s.stop < FindItem.CHUNKSIZE:
+        if not self.is_cached and s.stop is not None and s.stop < 100:
             # If the range is small, optimize a bit by setting self.page_size to only get as many items as strictly
             # needed.
-            if s.stop < 100:
-                self.page_size = s.stop
-            # Calculate the max number of items this query could possibly return. It's OK if s.stop is None
+            self.page_size = s.stop
             self.max_items = s.stop
         return islice(self.__iter__(), s.start, s.stop, s.step)
 
@@ -539,7 +535,6 @@ class QuerySet(object):
         if self.is_cached:
             return self._cache
         # Return an iterator that doesn't bother with caching
-        self.page_size = page_size
         return self._query()
 
     def get(self, *args, **kwargs):
@@ -585,10 +580,14 @@ class QuerySet(object):
 
     def delete(self, page_size=1000):
         """ Delete the items matching the query, with as little effort as possible. 'page_size' is the number of items
-        to fetch from the server per request. We're only fetching the IDs, so keep it high"""
+        to fetch and delete from the server per request. We're only fetching the IDs, so keep it high"""
         from .items import ALL_OCCURRENCIES
         if self.is_cached:
-            res = self.folder_collection.account.bulk_delete(ids=self._cache, affected_task_occurrences=ALL_OCCURRENCIES)
+            res = self.folder_collection.account.bulk_delete(
+                ids=self._cache,
+                affected_task_occurrences=ALL_OCCURRENCIES,
+                chunk_size=page_size,
+            )
             self._cache = None  # Invalidate the cache after delete, regardless of the results
             return res
         new_qs = self.copy()
@@ -596,7 +595,11 @@ class QuerySet(object):
         new_qs.order_fields = None
         new_qs.return_format = self.NONE
         new_qs.page_size = page_size
-        return self.folder_collection.account.bulk_delete(ids=new_qs, affected_task_occurrences=ALL_OCCURRENCIES)
+        return self.folder_collection.account.bulk_delete(
+            ids=new_qs,
+            affected_task_occurrences=ALL_OCCURRENCIES,
+            chunk_size=page_size,
+        )
 
     def __str__(self):
         fmt_args = [('q', self.q), ('folders', '[%s]' % ', '.join(str(f) for f in self.folder_collection.folders))]
