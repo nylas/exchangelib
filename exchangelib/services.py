@@ -346,16 +346,26 @@ class PagingEWSMixIn(EWSService):
     def _paged_call(self, payload_func, max_items, **kwargs):
         account = self.account if isinstance(self, EWSAccountService) else None
         log_prefix = 'EWS %s, account %s, service %s' % (self.protocol.service_endpoint, account, self.SERVICE_NAME)
-        next_offset = 0
-        item_count = 0
+        wait = 0
+        if isinstance(self, EWSFolderService):
+            expected_message_count = len(self.folders)
+        else:
+            expected_message_count = 1
+        paging_infos = [dict(item_count=0, next_offset=None) for _ in range(expected_message_count)]
+        common_next_offset = 0
+        total_item_count = 0
         while True:
-            log.debug('%s: Getting items at offset %s', log_prefix, next_offset)
-            kwargs['offset'] = next_offset
+            log.debug('%s: Getting items at offset %s (max_items %s)', log_prefix, common_next_offset, max_items)
+            kwargs['offset'] = common_next_offset
             payload = payload_func(**kwargs)
             response = self._get_response_xml(payload=payload)
-            wait = 0
+            if len(response) != expected_message_count:
+                raise TransportError(
+                    "Expected %s items in 'response', got %s (%s)" % (expected_message_count, len(response), response)
+                )
             try:
-                rootfolder, next_offset = self._get_page(response)
+                # Collect a tuple of (rootfolder, next_offset) tuples
+                parsed_pages = [self._get_page(message) for message in response]
             except ErrorServerBusy as e:
                 if self.protocol.credentials.fail_fast:
                     raise
@@ -366,27 +376,44 @@ class PagingEWSMixIn(EWSService):
                 time.sleep(back_off)
                 wait += back_off
                 continue
-            if isinstance(rootfolder, ElementType):
-                container = rootfolder.find(self.element_container_name)
-                if container is None:
-                    raise TransportError('No %s elements in ResponseMessage (%s)' % (self.element_container_name,
-                                                                                     xml_to_str(rootfolder)))
-                for elem in self._get_elements_in_container(container=container):
-                    item_count += 1
-                    yield elem
-                if max_items and item_count >= max_items:
-                    log.debug("'max_items' count reached")
-                    break
-            if not next_offset:
+            for (rootfolder, next_offset), paging_info in zip(parsed_pages, paging_infos):
+                paging_info['next_offset'] = next_offset
+                if isinstance(rootfolder, ElementType):
+                    container = rootfolder.find(self.element_container_name)
+                    if container is None:
+                        raise TransportError('No %s elements in ResponseMessage (%s)' % (self.element_container_name,
+                                                                                         xml_to_str(rootfolder)))
+                    for elem in self._get_elements_in_container(container=container):
+                        paging_info['item_count'] += 1
+                        yield elem
+                    total_item_count += paging_info['item_count']
+                    if max_items and total_item_count >= max_items:
+                        # No need to continue. Break out of inner loop
+                        log.debug("'max_items' count reached (inner)")
+                        break
+                if not paging_info['next_offset']:
+                    # Paging is done for this message
+                    continue
+                if paging_info['next_offset'] != paging_info['item_count']:
+                    # Check paging offsets
+                    raise TransportError(
+                        'Unexpected next offset: %s -> %s' % (paging_info['item_count'], paging_info['next_offset'])
+                    )
+            # Also break out of outer loop
+            if max_items and total_item_count >= max_items:
+                log.debug("'max_items' count reached (outer)")
                 break
-            if next_offset != item_count:
-                # Check paging offsets
-                raise TransportError('Unexpected next offset: %s -> %s' % (item_count, next_offset))
+            # Make sure all messages that have a next_offset also have the *same* next_offset
+            unique_item_counts = {p['next_offset'] for p in paging_infos if p['next_offset'] is not None}
+            if not unique_item_counts:
+                # Paging is done for all messages
+                break
+            if len(unique_item_counts) > 1:
+                raise TransportError('Inconsistent next offsets: %s' % unique_item_counts)
+            common_next_offset = unique_item_counts.pop()
 
-    def _get_page(self, response):
-        if len(response) != 1:
-            raise ValueError("Expected single item in 'response', got %s" % response)
-        rootfolder = self._get_element_container(message=response[0], name='{%s}RootFolder' % MNS)
+    def _get_page(self, message):
+        rootfolder = self._get_element_container(message=message, name='{%s}RootFolder' % MNS)
         is_last_page = rootfolder.get('IncludesLastItemInRange').lower() in ('true', '0')
         offset = rootfolder.get('IndexedPagingOffset')
         if offset is None and not is_last_page:
@@ -1410,14 +1437,17 @@ class FindPeople(EWSAccountService, PagingEWSMixIn):
         account = self.account if isinstance(self, EWSAccountService) else None
         log_prefix = 'EWS %s, account %s, service %s' % (self.protocol.service_endpoint, account, self.SERVICE_NAME)
         item_count = 0
+        wait = 0
         while True:
             log.debug('%s: Getting items at offset %s', log_prefix, item_count)
             kwargs['offset'] = item_count
             payload = payload_func(**kwargs)
             response = self._get_response_xml(payload=payload)
-            wait = 0
+            if len(response) != 1:
+                # We can only query one folder, so there should only be one element in response
+                raise TransportError("Expected single item in 'response', got %s" % response)
             try:
-                rootfolder, total_items = self._get_page(response)
+                rootfolder, total_items = self._get_page(response[0])
             except ErrorServerBusy as e:
                 if self.protocol.credentials.fail_fast:
                     raise
@@ -1443,17 +1473,15 @@ class FindPeople(EWSAccountService, PagingEWSMixIn):
                 log.debug('Got all items in view')
                 break
 
-    def _get_page(self, response):
-        if len(response) != 1:
-            raise ValueError("Expected single item in 'response', got %s" % response)
-        self._get_element_container(message=response[0])  # Just raise exceptions
-        total_items = int(response[0].find('{%s}TotalNumberOfPeopleInView' % MNS).text)
-        first_matching = int(response[0].find('{%s}FirstMatchingRowIndex' % MNS).text)
-        first_loaded = int(response[0].find('{%s}FirstLoadedRowIndex' % MNS).text)
+    def _get_page(self, message):
+        self._get_element_container(message=message)  # Just raise exceptions
+        total_items = int(message.find('{%s}TotalNumberOfPeopleInView' % MNS).text)
+        first_matching = int(message.find('{%s}FirstMatchingRowIndex' % MNS).text)
+        first_loaded = int(message.find('{%s}FirstLoadedRowIndex' % MNS).text)
         # TODO: Implement paging when we know how it works for this service
         log.debug('%s: Got page with total items %s, first matching %s, first loaded %s ', self.SERVICE_NAME,
                   total_items, first_matching, first_loaded)
-        return response[0], total_items
+        return message, total_items
 
 
 class ResolveNames(EWSService):
