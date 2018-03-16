@@ -42,6 +42,8 @@ from .version import EXCHANGE_2010, EXCHANGE_2010_SP2, EXCHANGE_2013_SP1
 
 log = logging.getLogger(__name__)
 
+CHUNK_SIZE = 100  # A default chunk size for all services
+
 
 class EWSService(object):
     __metaclass__ = abc.ABCMeta
@@ -60,7 +62,7 @@ class EWSService(object):
     WARNINGS_TO_IGNORE_IN_RESPONSE = ()
 
     def __init__(self, protocol, chunk_size=None):
-        self.chunk_size = chunk_size or 100  # The number of items to send in a single request
+        self.chunk_size = chunk_size or CHUNK_SIZE  # The number of items to send in a single request
         if not isinstance(self.chunk_size, int):
             raise ValueError("'chunk_size' %r must be an integer" % chunk_size)
         if self.chunk_size < 1:
