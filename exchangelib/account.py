@@ -289,13 +289,13 @@ class Account(object):
         # supports the 'del self.oof_settings' syntax to invalidate the cache, but does not support custom setter
         # methods. Having a non-cached service call here goes against the assumption that properties are cheap, but the
         # alternative is to create get_oof_settings() and set_oof_settings(), and that's just too Java-ish for my taste.
-        return GetUserOofSettings(self).call(mailbox=Mailbox(email_address=self.primary_smtp_address))
+        return GetUserOofSettings(account=self).call(mailbox=Mailbox(email_address=self.primary_smtp_address))
 
     @oof_settings.setter
     def oof_settings(self, value):
         if not isinstance(value, OofSettings):
             raise ValueError("'value' %r must be an OofSettings instance" % value)
-        SetUserOofSettings(self).call(mailbox=Mailbox(email_address=self.primary_smtp_address), oof_settings=value)
+        SetUserOofSettings(account=self).call(mailbox=Mailbox(email_address=self.primary_smtp_address), oof_settings=value)
 
     def export(self, items, chunk_size=None):
         """Return export strings of the given items
