@@ -258,13 +258,21 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
         :return: A generator of FreeBusyView objects
         """
         from .account import Account
+        attendee_type_choices = {c.value for c in MailboxData.get_field_by_fieldname('attendee_type').choices}
         for account, attendee_type, exclude_conflicts in accounts:
-            assert isinstance(account, Account)
-            assert attendee_type in {c.value for c in MailboxData.get_field_by_fieldname('attendee_type').choices}
-            assert isinstance(exclude_conflicts, bool)
-        assert end > start
-        assert isinstance(merged_free_busy_interval, int)
-        assert requested_view in {c.value for c in FreeBusyViewOptions.get_field_by_fieldname('requested_view').choices}
+            if not isinstance(account, Account):
+                raise ValueError("'accounts' item %r must be an 'Account' instance" % account)
+            if attendee_type not in attendee_type_choices:
+                raise ValueError("'accounts' item %r must be one of %s" % (attendee_type, attendee_type_choices))
+            if not isinstance(exclude_conflicts, bool):
+                raise ValueError("'accounts' item %r must be a 'bool' instance" % exclude_conflicts)
+        if start >= end:
+            raise ValueError("'start' must be less than 'end' (%s -> %s)" % (start, end))
+        if not isinstance(merged_free_busy_interval, int):
+            raise ValueError("'merged_free_busy_interval' value %r must be an 'int'" % merged_free_busy_interval)
+        requested_view_choices = {c.value for c in FreeBusyViewOptions.get_field_by_fieldname('requested_view').choices}
+        if requested_view not in requested_view_choices:
+            raise ValueError("'requested_view' value %r must be one of %s" % (requested_view, requested_view_choices))
         tz = start.tzinfo  # The timezone of the start and end dates
         for_year = start.year
         _, _, periods, transitions, transitions_groups = list(self.get_timezones(

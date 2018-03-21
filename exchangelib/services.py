@@ -508,12 +508,14 @@ class GetServerTimeZones(EWSService):
             if transitions is not None:
                 for transition in transitions.findall('{%s}Transition' % TNS):
                     to = transition.find('{%s}To' % TNS)
-                    assert to.get('Kind') == 'Group'
+                    if to.get('Kind') != 'Group':
+                        raise ValueError('Unexpected "Kind" XML attr: %s' % to.get('Kind'))
                     tg_id = xml_text_to_value(to.text, int)
                     tz_transitions[tg_id] = None
                 for transition in transitions.findall('{%s}AbsoluteDateTransition' % TNS):
                     to = transition.find('{%s}To' % TNS)
-                    assert to.get('Kind') == 'Group'
+                    if to.get('Kind') != 'Group':
+                        raise ValueError('Unexpected "Kind" XML attr: %s' % to.get('Kind'))
                     tg_id = xml_text_to_value(to.text, int)
                     try:
                         t_date = xml_text_to_value(transition.find('{%s}DateTime' % TNS).text, EWSDateTime).date()

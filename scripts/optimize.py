@@ -8,8 +8,7 @@ import time
 
 from yaml import safe_load
 
-from exchangelib import DELEGATE, services, ServiceAccount, Configuration, Account, EWSDateTime, EWSTimeZone, \
-    CalendarItem
+from exchangelib import DELEGATE, ServiceAccount, Configuration, Account, EWSDateTime, EWSTimeZone, CalendarItem
 
 logging.basicConfig(level=logging.WARNING)
 

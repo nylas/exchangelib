@@ -474,7 +474,8 @@ class TimeZone(EWSElement):
                 # This is a simple transition to STD time. That cannot be represented by this class
                 continue
             # 'offset' is the time of day to transition, as timedelta since midnight. Must be a reasonable value
-            assert datetime.timedelta(0) <= transition['offset'] < datetime.timedelta(days=1)
+            if not datetime.timedelta(0) <= transition['offset'] < datetime.timedelta(days=1):
+                raise ValueError("'offset' value %s must be be between 0 and 24 hours" % transition['offset'])
             transition_kwargs = dict(
                 time=(datetime.datetime(2000, 1, 1) + transition['offset']).time(),
                 occurrence=transition['occurrence'] if transition['occurrence'] >= 1 else 1,  # Value can be -1
@@ -484,13 +485,14 @@ class TimeZone(EWSElement):
             if period['name'] == 'Standard':
                 transition_kwargs['bias'] = 0
                 kwargs['standard_time'] = StandardTime(**transition_kwargs)
-            elif period['name'] == 'Daylight':
+                continue
+            if period['name'] == 'Daylight':
                 std_bias = kwargs['bias']
                 dst_bias = int(period['bias'].total_seconds()) // 60  # Convert to minutes
                 transition_kwargs['bias'] = dst_bias - std_bias
                 kwargs['daylight_time'] = DaylightTime(**transition_kwargs)
-            else:
-                assert False, 'Unknown transition: %s' % transition
+                continue
+            raise ValueError('Unknown transition: %s' % transition)
 
         return cls(**kwargs)
 
