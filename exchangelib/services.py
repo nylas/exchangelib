@@ -128,14 +128,14 @@ class EWSService(object):
                     UnauthorizedError,
             ):
                 # These are known and understood, and don't require a backtrace
-                # TODO: ErrorTooManyObjectsOpened means there are too many connections to the database. We should be able to
-                # act on this by lowering the self.protocol connection pool size.
+                # TODO: ErrorTooManyObjectsOpened means there are too many connections to the database. We should be
+                # able to act on this by lowering the self.protocol connection pool size.
                 raise
             except Exception:
                 # This may run from a thread pool, which obfuscates the stack trace. Print trace immediately.
                 account = self.account if isinstance(self, EWSAccountService) else None
-                log.warning('EWS %s, account %s: Exception in _get_elements: %s', self.protocol.service_endpoint, account,
-                            traceback.format_exc(20))
+                log.warning('EWS %s, account %s: Exception in _get_elements: %s', self.protocol.service_endpoint,
+                            account, traceback.format_exc(20))
                 raise
 
     def _get_response_xml(self, payload):
@@ -329,7 +329,8 @@ class EWSService(object):
             else:
                 yield container_or_exc
 
-    def _get_elements_in_container(self, container):
+    @staticmethod
+    def _get_elements_in_container(container):
         return [elem for elem in container]
 
 

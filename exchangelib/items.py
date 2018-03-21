@@ -640,7 +640,7 @@ class Message(Item):
                       send_meeting_invitations=SEND_TO_NONE):
         # Sends Message and saves a copy in the parent folder. Does not return an ItemId.
         if self.item_id:
-            res = self._update(
+            self._update(
                 update_fieldnames=update_fields,
                 message_disposition=SEND_AND_SAVE_COPY,
                 conflict_resolution=conflict_resolution,

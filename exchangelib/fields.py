@@ -334,6 +334,9 @@ class FieldURIField(Field):
         else:
             self.field_uri_postfix = self.field_uri
 
+    def from_xml(self, elem, account):
+        raise NotImplementedError()
+
     def to_xml(self, value, version):
         field_elem = create_element(self.request_tag())
         return set_xml_value(field_elem, value, version=version)
@@ -947,7 +950,8 @@ class SubField(Field):
     def to_xml(self, value, version):
         return value
 
-    def field_uri_xml(self, field_uri, label):
+    @staticmethod
+    def field_uri_xml(field_uri, label):
         return create_element('t:IndexedFieldURI', FieldURI=field_uri, FieldIndex=label)
 
     def __hash__(self):
@@ -1037,6 +1041,9 @@ class EmailAddressesField(IndexedField):
         kwargs['value_cls'] = EmailAddress
         super(EmailAddressesField, self).__init__(*args, **kwargs)
 
+    def field_uri_xml(self):
+        raise NotImplementedError()
+
 
 class PhoneNumberField(IndexedField):
     is_list = True
@@ -1047,6 +1054,9 @@ class PhoneNumberField(IndexedField):
         from .indexed_properties import PhoneNumber
         kwargs['value_cls'] = PhoneNumber
         super(PhoneNumberField, self).__init__(*args, **kwargs)
+
+    def field_uri_xml(self):
+        raise NotImplementedError()
 
 
 class PhysicalAddressField(IndexedField):
@@ -1059,6 +1069,9 @@ class PhysicalAddressField(IndexedField):
         from .indexed_properties import PhysicalAddress
         kwargs['value_cls'] = PhysicalAddress
         super(PhysicalAddressField, self).__init__(*args, **kwargs)
+
+    def field_uri_xml(self):
+        raise NotImplementedError()
 
 
 class ExtendedPropertyField(Field):

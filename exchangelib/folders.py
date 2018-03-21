@@ -96,9 +96,6 @@ class SearchableMixIn(object):
     def exclude(self, *args, **kwargs):
         raise NotImplementedError()
 
-    def view(self, start, end, max_items=None, *args, **kwargs):
-        raise NotImplementedError()
-
 
 class FolderCollection(SearchableMixIn):
     def __init__(self, account, folders):

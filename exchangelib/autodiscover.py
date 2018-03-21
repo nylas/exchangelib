@@ -43,12 +43,16 @@ AUTODISCOVER_NS = 'http://schemas.microsoft.com/exchange/autodiscover/outlook/re
 ERROR_NS = 'http://schemas.microsoft.com/exchange/autodiscover/responseschema/2006'
 RESPONSE_NS = 'http://schemas.microsoft.com/exchange/autodiscover/outlook/responseschema/2006a'
 
-# 'shelve' may pickle objects using different pickle protocol versions. Append the python major+minor version numbers
-# to the filename. Also append the username, to avoid permission errors.
-major, minor = sys.version_info[:2]
-user = getpass.getuser()
-shelve_filename = 'exchangelib.cache.{user}.py{major}{minor}'.format(user=user, major=major, minor=minor)
-AUTODISCOVER_PERSISTENT_STORAGE = os.path.join(tempfile.gettempdir(), shelve_filename)
+
+def shelve_filename():
+    # 'shelve' may pickle objects using different pickle protocol versions. Append the python major+minor version
+    # numbers to the filename. Also append the username, to avoid permission errors.
+    major, minor = sys.version_info[:2]
+    user = getpass.getuser()
+    return 'exchangelib.cache.{user}.py{major}{minor}'.format(user=user, major=major, minor=minor)
+
+
+AUTODISCOVER_PERSISTENT_STORAGE = os.path.join(tempfile.gettempdir(), shelve_filename())
 
 
 @contextmanager
