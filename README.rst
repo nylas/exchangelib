@@ -17,8 +17,8 @@ task, contact and distribution list items.
 .. image:: https://img.shields.io/pypi/pyversions/exchangelib.svg
     :target: https://pypi.python.org/pypi/exchangelib/
 
-.. image:: https://landscape.io/github/ecederstrand/exchangelib/master/landscape.png
-   :target: https://landscape.io/github/ecederstrand/exchangelib/master
+.. image:: https://api.codacy.com/project/badge/Grade/5f805ad901054a889f4b99a82d6c1cb7
+    :target: https://www.codacy.com/app/ecederstrand/exchangelib?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=ecederstrand/exchangelib&amp;utm_campaign=Badge_Grade
 
 .. image:: https://secure.travis-ci.org/ecederstrand/exchangelib.png
     :target: http://travis-ci.org/ecederstrand/exchangelib
