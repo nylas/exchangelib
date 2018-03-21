@@ -1854,4 +1854,4 @@ class GetUserAvailability(EWSService):
                 yield msg
 
     def _get_elements_in_container(self, container):
-            return [container.find('{%s}FreeBusyView' % MNS)]
+        return [container.find('{%s}FreeBusyView' % MNS)]
