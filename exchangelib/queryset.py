@@ -91,8 +91,7 @@ class QuerySet(object):
                 return FieldPath.from_string(s, folder=folder)
             except ValueError:
                 pass
-        else:
-            raise ValueError("Unknown fieldname '%s' on folders '%s'" % (s, self.folder_collection.folders))
+        raise ValueError("Unknown fieldname '%s' on folders '%s'" % (s, self.folder_collection.folders))
 
     def _get_field_order(self, s):
         for folder in self.folder_collection:
@@ -100,8 +99,7 @@ class QuerySet(object):
                 return FieldOrder.from_string(s, folder=folder)
             except ValueError:
                 pass
-        else:
-            raise ValueError("Unknown fieldname '%s' on folders '%s'" % (s, self.folder_collection.folders))
+        raise ValueError("Unknown fieldname '%s' on folders '%s'" % (s, self.folder_collection.folders))
 
     @property
     def _item_id_field(self):
