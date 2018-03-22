@@ -600,7 +600,7 @@ class QuerySet(object):
         )
 
     def __str__(self):
-        fmt_args = [('q', self.q), ('folders', '[%s]' % ', '.join(str(f) for f in self.folder_collection.folders))]
+        fmt_args = [('q', str(self.q)), ('folders', '[%s]' % ', '.join(str(f) for f in self.folder_collection.folders))]
         if self.is_cached:
-            fmt_args.append(('len', len(self)))
+            fmt_args.append(('len', str(len(self))))
         return self.__class__.__name__ + '(%s)' % ', '.join('%s=%s' % (k, v) for k, v in fmt_args)

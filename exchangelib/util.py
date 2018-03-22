@@ -14,14 +14,14 @@ from xml.etree.ElementTree import ElementTree, Element
 
 from defusedxml.ElementTree import fromstring, ParseError
 from defusedxml.lxml import parse, tostring, RestrictedElement
+from future.backports.misc import get_ident
 from future.moves.urllib.parse import urlparse
-from future.moves._thread import get_ident
 from future.utils import PY2
 import isodate
 from lxml.etree import XMLParser, ElementDefaultClassLookup
 from pygments import highlight
-from pygments.lexers import XmlLexer
-from pygments.formatters import TerminalFormatter
+from pygments.lexers.html import XmlLexer
+from pygments.formatters.terminal import TerminalFormatter
 import requests.exceptions
 from six import text_type, string_types
 
@@ -317,9 +317,9 @@ class PrettyXmlHandler(logging.StreamHandler):
                         record.args[key] = self.highlight_xml(self.prettify_xml(value)).encode('utf-8')
                     else:
                         record.args[key] = self.highlight_xml(self.prettify_xml(value))
-                except Exception:
+                except Exception as e:
                     # Something bad happened, but we don't want to crash the program just because logging failed
-                    pass
+                    print('XML highlighting failed: %s' % e)
         return super(PrettyXmlHandler, self).emit(record)
 
     def is_tty(self):
@@ -468,7 +468,7 @@ Response data: %(xml_response)s
             except CONNECTION_ERRORS as e:
                 log.debug('Session %s thread %s: connection error POST\'ing to %s', session.session_id, thread_id, url)
                 r = DummyResponse(url=url, headers={'TimeoutException': e}, request_headers=headers)
-            except:
+            except Exception:
                 # Always create a dummy response for logging purposes, before re-raising
                 r = DummyResponse(url=url, headers={}, request_headers=headers)
                 raise
