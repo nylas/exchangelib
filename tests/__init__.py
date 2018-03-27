@@ -4531,10 +4531,12 @@ class BaseItemTest(EWSTest):
             for f in item.FIELDS:
                 # datetime_created and last_modified_time aren't copied, but instead are added to the new item after
                 # uploading. This means mime_content and size can also change. Items also get new IDs on upload. And
-                # meeting_count values are dependent on contents of current calendar.
+                # meeting_count values are dependent on contents of current calendar. Form query strings contain the
+                # item ID and will also change.
                 if f.name in {'item_id', 'changekey', 'first_occurrence', 'last_occurrence', 'datetime_created',
                               'last_modified_time', 'mime_content', 'size', 'conversation_id',
-                              'adjacent_meeting_count', 'conflicting_meeting_count'}:
+                              'adjacent_meeting_count', 'conflicting_meeting_count',
+                              'web_client_read_form_query_string', 'web_client_edit_form_query_string'}:
                     continue
                 dict_item[f.name] = getattr(item, f.name)
                 if f.name == 'attachments':
