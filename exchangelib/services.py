@@ -88,8 +88,7 @@ class EWSService(object):
             try:
                 # Send the request, get the response and do basic sanity checking on the SOAP XML
                 response = self._get_response_xml(payload=payload)
-                # Read the XML and throw any SOAP or general EWS error messages. Return a generator over the result
-                # elements
+                # Read the XML and throw any general EWS error messages. Return a generator over the result elements
                 return self._get_elements_in_response(response=response)
             except ErrorServerBusy as e:
                 if self.protocol.credentials.fail_fast:
@@ -182,7 +181,11 @@ class EWSService(object):
                 continue
             except ResponseMessageError:
                 # We got an error message from Exchange, but we still want to get any new version info from the response
-                self._update_api_version(hint=hint, api_version=api_version, response=r)
+                try:
+                    self._update_api_version(hint=hint, api_version=api_version, response=r)
+                except TransportError as e:
+                    log.debug('Failed to update version info (%s)', e)
+                    pass
                 raise
             else:
                 self._update_api_version(hint=hint, api_version=api_version, response=r)
@@ -367,14 +370,8 @@ class PagingEWSMixIn(EWSService):
             log.debug('%s: Getting items at offset %s (max_items %s)', log_prefix, common_next_offset, max_items)
             kwargs['offset'] = common_next_offset
             payload = payload_func(**kwargs)
-            response = self._get_response_xml(payload=payload)
-            if len(response) != expected_message_count:
-                raise TransportError(
-                    "Expected %s items in 'response', got %s (%s)" % (expected_message_count, len(response), response)
-                )
             try:
-                # Collect a tuple of (rootfolder, next_offset) tuples
-                parsed_pages = [self._get_page(message) for message in response]
+                response = self._get_response_xml(payload=payload)
             except ErrorServerBusy as e:
                 if self.protocol.credentials.fail_fast:
                     raise
@@ -385,6 +382,13 @@ class PagingEWSMixIn(EWSService):
                 time.sleep(back_off)
                 wait += back_off
                 continue
+            if len(response) != expected_message_count:
+                raise TransportError(
+                    "Expected %s items in 'response', got %s (%s)" % (
+                        expected_message_count, len(response), response)
+                )
+            # Collect a tuple of (rootfolder, next_offset) tuples
+            parsed_pages = [self._get_page(message) for message in response]
             for (rootfolder, next_offset), paging_info in zip(parsed_pages, paging_infos):
                 paging_info['next_offset'] = next_offset
                 if isinstance(rootfolder, ElementType):
@@ -1440,12 +1444,8 @@ class FindPeople(EWSAccountService, PagingEWSMixIn):
             log.debug('%s: Getting items at offset %s', log_prefix, item_count)
             kwargs['offset'] = item_count
             payload = payload_func(**kwargs)
-            response = self._get_response_xml(payload=payload)
-            if len(response) != 1:
-                # We can only query one folder, so there should only be one element in response
-                raise TransportError("Expected single item in 'response', got %s" % response)
             try:
-                rootfolder, total_items = self._get_page(response[0])
+                response = self._get_response_xml(payload=payload)
             except ErrorServerBusy as e:
                 if self.protocol.credentials.fail_fast:
                     raise
@@ -1456,6 +1456,10 @@ class FindPeople(EWSAccountService, PagingEWSMixIn):
                 time.sleep(back_off)
                 wait += back_off
                 continue
+            if len(response) != 1:
+                # We can only query one folder, so there should only be one element in response
+                raise TransportError("Expected single item in 'response', got %s" % response)
+            rootfolder, total_items = self._get_page(response[0])
             if isinstance(rootfolder, ElementType):
                 container = rootfolder.find(self.element_container_name)
                 if container is None:
