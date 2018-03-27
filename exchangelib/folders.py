@@ -925,13 +925,13 @@ class Root(Folder):
                 if isinstance(f, (ErrorFolderNotFound, ErrorNoPublicFolderReplicaAvailable)):
                     # This is just a distinguished folder the server does not have
                     continue
-                if isinstance(f, ErrorInvalidOperation) \
+                if isinstance(f, ErrorInvalidOperation) and f.value == 'The distinguished folder name is unrecognized.':
+                    # This is just a distinguished folder the server does not have
+                    continue
+                if isinstance(f, ErrorItemNotFound) \
                         and f.value == 'The specified object was not found in the store., The process failed ' \
                                        'to get the correct properties.':
                     # This another way of telling us that this is just a distinguished folder the server does not have
-                    continue
-                if isinstance(f, ErrorItemNotFound) and f.value == 'The distinguished folder name is unrecognized.':
-                    # This is just a distinguished folder the server does not have
                     continue
                 folders_map[f.folder_id] = f
             for f in FolderCollection(account=self.account, folders=[self]).find_folders(depth=DEEP):
