@@ -10,7 +10,7 @@ from future.utils import python_2_unicode_compatible
 from six import text_type, string_types
 
 from .errors import ErrorAccessDenied, ErrorFolderNotFound, ErrorCannotEmptyFolder, ErrorCannotDeleteObject, \
-    ErrorNoPublicFolderReplicaAvailable, ErrorInvalidOperation, ErrorDeleteDistinguishedFolder
+    ErrorNoPublicFolderReplicaAvailable, ErrorInvalidOperation, ErrorDeleteDistinguishedFolder, ErrorItemNotFound
 from .fields import IntegerField, TextField, DateTimeField, FieldPath, EffectiveRightsField, MailboxField, IdField, \
     EWSElementField
 from .items import Item, CalendarItem, Contact, Message, Task, MeetingRequest, MeetingResponse, MeetingCancellation, \
@@ -925,7 +925,12 @@ class Root(Folder):
                 if isinstance(f, (ErrorFolderNotFound, ErrorNoPublicFolderReplicaAvailable)):
                     # This is just a distinguished folder the server does not have
                     continue
-                if isinstance(f, ErrorInvalidOperation) and f.value == 'The distinguished folder name is unrecognized.':
+                if isinstance(f, ErrorInvalidOperation) \
+                        and f.value == 'The specified object was not found in the store., The process failed ' \
+                                       'to get the correct properties.':
+                    # This another way of telling us that this is just a distinguished folder the server does not have
+                    continue
+                if isinstance(f, ErrorItemNotFound) and f.value == 'The distinguished folder name is unrecognized.':
                     # This is just a distinguished folder the server does not have
                     continue
                 folders_map[f.folder_id] = f
