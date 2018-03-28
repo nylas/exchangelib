@@ -20,7 +20,8 @@ from future.moves.queue import LifoQueue, Empty, Full
 from .credentials import Credentials
 from .errors import TransportError
 from .properties import FreeBusyViewOptions, MailboxData, TimeWindow, TimeZone
-from .services import GetServerTimeZones, GetRoomLists, GetRooms, ResolveNames, GetUserAvailability
+from .services import GetServerTimeZones, GetRoomLists, GetRooms, ResolveNames, GetUserAvailability, \
+    GetSearchableMailboxes
 from .transport import get_auth_instance, get_service_authtype, get_docs_authtype, AUTH_TYPE_MAP, DEFAULT_HEADERS
 from .util import split_url
 from .version import Version, API_VERSIONS
@@ -316,6 +317,12 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
             unresolved_entries=names, return_full_contact_data=return_full_contact_data, search_scope=search_scope,
             contact_data_shape=shape,
         ))
+
+    def get_searchable_mailboxes(self, search_filter=None, expand_group_membership=False):
+        return GetSearchableMailboxes(protocol=self).call(
+            search_filter=search_filter,
+            expand_group_membership=expand_group_membership,
+        )
 
     def __str__(self):
         return '''\
