@@ -507,6 +507,8 @@ class CalendarEvent(EWSElement):
         # CalendarEventDetails
     ]
 
+    __slots__ = tuple(f.name for f in FIELDS)
+
 
 class WorkingPeriod(EWSElement):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa580377(v=exchg.150).aspx
@@ -516,6 +518,8 @@ class WorkingPeriod(EWSElement):
         TimeField('start', field_uri='StartTimeInMinutes', is_required=True),
         TimeField('end', field_uri='EndTimeInMinutes', is_required=True),
     ]
+
+    __slots__ = tuple(f.name for f in FIELDS)
 
 
 class FreeBusyView(EWSElement):
@@ -534,6 +538,8 @@ class FreeBusyView(EWSElement):
         # hopefully don't care about.
         EWSElementListField('working_hours', field_uri='WorkingPeriodArray', value_cls=WorkingPeriod),
     ]
+
+    __slots__ = tuple(f.name for f in FIELDS)
 
     @classmethod
     def from_xml(cls, elem, account):
