@@ -1498,6 +1498,7 @@ class ResolveNames(EWSService):
 
     def call(self, unresolved_entries, parent_folders=None, return_full_contact_data=False, search_scope=None,
              contact_data_shape=None):
+        from .items import Contact
         from .properties import Mailbox
         elements = self._get_elements(payload=self.get_payload(
             unresolved_entries=unresolved_entries,
@@ -1511,7 +1512,13 @@ class ResolveNames(EWSService):
                 continue
             if isinstance(elem, Exception):
                 raise elem
-            yield Mailbox.from_xml(elem=elem.find(Mailbox.response_tag()), account=None)
+            if return_full_contact_data:
+                yield (
+                    Mailbox.from_xml(elem=elem.find(Mailbox.response_tag()), account=None),
+                    Contact.from_xml(elem=elem.find(Contact.response_tag()), account=None),
+                )
+            else:
+                yield Mailbox.from_xml(elem=elem.find(Mailbox.response_tag()), account=None)
 
     def get_payload(self, unresolved_entries, parent_folders, return_full_contact_data, search_scope,
                     contact_data_shape):

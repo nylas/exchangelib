@@ -1619,6 +1619,19 @@ class CommonTest(EWSTest):
             self.account.protocol.resolve_names(names=['foo\\bar']),
             []
         )
+        # Test return_full_contact_data
+        mailbox, contact = self.account.protocol.resolve_names(
+            names=[self.account.primary_smtp_address],
+            return_full_contact_data=True
+        )[0]
+        self.assertEqual(
+            mailbox,
+            Mailbox(email_address=self.account.primary_smtp_address)
+        )
+        self.assertListEqual(
+            [e.email.replace('SMTP:', '') for e in contact.email_addresses if e.label == 'EmailAddress1'],
+            [self.account.primary_smtp_address]
+        )
 
     def test_resolvenames_parsing(self):
         # Test static XML since server has no roomlists

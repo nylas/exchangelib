@@ -685,7 +685,10 @@ Non-account methods
     a.protocol.get_rooms(some_roomlist)
 
     # Get account information for a list of names or email addresses
-    a.protocol.resolve_names(['ann@example.com', 'bart@example.com'])
+    for mailbox in a.protocol.resolve_names(['ann@example.com', 'bart@example.com']):
+        print(mailbox.email_address)
+    for mailbox, contact in a.protocol.resolve_names(['anne', 'bart'], return_full_contact_data=True):
+        print(mailbox.email_address, contact.display_name)
 
     # Get availability information for a list of accounts
     start = tz.localize(EWSDateTime.now())
