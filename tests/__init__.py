@@ -298,15 +298,18 @@ class ProtocolTest(unittest.TestCase):
 
     def test_close(self):
         proc = psutil.Process()
-        ip_addr = socket.gethostbyname('example.com')
+        ip_addresses = {info[4][0] for info in socket.getaddrinfo(
+            host='example.com', port=80, family=socket.AF_INET, type=socket.SOCK_DGRAM, proto=socket.IPPROTO_IP
+        )}
+        self.assertGreater(len(ip_addresses), 0)
         protocol = Protocol(service_endpoint='http://example.com', credentials=Credentials('A', 'B'),
                             auth_type=NOAUTH, version=Version(Build(15, 1)))
         session = protocol.get_session()
         session.get('http://example.com')
-        self.assertEqual([p.raddr[0] for p in proc.connections() if p.raddr[0] == ip_addr], [ip_addr])
+        self.assertEqual(len({p.raddr[0] for p in proc.connections() if p.raddr[0] in ip_addresses}), 1)
         protocol.release_session(session)
         protocol.close()
-        self.assertEqual([p.raddr[0] for p in proc.connections() if p.raddr[0] == ip_addr], [])
+        self.assertEqual(len({p.raddr[0] for p in proc.connections() if p.raddr[0] in ip_addresses}), 0)
 
 
 class CredentialsTest(unittest.TestCase):
