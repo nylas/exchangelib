@@ -268,6 +268,32 @@ class Item(RegisterMixIn):
             raise res[0]
         return res[0]
 
+    def _update_fieldnames(self):
+        # Return the list of fields we are allowed to update
+        update_fieldnames = []
+        for f in self.supported_fields(version=self.account.version):
+            if f.name == 'attachments':
+                # Attachments are handled separately after item creation
+                continue
+            if f.is_read_only:
+                # These cannot be changed
+                continue
+            if f.is_required or f.is_required_after_save:
+                if getattr(self, f.name) is None or (f.is_list and not getattr(self, f.name)):
+                    # These are required and cannot be deleted
+                    continue
+            if not self.is_draft and f.is_read_only_after_send:
+                # These cannot be changed when the item is no longer a draft
+                continue
+            if f.name == 'message_id' and f.is_read_only_after_send:
+                # 'message_id' doesn't support updating, no matter the draft status
+                continue
+            if f.name == 'mime_content' and isinstance(self, (Contact, DistributionList)):
+                # Contact and DistributionList don't support updating mime_content, no matter the draft status
+                continue
+            update_fieldnames.append(f.name)
+        return update_fieldnames
+
     def _update(self, update_fieldnames, message_disposition, conflict_resolution, send_meeting_invitations):
         if not self.account:
             raise ValueError('Item must have an account')
@@ -275,28 +301,7 @@ class Item(RegisterMixIn):
             raise ValueError('Item must have changekey')
         if not update_fieldnames:
             # The fields to update was not specified explicitly. Update all fields where update is possible
-            update_fieldnames = []
-            for f in self.supported_fields(version=self.account.version):
-                if f.name == 'attachments':
-                    # Attachments are handled separately after item creation
-                    continue
-                if f.is_read_only:
-                    # These cannot be changed
-                    continue
-                if f.is_required or f.is_required_after_save:
-                    if getattr(self, f.name) is None or (f.is_list and not getattr(self, f.name)):
-                        # These are required and cannot be deleted
-                        continue
-                if not self.is_draft and f.is_read_only_after_send:
-                    # These cannot be changed when the item is no longer a draft
-                    continue
-                if f.name == 'message_id' and f.is_read_only_after_send:
-                    # 'message_id' doesn't support updating, no matter the draft status
-                    continue
-                if f.name == 'mime_content' and isinstance(self, (Contact, DistributionList)):
-                    # Contact and DistributionList don't support updating mime_content, no matter the draft status
-                    continue
-                update_fieldnames.append(f.name)
+            update_fieldnames = self._update_fieldnames()
         # bulk_update() returns a tuple
         res = self.account.bulk_update(
             items=[(self, update_fieldnames)], message_disposition=message_disposition,
