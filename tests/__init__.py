@@ -457,6 +457,16 @@ class EWSDateTimeTest(unittest.TestCase):
         self.assertEqual(tz.normalize(dt).ewsformat(), '2000-08-02T03:04:05+02:00')
         self.assertEqual(utc_tz.normalize(dt, is_dst=True).ewsformat(), '2000-08-02T01:04:05Z')
 
+        # Test in-place add and subtract
+        dt = tz.localize(EWSDateTime(2000, 1, 2, 3, 4, 5))
+        dt += datetime.timedelta(days=1)
+        self.assertIsInstance(dt, EWSDateTime)
+        self.assertEqual(dt, tz.localize(EWSDateTime(2000, 1, 3, 3, 4, 5)))
+        dt = tz.localize(EWSDateTime(2000, 1, 2, 3, 4, 5))
+        dt -= datetime.timedelta(days=1)
+        self.assertIsInstance(dt, EWSDateTime)
+        self.assertEqual(dt, tz.localize(EWSDateTime(2000, 1, 1, 3, 4, 5)))
+
     def test_generate(self):
         try:
             self.assertDictEqual(generate_map(), CLDR_TO_MS_TIMEZONE_MAP)
@@ -474,6 +484,16 @@ class EWSDateTimeTest(unittest.TestCase):
         self.assertIsInstance(EWSDate(2000, 1, 2) - EWSDate(2000, 1, 1), datetime.timedelta)
         self.assertIsInstance(EWSDate(2000, 1, 2) + datetime.timedelta(days=1), EWSDate)
         self.assertIsInstance(EWSDate(2000, 1, 2) - datetime.timedelta(days=1), EWSDate)
+
+        # Test in-place add and subtract
+        dt = EWSDate(2000, 1, 2)
+        dt += datetime.timedelta(days=1)
+        self.assertIsInstance(dt, EWSDate)
+        self.assertEqual(dt, EWSDate(2000, 1, 3))
+        dt = EWSDate(2000, 1, 2)
+        dt -= datetime.timedelta(days=1)
+        self.assertIsInstance(dt, EWSDate)
+        self.assertEqual(dt, EWSDate(2000, 1, 1))
 
 
 class PropertiesTest(unittest.TestCase):

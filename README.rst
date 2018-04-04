@@ -197,11 +197,13 @@ EWS has some special requirements on datetimes and timezones. You need to use th
     # Datetime math works transparently
     two_hours_later = localized_dt + timedelta(hours=2)
     two_hours = two_hours_later - localized_dt
+    two_hours_later += timedelta(hours=2)
 
     # Dates
     my_date = EWSDate(2017, 9, 5)
     today = EWSDate.today()
     also_today = right_now.date()
+    also_today += timedelta(days=10)
 
     # UTC helpers. 'UTC' is the UTC timezone as an EWSTimeZone instance.
     # 'UTC_NOW' returns a timezone-aware UTC timestamp of current time.
