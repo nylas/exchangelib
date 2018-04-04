@@ -478,6 +478,14 @@ class BulkCreateResult(Item):
         return cls(item_id=item_id, changekey=changekey, **kwargs)
 
 
+# CalendarItemType enums
+SINGLE = 'Single'
+OCCURRENCE = 'Occurrence'
+EXCEPTION = 'Exception'
+RECURRING_MASTER = 'RecurringMaster'
+CALENDAR_ITEM_CHOICES = (SINGLE, OCCURRENCE, EXCEPTION, RECURRING_MASTER)
+
+
 @python_2_unicode_compatible
 class CalendarItem(Item):
     """
@@ -501,9 +509,8 @@ class CalendarItem(Item):
         BooleanField('meeting_request_was_sent', field_uri='calendar:MeetingRequestWasSent', is_read_only=True),
         BooleanField('is_response_requested', field_uri='calendar:IsResponseRequested', default=None,
                      is_required_after_save=True, is_searchable=False),
-        ChoiceField('type', field_uri='calendar:CalendarItemType', choices={
-            Choice('Single'), Choice('Occurrence'), Choice('Exception'), Choice('RecurringMaster'),
-        }, is_read_only=True),
+        ChoiceField('type', field_uri='calendar:CalendarItemType', choices={Choice(c) for c in CALENDAR_ITEM_CHOICES},
+                    is_read_only=True),
         ChoiceField('my_response_type', field_uri='calendar:MyResponseType', choices={
             Choice(c) for c in Attendee.RESPONSE_TYPES
         }, is_read_only=True),
