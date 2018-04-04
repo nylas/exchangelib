@@ -299,7 +299,7 @@ class ProtocolTest(unittest.TestCase):
     def test_close(self):
         proc = psutil.Process()
         ip_addresses = {info[4][0] for info in socket.getaddrinfo(
-            host='example.com', port=80, family=socket.AF_INET, type=socket.SOCK_DGRAM, proto=socket.IPPROTO_IP
+            'example.com', 80, socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_IP
         )}
         self.assertGreater(len(ip_addresses), 0)
         protocol = Protocol(service_endpoint='http://example.com', credentials=Credentials('A', 'B'),
