@@ -577,6 +577,15 @@ class CalendarItem(Item):
         if version:
             self.clean_timezone_fields(version=version)
 
+    def _update_fieldnames(self):
+        update_fields = super(CalendarItem, self)._update_fieldnames()
+        if self.type == OCCURRENCE:
+            # Some CalendarItem fields cannot be updated when the item is an occurrence. The values are empty when we
+            # receive them so would have been updated because they are set to None.
+            update_fields.remove('recurrence')
+            update_fields.remove('uid')
+        return update_fields
+
 
 class Message(Item):
     """

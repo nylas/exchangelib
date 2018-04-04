@@ -5291,10 +5291,11 @@ class CalendarTest(BaseItemTest):
         )
 
     def test_recurring_items(self):
+        tz = self.account.default_timezone
         item = CalendarItem(
             folder=self.test_folder,
-            start=self.account.default_timezone.localize(EWSDateTime(2017, 9, 4, 11)),
-            end=self.account.default_timezone.localize(EWSDateTime(2017, 9, 4, 13)),
+            start=tz.localize(EWSDateTime(2017, 9, 4, 11)),
+            end=tz.localize(EWSDateTime(2017, 9, 4, 13)),
             subject='Hello Recurrence',
             recurrence=Recurrence(
                 pattern=WeeklyPattern(interval=3, weekdays=[MONDAY, WEDNESDAY]),
@@ -5312,19 +5313,19 @@ class CalendarTest(BaseItemTest):
             'Monday, Boundary: NumberedPattern(start=EWSDate(2017, 9, 4), number=7)'
         )
         self.assertIsInstance(fresh_item.first_occurrence, FirstOccurrence)
-        self.assertEqual(fresh_item.first_occurrence.start, self.account.default_timezone.localize(EWSDateTime(2017, 9, 4, 11)))
-        self.assertEqual(fresh_item.first_occurrence.end, self.account.default_timezone.localize(EWSDateTime(2017, 9, 4, 13)))
+        self.assertEqual(fresh_item.first_occurrence.start, tz.localize(EWSDateTime(2017, 9, 4, 11)))
+        self.assertEqual(fresh_item.first_occurrence.end, tz.localize(EWSDateTime(2017, 9, 4, 13)))
         self.assertIsInstance(fresh_item.last_occurrence, LastOccurrence)
-        self.assertEqual(fresh_item.last_occurrence.start, self.account.default_timezone.localize(EWSDateTime(2017, 11, 6, 11)))
-        self.assertEqual(fresh_item.last_occurrence.end, self.account.default_timezone.localize(EWSDateTime(2017, 11, 6, 13)))
+        self.assertEqual(fresh_item.last_occurrence.start, tz.localize(EWSDateTime(2017, 11, 6, 11)))
+        self.assertEqual(fresh_item.last_occurrence.end, tz.localize(EWSDateTime(2017, 11, 6, 13)))
         self.assertEqual(fresh_item.modified_occurrences, None)
         self.assertEqual(fresh_item.deleted_occurrences, None)
 
         # All occurrences expanded
         all_start_times = []
         for i in self.test_folder.view(
-                start=self.account.default_timezone.localize(EWSDateTime(2017, 9, 1)),
-                end=self.account.default_timezone.localize(EWSDateTime(2017, 12, 1))
+                start=tz.localize(EWSDateTime(2017, 9, 1)),
+                end=tz.localize(EWSDateTime(2017, 12, 1))
         ).only('start', 'categories').order_by('start'):
             if i.categories != self.categories:
                 continue
@@ -5332,15 +5333,59 @@ class CalendarTest(BaseItemTest):
         self.assertListEqual(
             all_start_times,
             [
-                self.account.default_timezone.localize(EWSDateTime(2017, 9, 4, 11)),
-                self.account.default_timezone.localize(EWSDateTime(2017, 9, 6, 11)),
-                self.account.default_timezone.localize(EWSDateTime(2017, 9, 25, 11)),
-                self.account.default_timezone.localize(EWSDateTime(2017, 9, 27, 11)),
-                self.account.default_timezone.localize(EWSDateTime(2017, 10, 16, 11)),
-                self.account.default_timezone.localize(EWSDateTime(2017, 10, 18, 11)),
-                self.account.default_timezone.localize(EWSDateTime(2017, 11, 6, 11)),
+                tz.localize(EWSDateTime(2017, 9, 4, 11)),
+                tz.localize(EWSDateTime(2017, 9, 6, 11)),
+                tz.localize(EWSDateTime(2017, 9, 25, 11)),
+                tz.localize(EWSDateTime(2017, 9, 27, 11)),
+                tz.localize(EWSDateTime(2017, 10, 16, 11)),
+                tz.localize(EWSDateTime(2017, 10, 18, 11)),
+                tz.localize(EWSDateTime(2017, 11, 6, 11)),
             ]
         )
+
+        # Test updating and deleting
+        for i, occurrence in enumerate(self.test_folder.view(
+                start=tz.localize(EWSDateTime(2017, 9, 1)),
+                end=tz.localize(EWSDateTime(2017, 12, 1))
+        ).order_by('start')):
+            if i % 2:
+                # Delete every other occurrence (items 1, 3 and 5)
+                occurrence.delete()
+            else:
+                # Update every other occurrence (items 0, 2, 4 and 6)
+                occurrence.refresh()  # changekey is sometimes updated. Possible due to neighbour occurrences changing?
+                # We receive timestamps as UTC but want to write them back as local timezone
+                occurrence.start = occurrence.start.astimezone(tz)
+                occurrence.start += datetime.timedelta(minutes=30)
+                occurrence.end = occurrence.end.astimezone(tz)
+                occurrence.end += datetime.timedelta(minutes=30)
+                occurrence.subject = 'Changed Occurrence'
+                occurrence.save()
+
+        # We should only get half the items of before, and start times should be shifted 30 minutes
+        updated_start_times = []
+        for i in self.test_folder.view(
+                start=tz.localize(EWSDateTime(2017, 9, 1)),
+                end=tz.localize(EWSDateTime(2017, 12, 1))
+        ).only('start', 'subject', 'categories').order_by('start'):
+            if i.categories != self.categories:
+                continue
+            updated_start_times.append(i.start)
+            self.assertEqual(i.subject, 'Changed Occurrence')
+        self.assertListEqual(
+            updated_start_times,
+            [
+                tz.localize(EWSDateTime(2017, 9, 4, 11, 30)),
+                tz.localize(EWSDateTime(2017, 9, 25, 11, 30)),
+                tz.localize(EWSDateTime(2017, 10, 16, 11, 30)),
+                tz.localize(EWSDateTime(2017, 11, 6, 11, 30)),
+            ]
+        )
+
+        # Test that the master item sees the deletes and updates
+        fresh_item = self.test_folder.get(item_id=item.item_id, changekey=item.changekey)
+        self.assertEqual(len(fresh_item.modified_occurrences), 4)
+        self.assertEqual(len(fresh_item.deleted_occurrences), 3)
 
 
 class MessagesTest(BaseItemTest):

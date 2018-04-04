@@ -619,6 +619,22 @@ Here's an example of creating 7 occurrences on Mondays and Wednesdays of every t
     for i in a.calendar.view(start=start, end=start + timedelta(days=4*3*7)):
         print(i.subject, i.start, i.end)
 
+    # 'modified_occurrences' and 'deleted_occurrences' of master items are read-only fields. To delete or modify an
+    # occurrence, you must use 'view()' to fetch the occurrence and modify or delete it:
+    for occurrence in a.calendar.view(start=start, end=start + timedelta(days=4*3*7)):
+        # Delete or update random occurrences. This will affect  'modified_occurrences' and 'deleted_occurrences'
+        # of the master item.
+        if i.start.milliseconds % 2:
+            # We receive timestamps as UTC but want to write them back as local timezone
+            occurrence.start = occurrence.start.astimezone(tz)
+            occurrence.start += datetime.timedelta(minutes=30)
+            occurrence.end = occurrence.end.astimezone(tz)
+            occurrence.end += datetime.timedelta(minutes=30)
+            occurrence.subject = 'My new subject'
+            occurrence.save()
+        else:
+            item.delete()
+
 
 Message timestamp fields
 ^^^^^^^^^^^^^^^^^^^^^^^^
