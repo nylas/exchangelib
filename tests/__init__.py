@@ -16,6 +16,7 @@ import string
 import tempfile
 import time
 import unittest
+import unittest.util
 import warnings
 
 from dateutil.relativedelta import relativedelta
@@ -82,6 +83,9 @@ string_type = string_types[0]
 mock_account = namedtuple('mock_account', ('protocol', 'version'))
 mock_protocol = namedtuple('mock_protocol', ('version', 'service_endpoint'))
 mock_version = namedtuple('mock_version', ('build',))
+
+# Show full repr() output for object instances in unittest error messages
+unittest.util._MAX_LENGTH = 2000
 
 
 def mock_post(url, status_code, headers, text=''):
