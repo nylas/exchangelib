@@ -17,7 +17,7 @@ from .items import Item, CalendarItem, Contact, Message, Task, MeetingRequest, M
     DistributionList, RegisterMixIn, ITEM_CLASSES, ITEM_TRAVERSAL_CHOICES, SHAPE_CHOICES, IdOnly, DELETE_TYPE_CHOICES, \
     HARD_DELETE, Persona
 from .properties import ItemId, Mailbox, EWSElement, ParentFolderId
-from .queryset import QuerySet
+from .queryset import QuerySet, SearchableMixIn
 from .restriction import Restriction
 from .services import FindFolder, GetFolder, FindItem, CreateFolder, UpdateFolder, DeleteFolder, EmptyFolder, FindPeople
 from .transport import TNS, MNS
@@ -78,24 +78,6 @@ class CalendarView(EWSElement):
         super(CalendarView, self).clean(version=version)
         if self.end < self.start:
             raise ValueError("'start' must be before 'end'")
-
-
-class SearchableMixIn(object):
-    # Implements a search API for inheritance
-    def get(self, *args, **kwargs):
-        raise NotImplementedError()
-
-    def all(self):
-        raise NotImplementedError()
-
-    def none(self):
-        raise NotImplementedError()
-
-    def filter(self, *args, **kwargs):
-        raise NotImplementedError()
-
-    def exclude(self, *args, **kwargs):
-        raise NotImplementedError()
 
 
 class FolderCollection(SearchableMixIn):
@@ -578,6 +560,12 @@ class Folder(RegisterMixIn, SearchableMixIn):
 
     def exclude(self, *args, **kwargs):
         return FolderCollection(account=self.account, folders=[self]).exclude(*args, **kwargs)
+
+    def people(self):
+        return QuerySet(
+            folder_collection=FolderCollection(account=self.account, folders=[self]),
+            request_type=QuerySet.PERSONA,
+        )
 
     def find_people(self, q, shape=IdOnly, depth=SHALLOW, additional_fields=None, order_fields=None, page_size=None,
                     max_items=None):

@@ -447,6 +447,20 @@ Here are some examples of using the API:
     FolderCollection(account=account, folders=[account.inbox, account.calendar]).filter(subject='foo')
 
 
+Searching contacts
+^^^^^^^^^^^^^^^^^^
+Fetching personas from a contact folderis supported using the same syntax as folders. Just start your query with
+``.people()``:
+
+.. code-block:: python
+    # Navigate to a contact folder and start the search
+    all_contacts = a.root / 'AllContacts'
+    for p in all_contacts.people():
+        print(p)
+    for p in all_contacts.people().only('display_name').filter(display_name='john').order_by('display_name'):
+        print(p)
+
+
 Extended properties
 ^^^^^^^^^^^^^^^^^^^
 Extended properties makes it possible to attach custom key-value pairs to items and folders on the Exchange server.

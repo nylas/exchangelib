@@ -1486,6 +1486,35 @@ class FindPeople(EWSAccountService, PagingEWSMixIn):
         return message, total_items
 
 
+class GetPersona(EWSService):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/jj191408(v=exchg.150).aspx
+    """
+    SERVICE_NAME = 'GetPersona'
+
+    def call(self, persona):
+        from .items import Persona
+        elements = list(self._get_elements(payload=self.get_payload(persona=persona)))
+        if len(elements) != 1:
+            raise ValueError('Expected exactly one element in response')
+        elem = elements[0]
+        if isinstance(elem, Exception):
+            raise elem
+        return Persona.from_xml(elem=elem.find(Persona.response_tag()), account=None)
+
+    def get_payload(self, persona):
+        from .items import Persona
+        from .properties import PersonaId
+        payload = create_element('m:%s' % self.SERVICE_NAME)
+        if isinstance(persona, PersonaId):
+            set_xml_value(payload, persona, version=self.protocol.version)
+        elif isinstance(persona, Persona):
+            set_xml_value(payload, persona.persona_id, version=self.protocol.version)
+        else:
+            set_xml_value(payload, PersonaId(*persona), version=self.protocol.version)
+        return payload
+
+
 class ResolveNames(EWSService):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa565329(v=exchg.150).aspx

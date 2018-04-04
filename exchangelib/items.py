@@ -67,10 +67,11 @@ ITEM_TRAVERSAL_CHOICES = (SHALLOW, SOFT_DELETED, ASSOCIATED)
 
 # Shape enums
 IdOnly = 'IdOnly'
+Default = 'Default'
 # AllProperties doesn't actually get all properties in FindItem, just the "first-class" ones. See
 #    http://msdn.microsoft.com/en-us/library/office/dn600367(v=exchg.150).aspx
 AllProperties = 'AllProperties'
-SHAPE_CHOICES = (IdOnly, 'Default', AllProperties)
+SHAPE_CHOICES = (IdOnly, Default, AllProperties)
 
 # Contacts search (ResolveNames) scope enums
 ActiveDirectory = 'ActiveDirectory'
@@ -365,7 +366,7 @@ class Item(RegisterMixIn):
         self._delete(delete_type=MOVE_TO_DELETED_ITEMS, send_meeting_cancellations=send_meeting_cancellations,
                      affected_task_occurrences=affected_task_occurrences, suppress_read_receipts=suppress_read_receipts)
         self.item_id, self.changekey = None, None
-        self.folder = self.account.trash
+        self.folder = self.folder.account.trash
 
     def soft_delete(self, send_meeting_cancellations=SEND_TO_NONE, affected_task_occurrences=ALL_OCCURRENCIES,
                     suppress_read_receipts=True):
@@ -373,7 +374,7 @@ class Item(RegisterMixIn):
         self._delete(delete_type=SOFT_DELETE, send_meeting_cancellations=send_meeting_cancellations,
                      affected_task_occurrences=affected_task_occurrences, suppress_read_receipts=suppress_read_receipts)
         self.item_id, self.changekey = None, None
-        self.folder = self.account.recoverable_items_deletions
+        self.folder = self.folder.account.recoverable_items_deletions
 
     def delete(self, send_meeting_cancellations=SEND_TO_NONE, affected_task_occurrences=ALL_OCCURRENCIES,
                suppress_read_receipts=True):
@@ -1010,17 +1011,17 @@ class Persona(EWSElement):
     ELEMENT_NAME = 'Persona'
     FIELDS = [
         EWSElementField('persona_id', field_uri='persona:PersonaId', value_cls=PersonaId),
-        TextField('file_as', field_uri='persona:FileAs'),
+        CharField('file_as', field_uri='persona:FileAs'),
         CharField('display_name', field_uri='persona:DisplayName'),
         CharField('given_name', field_uri='persona:GivenName'),
-        CharField('middle_name', field_uri='persona:MiddleName'),
+        TextField('middle_name', field_uri='persona:MiddleName'),
         CharField('surname', field_uri='persona:Surname'),
         TextField('generation', field_uri='persona:Generation'),
         TextField('nickname', field_uri='persona:Nickname'),
-        TextField('title', field_uri='persona:Title'),
+        CharField('title', field_uri='persona:Title'),
         TextField('department', field_uri='persona:Department'),
-        TextField('company_name', field_uri='persona:CompanyName'),
-        TextField('im_address', field_uri='persona:ImAddress'),
+        CharField('company_name', field_uri='persona:CompanyName'),
+        CharField('im_address', field_uri='persona:ImAddress'),
         TextField('initials', field_uri='persona:Initials'),
     ]
 
