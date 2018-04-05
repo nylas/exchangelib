@@ -172,7 +172,11 @@ class EWSService(object):
                 raise SOAPError('Bad SOAP response: %s' % e)
             try:
                 res = self._get_soap_payload(soap_response=soap_response_payload)
-            except (ErrorInvalidSchemaVersionForMailboxVersion, ErrorInvalidServerVersion):
+            except ErrorInvalidServerVersion:
+                # The guessed server version is wrong. Try the next version
+                log.debug('API version %s was invalid', api_version)
+                continue
+            except ErrorInvalidSchemaVersionForMailboxVersion:
                 if not account:
                     # This should never happen for non-account services
                     raise ValueError("'account' should not be None")
@@ -190,8 +194,10 @@ class EWSService(object):
             else:
                 self._update_api_version(hint=hint, api_version=api_version, response=r)
             return res
-        raise ErrorInvalidSchemaVersionForMailboxVersion('Tried versions %s but all were invalid for account %s' %
-                                                         (api_versions, account))
+        if account:
+            raise ErrorInvalidSchemaVersionForMailboxVersion('Tried versions %s but all were invalid for account %s' %
+                                                             (api_versions, account))
+        raise ErrorInvalidServerVersion('Tried versions %s but all were invalid' % api_versions)
 
     def _update_api_version(self, hint, api_version, response):
         if api_version == hint.api_version and hint.build is not None:
