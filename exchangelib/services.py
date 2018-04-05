@@ -1514,6 +1514,21 @@ class GetPersona(EWSService):
             set_xml_value(payload, PersonaId(*persona), version=self.protocol.version)
         return payload
 
+    @classmethod
+    def _get_soap_payload(cls, soap_response):
+        if not isinstance(soap_response, ElementType):
+            raise ValueError("'soap_response' %r must be an ElementType" % soap_response)
+        body = soap_response.find('{%s}Body' % SOAPNS)
+        if body is None:
+            raise TransportError('No Body element in SOAP response')
+        response = body.find('{%s}%sResponseMessage' % (MNS, cls.SERVICE_NAME))
+        if response is None:
+            fault = body.find('{%s}Fault' % SOAPNS)
+            if fault is None:
+                raise SOAPError('Unknown SOAP response: %s' % xml_to_str(body))
+            cls._raise_soap_errors(fault=fault)  # Will throw SOAPError or custom EWS error
+        return [response]
+
 
 class ResolveNames(EWSService):
     """

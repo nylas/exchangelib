@@ -58,9 +58,9 @@ from exchangelib.folders import Calendar, DeletedItems, Drafts, Inbox, Outbox, S
     SyncIssues, MyContacts, ToDoSearch, FolderCollection
 from exchangelib.indexed_properties import EmailAddress, PhysicalAddress, PhoneNumber, \
     SingleFieldIndexedElement, MultiFieldIndexedElement
-from exchangelib.items import Item, CalendarItem, Message, Contact, Task, DistributionList
+from exchangelib.items import Item, CalendarItem, Message, Contact, Task, DistributionList, Persona
 from exchangelib.properties import Attendee, Mailbox, RoomList, MessageHeader, Room, ItemId, Member, EWSElement, Body, \
-    HTMLBody, TimeZone, FreeBusyView
+    HTMLBody, TimeZone, FreeBusyView, PersonaId
 from exchangelib.protocol import BaseProtocol, Protocol, NoVerifyHTTPAdapter
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.recurrence import Recurrence, AbsoluteYearlyPattern, RelativeYearlyPattern, AbsoluteMonthlyPattern, \
@@ -68,7 +68,8 @@ from exchangelib.recurrence import Recurrence, AbsoluteYearlyPattern, RelativeYe
     NoEndPattern, EndDatePattern, NumberedPattern, ExtraWeekdaysField
 from exchangelib.restriction import Restriction, Q
 from exchangelib.settings import OofSettings
-from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, GetAttachment, ResolveNames, TNS
+from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, GetAttachment, ResolveNames, GetPersona, \
+    TNS
 from exchangelib.transport import NOAUTH, BASIC, DIGEST, NTLM, wrap, _get_auth_method_from_response
 from exchangelib.util import chunkify, peek, get_redirect_url, to_xml, BOM, get_domain, value_to_xml_text, \
     post_ratelimited, create_element, CONNECTION_ERRORS, PrettyXmlHandler, xml_to_str
@@ -5589,6 +5590,24 @@ class ContactsTest(BaseItemTest):
         self.assertEqual({m.mailbox.email_address for m in new_dl.members}, dl.members)
 
         dl.delete()
+
+    def test_find_people(self):
+        # The test server may not have any contacts. Just test that the FindPeople service and helpers work
+        self.assertGreaterEqual(len(list(self.test_folder.people())), 0)
+        self.assertGreaterEqual(
+            len(list(
+                self.test_folder.people().only('display_name').filter(display_name='john').order_by('display_name')
+            )),
+            0
+        )
+
+    def test_get_persona(self):
+        # The test server may not have any personas. Just test that the service response with something we can parse
+        persona = Persona(persona_id=PersonaId(id='AAA=', changekey='xxx'))
+        try:
+            GetPersona(protocol=self.account.protocol).call(persona=persona)
+        except ErrorInvalidIdMalformed:
+            pass
 
 
 def get_random_bool():

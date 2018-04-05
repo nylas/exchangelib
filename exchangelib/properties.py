@@ -263,6 +263,7 @@ class ReferenceItemId(ItemId):
 class PersonaId(ItemId):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/jj191430(v=exchg.150).aspx
     ELEMENT_NAME = 'PersonaId'
+    NAMESPACE = MNS
 
     __slots__ = ItemId.__slots__
 
