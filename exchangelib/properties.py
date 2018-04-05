@@ -265,6 +265,11 @@ class PersonaId(ItemId):
     ELEMENT_NAME = 'PersonaId'
     NAMESPACE = MNS
 
+    @classmethod
+    def response_tag(cls):
+        # For some reason, EWS wants this in the MNS namespace in a request, but TNS namespace in a response...
+        return '{%s}%s' % (TNS, cls.ELEMENT_NAME)
+
     __slots__ = ItemId.__slots__
 
 
