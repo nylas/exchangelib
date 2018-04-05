@@ -5461,7 +5461,7 @@ class MessagesTest(BaseItemTest):
         item = self.get_test_item()
         item.folder = None
         item.send()  # get_test_item() sets the to_recipients to the test account
-        for _ in range(30):
+        for _ in range(60):
             try:
                 sent_item = self.account.inbox.get(subject=item.subject)
                 break
@@ -5471,7 +5471,7 @@ class MessagesTest(BaseItemTest):
             assert False, 'Gave up waiting for the sent item to show up in the inbox'
         new_subject = ('Re: %s' % sent_item.subject)[:255]
         sent_item.reply(subject=new_subject, body='Hello reply', to_recipients=[item.author])
-        for _ in range(30):
+        for _ in range(60):
             try:
                 reply = self.account.inbox.get(subject=new_subject)
                 break
@@ -5486,7 +5486,7 @@ class MessagesTest(BaseItemTest):
         item = self.get_test_item(folder=None)
         item.folder = None
         item.send()
-        for _ in range(30):
+        for _ in range(60):
             try:
                 sent_item = self.account.inbox.get(subject=item.subject)
                 break
@@ -5496,7 +5496,7 @@ class MessagesTest(BaseItemTest):
             assert False, 'Gave up waiting for the sent item to show up in the inbox'
         new_subject = ('Re: %s' % sent_item.subject)[:255]
         sent_item.reply_all(subject=new_subject, body='Hello reply')
-        for _ in range(30):
+        for _ in range(60):
             try:
                 reply = self.account.inbox.get(subject=new_subject)
                 break
@@ -5511,7 +5511,7 @@ class MessagesTest(BaseItemTest):
         item = self.get_test_item(folder=None)
         item.folder = None
         item.send()
-        for _ in range(30):
+        for _ in range(60):
             try:
                 sent_item = self.account.inbox.get(subject=item.subject)
                 break
@@ -5521,7 +5521,7 @@ class MessagesTest(BaseItemTest):
             assert False, 'Gave up waiting for the sent item to show up in the inbox'
         new_subject = ('Re: %s' % sent_item.subject)[:255]
         sent_item.forward(subject=new_subject, body='Hello reply', to_recipients=[item.author])
-        for _ in range(30):
+        for _ in range(60):
             try:
                 reply = self.account.inbox.get(subject=new_subject)
                 break
