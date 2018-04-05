@@ -453,6 +453,7 @@ Fetching personas from a contact folderis supported using the same syntax as fol
 ``.people()``:
 
 .. code-block:: python
+
     # Navigate to a contact folder and start the search
     all_contacts = a.root / 'AllContacts'
     for p in all_contacts.people():
