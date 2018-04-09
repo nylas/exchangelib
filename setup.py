@@ -17,13 +17,18 @@ from setuptools import setup
 __version__ = None
 with io.open(os.path.join(os.path.dirname(__file__), 'exchangelib/__init__.py'), encoding='utf-8') as f:
     for l in f:
-        if l.startswith('__version__'):
-            exec(l)
+        if not l.startswith('__version__'):
+            continue
+        cxt = {}
+        exec(l, {}, cxt)
+        __version__ = cxt['__version__']
+        break
 
 
 def read(file_name):
     with io.open(os.path.join(os.path.dirname(__file__), file_name), encoding='utf-8') as f:
         return f.read()
+
 
 setup(
     name='exchangelib',
