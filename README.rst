@@ -1,7 +1,7 @@
 Exchange Web Services client library
 ====================================
-:release:       1.10.7
-:date:          2017-12-27
+:release:       1.11.0
+:date:          2018-04-09
 :home:          https://github.com/ecederstrand/exchangelib/
 :pypi-repo:     https://pypi.python.org/pypi/exchangelib/
 

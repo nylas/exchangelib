@@ -2,8 +2,8 @@
 Change Log
 ==========
 
-HEAD
-----
+1.11.0
+------
 * Added ``cancel`` to ``CalendarItem`` and ``CancelCalendarItem`` class to allow cancelling meetings that were set up
 * Added ``accept``, ``decline`` and ``tentatively_accept`` to ``CalendarItem`` as wrapper methods
 * Added ``accept``, ``decline`` and ``tentatively_accept`` to ``MeetingRequest`` to respond to incoming invitations

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
 Release notes:
-* Bump version in setup.py
+* Bump version in exchangelib/__init__.py
 * Bump version and date in README.rst
 * Bump version in CHANGELOG.rst
 * Commit and push changes
