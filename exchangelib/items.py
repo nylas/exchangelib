@@ -13,8 +13,9 @@ from .fields import BooleanField, IntegerField, DecimalField, Base64Field, TextF
     PhysicalAddressField, ExtendedPropertyField, AttachmentField, RecurrenceField, MailboxField, MailboxListField, \
     AttendeesField, Choice, OccurrenceField, OccurrenceListField, MemberListField, EWSElementField, \
     EffectiveRightsField, TimeZoneField, CultureField, IdField, CharField, TextListField, EnumAsIntField, \
-    EmailAddressField, FreeBusyStatusField
-from .properties import EWSElement, ItemId, ConversationId, ParentFolderId, Attendee, ReferenceItemId, PersonaId
+    EmailAddressField, FreeBusyStatusField, ReferenceItemIdField, AssociatedCalendarItemIdField
+from .properties import EWSElement, ItemId, ConversationId, ParentFolderId, Attendee, ReferenceItemId, \
+    AssociatedCalendarItemId, PersonaId
 from .recurrence import FirstOccurrence, LastOccurrence, Occurrence, DeletedOccurrence
 from .util import is_iterable
 from .version import EXCHANGE_2007_SP1, EXCHANGE_2010, EXCHANGE_2013
@@ -22,6 +23,7 @@ from .version import EXCHANGE_2007_SP1, EXCHANGE_2010, EXCHANGE_2013
 string_type = string_types[0]
 log = logging.getLogger(__name__)
 
+# Overall Types Schema: https://msdn.microsoft.com/en-us/library/hh354700(v=exchg.150).aspx
 
 # MessageDisposition values. See https://msdn.microsoft.com/en-us/library/office/aa565209(v=exchg.150).aspx
 SAVE_ONLY = 'SaveOnly'
@@ -46,6 +48,9 @@ SEND_MEETING_CANCELLATIONS_CHOICES = (SEND_TO_NONE, SEND_ONLY_TO_ALL, SEND_TO_AL
 ALL_OCCURRENCIES = 'AllOccurrences'
 SPECIFIED_OCCURRENCE_ONLY = 'SpecifiedOccurrenceOnly'
 AFFECTED_TASK_OCCURRENCES_CHOICES = (ALL_OCCURRENCIES, SPECIFIED_OCCURRENCE_ONLY)
+
+# Conference Type values. See https://msdn.microsoft.com/en-US/library/office/aa563529(v=exchg.150).aspx
+CONFERENCE_TYPES = ('NetMeeting', 'NetShow', 'Chat')
 
 # ConflictResolution values. See https://msdn.microsoft.com/en-us/library/office/aa580254(v=exchg.150).aspx
 NEVER_OVERWRITE = 'NeverOverwrite'
@@ -493,7 +498,6 @@ class CalendarItem(Item):
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa564765(v=exchg.150).aspx
     """
     ELEMENT_NAME = 'CalendarItem'
-    CONFERENCE_TYPES = ('NetMeeting', 'NetShow', 'Chat')
     FIELDS = Item.FIELDS + [
         TextField('uid', field_uri='calendar:UID', is_required_after_save=True, is_searchable=False),
         DateTimeField('start', field_uri='calendar:Start', is_required=True),
@@ -577,6 +581,23 @@ class CalendarItem(Item):
             raise ValueError("'end' must be greater than 'start' (%s -> %s)" % (self.start, self.end))
         if version:
             self.clean_timezone_fields(version=version)
+
+    def accept(self, **kwargs):
+        return AcceptItem(reference_item_id=ReferenceItemId(id=self.item_id,
+                                                            changekey=self.changekey), **kwargs).send()
+
+    def cancel(self, **kwargs):
+        return CancelCalendarItem(account=self.account,
+                                  reference_item_id=ReferenceItemId(id=self.item_id, changekey=self.changekey),
+                                  **kwargs).send()
+
+    def decline(self, **kwargs):
+        return DeclineItem(reference_item_id=ReferenceItemId(id=self.item_id,
+                                                             changekey=self.changekey), **kwargs).send()
+
+    def tentatively_accept(self, **kwargs):
+        return TentativelyAcceptItem(reference_item_id=ReferenceItemId(id=self.item_id,
+                                                                       changekey=self.changekey), **kwargs).send()
 
     def _update_fieldnames(self):
         update_fields = super(CalendarItem, self)._update_fieldnames()
@@ -909,43 +930,288 @@ class PostItem(Item):
     ]
 
 
-class MeetingRequest(Message):
+class PostReplyItem(Item):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/bb891896(v=exchg.150).aspx
+    """
+    # TODO: Untested and unfinished.
+    ELEMENT_NAME = 'PostReplyItem'
+
+
+class BaseMeetingItem(Item):
+    """
+    A base class for meeting requests that share the same fields (Message, Request, Response, Cancellation)
+
+    MSDN: https://msdn.microsoft.com/en-us/library/aa580757(v=exchg.150).aspx
+        Certain types are created as a side effect of doing something else. Meeting messages, for example, are created
+        when you send a calendar item to attendees; they are not explicitly created.
+
+    Therefore BaseMeetingItem inherits from  EWSElement has no save() or send() method
+
+    """
+    FIELDS = [
+        Base64Field('mime_content', field_uri='item:MimeContent', is_read_only_after_send=True),
+        IdField('item_id', field_uri=ItemId.ID_ATTR, is_read_only=True),
+        IdField('changekey', field_uri=ItemId.CHANGEKEY_ATTR, is_read_only=True),
+        EWSElementField('parent_folder_id', field_uri='item:ParentFolderId', value_cls=ParentFolderId,
+                        is_read_only=True),
+        CharField('item_class', field_uri='item:ItemClass', is_read_only=True),
+        CharField('subject', field_uri='item:Subject'),
+        ChoiceField('sensitivity', field_uri='item:Sensitivity', choices={
+            Choice('Normal'), Choice('Personal'), Choice('Private'), Choice('Confidential')
+        }, is_required=True, default='Normal'),
+        TextField('text_body', field_uri='item:TextBody', is_read_only=True, supported_from=EXCHANGE_2013),
+        BodyField('body', field_uri='item:Body'),  # Accepts and returns Body or HTMLBody instances
+        AttachmentField('attachments', field_uri='item:Attachments'),  # ItemAttachment or FileAttachment
+        DateTimeField('datetime_received', field_uri='item:DateTimeReceived', is_read_only=True),
+        IntegerField('size', field_uri='item:Size', is_read_only=True),  # Item size in bytes
+        CharListField('categories', field_uri='item:Categories'),
+        ChoiceField('importance', field_uri='item:Importance', choices={
+            Choice('Low'), Choice('Normal'), Choice('High')
+        }, is_required=True, default='Normal'),
+        TextField('in_reply_to', field_uri='item:InReplyTo'),
+        BooleanField('is_submitted', field_uri='item:IsSubmitted', is_read_only=True),
+        BooleanField('is_draft', field_uri='item:IsDraft', is_read_only=True),
+        BooleanField('is_from_me', field_uri='item:IsFromMe', is_read_only=True),
+        BooleanField('is_resend', field_uri='item:IsResend', is_read_only=True),
+        BooleanField('is_unmodified', field_uri='item:IsUnmodified', is_read_only=True),
+        MessageHeaderField('headers', field_uri='item:InternetMessageHeaders', is_read_only=True),
+        DateTimeField('datetime_sent', field_uri='item:DateTimeSent', is_read_only=True),
+        DateTimeField('datetime_created', field_uri='item:DateTimeCreated', is_read_only=True),
+        # Placeholder for ResponseObjects
+        DateTimeField('reminder_due_by', field_uri='item:ReminderDueBy', is_required_after_save=True,
+                      is_searchable=False),
+        BooleanField('reminder_is_set', field_uri='item:ReminderIsSet', is_required=True, default=False),
+        IntegerField('reminder_minutes_before_start', field_uri='item:ReminderMinutesBeforeStart',
+                     is_required_after_save=True, min=0, default=0),
+        CharField('display_cc', field_uri='item:DisplayCc', is_read_only=True),
+        CharField('display_to', field_uri='item:DisplayTo', is_read_only=True),
+        BooleanField('has_attachments', field_uri='item:HasAttachments', is_read_only=True),
+        # ExtendedProperty fields go here
+        CultureField('culture', field_uri='item:Culture', is_required_after_save=True, is_searchable=False),
+        EffectiveRightsField('effective_rights', field_uri='item:EffectiveRights', is_read_only=True),
+        CharField('last_modified_name', field_uri='item:LastModifiedName', is_read_only=True),
+        DateTimeField('last_modified_time', field_uri='item:LastModifiedTime', is_read_only=True),
+        BooleanField('is_associated', field_uri='item:IsAssociated', is_read_only=True, supported_from=EXCHANGE_2010),
+        URIField('web_client_read_form_query_string', field_uri='item:WebClientReadFormQueryString',
+                 is_read_only=True, supported_from=EXCHANGE_2010),
+        URIField('web_client_edit_form_query_string', field_uri='item:WebClientEditFormQueryString',
+                 is_read_only=True, supported_from=EXCHANGE_2010),
+        EWSElementField('conversation_id', field_uri='item:ConversationId', value_cls=ConversationId,
+                        is_read_only=True, supported_from=EXCHANGE_2010),
+        BodyField('unique_body', field_uri='item:UniqueBody', is_read_only=True, supported_from=EXCHANGE_2010),
+
+        MailboxField('sender', field_uri='message:Sender', is_read_only=True, is_read_only_after_send=True),
+        MailboxListField('to_recipients', field_uri='message:ToRecipients', is_read_only_after_send=True,
+                         is_searchable=False),
+        MailboxListField('cc_recipients', field_uri='message:CcRecipients', is_read_only_after_send=True,
+                         is_searchable=False),
+        MailboxListField('bcc_recipients', field_uri='message:BccRecipients', is_read_only_after_send=True,
+                         is_searchable=False),
+        BooleanField('is_read_receipt_requested', field_uri='message:IsReadReceiptRequested',
+                     is_required=True, default=False, is_read_only_after_send=True),
+        BooleanField('is_delivery_receipt_requested', field_uri='message:IsDeliveryReceiptRequested',
+                     is_required=True, default=False, is_read_only_after_send=True),
+        Base64Field('conversation_index', field_uri='message:ConversationIndex', is_read_only=True),
+        CharField('conversation_topic', field_uri='message:ConversationTopic', is_read_only=True),
+        # Rename 'From' to 'author'. We can't use fieldname 'from' since it's a Python keyword.
+        MailboxField('author', field_uri='message:From', is_read_only_after_send=True),
+        CharField('message_id', field_uri='message:InternetMessageId', is_read_only_after_send=True),
+        BooleanField('is_read', field_uri='message:IsRead', is_required=True, default=False),
+        BooleanField('is_response_requested', field_uri='message:IsResponseRequested', default=False, is_required=True),
+        TextField('references', field_uri='message:References'),
+        MailboxField('reply_to', field_uri='message:ReplyTo', is_read_only_after_send=True, is_searchable=False),
+        AssociatedCalendarItemIdField('associated_calendar_item_id', field_uri='meeting:AssociatedCalendarItemId',
+                                      value_cls=AssociatedCalendarItemId),
+        BooleanField('is_delegated', field_uri='meeting:IsDelegated', is_read_only=True, default=False),
+        BooleanField('is_out_of_date', field_uri='meeting:IsOutOfDate', is_read_only=True, default=False),
+        BooleanField('has_been_processed', field_uri='meeting:HasBeenProcessed', is_read_only=True, default=False),
+        ChoiceField('response_type', field_uri='meeting:ResponseType',
+                    choices={Choice('Unknown'), Choice('Organizer'), Choice('Tentative'),
+                             Choice('Accept'), Choice('Decline'), Choice('NoResponseReceived')},
+                    is_required=True, default='Unknown'),
+    ]
+
+    # Used to register extended properties
+    INSERT_AFTER_FIELD = 'has_attachments'
+
+
+class MeetingRequest(BaseMeetingItem):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa565229(v=exchg.150).aspx
     """
-    # TODO: Untested and unfinished. Only the bare minimum supported to allow reading a folder that contains meeting
-    # requests.
     ELEMENT_NAME = 'MeetingRequest'
     FIELDS = Message.FIELDS + [
+        ChoiceField('meeting_request_type', field_uri='meetingRequest:MeetingRequestType',
+                    choices={Choice('FullUpdate'), Choice('InformationalUpdate'), Choice('NewMeetingRequest'),
+                             Choice('None'), Choice('Outdated'), Choice('PrincipalWantsCopy'),
+                             Choice('SilentUpdate')},
+                    default='None'),
+        ChoiceField('intended_free_busy_status', field_uri='meetingRequest:IntendedFreeBusyStatus', choices={
+                    Choice('Free'), Choice('Tentative'), Choice('Busy'), Choice('OOF'), Choice('NoData')},
+                    is_required=True, default='Busy'),
         DateTimeField('start', field_uri='calendar:Start', is_read_only=True, supported_from=EXCHANGE_2010),
         DateTimeField('end', field_uri='calendar:End', is_read_only=True, supported_from=EXCHANGE_2010),
+        DateTimeField('original_start', field_uri='calendar:OriginalStart', is_read_only=True),
+        BooleanField('is_all_day', field_uri='calendar:IsAllDayEvent', is_required=True, default=False),
+        ChoiceField('legacy_free_busy_status', field_uri='calendar:LegacyFreeBusyStatus', choices={
+            Choice('Free'), Choice('Tentative'), Choice('Busy'), Choice('OOF'), Choice('NoData'),
+            Choice('WorkingElsewhere', supported_from=EXCHANGE_2013)
+        }, is_required=True, default='Busy'),
+        TextField('location', field_uri='calendar:Location'),
+        TextField('when', field_uri='calendar:When'),
+        BooleanField('is_meeting', field_uri='calendar:IsMeeting', is_read_only=True),
+        BooleanField('is_cancelled', field_uri='calendar:IsCancelled', is_read_only=True),
+        BooleanField('is_recurring', field_uri='calendar:IsRecurring', is_read_only=True),
+        BooleanField('meeting_request_was_sent', field_uri='calendar:MeetingRequestWasSent', is_read_only=True),
+        ChoiceField('type', field_uri='calendar:CalendarItemType', choices={
+            Choice('Single'), Choice('Occurrence'), Choice('Exception'), Choice('RecurringMaster'),
+        }, is_read_only=True),
+        ChoiceField('my_response_type', field_uri='calendar:MyResponseType', choices={
+            Choice(c) for c in Attendee.RESPONSE_TYPES
+        }, is_read_only=True),
+        MailboxField('organizer', field_uri='calendar:Organizer', is_read_only=True),
+        AttendeesField('required_attendees', field_uri='calendar:RequiredAttendees', is_searchable=False),
+        AttendeesField('optional_attendees', field_uri='calendar:OptionalAttendees', is_searchable=False),
+        AttendeesField('resources', field_uri='calendar:Resources', is_searchable=False),
+        IntegerField('conflicting_meeting_count', field_uri='calendar:ConflictingMeetingCount', is_read_only=True),
+        IntegerField('adjacent_meeting_count', field_uri='calendar:AdjacentMeetingCount', is_read_only=True),
+        # Placeholder for calendar:ConflictingMeetings
+        # Placeholder for calendar:AdjacentMeetings
+        CharField('duration', field_uri='calendar:Duration', is_read_only=True),
+        # Placeholder for calendar:TimeZone
+        DateTimeField('appointment_reply_time', field_uri='calendar:AppointmentReplyTime', is_read_only=True),
+        IntegerField('appointment_sequence_number', field_uri='calendar:AppointmentSequenceNumber', is_read_only=True),
+        # Placeholder for calendar:AppointmentState
+        # AppointmentState is an EnumListField-like field, but with bitmask values:
+        #    https://msdn.microsoft.com/en-us/library/office/aa564700(v=exchg.150).aspx
+        # We could probably subclass EnumListField to implement this field.
+        RecurrenceField('recurrence', field_uri='calendar:Recurrence', is_searchable=False),
+        OccurrenceField('first_occurrence', field_uri='calendar:FirstOccurrence', value_cls=FirstOccurrence,
+                        is_read_only=True),
+        OccurrenceField('last_occurrence', field_uri='calendar:LastOccurrence', value_cls=LastOccurrence,
+                        is_read_only=True),
+        OccurrenceListField('modified_occurrences', field_uri='calendar:ModifiedOccurrences', value_cls=Occurrence,
+                            is_read_only=True),
+        OccurrenceListField('deleted_occurrences', field_uri='calendar:DeletedOccurrences', value_cls=DeletedOccurrence,
+                            is_read_only=True),
+        TimeZoneField('_meeting_timezone', field_uri='calendar:MeetingTimeZone', deprecated_from=EXCHANGE_2010,
+                      is_read_only=True, is_searchable=False),
+        TimeZoneField('_start_timezone', field_uri='calendar:StartTimeZone', supported_from=EXCHANGE_2010,
+                      is_read_only=True, is_searchable=False),
+        TimeZoneField('_end_timezone', field_uri='calendar:EndTimeZone', supported_from=EXCHANGE_2010,
+                      is_read_only=True, is_searchable=False),
+        EnumAsIntField('conference_type', field_uri='calendar:ConferenceType', enum=CONFERENCE_TYPES, min=0,
+                       default=None, is_required_after_save=True),
+        BooleanField('allow_new_time_proposal', field_uri='calendar:AllowNewTimeProposal', default=None,
+                     is_required_after_save=True, is_searchable=False),
+        BooleanField('is_online_meeting', field_uri='calendar:IsOnlineMeeting', default=None,
+                     is_required_after_save=True),
+        URIField('meeting_workspace_url', field_uri='calendar:MeetingWorkspaceUrl'),
+        URIField('net_show_url', field_uri='calendar:NetShowUrl'),
     ]
 
+    def accept(self, **kwargs):
+        return AcceptItem(account=self.account,
+                          reference_item_id=ReferenceItemId(id=self.item_id, changekey=self.changekey),
+                          **kwargs).send()
 
-class MeetingResponse(Message):
+    def decline(self, **kwargs):
+        return DeclineItem(account=self.account,
+                           reference_item_id=ReferenceItemId(id=self.item_id, changekey=self.changekey),
+                           **kwargs).send()
+
+    def tentatively_accept(self, **kwargs):
+        return TentativelyAcceptItem(account=self.account,
+                                     reference_item_id=ReferenceItemId(id=self.item_id, changekey=self.changekey),
+                                     **kwargs).send()
+
+
+class MeetingMessage(BaseMeetingItem):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa565359(v=exchg.150).aspx
+    """
+    # TODO: Untested - not sure if this is ever used
+    ELEMENT_NAME = 'MeetingMessage'
+
+
+class MeetingResponse(BaseMeetingItem):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa564337(v=exchg.150).aspx
     """
-    # TODO: Untested and unfinished. Only the bare minimum supported to allow reading a folder that contains meeting
-    # responses.
     ELEMENT_NAME = 'MeetingResponse'
     FIELDS = Message.FIELDS + [
-        DateTimeField('start', field_uri='calendar:Start', is_read_only=True, supported_from=EXCHANGE_2010),
-        DateTimeField('end', field_uri='calendar:End', is_read_only=True, supported_from=EXCHANGE_2010),
+        MailboxField('received_by', field_uri='message:ReceivedBy', is_read_only=True),
+        MailboxField('received_representing', field_uri='message:ReceivedRepresenting', is_read_only=True),
     ]
 
 
-class MeetingCancellation(Message):
+class MeetingCancellation(BaseMeetingItem):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/office/aa564337(v=exchg.150).aspx
+    MSDN: https://msdn.microsoft.com/en-us/library/office/aa564685(v=exchg.150).aspx
     """
-    # TODO: Untested and unfinished. Only the bare minimum supported to allow reading a folder that contains meeting
-    # cancellations.
     ELEMENT_NAME = 'MeetingCancellation'
-    FIELDS = Message.FIELDS + [
-        DateTimeField('start', field_uri='calendar:Start', is_read_only=True, supported_from=EXCHANGE_2010),
-        DateTimeField('end', field_uri='calendar:End', is_read_only=True, supported_from=EXCHANGE_2010),
+
+
+class BaseMeetingReplyItem(Item):
+    # A base class for meeting request reply items that share the same fields (Accept, TentativelyAccept, Decline)
+    FIELDS = [
+        CharField('item_class', field_uri='item:ItemClass', is_read_only=True),
+        ChoiceField('sensitivity', field_uri='item:Sensitivity', choices={
+            Choice('Normal'), Choice('Personal'), Choice('Private'), Choice('Confidential')
+        }, is_required=True, default='Normal'),
+        BodyField('body', field_uri='item:Body'),  # Accepts and returns Body or HTMLBody instances
+        AttachmentField('attachments', field_uri='item:Attachments'),  # ItemAttachment or FileAttachment
+        MessageHeaderField('headers', field_uri='item:InternetMessageHeaders', is_read_only=True),
+        MailboxField('sender', field_uri='message:Sender', is_read_only=True, is_read_only_after_send=True),
+        MailboxListField('to_recipients', field_uri='message:ToRecipients', is_read_only_after_send=True,
+                         is_searchable=False),
+        MailboxListField('cc_recipients', field_uri='message:CcRecipients', is_read_only_after_send=True,
+                         is_searchable=False),
+        MailboxListField('bcc_recipients', field_uri='message:BccRecipients', is_read_only_after_send=True,
+                         is_searchable=False),
+        BooleanField('is_read_receipt_requested', field_uri='message:IsReadReceiptRequested',
+                     is_required=True, default=False, is_read_only_after_send=True),
+        BooleanField('is_delivery_receipt_requested', field_uri='message:IsDeliveryReceiptRequested',
+                     is_required=True, default=False, is_read_only_after_send=True),
+        ReferenceItemIdField('reference_item_id', field_uri='item:ReferenceItemId', value_cls=ReferenceItemId),
+        MailboxField('received_by', field_uri='message:ReceivedBy', is_read_only=True),
+        MailboxField('received_representing', field_uri='message:ReceivedRepresenting', is_read_only=True),
+        DateTimeField('proposed_start', field_uri='meeting:ProposedStart', supported_from=EXCHANGE_2013),
+        DateTimeField('proposed_end', field_uri='meeting:ProposedEnd', supported_from=EXCHANGE_2013),
     ]
+
+    def send(self, message_disposition=SEND_AND_SAVE_COPY):
+        if not self.account:
+            raise ValueError('Item must have an account')
+
+        res = self.account.bulk_create(items=[self], folder=self.folder, message_disposition=message_disposition)
+
+        for r_item in res:
+            if isinstance(r_item, Exception):
+                raise r_item
+        return res
+
+
+class AcceptItem(BaseMeetingReplyItem):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/aa562964(v=exchg.150).aspx
+    """
+    ELEMENT_NAME = 'AcceptItem'
+
+
+class TentativelyAcceptItem(BaseMeetingReplyItem):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/aa565438(v=exchg.150).aspx
+    """
+    ELEMENT_NAME = 'TentativelyAcceptItem'
+
+
+class DeclineItem(BaseMeetingReplyItem):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/aa579729(v=exchg.150).aspx
+    """
+    ELEMENT_NAME = 'DeclineItem'
 
 
 class BaseReplyItem(EWSElement):
@@ -1004,6 +1270,13 @@ class ForwardItem(BaseReplyItem):
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa564250(v=exchg.150).aspx
     """
     ELEMENT_NAME = 'ForwardItem'
+
+
+class CancelCalendarItem(BaseReplyItem):
+    """
+    MSDN: https://msdn.microsoft.com/en-us/library/aa564482(v=exchg.150).aspx
+    """
+    ELEMENT_NAME = 'CancelCalendarItem'
 
 
 class Persona(EWSElement):

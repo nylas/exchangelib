@@ -447,6 +447,58 @@ Here are some examples of using the API:
     FolderCollection(account=account, folders=[account.inbox, account.calendar]).filter(subject='foo')
 
 
+Meetings
+^^^^^^^^
+
+The ``CalendarItem`` class allows you send out requests for meetings that you initiate or to cancel meetings that you
+already set out before. It is also possible to process ``MeetingRequest`` messages that are received. You can reply to
+these messages using the ``AcceptItem``, ``TentativelyAcceptItem`` and ``DeclineItem`` classes. If you receive a
+cancellation for a meeting (class ``MeetingCancellation``) that you already accepted then you can also process these
+by removing the entry from the calendar.
+
+.. code-block:: python
+
+    # create a meeting request and send it out
+    calendar_item = CalendarItem(
+        account=account,
+        folder=account.calendar,
+        start=tz.localize(EWSDateTime(year, month, day, hour, minute)),
+        end=tz.localize(EWSDateTime(year, month, day, hour, minute)),
+        subject="Subject of Meeting",
+        body="Please come to my meeting",
+        required_attendees=['anne@example.com', 'bob@example.com']
+    )
+    item.save(send_meeting_invitations=SEND_TO_ALL_AND_SAVE_COPY)
+
+    # cancel a meeting that was sent out using the CalendarItem class
+    for calendar_item in account.calendar.all().order_by('-datetime_received')[:5]:
+        # only the organizer of a meeting can cancel it
+        if calendar_item.organizer.email_address == account.primary_smtp_address:
+            calendar_item.cancel()
+
+    # processing an incoming MeetingRequest
+    for item in account.inbox.all().order_by('-datetime_received')[:5]:
+        if isinstance(item, MeetingRequest):
+            item.accept(body="Sure, I'll come")
+            # Or:
+            item.decline(body="No way!")
+            # Or:
+            item.tentatively_accept(body="Maybe...")
+
+    # meeting requests can also be handled from the calendar - e.g. decline the meeting that was received last
+    for calendar_item in account.calendar.all().order_by('-datetime_received')[:1]:
+        calendar_item.decline()
+
+    # processing an incoming MeetingCancellation (also delete from calendar)
+    for item in account.inbox.all().order_by('-datetime_received')[:5]:
+        if isinstance(ews_item, MeetingCancellation):
+            if item.associated_calendar_item_id:
+                calendar_item = account.inbox.get(item_id=item.associated_calendar_item_id.id,
+                                                  changekey=item.associated_calendar_item_id.changekey)
+                calendar_item.delete()
+            item.move_to_trash()
+
+
 Searching contacts
 ^^^^^^^^^^^^^^^^^^
 Fetching personas from a contact folderis supported using the same syntax as folders. Just start your query with
