@@ -189,7 +189,6 @@ class EWSService(object):
                     self._update_api_version(hint=hint, api_version=api_version, response=r)
                 except TransportError as e:
                     log.debug('Failed to update version info (%s)', e)
-                    pass
                 raise
             else:
                 self._update_api_version(hint=hint, api_version=api_version, response=r)

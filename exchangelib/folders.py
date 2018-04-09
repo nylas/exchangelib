@@ -967,7 +967,7 @@ class Root(Folder):
         candidates = []
         # Try direct children of TOIS first. TOIS might not exist.
         try:
-            same_type = [f for f in self.tois.children if type(f) == folder_cls]
+            same_type = [f for f in self.tois.children if f.__class__ == folder_cls]
             are_distinguished = [f for f in same_type if f.is_distinguished]
             if are_distinguished:
                 candidates = are_distinguished
@@ -985,7 +985,7 @@ class Root(Folder):
             return candidates[0]
 
         # No candidates in TOIS. Try direct children of root.
-        same_type = [f for f in self.children if type(f) == folder_cls]
+        same_type = [f for f in self.children if f.__class__ == folder_cls]
         are_distinguished = [f for f in same_type if f.is_distinguished]
         if are_distinguished:
             candidates = are_distinguished

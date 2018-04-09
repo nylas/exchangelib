@@ -203,6 +203,7 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
         self.types_url = '%s://%s/EWS/types.xsd' % (scheme, self.server)
 
         # Autodetect authentication type if necessary
+        # pylint: disable=access-member-before-definition
         if self.auth_type is None:
             self.auth_type = get_service_authtype(service_endpoint=self.service_endpoint, versions=API_VERSIONS,
                                                   name=self.credentials.username)

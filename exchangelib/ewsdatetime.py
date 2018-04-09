@@ -100,7 +100,7 @@ class EWSDateTime(datetime.datetime):
 
     @classmethod
     def from_datetime(cls, d):
-        if type(d) != datetime.datetime:
+        if d.__class__ != datetime.datetime:
             raise ValueError("%r must be a datetime instance" % d)
         if d.tzinfo is None:
             tz = None
