@@ -738,6 +738,7 @@ class Folder(RegisterMixIn, SearchableMixIn):
             # TODO: Only do this if we actually requested the 'name' field.
             kwargs['name'] = cls.DISTINGUISHED_FOLDER_ID
         elem.clear()
+        folder_cls = cls
         if cls == Folder:
             # We were called on the generic Folder class. Try to find a more specific class to return objects as.
             #
@@ -752,20 +753,24 @@ class Folder(RegisterMixIn, SearchableMixIn):
             #
             # Instead, search for a folder class using the localized name. If none are found, fall back to getting the
             # folder class by the "FolderClass" value.
-            try:
-                # TODO: fld_class.LOCALIZED_NAMES is most definitely neither complete nor authoritative
-                folder_cls = cls.folder_cls_from_folder_name(folder_name=kwargs['name'], locale=account.locale)
-                log.debug('Folder class %s matches localized folder name %s', folder_cls, kwargs['name'])
-            except KeyError:
+            #
+            # The returned XML may contain neither folder class nor name. In that case, we default
+            if kwargs['name']:
                 try:
-                    folder_cls = cls.folder_cls_from_container_class(kwargs['folder_class'])
+                    # TODO: fld_class.LOCALIZED_NAMES is most definitely neither complete nor authoritative
+                    folder_cls = cls.folder_cls_from_folder_name(folder_name=kwargs['name'], locale=account.locale)
+                    log.debug('Folder class %s matches localized folder name %s', folder_cls, kwargs['name'])
+                except KeyError:
+                    pass
+            if kwargs['folder_class'] and folder_cls == Folder:
+                try:
+                    folder_cls = cls.folder_cls_from_container_class(container_class=kwargs['folder_class'])
                     log.debug('Folder class %s matches container class %s (%s)', folder_cls, kwargs['folder_class'],
                               kwargs['name'])
                 except KeyError:
-                    log.debug('Fallback to container class %s (%s)', kwargs['folder_class'], kwargs['name'])
-                    folder_cls = cls
-        else:
-            folder_cls = cls
+                    pass
+            if folder_cls == Folder:
+                log.debug('Fallback to class Folder (folder_class %s, name %s)', kwargs['folder_class'], kwargs['name'])
         return folder_cls(account=account, folder_id=fld_id, changekey=changekey, **kwargs)
 
     def to_xml(self, version):

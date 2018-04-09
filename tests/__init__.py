@@ -2799,6 +2799,13 @@ class FolderTest(EWSTest):
         with self.assertRaises(ErrorDeleteDistinguishedFolder):
             self.account.inbox.delete()
 
+    def test_generic_folder(self):
+        f = Folder(parent=self.account.inbox, name=get_random_string(16))
+        f.save()
+        f.name = get_random_string(16)
+        f.save()
+        f.delete()
+
 
 class BaseItemTest(EWSTest):
     TEST_FOLDER = None
