@@ -2,7 +2,7 @@
 import logging
 
 from future.utils import python_2_unicode_compatible
-from six import string_types, PY2
+from six import string_types
 
 from .util import create_element, xml_to_str, value_to_xml_text, is_iterable
 from .version import EXCHANGE_2010
@@ -99,8 +99,6 @@ class Q(object):
             # We only have one child and no expression on ourselves, so we are a no-op. Flatten by taking over the child
             self._promote()
 
-        self.clean()
-
     def _get_children_from_kwarg(self, key, value, is_single_kwarg=False):
         # Generates Q objects corresponding to a single keyword argument. Makes this a leaf if there are no children to
         # generate.
@@ -183,34 +181,10 @@ class Q(object):
         self.children = q.children
 
     def clean(self):
-        if self.is_empty():
-            return
-        if self.query_string:
-            if any([self.field_path, self.op, self.value, self.children]):
-                raise ValueError('Query strings cannot be combined with other settings')
-            return
-        if self.conn_type not in self.CONN_TYPES:
-            raise ValueError("'conn_type' %s must be one of %s" % (self.conn_type, self.CONN_TYPES))
-        if not self.is_leaf():
-            return
-        if not self.field_path:
-            raise ValueError("'field_path' must be set")
-        if self.op not in self.OP_TYPES:
-            raise ValueError("'op' %s must be one of %s" % (self.op, self.OP_TYPES))
-        if self.op == self.EXISTS:
-            if self.value is not True:
-                raise ValueError("'value' must be True when operator is EXISTS")
-        if self.value is None:
-            raise ValueError('Value for filter on field path "%s" cannot be None' % self.field_path)
-        if is_iterable(self.value, generators_allowed=True):
-            raise ValueError(
-                'Value %r for filter on field path "%s" must be a single value' % (self.value, self.field_path)
-            )
-        if not PY2 and not isinstance(self.value, bytes):
-            try:
-                value_to_xml_text(self.value)
-            except NotImplementedError:
-                raise ValueError('Value %r for filter on field path "%s" is unsupported' % (self.value, self.field_path))
+        # Do some basic checks on the attributes, using a generic folder and no Exchange version restrictions. to_xml()
+        # does a really good job of validating. There's no reason to replicate much of that here.
+        from .folders import Folder
+        self.to_xml(folders=[Folder()], version=None)
 
     @classmethod
     def _lookup_to_op(cls, lookup):
@@ -316,18 +290,6 @@ class Q(object):
             return self.conn_type + ' (%s)' % expr
         return expr
 
-    def _validate_field_path(self, field_path, folder):
-        from .indexed_properties import MultiFieldIndexedElement
-        if field_path.field not in folder.allowed_fields():
-            raise ValueError(
-                "'%s' is not a valid field when filtering on %s" % (field_path.field.name, folder.__class__.__name__))
-        if not field_path.field.is_searchable:
-            raise ValueError("EWS does not support filtering on field '%s'" % field_path.field.name)
-        if field_path.subfield and not field_path.subfield.is_searchable:
-            raise ValueError("EWS does not support filtering on subfield '%s'" % field_path.subfield.name)
-        if issubclass(field_path.field.value_cls, MultiFieldIndexedElement) and not field_path.subfield:
-            raise ValueError("Field path '%s' must contain a subfield" % self.field_path)
-
     def to_xml(self, folders, version):
         if self.query_string:
             if version.build < EXCHANGE_2010:
@@ -343,42 +305,88 @@ class Q(object):
         restriction.append(elem)
         return restriction
 
+    def _check_integrity(self):
+        if self.is_empty():
+            return
+        if self.query_string:
+            if any([self.field_path, self.op, self.value, self.children]):
+                raise ValueError('Query strings cannot be combined with other settings')
+            return
+        if self.conn_type not in self.CONN_TYPES:
+            raise ValueError("'conn_type' %s must be one of %s" % (self.conn_type, self.CONN_TYPES))
+        if not self.is_leaf():
+            return
+        if not self.field_path:
+            raise ValueError("'field_path' must be set")
+        if self.op not in self.OP_TYPES:
+            raise ValueError("'op' %s must be one of %s" % (self.op, self.OP_TYPES))
+        if self.op == self.EXISTS:
+            if self.value is not True:
+                raise ValueError("'value' must be True when operator is EXISTS")
+        if self.value is None:
+            raise ValueError('Value for filter on field path "%s" cannot be None' % self.field_path)
+        if is_iterable(self.value, generators_allowed=True):
+            raise ValueError(
+                'Value %r for filter on field path "%s" must be a single value' % (self.value, self.field_path)
+            )
+
+    def _validate_field_path(self, field_path, folder):
+        from .indexed_properties import MultiFieldIndexedElement
+        if field_path.field not in folder.allowed_fields():
+            raise ValueError(
+                "'%s' is not a valid field when filtering on %s" % (field_path.field.name, folder.__class__.__name__))
+        if not field_path.field.is_searchable:
+            raise ValueError("EWS does not support filtering on field '%s'" % field_path.field.name)
+        if field_path.subfield and not field_path.subfield.is_searchable:
+            raise ValueError("EWS does not support filtering on subfield '%s'" % field_path.subfield.name)
+        if issubclass(field_path.field.value_cls, MultiFieldIndexedElement) and not field_path.subfield:
+            raise ValueError("Field path '%s' must contain a subfield" % self.field_path)
+
+    def _get_field_path(self, folders):
+        # Convert the string field path to a real FieldPath object. The path is validated using the given folders.
+        from .fields import FieldPath
+        for folder in folders:
+            try:
+                field_path = FieldPath.from_string(self.field_path, folder=folder)
+                self._validate_field_path(field_path=field_path, folder=folder)
+                return field_path
+            except ValueError:
+                continue
+        else:
+            raise ValueError("Unknown fieldname '%s' on folders '%s'" % (self.field_path, folders))
+
+    def _get_clean_value(self, field_path, version):
+        if self.op == self.EXISTS:
+            return None
+        clean_field = field_path.subfield if (field_path.subfield and field_path.label) else field_path.field
+        if clean_field.is_list:
+            # With __contains, we allow filtering by only one value even though the field is a list type
+            return clean_field.clean(value=[self.value], version=version)[0]
+        else:
+            return clean_field.clean(value=self.value, version=version)
+
     def xml_elem(self, folders, version):
         # Recursively build an XML tree structure of this Q object. If this is an empty leaf (the equivalent of Q()),
         # return None.
-        from .fields import FieldPath
         from .indexed_properties import SingleFieldIndexedElement
+        # Don't check self.value just yet. We want to return error messages on the field path first, and then the value.
+        # This is done in _get_field_path() and _get_clean_value(), respectively.
+        self._check_integrity()
         if self.is_empty():
             return None
         if self.is_leaf():
             elem = self._op_to_xml(self.op)
-            for folder in folders:
-                try:
-                    field_path = FieldPath.from_string(self.field_path, folder=folder)
-                except ValueError:
-                    continue
-                self._validate_field_path(field_path=field_path, folder=folder)
-                break
-            else:
-                raise ValueError("Unknown fieldname '%s' on folders '%s'" % (self.field_path, folders))
-            if self.op == self.EXISTS:
-                value = self.value
-            else:
-                clean_field = field_path.subfield if (field_path.subfield and field_path.label) else field_path.field
-                if clean_field.is_list:
-                    # With __contains, we allow filtering by only one value even though the field is a list type
-                    value = clean_field.clean(value=[self.value], version=version)[0]
-                else:
-                    value = clean_field.clean(value=self.value, version=version)
+            field_path = self._get_field_path(folders)
+            clean_value = self._get_clean_value(field_path=field_path, version=version)
             if issubclass(field_path.field.value_cls, SingleFieldIndexedElement) and not field_path.label:
                 # We allow a filter shortcut of e.g. email_addresses__contains=EmailAddress(label='Foo', ...) instead of
                 # email_addresses__Foo_email_address=.... Set FieldPath label now so we can generate the field_uri.
-                field_path.label = value.label
+                field_path.label = clean_value.label
             elem.append(field_path.to_xml())
             constant = create_element('t:Constant')
             if self.op != self.EXISTS:
                 # Use .set() to not fill up the create_element() cache with unique values
-                constant.set('Value', value_to_xml_text(value))
+                constant.set('Value', value_to_xml_text(clean_value))
                 if self.op in self.CONTAINS_OPS:
                     elem.append(constant)
                 else:

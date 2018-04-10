@@ -889,7 +889,7 @@ class RestrictionTest(unittest.TestCase):
             Q(datetime_created__range=(1,))  # Must have exactly 2 args
         with self.assertRaises(ValueError):
             Q(datetime_created__range=(1, 2, 3))  # Must have exactly 2 args
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             Q(datetime_created=Build(15, 1)).clean()  # Must be serializable
         with self.assertRaises(ValueError):
             Q(datetime_created=EWSDateTime(2017, 1, 1)).clean()  # Must be tz-aware date
@@ -962,7 +962,7 @@ class RestrictionTest(unittest.TestCase):
     def test_q_failures(self):
         with self.assertRaises(ValueError):
             # Invalid value
-            Q(foo=None)
+            Q(foo=None).clean()
 
 
 class QuerySetTest(unittest.TestCase):
