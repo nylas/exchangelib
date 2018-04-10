@@ -139,7 +139,7 @@ you can create an ``HTTPAdapter`` class that looks like this:
             super(CustomRootVerifyHTTPAdapter, self).cert_verify(conn=conn, url=url, verify=cert_file, cert=cert)
 
 
-``exchangelib`` provides a sample adapter which ignores SSL validation errors. Use at own risk.
+``exchangelib`` provides a sample adapter which ignores TLS validation errors. Use at own risk.
 
 .. code-block:: python
 

@@ -64,7 +64,7 @@ Change Log
 
 1.10.0
 ------
-* Removed the ``verify_ssl`` argument to ``Account``, ``discover`` and ``Configuration``. If you need to disable SSL
+* Removed the ``verify_ssl`` argument to ``Account``, ``discover`` and ``Configuration``. If you need to disable TLS
   verification, register a custom ``HTTPAdapter`` class. A sample adapter class is provided for convenience:
 
   .. code-block:: python

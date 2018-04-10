@@ -6,7 +6,7 @@ User Principal Name). The protocol for autodiscovering an email address is descr
 http://msdn.microsoft.com/en-us/library/hh352638(v=exchg.140).aspx. Handling error messages is described here:
 http://msdn.microsoft.com/en-us/library/office/dn467392(v=exchg.150).aspx. This is not fully implemented.
 
-WARNING: We are taking many shortcuts here, like assuming SSL and following 302 Redirects automatically.
+WARNING: We are taking many shortcuts here, like assuming TLS and following 302 Redirects automatically.
 If you have problems autodiscovering, start by doing an official test at https://testconnectivity.microsoft.com
 """
 from __future__ import unicode_literals
@@ -33,7 +33,7 @@ from .errors import AutoDiscoverFailed, AutoDiscoverRedirect, AutoDiscoverCircul
 from .protocol import BaseProtocol, Protocol
 from .transport import DEFAULT_ENCODING, DEFAULT_HEADERS
 from .util import create_element, get_xml_attr, add_xml_child, to_xml, is_xml, post_ratelimited, xml_to_str, \
-    get_domain, CONNECTION_ERRORS, SSL_ERRORS
+    get_domain, CONNECTION_ERRORS, TLS_ERRORS
 
 
 log = logging.getLogger(__name__)
@@ -176,7 +176,7 @@ def discover(email, credentials):
     if not isinstance(credentials, Credentials):
         raise ValueError("'credentials' %r must be a Credentials instance" % credentials)
     domain = get_domain(email)
-    # We may be using multiple different credentials and changing our minds on SSL verification. This key combination
+    # We may be using multiple different credentials and changing our minds on TLS verification. This key combination
     # should be safe.
     autodiscover_key = (domain, credentials)
     # Use lock to guard against multiple threads competing to cache information
@@ -256,7 +256,7 @@ def _try_autodiscover(hostname, credentials, email):
                 log.info('autodiscover.%s redirected us to %s', hostname, e.server)
                 return _try_autodiscover(e.server, credentials, email)
             except AutoDiscoverFailed as e:
-                log.info('Autodiscover on autodiscover.%s (no SSL) failed (%s). Trying DNS records', hostname, e)
+                log.info('Autodiscover on autodiscover.%s (no TLS) failed (%s). Trying DNS records', hostname, e)
                 hostname_from_dns = _get_canonical_name(hostname='autodiscover.%s' % hostname)
                 try:
                     if not hostname_from_dns:
@@ -276,7 +276,7 @@ def _try_autodiscover(hostname, credentials, email):
 
 
 def _get_auth_type_or_raise(url, email, hostname):
-    # Returns the auth type of the URL. Raises any redirection errors. This tests host DNS, port availability, and SSL
+    # Returns the auth type of the URL. Raises any redirection errors. This tests host DNS, port availability, and TLS
     # validation (if applicable).
     try:
         return _get_auth_type(url=url, email=email)
@@ -357,7 +357,7 @@ def _get_auth_type(url, email):
         if isinstance(e, RedirectError):
             raise
         raise_from(AutoDiscoverFailed('Error guessing auth type: %s' % e), None)
-    except SSL_ERRORS as e:
+    except TLS_ERRORS as e:
         raise_from(AutoDiscoverFailed('Error guessing auth type: %s' % e), None)
     except CONNECTION_ERRORS as e:
         raise_from(AutoDiscoverFailed('Error guessing auth type: %s' % e), None)

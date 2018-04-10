@@ -398,12 +398,12 @@ if not PY2:
     # Python2 does not have ConnectionResetError
     CONNECTION_ERRORS += (ConnectionResetError,)
 
-# A collection of error classes we want to handle as SSL verification errors
-SSL_ERRORS = (requests.exceptions.SSLError,)
+# A collection of error classes we want to handle as TLS verification errors
+TLS_ERRORS = (requests.exceptions.SSLError,)
 try:
-    # If pyOpenSSL is installed, requests will use it and throw this class on SSL errors
+    # If pyOpenSSL is installed, requests will use it and throw this class on TLS errors
     import OpenSSL.SSL
-    SSL_ERRORS += (OpenSSL.SSL.Error,)
+    TLS_ERRORS += (OpenSSL.SSL.Error,)
 except ImportError:
     pass
 
@@ -524,7 +524,7 @@ Response data: %(xml_response)s
 
 def _may_retry_on_error(r, protocol, wait):
     # The genericerrorpage.htm/internalerror.asp is ridiculous behaviour for random outages. Redirect to
-    # '/internalsite/internalerror.asp' or '/internalsite/initparams.aspx' is caused by e.g. SSL certificate
+    # '/internalsite/internalerror.asp' or '/internalsite/initparams.aspx' is caused by e.g. TLS certificate
     # f*ckups on the Exchange server.
     if (r.status_code == 401) \
             or (r.headers.get('connection') == 'close') \

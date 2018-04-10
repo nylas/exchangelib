@@ -46,10 +46,10 @@ from exchangelib import DELEGATE, Credentials, Account, EWSTimeZone, UTC_NOW
 import sh
 
 if '--insecure' in sys.argv:
-    # Disable SSL when Office365 can't get their certificate act together
+    # Disable TLS when Office365 can't get their certificate act together
     from exchangelib.protocol import BaseProtocol, NoVerifyHTTPAdapter
     BaseProtocol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
-    # Disable insecure SSL warnings
+    # Disable insecure TLS warnings
     warnings.filterwarnings("ignore")
 
 # Use notify-send for email notifications and zenity for calendar notifications

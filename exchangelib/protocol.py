@@ -149,7 +149,7 @@ class CachingProtocol(type):
         # We ignore auth_type from kwargs in the cache key. We trust caller to supply the correct auth_type - otherwise
         # __init__ will guess the correct auth type.
 
-        # We may be using multiple different credentials and changing our minds on SSL verification. This key
+        # We may be using multiple different credentials and changing our minds on TLS verification. This key
         # combination should be safe.
         _protocol_cache_key = kwargs['service_endpoint'], kwargs['credentials']
 
@@ -359,6 +359,6 @@ class EWSSession(requests.sessions.Session):
 
 
 class NoVerifyHTTPAdapter(requests.adapters.HTTPAdapter):
-    # An HTTP adapter that ignores SSL validation errors. Use at own risk.
+    # An HTTP adapter that ignores TLS validation errors. Use at own risk.
     def cert_verify(self, conn, url, verify, cert):
         super(NoVerifyHTTPAdapter, self).cert_verify(conn=conn, url=url, verify=False, cert=cert)

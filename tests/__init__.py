@@ -1275,7 +1275,7 @@ class EWSTest(unittest.TestCase):
 
         cls.verify_ssl = settings.get('verify_ssl', True)
         if not cls.verify_ssl:
-            # Allow unverified SSL if requested in settings file
+            # Allow unverified TLS if requested in settings file
             BaseProtocol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
 
         # Speed up tests a bit. We don't need to wait 10 seconds for every nonexisting server in the discover dance
@@ -2476,8 +2476,8 @@ class AutodiscoverTest(EWSTest):
 
     def test_disable_ssl_verification(self):
         if not self.verify_ssl:
-            # We can only run this test if we haven't already disabled SSL
-            raise self.skipTest('SSL verification already disabled')
+            # We can only run this test if we haven't already disabled TLS
+            raise self.skipTest('TLS verification already disabled')
         import exchangelib.autodiscover
 
         default_adapter_cls = BaseProtocol.HTTP_ADAPTER_CLS
@@ -2486,7 +2486,7 @@ class AutodiscoverTest(EWSTest):
         exchangelib.autodiscover._autodiscover_cache.clear()
         discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
 
-        # Smash SSL verification using an untrusted certificate
+        # Smash TLS verification using an untrusted certificate
         with tempfile.NamedTemporaryFile() as f:
             f.write(b'''\
  -----BEGIN CERTIFICATE-----
@@ -2517,15 +2517,15 @@ r5p9FrBgavAw5bKO54C0oQKpN/5fta5l6Ws0
             try:
                 os.environ['REQUESTS_CA_BUNDLE'] = f.name
 
-                # Now discover should fail. SSL errors mean we exhaust all autodiscover attempts
+                # Now discover should fail. TLS errors mean we exhaust all autodiscover attempts
                 with self.assertRaises(AutoDiscoverFailed):
                     exchangelib.autodiscover._autodiscover_cache.clear()
                     discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
 
-                # Disable insecure SSL warnings
+                # Disable insecure TLS warnings
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
-                    # Make sure we can survive SSL validation errors when using the custom adapter
+                    # Make sure we can survive TLS validation errors when using the custom adapter
                     exchangelib.autodiscover._autodiscover_cache.clear()
                     BaseProtocol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
                     discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
