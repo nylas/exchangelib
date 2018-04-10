@@ -498,6 +498,11 @@ class Base64Field(FieldURIField):
     value_cls = bytes
     is_complex = True
 
+    def __init__(self, *args, **kwargs):
+        if 'is_searchable' not in kwargs:
+            kwargs['is_searchable'] = False
+        super(Base64Field, self).__init__(*args, **kwargs)
+
     def from_xml(self, elem, account):
         field_elem = elem.find(self.response_tag())
         val = None if field_elem is None else field_elem.text or None

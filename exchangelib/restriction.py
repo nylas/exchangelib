@@ -2,7 +2,7 @@
 import logging
 
 from future.utils import python_2_unicode_compatible
-from six import string_types
+from six import string_types, PY2
 
 from .util import create_element, xml_to_str, value_to_xml_text, is_iterable
 from .version import EXCHANGE_2010
@@ -206,10 +206,11 @@ class Q(object):
             raise ValueError(
                 'Value %r for filter on field path "%s" must be a single value' % (self.value, self.field_path)
             )
-        try:
-            value_to_xml_text(self.value)
-        except NotImplementedError:
-            raise ValueError('Value %r for filter on field path "%s" is unsupported' % (self.value, self.field_path))
+        if not PY2 and not isinstance(self.value, bytes):
+            try:
+                value_to_xml_text(self.value)
+            except NotImplementedError:
+                raise ValueError('Value %r for filter on field path "%s" is unsupported' % (self.value, self.field_path))
 
     @classmethod
     def _lookup_to_op(cls, lookup):

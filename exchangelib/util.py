@@ -53,7 +53,7 @@ def is_iterable(value, generators_allowed=False):
     :return: True or False
     """
     if generators_allowed:
-        if not isinstance(value, string_types) and hasattr(value, '__iter__'):
+        if not isinstance(value, string_types + (bytes,)) and hasattr(value, '__iter__'):
             return True
     else:
         if isinstance(value, (tuple, list, set)):
