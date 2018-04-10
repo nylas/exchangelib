@@ -115,9 +115,34 @@ Setup and connecting
         primary_smtp_address=primary_smtp_address, config=config, autodiscover=False, access_type=DELEGATE
     )
 
-    # If you need proxy support or custom TLS validation, you can supply a custom 'requests' transport adapter, as
-    # described in http://docs.python-requests.org/en/master/user/advanced/#transport-adapters
-    # exchangelib provides a sample adapter which ignores SSL validation errors. Use at own risk.
+
+Proxies and custom TLS validation
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If you need proxy support or custom TLS validation, you can supply a custom 'requests' transport adapter, as
+described in http://docs.python-requests.org/en/master/user/advanced/#transport-adapters
+
+If you need to provide ``exchangelib`` with different custom root certificates depending on the server you connect to,
+you can create an ``HTTPAdapter`` class that looks like this:
+
+.. code-block:: python
+
+    from urllib.parse import urlparse
+    class CustomRootCAHTTPAdapter(requests.adapters.HTTPAdapter):
+        # An HTTP adapter that uses a custom root CA certificate at a hard coded location
+        def cert_verify(self, conn, url, verify, cert):
+            cert_file = {
+                'example.com': '/path/to/example.com.crt',
+                'mail.internal': '/path/to/mail.internal.crt',
+                ...
+            }[urlparse(url).hostname]
+            super(CustomRootVerifyHTTPAdapter, self).cert_verify(conn=conn, url=url, verify=cert_file, cert=cert)
+
+
+``exchangelib`` provides a sample adapter which ignores SSL validation errors. Use at own risk.
+
+.. code-block:: python
+
     from exchangelib.protocol import BaseProtocol, NoVerifyHTTPAdapter
     BaseProtocol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
 
@@ -760,6 +785,7 @@ Non-account methods
 ^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: python
+
     # Get timezone information from the server
     a.protocol.get_timezones()
 
