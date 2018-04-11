@@ -119,16 +119,18 @@ Setup and connecting
 Proxies and custom TLS validation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-If you need proxy support or custom TLS validation, you can supply a custom 'requests' transport adapter, as
-described in http://docs.python-requests.org/en/master/user/advanced/#transport-adapters
+If you need proxy support or custom TLS validation, you can supply a custom 'requests' transport adapter class, as
+described in http://docs.python-requests.org/en/master/user/advanced/#transport-adapters.
 
-If you need to provide ``exchangelib`` with different custom root certificates depending on the server you connect to,
-you can create an ``HTTPAdapter`` class that looks like this:
+Here's an example using different custom root certificates depending on the server to connect to:
 
 .. code-block:: python
 
     from urllib.parse import urlparse
-    class CustomRootCAHTTPAdapter(requests.adapters.HTTPAdapter):
+    import requests.adapters
+    from exchangelib.protocol import BaseProtocol
+
+    class RootCAAdapter(requests.adapters.HTTPAdapter):
         # An HTTP adapter that uses a custom root CA certificate at a hard coded location
         def cert_verify(self, conn, url, verify, cert):
             cert_file = {
@@ -136,14 +138,33 @@ you can create an ``HTTPAdapter`` class that looks like this:
                 'mail.internal': '/path/to/mail.internal.crt',
                 ...
             }[urlparse(url).hostname]
-            super(CustomRootVerifyHTTPAdapter, self).cert_verify(conn=conn, url=url, verify=cert_file, cert=cert)
+            super(RootCAAdapter, self).cert_verify(conn=conn, url=url, verify=cert_file, cert=cert)
 
+    # Tell exchangelib to use this adapter class instead of the default
+    BaseProtocol.HTTP_ADAPTER_CLS = RootCAAdapter
+
+Here's an example of adding proxy support:
+
+.. code-block:: python
+
+    class ProxyAdapter(requests.adapters.HTTPAdapter):
+        def send(self, *args, **kwargs):
+            kwargs['proxies'] = {
+                'http': 'http://10.0.0.1:1243',
+                'https': 'http://10.0.0.1:4321',
+            }
+            return super(ProxyAdapter, self).send(*args, **kwargs)
+
+    # Tell exchangelib to use this adapter class instead of the default
+    BaseProtocol.HTTP_ADAPTER_CLS = ProxyAdapter
 
 ``exchangelib`` provides a sample adapter which ignores TLS validation errors. Use at own risk.
 
 .. code-block:: python
 
-    from exchangelib.protocol import BaseProtocol, NoVerifyHTTPAdapter
+    from exchangelib.protocol import NoVerifyHTTPAdapter
+
+    # Tell exchangelib to use this adapter class instead of the default
     BaseProtocol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
 
 
