@@ -2,8 +2,7 @@
 """
 Release notes:
 * Bump version in exchangelib/__init__.py
-* Bump version and date in README.rst
-* Bump version in CHANGELOG.rst
+* Bump version in CHANGELOG.md
 * Commit and push changes
 * Push to PyPI: python setup.py sdist bdist_wheel upload
 * Create release on GitHub
@@ -36,7 +35,8 @@ setup(
     author='Erik Cederstrand',
     author_email='erik@cederstrand.dk',
     description='Client for Microsoft Exchange Web Services (EWS)',
-    long_description=read('README.rst'),
+    long_description=read('README.md'),
+    long_description_content_type='text/markdown',
     license='BSD',
     keywords='Exchange EWS autodiscover',
     install_requires=['requests>=2.7', 'requests_ntlm>=0.2.0', 'dnspython>=1.14.0', 'pytz', 'lxml>3.0',
