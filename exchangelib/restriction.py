@@ -349,11 +349,12 @@ class Q(object):
             try:
                 field_path = FieldPath.from_string(self.field_path, folder=folder)
                 self._validate_field_path(field_path=field_path, folder=folder)
-                return field_path
+                break
             except ValueError:
                 continue
         else:
             raise ValueError("Unknown fieldname '%s' on folders '%s'" % (self.field_path, folders))
+        return field_path
 
     def _get_clean_value(self, field_path, version):
         if self.op == self.EXISTS:
