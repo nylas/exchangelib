@@ -926,6 +926,8 @@ class Root(Folder):
                                        'to get the correct properties.':
                     # This another way of telling us that this is just a distinguished folder the server does not have
                     continue
+                if isinstance(f, Exception):
+                    raise f
                 folders_map[f.folder_id] = f
             for f in FolderCollection(account=self.account, folders=[self]).find_folders(depth=DEEP):
                 if isinstance(f, Exception):
