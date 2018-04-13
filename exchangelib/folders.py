@@ -287,7 +287,9 @@ class Folder(RegisterMixIn, SearchableMixIn):
     # Default item type for this folder. See http://msdn.microsoft.com/en-us/library/hh354773(v=exchg.80).aspx
     CONTAINER_CLASS = None
     supported_item_models = ITEM_CLASSES  # The Item types that this folder can contain. Default is all
-    supported_from = None  # For distinguished folders, marks the version from which the folder was introduced
+    # Marks the version from which a distinguished folder was introduced. A possibly authoritative source is:
+    # https://github.com/OfficeDev/ews-managed-api/blob/master/Enumerations/WellKnownFolderName.cs
+    supported_from = None
     LOCALIZED_NAMES = dict()  # A map of (str)locale: (tuple)localized_folder_names
     ITEM_MODEL_MAP = {cls.response_tag(): cls for cls in ITEM_CLASSES}
     FIELDS = [
@@ -921,10 +923,8 @@ class Root(Folder):
                 if isinstance(f, ErrorInvalidOperation) and f.value == 'The distinguished folder name is unrecognized.':
                     # This is just a distinguished folder the server does not have
                     continue
-                if isinstance(f, ErrorItemNotFound) \
-                        and f.value == 'The specified object was not found in the store., The process failed ' \
-                                       'to get the correct properties.':
-                    # This another way of telling us that this is just a distinguished folder the server does not have
+                if isinstance(f, ErrorItemNotFound):
+                    # Another way of telling us that this is a distinguished folder the server does not have
                     continue
                 if isinstance(f, Exception):
                     raise f
