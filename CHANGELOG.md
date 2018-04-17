@@ -88,7 +88,7 @@ Change Log
 
     ```python
     from exchangelib.protocol import BaseProtocol, NoVerifyHTTPAdapter
-    BaseProcotol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
+    BaseProtocol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
     ```
 
 1.9.6
