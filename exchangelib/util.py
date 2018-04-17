@@ -284,11 +284,13 @@ def is_xml(text):
 
 class PrettyXmlHandler(logging.StreamHandler):
     """A steaming log handler that prettifies log statements containing XML when output is a terminal"""
-    @staticmethod
-    def prettify_xml(xml_bytes):
+    def parse_bytes(self, xml_bytes):
+        return parse(io.BytesIO(xml_bytes))
+
+    def prettify_xml(self, xml_bytes):
         # Re-formats an XML document to a consistent style
-        return tostring(parse(
-            io.BytesIO(xml_bytes)),
+        return tostring(
+            self.parse_bytes(xml_bytes),
             xml_declaration=True,
             encoding='utf-8',
             pretty_print=True
@@ -329,6 +331,22 @@ class PrettyXmlHandler(logging.StreamHandler):
             return self.stream.isatty()
         except AttributeError:
             return False
+
+
+class AnonymizingXmlHandler(PrettyXmlHandler):
+    """A steaming log handler that prettifies and anonymizes log statements containing XML when output is a terminal"""
+    def __init__(self, forbidden_strings, *args, **kwargs):
+        self.forbidden_strings = forbidden_strings
+        super(PrettyXmlHandler, self).__init__(*args, **kwargs)
+
+    def parse_bytes(self, xml_bytes):
+        root = parse(io.BytesIO(xml_bytes))
+        for elem in root.iter():
+            for attr in set(elem.keys()) & {'RootItemId', 'ItemId', 'Id', 'RootItemChangeKey', 'ChangeKey'}:
+                elem.set(attr, 'DEADBEEF=')
+            for s in self.forbidden_strings:
+                elem.text.replace(s, '[REMOVED]')
+        return root
 
 
 class DummyRequest(object):
