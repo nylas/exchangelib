@@ -920,8 +920,10 @@ class Root(Folder):
                 if isinstance(f, (ErrorFolderNotFound, ErrorNoPublicFolderReplicaAvailable)):
                     # This is just a distinguished folder the server does not have
                     continue
-                if isinstance(f, ErrorInvalidOperation) and f.value == 'The distinguished folder name is unrecognized.':
-                    # This is just a distinguished folder the server does not have
+                if isinstance(f, ErrorInvalidOperation):
+                    # This is probably a distinguished folder the server does not have. We previously tested the exact
+                    # error message (f.value), but some Exchange servers return localized error messages, so that's not
+                    # possible to do reliably.
                     continue
                 if isinstance(f, ErrorItemNotFound):
                     # Another way of telling us that this is a distinguished folder the server does not have
