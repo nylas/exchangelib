@@ -167,6 +167,14 @@ class QuerySet(SearchableMixIn):
                 additional_fields.add(FieldPath(field=end_tz_field))
         return additional_fields
 
+    def _format_items(self, items, return_format):
+        return {
+            self.VALUES: self._as_values,
+            self.VALUES_LIST: self._as_values_list,
+            self.FLAT: self._as_flat_values_list,
+            self.NONE: self._as_items,
+        }[return_format](items)
+
     def _query(self):
         from .folders import SHALLOW
         from .items import Persona
@@ -300,13 +308,7 @@ class QuerySet(SearchableMixIn):
 
         log.debug('Initializing cache')
         _cache = []
-        result_formatter = {
-            self.VALUES: self._as_values,
-            self.VALUES_LIST: self._as_values_list,
-            self.FLAT: self._as_flat_values_list,
-            self.NONE: self._as_items,
-        }[self.return_format]
-        for val in result_formatter(self._query()):
+        for val in self._format_items(items=self._query(), return_format=self.return_format):
             _cache.append(val)
             yield val
         self._cache = _cache
@@ -599,7 +601,7 @@ class QuerySet(SearchableMixIn):
         if self.is_cached:
             return self._cache
         # Return an iterator that doesn't bother with caching
-        return self._query()
+        return self._format_items(items=self._query(), return_format=self.return_format)
 
     def get(self, *args, **kwargs):
         """ Assume the query will return exactly one item. Return that item """

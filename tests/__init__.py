@@ -3301,8 +3301,14 @@ class BaseItemTest(EWSTest):
             [i.categories[0] for i in qs.only('categories').order_by('subject')],
             [test_cat, test_cat, test_cat, test_cat]
         )
+        # Test iterator
         self.assertEqual(
             set((i.subject, i.categories[0]) for i in qs.iterator()),
+            {('Item 0', test_cat), ('Item 1', test_cat), ('Item 2', test_cat), ('Item 3', test_cat)}
+        )
+        # Test that iterator() preserves the result format
+        self.assertEqual(
+            set((i[0], i[1][0]) for i in qs.values_list('subject', 'categories').iterator()),
             {('Item 0', test_cat), ('Item 1', test_cat), ('Item 2', test_cat), ('Item 3', test_cat)}
         )
         self.assertEqual(qs.get(subject='Item 3').subject, 'Item 3')
