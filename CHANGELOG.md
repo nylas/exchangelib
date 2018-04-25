@@ -38,6 +38,16 @@ Change Log
     chunk\_size available on `Account.bulk_foo()` methods.
 -   Support searching the GAL and other contact folders using
     `some_contact_folder.people()`.
+-   Deprecated the `page_size` argument for `QuerySet.iterator()` because it
+    was inconsistent with other API methods. You can still set the page size
+    of a queryset like this:
+
+    ```python
+    qs = a.inbox.filter(...).iterator()
+    qs.page_size = 123
+    for item in items:
+        print(item)
+    ```
 
 1.10.7
 ------

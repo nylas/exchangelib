@@ -593,8 +593,7 @@ class QuerySet(SearchableMixIn):
     #
     ###########################
     def iterator(self):
-        """ Return the query result as an iterator, without caching the result. 'page_size' is the number of items to
-        fetch from the server per request. """
+        """ Return the query result as an iterator, without caching the result """
         if self.q is None:
             return []
         if self.is_cached:
