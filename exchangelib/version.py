@@ -2,6 +2,7 @@
 from __future__ import unicode_literals
 
 import logging
+import re
 
 from defusedxml.ElementTree import ParseError
 from future.utils import python_2_unicode_compatible
@@ -245,8 +246,8 @@ class Version(object):
 
     @staticmethod
     def _is_invalid_version_string(s):
-        # Check if a version string is bogus
-        return s.startswith('V2_') or s[:6] in ('V2015_', 'V2016_', 'V2017_')
+        # Check if a version string is bogus, e.g. V2_, V2015_ or V2018_
+        return re.match(r'V[0-9]{1,4}_.*', s)
 
     @classmethod
     def from_response(cls, requested_api_version, response):
