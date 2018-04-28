@@ -246,6 +246,19 @@ class FolderCollection(SearchableMixIn):
                     item = Folder.item_model_from_tag(i.tag).from_xml(elem=i, account=self.account)
                     yield item
 
+    def _get_folder_fields(self):
+        additional_fields = set()
+        for folder in self.folders:
+            if isinstance(folder, Folder):
+                additional_fields.update(
+                    FieldPath(field=f) for f in folder.supported_fields(version=self.account.version)
+                )
+            else:
+                additional_fields.update(
+                    FieldPath(field=f) for f in Folder.supported_fields(version=self.account.version)
+                )
+        return additional_fields
+
     def find_folders(self, shape=IdOnly, depth=DEEP, page_size=None):
         # 'depth' controls whether to return direct children or recurse into sub-folders
         if not self.account:
@@ -254,9 +267,7 @@ class FolderCollection(SearchableMixIn):
             raise ValueError("'shape' %s must be one of %s" % (shape, SHAPE_CHOICES))
         if depth not in FOLDER_TRAVERSAL_CHOICES:
             raise ValueError("'depth' %s must be one of %s" % (depth, FOLDER_TRAVERSAL_CHOICES))
-        additional_fields = {
-            FieldPath(field=f) for folder in self.folders for f in folder.supported_fields(version=self.account.version)
-        }
+        additional_fields = self._get_folder_fields()
         # TODO: Support the Restriction class for folders, too
         return FindFolder(account=self.account, folders=self.folders, chunk_size=page_size).call(
                 additional_fields=additional_fields,
@@ -266,9 +277,7 @@ class FolderCollection(SearchableMixIn):
         )
 
     def get_folders(self):
-        additional_fields = {
-            FieldPath(field=f) for folder in self.folders for f in folder.supported_fields(version=self.account.version)
-        }
+        additional_fields = self._get_folder_fields()
         return GetFolder(account=self.account).call(
                 folders=self.folders,
                 additional_fields=additional_fields,

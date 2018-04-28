@@ -1050,6 +1050,7 @@ class GetFolder(EWSAccountService):
         """
         # We can't easily find the correct folder class from the returned XML. Instead, return objects with the same
         # class as the folder instance it was requested with.
+        from .folders import Folder, DistinguishedFolderId
         folders_list = list(folders)  # Convert to a list, in case 'folders' is a generator
         for folder, elem in zip(folders_list, self._get_elements(payload=self.get_payload(
             folders=folders,
@@ -1059,9 +1060,15 @@ class GetFolder(EWSAccountService):
             if isinstance(elem, Exception):
                 yield elem
                 continue
-            f = folder.from_xml(elem=elem, account=self.account)
-            if folder.is_distinguished or (not folder.folder_id and folder.has_distinguished_name):
-                f.is_distinguished = True
+            if isinstance(folder, Folder):
+                f = folder.from_xml(elem=elem, account=self.account)
+                if folder.is_distinguished or (not folder.folder_id and folder.has_distinguished_name):
+                    f.is_distinguished = True
+            else:
+                # 'folder' may be a FolderId/DistinguishedFolderId instance
+                f = Folder.from_xml(elem=elem, account=self.account)
+                if isinstance(folder, DistinguishedFolderId):
+                    f.is_distinguished = True
             yield f
 
     def get_payload(self, folders, additional_fields, shape):
