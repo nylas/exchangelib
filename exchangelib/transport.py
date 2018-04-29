@@ -6,6 +6,7 @@ import logging
 import requests.auth
 import requests.sessions
 import requests_ntlm
+import requests_kerberos
 
 from .credentials import IMPERSONATION
 from .errors import UnauthorizedError, TransportError, RedirectError, RelativeRedirect
@@ -24,11 +25,13 @@ NOAUTH = 'no authentication'
 NTLM = 'NTLM'
 BASIC = 'basic'
 DIGEST = 'digest'
+GSSAPI = 'gssapi'
 
 AUTH_TYPE_MAP = {
     NTLM: requests_ntlm.HttpNtlmAuth,
     BASIC: requests.auth.HTTPBasicAuth,
     DIGEST: requests.auth.HTTPDigestAuth,
+    GSSAPI: requests_kerberos.HTTPKerberosAuth,
     NOAUTH: None,
 }
 
@@ -87,6 +90,9 @@ def get_auth_instance(credentials, auth_type):
     username = credentials.username
     if auth_type == NTLM and credentials.type == credentials.EMAIL:
         username = '\\' + username
+    if auth_type == GSSAPI:
+        # Kerberos auth relies on credentials supplied via a ticket available externally to this library
+        return model()
     return model(username=username, password=credentials.password)
 
 
