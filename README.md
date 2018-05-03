@@ -36,7 +36,7 @@ for item in account.inbox.all().order_by('-datetime_received')[:100]:
 from datetime import datetime, timedelta
 import pytz
 from exchangelib import DELEGATE, IMPERSONATION, Account, Credentials, ServiceAccount, \
-    EWSDateTime, EWSTimeZone, Configuration, NTLM, CalendarItem, Message, \
+    EWSDateTime, EWSTimeZone, Configuration, NTLM, GSSAPI, CalendarItem, Message, \
     Mailbox, Attendee, Q, ExtendedProperty, FileAttachment, ItemAttachment, \
     HTMLBody, Build, Version, FolderCollection
 
@@ -92,6 +92,11 @@ version = Version(build=Build(15, 0, 12, 34))
 config = Configuration(
     server='example.com', credentials=credentials, version=version, auth_type=NTLM
 )
+
+# Kerberos authentication is supported via the 'gssapi' auth type. Enabling it is slightly awkward,
+# does not work with autodiscover (yet) and is likely to change in future versions.
+credentials = Credentials('', '')
+config = Configuration(server='example.com', credentials=credentials, auth_type=GSSAPI)
 
 # If you're connecting to the same account very often, you can cache the autodiscover result for
 # later so you can skip the autodiscover lookup:

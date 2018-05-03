@@ -1,6 +1,11 @@
 Change Log
 ==========
 
+1.11.3
+------
+
+-   Add experimental Kerberos support
+
 1.11.2
 ------
 

@@ -4,7 +4,8 @@ Release notes:
 * Bump version in exchangelib/__init__.py
 * Bump version in CHANGELOG.md
 * Commit and push changes
-* Push to PyPI: python setup.py sdist bdist_wheel upload
+* Build package: rm dist/* && python setup.py sdist bdist_wheel
+* Push to PyPI: twine upload dist/*
 * Create release on GitHub
 """
 import io

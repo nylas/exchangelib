@@ -13,11 +13,11 @@ from .items import AcceptItem, TentativelyAcceptItem, DeclineItem
 from .items import CalendarItem, CancelCalendarItem, Contact, DistributionList, Message, PostItem, Task
 from .properties import Body, HTMLBody, ItemId, Mailbox, Attendee, Room, RoomList
 from .restriction import Q
-from .transport import BASIC, DIGEST, NTLM
+from .transport import BASIC, DIGEST, NTLM, GSSAPI
 from .version import Build, Version
 from .settings import OofSettings
 
-__version__ = '1.11.2'
+__version__ = '1.11.3'
 
 __all__ = [
     '__version__',
@@ -34,7 +34,7 @@ __all__ = [
     'OofSettings',
     'Q',
     'Folder', 'FolderCollection', 'SHALLOW', 'DEEP',
-    'BASIC', 'DIGEST', 'NTLM',
+    'BASIC', 'DIGEST', 'NTLM', 'GSSAPI',
     'Build', 'Version',
 ]
 
