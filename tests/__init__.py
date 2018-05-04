@@ -5380,10 +5380,13 @@ class CalendarTest(BaseItemTest):
         )
 
         # Test updating and deleting
-        for i, occurrence in enumerate(self.test_folder.view(
+        i = 0
+        for occurrence in self.test_folder.view(
                 start=tz.localize(EWSDateTime(2017, 9, 1)),
-                end=tz.localize(EWSDateTime(2017, 12, 1))
-        ).order_by('start')):
+                end=tz.localize(EWSDateTime(2017, 12, 1)),
+        ).order_by('start'):
+            if occurrence.categories != self.categories:
+                continue
             if i % 2:
                 # Delete every other occurrence (items 1, 3 and 5)
                 occurrence.delete()
@@ -5397,6 +5400,7 @@ class CalendarTest(BaseItemTest):
                 occurrence.end += datetime.timedelta(minutes=30)
                 occurrence.subject = 'Changed Occurrence'
                 occurrence.save()
+            i += 1
 
         # We should only get half the items of before, and start times should be shifted 30 minutes
         updated_start_times = []
