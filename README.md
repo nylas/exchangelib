@@ -8,8 +8,8 @@ Services (EWS). It currently implements autodiscover, and functions for
 searching, creating, updating, deleting, exporting and uploading
 calendar, mailbox, task, contact and distribution list items.
 
-[![image](https://img.shields.io/pypi/v/exchangelib.svg)](https://pypi.python.org/pypi/exchangelib/)
-[![image](https://img.shields.io/pypi/pyversions/exchangelib.svg)](https://pypi.python.org/pypi/exchangelib/)
+[![image](https://img.shields.io/pypi/v/exchangelib.svg)](https://pypi.org/project/exchangelib/)
+[![image](https://img.shields.io/pypi/pyversions/exchangelib.svg)](https://pypi.org/project/exchangelib/)
 [![image](https://api.codacy.com/project/badge/Grade/5f805ad901054a889f4b99a82d6c1cb7)](https://www.codacy.com/app/ecederstrand/exchangelib?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=ecederstrand/exchangelib&amp;utm_campaign=Badge_Grade)
 [![image](https://secure.travis-ci.org/ecederstrand/exchangelib.png)](http://travis-ci.org/ecederstrand/exchangelib)
 [![image](https://coveralls.io/repos/github/ecederstrand/exchangelib/badge.svg?branch=master)](https://coveralls.io/github/ecederstrand/exchangelib?branch=master)
