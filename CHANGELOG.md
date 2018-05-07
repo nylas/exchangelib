@@ -4,7 +4,9 @@ Change Log
 1.11.3
 ------
 
--   Add experimental Kerberos support
+-   Add experimental Kerberos support. This adds the `pykerberos` package, 
+    which needs the following system packages to be installed on Ubuntu/Debian
+    systems: `apt-get install build-essential libssl-dev libffi-dev python-dev libkrb5-dev`.
 
 1.11.2
 ------
