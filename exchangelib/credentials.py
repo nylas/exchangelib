@@ -52,6 +52,14 @@ class Credentials(object):
         # policy is used.
         return True
 
+    @property
+    def back_off_until(self):
+        return None
+
+    @back_off_until.setter
+    def back_off_until(self, value):
+        raise NotImplementedError()
+
     def __eq__(self, other):
         return self.username == other.username and self.password == other.password
 
