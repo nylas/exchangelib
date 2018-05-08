@@ -83,7 +83,6 @@ class EWSService(object):
     def _get_elements(self, payload):
         if not isinstance(payload, ElementType):
             raise ValueError("'payload' %r must be an ElementType" % payload)
-        wait = 0
         while True:
             try:
                 # Send the request, get the response and do basic sanity checking on the SOAP XML
@@ -93,12 +92,10 @@ class EWSService(object):
             except ErrorServerBusy as e:
                 if self.protocol.credentials.fail_fast:
                     raise
-                if wait > self.protocol.credentials.max_wait:
-                    raise
                 back_off = e.back_off or 60  # Back off 60 seconds if we didn't get an explicit suggested value
-                log.warning('Got ErrorServerBusy from server (will back off %s seconds)', back_off)
-                time.sleep(back_off)
-                wait += back_off
+                back_off_until = datetime.datetime.now() + datetime.timedelta(seconds=back_off)
+                self.protocol.credentials.back_off_until = back_off_until
+                # We'll warn about this if we actually need to sleep
                 continue
             except (
                     ErrorAccessDenied,
@@ -363,7 +360,6 @@ class PagingEWSMixIn(EWSService):
     def _paged_call(self, payload_func, max_items, **kwargs):
         account = self.account if isinstance(self, EWSAccountService) else None
         log_prefix = 'EWS %s, account %s, service %s' % (self.protocol.service_endpoint, account, self.SERVICE_NAME)
-        wait = 0
         if isinstance(self, EWSFolderService):
             expected_message_count = len(self.folders)
         else:
@@ -380,12 +376,10 @@ class PagingEWSMixIn(EWSService):
             except ErrorServerBusy as e:
                 if self.protocol.credentials.fail_fast:
                     raise
-                if wait > self.protocol.credentials.max_wait:
-                    raise
-                back_off = e.back_off or 60  # Back off 10 seconds if we didn't get an explicit suggested value
-                log.warning('Got ErrorServerBusy from server (will back off %s seconds)', back_off)
-                time.sleep(back_off)
-                wait += back_off
+                back_off = e.back_off or 60  # Back off 60 seconds if we didn't get an explicit suggested value
+                back_off_until = datetime.datetime.now() + datetime.timedelta(seconds=back_off)
+                self.protocol.credentials.back_off_until = back_off_until
+                # We'll warn about this if we actually need to sleep
                 continue
             if len(response) != expected_message_count:
                 raise TransportError(
@@ -1451,7 +1445,6 @@ class FindPeople(EWSAccountService, PagingEWSMixIn):
         account = self.account if isinstance(self, EWSAccountService) else None
         log_prefix = 'EWS %s, account %s, service %s' % (self.protocol.service_endpoint, account, self.SERVICE_NAME)
         item_count = 0
-        wait = 0
         while True:
             log.debug('%s: Getting items at offset %s', log_prefix, item_count)
             kwargs['offset'] = item_count
@@ -1461,12 +1454,10 @@ class FindPeople(EWSAccountService, PagingEWSMixIn):
             except ErrorServerBusy as e:
                 if self.protocol.credentials.fail_fast:
                     raise
-                if wait > self.protocol.credentials.max_wait:
-                    raise
-                back_off = e.back_off or 60  # Back off 10 seconds if we didn't get an explicit suggested value
-                log.warning('Got ErrorServerBusy from server (will back off %s seconds)', back_off)
-                time.sleep(back_off)
-                wait += back_off
+                back_off = e.back_off or 60  # Back off 60 seconds if we didn't get an explicit suggested value
+                back_off_until = datetime.datetime.now() + datetime.timedelta(seconds=back_off)
+                self.protocol.credentials.back_off_until = back_off_until
+                # We'll warn about this if we actually need to sleep
                 continue
             if len(response) != 1:
                 # We can only query one folder, so there should only be one element in response
