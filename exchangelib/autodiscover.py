@@ -450,7 +450,7 @@ def _get_canonical_name(hostname):
     resolver.timeout = AutodiscoverProtocol.TIMEOUT
     try:
         canonical_name = resolver.query(hostname).canonical_name.to_unicode().rstrip('.')
-    except dns.resolver.NXDOMAIN:
+    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer):
         log.debug('Nonexistent domain %s', hostname)
         return None
     if canonical_name != hostname:
