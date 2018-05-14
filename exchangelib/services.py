@@ -16,7 +16,6 @@ import abc
 import datetime
 from itertools import chain
 import logging
-import time
 import traceback
 
 from defusedxml.ElementTree import ParseError

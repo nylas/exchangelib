@@ -337,7 +337,7 @@ class AnonymizingXmlHandler(PrettyXmlHandler):
     """A steaming log handler that prettifies and anonymizes log statements containing XML when output is a terminal"""
     def __init__(self, forbidden_strings, *args, **kwargs):
         self.forbidden_strings = forbidden_strings
-        super(PrettyXmlHandler, self).__init__(*args, **kwargs)
+        super(AnonymizingXmlHandler, self).__init__(*args, **kwargs)
 
     def parse_bytes(self, xml_bytes):
         root = parse(io.BytesIO(xml_bytes))
