@@ -54,7 +54,7 @@ class DistinguishedFolderId(ItemId):
 
     def clean(self, version=None):
         super(DistinguishedFolderId, self).clean(version=version)
-        if self.id in (Root.DISTINGUISHED_FOLDER_ID, PublicFoldersRoot.DISTINGUISHED_FOLDER_ID):
+        if self.id == PublicFoldersRoot.DISTINGUISHED_FOLDER_ID:
             # Avoid "ErrorInvalidOperation: It is not valid to specify a mailbox with the public folder root" from EWS
             self.mailbox = None
 
