@@ -259,7 +259,7 @@ CLDR_TO_MS_TIMEZONE_MAP = {
     'Asia/Dili': 'Tokyo Standard Time',
     'Asia/Dubai': 'Arabian Standard Time',
     'Asia/Dushanbe': 'West Asia Standard Time',
-    'Asia/Famagusta': 'Turkey Standard Time',
+    'Asia/Famagusta': 'GTB Standard Time',
     'Asia/Gaza': 'West Bank Standard Time',
     'Asia/Hebron': 'West Bank Standard Time',
     'Asia/Hong_Kong': 'China Standard Time',
