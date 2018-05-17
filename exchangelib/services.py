@@ -1320,11 +1320,11 @@ class MoveItem(EWSAccountService):
     def get_payload(self, items, to_folder):
         # Takes a list of items and returns their new item IDs
         from .properties import ItemId
-        moveeitem = create_element('m:%s' % self.SERVICE_NAME)
+        moveitem = create_element('m:%s' % self.SERVICE_NAME)
 
         tofolderid = create_element('m:ToFolderId')
         set_xml_value(tofolderid, to_folder, version=self.account.version)
-        moveeitem.append(tofolderid)
+        moveitem.append(tofolderid)
         item_ids = create_element('m:ItemIds')
         is_empty = True
         for item in items:
@@ -1334,8 +1334,8 @@ class MoveItem(EWSAccountService):
             set_xml_value(item_ids, item_id, version=self.account.version)
         if is_empty:
             raise ValueError('"items" must not be empty')
-        moveeitem.append(item_ids)
-        return moveeitem
+        moveitem.append(item_ids)
+        return moveitem
 
 
 class CopyItem(EWSAccountService):
