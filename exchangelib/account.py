@@ -577,7 +577,8 @@ class Account(object):
         :param ids: an iterable of either (item_id, changekey) tuples or Item objects.
         :param to_folder: The destination folder of the copy operation
         :param chunk_size: The number of items to send to the server in a single request
-        :return: The new IDs of the moved items, in the same order as the input
+        :return: The new IDs of the moved items, in the same order as the input. If 'to_folder' is a public folder or a
+        folder in a different mailbox, an empty list is returned.
         """
         if not isinstance(to_folder, Folder):
             raise ValueError("'to_folder' %r must be a Folder instence" % to_folder)
