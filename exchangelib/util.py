@@ -290,6 +290,8 @@ class PrettyXmlHandler(logging.StreamHandler):
     @classmethod
     def prettify_xml(cls, xml_bytes):
         # Re-formats an XML document to a consistent style
+        if isinstance(xml_bytes, unicode):
+            xml_bytes = xml_bytes.encode('utf-8')
         return tostring(
             cls.parse_bytes(xml_bytes),
             xml_declaration=True,
