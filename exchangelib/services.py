@@ -12,7 +12,9 @@ Exchange EWS references:
 """
 from __future__ import unicode_literals
 
+import os
 import abc
+import time
 from itertools import chain
 import logging
 import traceback
@@ -34,11 +36,12 @@ from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, 
     ErrorInvalidOperation, ErrorSubscriptionUnsubscribed
 from .transport import wrap, SOAPNS, TNS, MNS, ENS
 from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, ElementType, \
-    xml_to_str, set_xml_value
+    xml_to_str, set_xml_value, PrettyXmlHandler
 from .version import EXCHANGE_2010, EXCHANGE_2010_SP2, EXCHANGE_2013_SP1
 
 log = logging.getLogger(__name__)
 
+req_id = 0
 
 class EWSService(object):
     __metaclass__ = abc.ABCMeta
@@ -117,6 +120,17 @@ class EWSService(object):
                         traceback.format_exc(20))
             raise
 
+    def _get_elements_from_xml_text(self, raw_text):
+        """
+        This is useful for testing.
+        """
+        try:
+            soap_response_payload = to_xml(raw_text)
+        except ParseError as e:
+            raise SOAPError('Bad SOAP response: %s' % e)
+        response = self._get_soap_payload(soap_response=soap_response_payload)
+        return self._get_elements_in_response(response=response)
+
     def _stream_elements(self, payload, timeout, headers=None):
         if not isinstance(payload, ElementType):
             raise ValueError("'payload' %r must be an ElementType" % payload)
@@ -156,6 +170,7 @@ class EWSService(object):
         if not isinstance(payload, ElementType):
             raise ValueError("'payload' %r must be an ElementType" % payload)
 
+        global req_id
         account, hint = self._get_account_and_version_hint()
         api_versions = self._get_versions_to_try(hint)
 
@@ -163,7 +178,10 @@ class EWSService(object):
         for api_version in api_versions:
             session = self.protocol.get_session()
             try:
+                req_id += 1
+                local_req_id = req_id
                 soap_payload = wrap(content=payload, version=api_version, account=account)
+                self._save_xml('request', local_req_id, soap_payload)
                 r, session = post_ratelimited(
                     protocol=self.protocol,
                     session=session,
@@ -178,6 +196,8 @@ class EWSService(object):
                     result = self._handle_xml_response(r, envelope, account, api_version, hint)
                     if result is None:
                         break
+                    for r in result:
+                        self._save_xml('response', local_req_id, r.text)
                     got_envelopes = True
                     yield result
             finally:
@@ -189,6 +209,18 @@ class EWSService(object):
         if not got_envelopes:
             raise ErrorInvalidSchemaVersionForMailboxVersion(
                 'Tried versions %s but all were invalid for account %s' % (api_versions, account))
+
+    def _save_xml(self, ftype, req_id, xml_str):
+        if os.environ.get('SAVE_RAW_XML_PATH') is None:
+            return
+        fname = os.environ.get('SAVE_RAW_XML_PATH')
+        with file(fname, 'a') as f:
+            now = time.time()
+            if ftype == 'request':
+                f.write(u'REQUEST {} >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> {}\n'.format(req_id, now))
+            elif ftype == 'response':
+                f.write(u'RESPONSE {} <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< {}\n'.format(req_id, now))
+            f.write(PrettyXmlHandler.prettify_xml(xml_str) + '\n')
 
     def _parse_envelopes(self, response):
         try:
@@ -215,9 +247,14 @@ class EWSService(object):
         account, hint = self._get_account_and_version_hint()
         api_versions = self._get_versions_to_try(hint)
 
+        global req_id
+
         for api_version in api_versions:
             session = self.protocol.get_session()
             soap_payload = wrap(content=payload, version=api_version, account=account)
+            req_id += 1
+            local_req_id = req_id
+            self._save_xml('request', local_req_id, soap_payload)
             r, session = post_ratelimited(
                 protocol=self.protocol,
                 session=session,
@@ -227,6 +264,7 @@ class EWSService(object):
                 allow_redirects=False,
                 stream=False)
             self.protocol.release_session(session)
+            self._save_xml('response', local_req_id, r.text)
             result = self._handle_xml_response(r, r.text, account, api_version, hint)
             if result is None:
                 continue
@@ -1210,6 +1248,16 @@ class SyncFolderHierarchy(EWSAccountService):
         return result
 
 
+class SyncStateFinish(object):
+    def __init__(self, sync_state=None, includes_last_item_in_range=None):
+        self.sync_state = sync_state
+        self.includes_last_item_in_range = includes_last_item_in_range
+        if isinstance(sync_state, ElementType):
+            self.sync_state = sync_state.text
+        if isinstance(includes_last_item_in_range, ElementType):
+            self.includes_last_item_in_range = includes_last_item_in_range.text == 'true'
+
+
 class SyncFolderItems(EWSFolderService):
     """
     https://msdn.microsoft.com/en-us/library/office/aa563967(v=exchg.150).aspx
@@ -1233,7 +1281,7 @@ class SyncFolderItems(EWSFolderService):
         if self.sync_state is None:
             yield None
         else:
-            yield self.sync_state.text
+            yield SyncStateFinish(sync_state=self.sync_state, includes_last_item_in_range=self.includes_last_item_in_range)
 
     def get_payload(self, folder, shape, sync_state=None, ignore=None, max_changes=100):
         if ignore is None:
@@ -1266,6 +1314,7 @@ class SyncFolderItems(EWSFolderService):
         result = super(SyncFolderItems, self)._get_elements_in_response(response)
         for msg in response:
             self.sync_state = self._get_element_container(message=msg, name='{%s}SyncState' % MNS)
+            self.includes_last_item_in_range = self._get_element_container(message=msg, name='{%s}IncludesLastItemInRange' % MNS)
         return result
 
 
