@@ -1,6 +1,13 @@
 Change Log
 ==========
 
+1.11.4
+------
+
+-   Improve back off handling when receiving `ErrorServerBusy` error messages from the server
+-   Fixed bug where `Account.root` and its children would point to the root folder of the
+    connecting account instead of the target account when connecting to other accounts.
+
 1.11.3
 ------
 
