@@ -289,8 +289,10 @@ class PrettyXmlHandler(logging.StreamHandler):
 
     def prettify_xml(self, xml_bytes):
         # Re-formats an XML document to a consistent style
-        return tostring(
-            self.parse_bytes(xml_bytes),
+        if isinstance(xml_bytes, unicode):
+            xml_bytes = xml_bytes.encode('utf-8')
+        return tostring(parse(
+            self.parse_bytes(xml_bytes)),
             xml_declaration=True,
             encoding='utf-8',
             pretty_print=True
