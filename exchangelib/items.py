@@ -953,58 +953,7 @@ class BaseMeetingItem(Item):
     Therefore BaseMeetingItem inherits from  EWSElement has no save() or send() method
 
     """
-    FIELDS = [
-        Base64Field('mime_content', field_uri='item:MimeContent', is_read_only_after_send=True),
-        IdField('item_id', field_uri=ItemId.ID_ATTR, is_read_only=True),
-        IdField('changekey', field_uri=ItemId.CHANGEKEY_ATTR, is_read_only=True),
-        EWSElementField('parent_folder_id', field_uri='item:ParentFolderId', value_cls=ParentFolderId,
-                        is_read_only=True),
-        CharField('item_class', field_uri='item:ItemClass', is_read_only=True),
-        CharField('subject', field_uri='item:Subject'),
-        ChoiceField('sensitivity', field_uri='item:Sensitivity', choices={
-            Choice('Normal'), Choice('Personal'), Choice('Private'), Choice('Confidential')
-        }, is_required=True, default='Normal'),
-        TextField('text_body', field_uri='item:TextBody', is_read_only=True, supported_from=EXCHANGE_2013),
-        BodyField('body', field_uri='item:Body'),  # Accepts and returns Body or HTMLBody instances
-        AttachmentField('attachments', field_uri='item:Attachments'),  # ItemAttachment or FileAttachment
-        DateTimeField('datetime_received', field_uri='item:DateTimeReceived', is_read_only=True),
-        IntegerField('size', field_uri='item:Size', is_read_only=True),  # Item size in bytes
-        CharListField('categories', field_uri='item:Categories'),
-        ChoiceField('importance', field_uri='item:Importance', choices={
-            Choice('Low'), Choice('Normal'), Choice('High')
-        }, is_required=True, default='Normal'),
-        TextField('in_reply_to', field_uri='item:InReplyTo'),
-        BooleanField('is_submitted', field_uri='item:IsSubmitted', is_read_only=True),
-        BooleanField('is_draft', field_uri='item:IsDraft', is_read_only=True),
-        BooleanField('is_from_me', field_uri='item:IsFromMe', is_read_only=True),
-        BooleanField('is_resend', field_uri='item:IsResend', is_read_only=True),
-        BooleanField('is_unmodified', field_uri='item:IsUnmodified', is_read_only=True),
-        MessageHeaderField('headers', field_uri='item:InternetMessageHeaders', is_read_only=True),
-        DateTimeField('datetime_sent', field_uri='item:DateTimeSent', is_read_only=True),
-        DateTimeField('datetime_created', field_uri='item:DateTimeCreated', is_read_only=True),
-        # Placeholder for ResponseObjects
-        DateTimeField('reminder_due_by', field_uri='item:ReminderDueBy', is_required_after_save=True,
-                      is_searchable=False),
-        BooleanField('reminder_is_set', field_uri='item:ReminderIsSet', is_required=True, default=False),
-        IntegerField('reminder_minutes_before_start', field_uri='item:ReminderMinutesBeforeStart',
-                     is_required_after_save=True, min=0, default=0),
-        CharField('display_cc', field_uri='item:DisplayCc', is_read_only=True),
-        CharField('display_to', field_uri='item:DisplayTo', is_read_only=True),
-        BooleanField('has_attachments', field_uri='item:HasAttachments', is_read_only=True),
-        # ExtendedProperty fields go here
-        CultureField('culture', field_uri='item:Culture', is_required_after_save=True, is_searchable=False),
-        EffectiveRightsField('effective_rights', field_uri='item:EffectiveRights', is_read_only=True),
-        CharField('last_modified_name', field_uri='item:LastModifiedName', is_read_only=True),
-        DateTimeField('last_modified_time', field_uri='item:LastModifiedTime', is_read_only=True),
-        BooleanField('is_associated', field_uri='item:IsAssociated', is_read_only=True, supported_from=EXCHANGE_2010),
-        URIField('web_client_read_form_query_string', field_uri='item:WebClientReadFormQueryString',
-                 is_read_only=True, supported_from=EXCHANGE_2010),
-        URIField('web_client_edit_form_query_string', field_uri='item:WebClientEditFormQueryString',
-                 is_read_only=True, supported_from=EXCHANGE_2010),
-        EWSElementField('conversation_id', field_uri='item:ConversationId', value_cls=ConversationId,
-                        is_read_only=True, supported_from=EXCHANGE_2010),
-        BodyField('unique_body', field_uri='item:UniqueBody', is_read_only=True, supported_from=EXCHANGE_2010),
-
+    FIELDS = Item.FIELDS + [
         MailboxField('sender', field_uri='message:Sender', is_read_only=True, is_read_only_after_send=True),
         MailboxListField('to_recipients', field_uri='message:ToRecipients', is_read_only_after_send=True,
                          is_searchable=False),
