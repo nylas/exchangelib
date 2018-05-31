@@ -56,7 +56,7 @@ apt-get install libxml2-dev libxslt-dev libkrb5-dev build-essential libssl-dev l
 On FreeBSD:
 ```
 pkg install libxml2 libxslt krb5
-PATH=/usr/local/bin:$PATH pip install lxml kerberos pykerberos
+CFLAGS=-I/usr/local/include pip install kerberos pykerberos lxml
 
 ```
 
