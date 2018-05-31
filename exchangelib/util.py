@@ -490,14 +490,14 @@ Response data: %(xml_response)s
             log.debug('Session %s thread %s: retry %s timeout %s POST\'ing to %s after %ss wait', session.session_id,
                       thread_id, retry, protocol.TIMEOUT, url, wait)
             d_start = time_func()
+            # Always create a dummy response for logging purposes, in case we fail in the following
+            r = DummyResponse(url=url, headers={}, request_headers=headers)
             try:
                 r = session.post(url=url, headers=headers, data=data, allow_redirects=False, timeout=protocol.TIMEOUT)
             except CONNECTION_ERRORS as e:
                 log.debug('Session %s thread %s: connection error POST\'ing to %s', session.session_id, thread_id, url)
                 r = DummyResponse(url=url, headers={'TimeoutException': e}, request_headers=headers)
             except Exception:
-                # Always create a dummy response for logging purposes, before re-raising
-                r = DummyResponse(url=url, headers={}, request_headers=headers)
                 raise
             finally:
                 log_vals = dict(
