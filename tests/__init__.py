@@ -2911,15 +2911,16 @@ class FolderTest(EWSTest):
         for change in self.account.inbox.sync_folder_items(shape='Default'):
             if isinstance(change, ItemChange):
                 assert change.item is not None
-                changes_seen.add((change.item.item_id, change.item.changekey))
+                changes_seen.add((change.item.id, change.item.changekey))
             else:
-                sync_state = change
-        assert sync_state is not None
+                sync_state_finish = change
+        assert sync_state_finish is not None
+        sync_state = sync_state_finish.sync_state
 
         for change in self.account.inbox.sync_folder_items(shape='Default', sync_state=sync_state):
             if isinstance(change, ItemChange):
                 assert change.item is not None
-                assert (change.item.item_id, change.item.changekey) not in changes_seen
+                assert (change.item.id, change.item.changekey) not in changes_seen
 
     def test_streaming_subscription(self):
         subscription_id = self.account.inbox.subscribe_for_notifications(CONCRETE_EVENT_TYPES)
@@ -5575,15 +5576,16 @@ class CalendarTest(BaseItemTest):
         for change in self.test_folder.sync_folder_items(shape='Default'):
             if isinstance(change, ItemChange):
                 assert change.item is not None
-                changes_seen.add((change.item.item_id, change.item.changekey))
+                changes_seen.add((change.item.id, change.item.changekey))
             else:
-                sync_state = change
-        assert sync_state is not None
+                sync_state_finish = change
+        assert sync_state_finish is not None
+        sync_state = sync_state_finish.sync_state
 
         for change in self.test_folder.sync_folder_items(shape='Default', sync_state=sync_state):
             if isinstance(change, ItemChange):
                 assert change.item is not None
-                assert (change.item.item_id, change.item.changekey) not in changes_seen
+                assert (change.item.id, change.item.changekey) not in changes_seen
 
 
 class MessagesTest(BaseItemTest):
