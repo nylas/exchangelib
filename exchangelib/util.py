@@ -481,7 +481,7 @@ Response data: %(xml_response)s
         while True:
             back_off_until = protocol.credentials.back_off_until
             if back_off_until:
-                sleep_secs = (datetime.datetime.now() - back_off_until).total_seconds()
+                sleep_secs = (back_off_until - datetime.datetime.now()).total_seconds()
                 # The back off value may have expired within the last few milliseconds
                 if sleep_secs > 0:
                     log.warning('Server requested back off until %s. Sleeping %s seconds', back_off_until, sleep_secs)

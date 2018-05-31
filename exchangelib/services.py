@@ -89,6 +89,7 @@ class EWSService(object):
                 # Read the XML and throw any general EWS error messages. Return a generator over the result elements
                 return self._get_elements_in_response(response=response)
             except ErrorServerBusy as e:
+                log.debug('Got ErrorServerBusy (back off %s seconds)', e.back_off)
                 if self.protocol.credentials.fail_fast:
                     raise
                 back_off = e.back_off or 60  # Back off 60 seconds if we didn't get an explicit suggested value
@@ -150,6 +151,7 @@ class EWSService(object):
             hint = self.protocol.version
         api_versions = [hint.api_version] + [v for v in API_VERSIONS if v != hint.api_version]
         for api_version in api_versions:
+            log.debug('Trying API version %s for account %s', api_version, account)
             session = self.protocol.get_session()
             soap_payload = wrap(content=payload, version=api_version, account=account)
             http_headers = extra_headers(account=account)
@@ -161,7 +163,6 @@ class EWSService(object):
                 data=soap_payload,
                 allow_redirects=False)
             self.protocol.release_session(session)
-            log.debug('Trying API version %s for account %s', api_version, account)
             try:
                 soap_response_payload = to_xml(r.text)
             except ParseError as e:
@@ -179,13 +180,13 @@ class EWSService(object):
                 # The guessed server version is wrong for this account. Try the next version
                 log.debug('API version %s was invalid for account %s', api_version, account)
                 continue
-            except ResponseMessageError:
+            except ResponseMessageError as rme:
                 # We got an error message from Exchange, but we still want to get any new version info from the response
                 try:
                     self._update_api_version(hint=hint, api_version=api_version, response=r)
-                except TransportError as e:
-                    log.debug('Failed to update version info (%s)', e)
-                raise
+                except TransportError as te:
+                    log.debug('Failed to update version info (%s)', te)
+                raise rme
             else:
                 self._update_api_version(hint=hint, api_version=api_version, response=r)
             return res
@@ -373,6 +374,7 @@ class PagingEWSMixIn(EWSService):
             try:
                 response = self._get_response_xml(payload=payload)
             except ErrorServerBusy as e:
+                log.debug('Got ErrorServerBusy (back off %s seconds)', e.back_off)
                 if self.protocol.credentials.fail_fast:
                     raise
                 back_off = e.back_off or 60  # Back off 60 seconds if we didn't get an explicit suggested value
@@ -1451,6 +1453,7 @@ class FindPeople(EWSAccountService, PagingEWSMixIn):
             try:
                 response = self._get_response_xml(payload=payload)
             except ErrorServerBusy as e:
+                log.debug('Got ErrorServerBusy (back off %s seconds)', e.back_off)
                 if self.protocol.credentials.fail_fast:
                     raise
                 back_off = e.back_off or 60  # Back off 60 seconds if we didn't get an explicit suggested value
