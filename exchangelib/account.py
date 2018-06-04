@@ -356,8 +356,8 @@ class Account(object):
                SEND_MEETING_INVITATIONS_CHOICES
         :param chunk_size: The number of items to send to the server in a single request
         :return: a list of either BulkCreateResult or exception instances in the same order as the input. The returned
-                 BulkCreateResult objects are normal Item objects except they only contain the 'item_id' and 'changekey'
-                 of the created item, and the 'item_id' on any attachments that were also created.
+                 BulkCreateResult objects are normal Item objects except they only contain the 'id' and 'changekey'
+                 of the created item, and the 'id' of any attachments that were also created.
         """
         if message_disposition not in MESSAGE_DISPOSITION_CHOICES:
             raise ValueError("'message_disposition' %s must be one of %s" % (
@@ -420,7 +420,7 @@ class Account(object):
         :param suppress_read_receipts: nly supported from Exchange 2013. True or False
         :param chunk_size: The number of items to send to the server in a single request
 
-        :return: a list of either (item_id, changekey) tuples or exception instances, in the same order as the input
+        :return: a list of either (id, changekey) tuples or exception instances, in the same order as the input
         """
         if conflict_resolution not in CONFLICT_RESOLUTION_CHOICES:
             raise ValueError("'conflict_resolution' %s must be one of %s" % (
@@ -471,7 +471,7 @@ class Account(object):
         """
         Bulk deletes items.
 
-        :param ids: an iterable of either (item_id, changekey) tuples or Item objects.
+        :param ids: an iterable of either (id, changekey) tuples or Item objects.
         :param delete_type: the type of delete to perform. Possible values are specified in DELETE_TYPE_CHOICES
         :param send_meeting_cancellations: only applicable to CalendarItem. Possible values are specified in
                SEND_MEETING_CANCELLATIONS_CHOICES.
@@ -524,7 +524,7 @@ class Account(object):
     def bulk_send(self, ids, save_copy=True, copy_to_folder=None, chunk_size=None):
         """ Send existing draft messages. If requested, save a copy in 'copy_to_folder'
 
-        :param ids: an iterable of either (item_id, changekey) tuples or Item objects.
+        :param ids: an iterable of either (id, changekey) tuples or Item objects.
         :param save_copy: If true, saves a copy of the message
         :param copy_to_folder: If requested, save a copy of the message in this folder. Default is the Sent folder
         :param chunk_size: The number of items to send to the server in a single request
@@ -549,7 +549,7 @@ class Account(object):
     def bulk_copy(self, ids, to_folder, chunk_size=None):
         """ Copy items to another folder
 
-        :param ids: an iterable of either (item_id, changekey) tuples or Item objects.
+        :param ids: an iterable of either (id, changekey) tuples or Item objects.
         :param to_folder: The destination folder of the copy operation
         :param chunk_size: The number of items to send to the server in a single request
         :return: Status for each send operation, in the same order as the input
@@ -574,7 +574,7 @@ class Account(object):
     def bulk_move(self, ids, to_folder, chunk_size=None):
         """Move items to another folder
 
-        :param ids: an iterable of either (item_id, changekey) tuples or Item objects.
+        :param ids: an iterable of either (id, changekey) tuples or Item objects.
         :param to_folder: The destination folder of the copy operation
         :param chunk_size: The number of items to send to the server in a single request
         :return: The new IDs of the moved items, in the same order as the input. If 'to_folder' is a public folder or a
@@ -600,7 +600,7 @@ class Account(object):
     def fetch(self, ids, folder=None, only_fields=None, chunk_size=None):
         """ Fetch items by ID
 
-        :param ids: an iterable of either (item_id, changekey) tuples or Item objects.
+        :param ids: an iterable of either (id, changekey) tuples or Item objects.
         :param folder: used for validating 'only_fields'
         :param only_fields: A list of string or FieldPath items specifying the fields to fetch. Default to all fields
         :param chunk_size: The number of items to send to the server in a single request

@@ -64,7 +64,7 @@ class Attachment(EWSElement):
         super(Attachment, self).clean(version=version)
 
     def attach(self):
-        # Adds this attachment to an item and updates the item_id and updated changekey on the parent item
+        # Adds this attachment to an item and updates the changekey of the parent item
         if self.attachment_id:
             raise ValueError('This attachment has already been created')
         if not self.parent_item or not self.parent_item.account:
@@ -79,8 +79,8 @@ class Attachment(EWSElement):
         if isinstance(root_item_id, Exception):
             raise root_item_id
         attachment_id = root_item_id.attachment_id
-        if attachment_id.root_id != self.parent_item.item_id:
-            raise ValueError('root_id vs. item_id mismatch')
+        if attachment_id.root_id != self.parent_item.id:
+            raise ValueError("'root_id' vs. 'id' mismatch")
         if attachment_id.root_changekey == self.parent_item.changekey:
             raise ValueError('root_id changekey match')
         self.parent_item.changekey = attachment_id.root_changekey
@@ -90,7 +90,7 @@ class Attachment(EWSElement):
         self.attachment_id = attachment_id
 
     def detach(self):
-        # Deletes an attachment remotely and returns the item_id and updated changekey of the parent item
+        # Deletes an attachment remotely and updates the changekey of the parent item
         if not self.attachment_id:
             raise ValueError('This attachment has not been created')
         if not self.parent_item or not self.parent_item.account:
@@ -104,10 +104,10 @@ class Attachment(EWSElement):
         root_item_id = items[0]
         if isinstance(root_item_id, Exception):
             raise root_item_id
-        if root_item_id.id != self.parent_item.item_id:
-            raise ValueError('root_item_id vs. item_id mismatch')
+        if root_item_id.id != self.parent_item.id:
+            raise ValueError("'root_item_id.id' mismatch")
         if root_item_id.changekey == self.parent_item.changekey:
-            raise ValueError('root_item_id changekey match')
+            raise ValueError("'root_item_id.changekey' match")
         self.parent_item.changekey = root_item_id.changekey
         self.parent_item = None
         self.attachment_id = None

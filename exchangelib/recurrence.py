@@ -1,4 +1,5 @@
 import logging
+import warnings
 
 from six import string_types
 
@@ -214,7 +215,7 @@ class Occurrence(EWSElement):
     ID_ATTR = 'ItemId'
     CHANGEKEY_ATTR = 'ChangeKey'
     FIELDS = [
-        IdField('item_id', field_uri=ID_ATTR),
+        IdField('id', field_uri=ID_ATTR),
         IdField('changekey', field_uri=CHANGEKEY_ATTR),
         # The modified start time of the item, as EWSDateTime
         DateTimeField('start', field_uri='t:Start'),
@@ -223,7 +224,24 @@ class Occurrence(EWSElement):
         # The original start time of the item, as EWSDateTime
         DateTimeField('original_start', field_uri='t:OriginalStart'),
     ]
-    __slots__ = ('item_id', 'changekey', 'start', 'end', 'original_start')
+    __slots__ = ('id', 'changekey', 'start', 'end', 'original_start')
+
+    @property
+    def item_id(self):
+        warnings.warn("The 'item_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
+        return self.id
+
+    @item_id.setter
+    def item_id(self, value):
+        warnings.warn("The 'item_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
+        self.id = value
+
+    @classmethod
+    def get_field_by_fieldname(cls, fieldname):
+        if fieldname == 'item_id':
+            warnings.warn("The 'item_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
+            fieldname = 'id'
+        return super(Occurrence, cls).get_field_by_fieldname(fieldname)
 
     @classmethod
     def id_from_xml(cls, elem):
@@ -239,7 +257,7 @@ class Occurrence(EWSElement):
         item_id, changekey = cls.id_from_xml(elem)
         kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.supported_fields()}
         elem.clear()
-        return cls(item_id=item_id, changekey=changekey, **kwargs)
+        return cls(id=item_id, changekey=changekey, **kwargs)
 
 
 # Container elements:

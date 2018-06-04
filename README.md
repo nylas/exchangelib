@@ -302,7 +302,7 @@ ews_now = EWSDateTime.from_datetime(py_dt)
 # You can create, update and delete single items:
 from exchangelib.items import SEND_ONLY_TO_ALL, SEND_ONLY_TO_CHANGED
 item = CalendarItem(folder=account.calendar, subject='foo')
-item.save()  # This gives the item an 'item_id' and a 'changekey' value
+item.save()  # This gives the item an 'id' and a 'changekey' value
 item.save(send_meeting_invitations=SEND_ONLY_TO_ALL)  # Send a meeting invitation to attendees
 # Update a field. All fields have a corresponding Python type that must be used.
 item.subject = 'bar'
@@ -390,7 +390,7 @@ for hour in range(7, 17):
 return_ids = account.bulk_create(folder=account.calendar, items=calendar_items)
 
 # Bulk fetch, when you have a list of item IDs and want the full objects. Returns a generator.
-calendar_ids = [(i.item_id, i.changekey) for i in calendar_items]
+calendar_ids = [(i.id, i.changekey) for i in calendar_items]
 items_iter = account.fetch(ids=calendar_ids)
 # If you only want some fields, use the 'only_fields' attribute
 items_iter = account.fetch(ids=calendar_ids, only_fields=['start', 'subject'])
@@ -457,7 +457,7 @@ sparse_items = my_contacts.all().only('phone_numbers__CarPhone')
 sparse_items = my_contacts.all().only('physical_addresses__Home__street')
 
 # Return values as dicts, not objects
-ids_as_dict = my_folder.all().values('item_id', 'changekey')
+ids_as_dict = my_folder.all().values('id', 'changekey')
 # Return values as nested lists
 values_as_list = my_folder.all().values_list('subject', 'body')
 # Return values as a flat list
@@ -589,7 +589,7 @@ for calendar_item in account.calendar.all().order_by('-datetime_received')[:1]:
 for item in account.inbox.all().order_by('-datetime_received')[:5]:
     if isinstance(ews_item, MeetingCancellation):
         if item.associated_calendar_item_id:
-            calendar_item = account.inbox.get(item_id=item.associated_calendar_item_id.id,
+            calendar_item = account.inbox.get(id=item.associated_calendar_item_id.id,
                                               changekey=item.associated_calendar_item_id.changekey)
             calendar_item.delete()
         item.move_to_trash()

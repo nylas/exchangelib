@@ -1,7 +1,8 @@
 from __future__ import unicode_literals
 
-import logging
 from decimal import Decimal
+import logging
+import warnings
 
 from future.utils import python_2_unicode_compatible
 from six import string_types
@@ -137,7 +138,7 @@ class Item(RegisterMixIn):
     # FIELDS is an ordered list of attributes supported by this item class
     FIELDS = [
         Base64Field('mime_content', field_uri='item:MimeContent', is_read_only_after_send=True),
-        IdField('item_id', field_uri=ItemId.ID_ATTR, is_read_only=True),
+        IdField('id', field_uri=ItemId.ID_ATTR, is_read_only=True),
         IdField('changekey', field_uri=ItemId.CHANGEKEY_ATTR, is_read_only=True),
         EWSElementField('parent_folder_id', field_uri='item:ParentFolderId', value_cls=ParentFolderId,
                         is_read_only=True),
@@ -224,16 +225,33 @@ class Item(RegisterMixIn):
         else:
             self.attachments = []
 
+    @property
+    def item_id(self):
+        warnings.warn("The 'item_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
+        return self.id
+
+    @item_id.setter
+    def item_id(self, value):
+        warnings.warn("The 'item_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
+        self.id = value
+
+    @classmethod
+    def get_field_by_fieldname(cls, fieldname):
+        if fieldname == 'item_id':
+            warnings.warn("The 'item_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
+            fieldname = 'id'
+        return super(Item, cls).get_field_by_fieldname(fieldname)
+
     def save(self, update_fields=None, conflict_resolution=AUTO_RESOLVE, send_meeting_invitations=SEND_TO_NONE):
-        if self.item_id:
+        if self.id:
             item_id, changekey = self._update(
                 update_fieldnames=update_fields,
                 message_disposition=SAVE_ONLY,
                 conflict_resolution=conflict_resolution,
                 send_meeting_invitations=send_meeting_invitations
             )
-            if self.item_id != item_id:
-                raise ValueError("'item_id' mismatch in returned update response")
+            if self.id != item_id:
+                raise ValueError("'id' mismatch in returned update response")
             # Don't check that changekeys are different. No-op saves will sometimes leave the changekey intact
             self.changekey = changekey
         else:
@@ -245,7 +263,7 @@ class Item(RegisterMixIn):
                 # the attachment of this item temporarily and attach later.
                 tmp_attachments, self.attachments = self.attachments, []
             item = self._create(message_disposition=SAVE_ONLY, send_meeting_invitations=send_meeting_invitations)
-            self.item_id, self.changekey = item.item_id, item.changekey
+            self.id, self.changekey = item.id, item.changekey
             for old_att, new_att in zip(self.attachments, item.attachments):
                 if old_att.attachment_id is not None:
                     raise ValueError("Old 'attachment_id' is not empty")
@@ -260,7 +278,7 @@ class Item(RegisterMixIn):
     def _create(self, message_disposition, send_meeting_invitations):
         if not self.account:
             raise ValueError('Item must have an account')
-        # bulk_create() returns an Item because we want to return item_id on both main item *and* attachments
+        # bulk_create() returns an Item because we want to return the ID of both the main item *and* attachments
         res = self.account.bulk_create(
             items=[self], folder=self.folder, message_disposition=message_disposition,
             send_meeting_invitations=send_meeting_invitations)
@@ -327,7 +345,7 @@ class Item(RegisterMixIn):
         # Updates the item based on fresh data from EWS
         if not self.account:
             raise ValueError('Item must have an account')
-        if not self.item_id:
+        if not self.id:
             raise ValueError('Item must have an ID')
         res = list(self.account.fetch(ids=[self]))
         if len(res) != 1:
@@ -335,15 +353,15 @@ class Item(RegisterMixIn):
         if isinstance(res[0], Exception):
             raise res[0]
         fresh_item = res[0]
-        if self.item_id != fresh_item.item_id:
-            raise ValueError('Unexpected item_id of fresh item')
+        if self.id != fresh_item.id:
+            raise ValueError('Unexpected ID of fresh item')
         for f in self.FIELDS:
             setattr(self, f.name, getattr(fresh_item, f.name))
 
     def copy(self, to_folder):
         if not self.account:
             raise ValueError('Item must have an account')
-        if not self.item_id:
+        if not self.id:
             raise ValueError('Item must have an ID')
         res = self.account.bulk_copy(ids=[self], to_folder=to_folder)
         if len(res) != 1:
@@ -355,18 +373,18 @@ class Item(RegisterMixIn):
     def move(self, to_folder):
         if not self.account:
             raise ValueError('Item must have an account')
-        if not self.item_id:
+        if not self.id:
             raise ValueError('Item must have an ID')
         res = self.account.bulk_move(ids=[self], to_folder=to_folder)
         if not res:
             # Assume 'to_folder' is a public folder or a folder in a different mailbox
-            self.item_id, self.changekey = None, None
+            self.id, self.changekey = None, None
             return
         if len(res) != 1:
             raise ValueError('Expected result length 1, but got %s' % res)
         if isinstance(res[0], Exception):
             raise res[0]
-        self.item_id, self.changekey = res[0]
+        self.id, self.changekey = res[0]
         self.folder = to_folder
 
     def move_to_trash(self, send_meeting_cancellations=SEND_TO_NONE, affected_task_occurrences=ALL_OCCURRENCIES,
@@ -374,7 +392,7 @@ class Item(RegisterMixIn):
         # Delete and move to the trash folder.
         self._delete(delete_type=MOVE_TO_DELETED_ITEMS, send_meeting_cancellations=send_meeting_cancellations,
                      affected_task_occurrences=affected_task_occurrences, suppress_read_receipts=suppress_read_receipts)
-        self.item_id, self.changekey = None, None
+        self.id, self.changekey = None, None
         self.folder = self.account.trash
 
     def soft_delete(self, send_meeting_cancellations=SEND_TO_NONE, affected_task_occurrences=ALL_OCCURRENCIES,
@@ -382,7 +400,7 @@ class Item(RegisterMixIn):
         # Delete and move to the dumpster, if it is enabled.
         self._delete(delete_type=SOFT_DELETE, send_meeting_cancellations=send_meeting_cancellations,
                      affected_task_occurrences=affected_task_occurrences, suppress_read_receipts=suppress_read_receipts)
-        self.item_id, self.changekey = None, None
+        self.id, self.changekey = None, None
         self.folder = self.account.recoverable_items_deletions
 
     def delete(self, send_meeting_cancellations=SEND_TO_NONE, affected_task_occurrences=ALL_OCCURRENCIES,
@@ -390,12 +408,12 @@ class Item(RegisterMixIn):
         # Remove the item permanently. No copies are stored anywhere.
         self._delete(delete_type=HARD_DELETE, send_meeting_cancellations=send_meeting_cancellations,
                      affected_task_occurrences=affected_task_occurrences, suppress_read_receipts=suppress_read_receipts)
-        self.item_id, self.changekey, self.folder = None, None, None
+        self.id, self.changekey, self.folder = None, None, None
 
     def _delete(self, delete_type, send_meeting_cancellations, affected_task_occurrences, suppress_read_receipts):
         if not self.account:
             raise ValueError('Item must have an account')
-        if not self.item_id:
+        if not self.id:
             raise ValueError('Item must have an ID')
         res = self.account.bulk_delete(
             ids=[self], delete_type=delete_type, send_meeting_cancellations=send_meeting_cancellations,
@@ -417,7 +435,7 @@ class Item(RegisterMixIn):
         for a in attachments:
             if not a.parent_item:
                 a.parent_item = self
-            if self.item_id and not a.attachment_id:
+            if self.id and not a.attachment_id:
                 # Already saved object. Attach the attachment server-side now
                 a.attach()
             if a not in self.attachments:
@@ -435,7 +453,7 @@ class Item(RegisterMixIn):
         for a in attachments:
             if a.parent_item is not self:
                 raise ValueError('Attachment does not belong to this item')
-            if self.item_id:
+            if self.id:
                 # Item is already created. Detach  the attachment server-side now
                 a.detach()
             if a in self.attachments:
@@ -455,17 +473,17 @@ class Item(RegisterMixIn):
         item_id, changekey = cls.id_from_xml(elem=elem)
         kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.supported_fields()}
         elem.clear()
-        return cls(account=account, item_id=item_id, changekey=changekey, **kwargs)
+        return cls(account=account, id=item_id, changekey=changekey, **kwargs)
 
     def __eq__(self, other):
         if isinstance(other, tuple):
-            return hash((self.item_id, self.changekey)) == hash(other)
+            return hash((self.id, self.changekey)) == hash(other)
         return super(Item, self).__eq__(other)
 
     def __hash__(self):
-        # If we have an item_id and changekey, use that as key. Else return a hash of all attributes
-        if self.item_id:
-            return hash((self.item_id, self.changekey))
+        # If we have an ID and changekey, use that as key. Else return a hash of all attributes
+        if self.id:
+            return hash((self.id, self.changekey))
         return super(Item, self).__hash__()
 
 
@@ -475,7 +493,7 @@ class BulkCreateResult(Item):
     A dummy class to store return values from a CreateItem service call
     """
     FIELDS = [
-        IdField('item_id', field_uri=ItemId.ID_ATTR, is_required=True, is_read_only=True),
+        IdField('id', field_uri=ItemId.ID_ATTR, is_required=True, is_read_only=True),
         IdField('changekey', field_uri=ItemId.CHANGEKEY_ATTR, is_required=True, is_read_only=True),
         AttachmentField('attachments', field_uri='item:Attachments'),  # ItemAttachment or FileAttachment
     ]
@@ -485,7 +503,7 @@ class BulkCreateResult(Item):
         item_id, changekey = cls.id_from_xml(elem)
         kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.supported_fields()}
         elem.clear()
-        return cls(item_id=item_id, changekey=changekey, **kwargs)
+        return cls(id=item_id, changekey=changekey, **kwargs)
 
 
 # CalendarItemType enums
@@ -587,21 +605,29 @@ class CalendarItem(Item):
             self.clean_timezone_fields(version=version)
 
     def accept(self, **kwargs):
-        return AcceptItem(reference_item_id=ReferenceItemId(id=self.item_id,
-                                                            changekey=self.changekey), **kwargs).send()
+        return AcceptItem(
+            reference_item_id=ReferenceItemId(id=self.id, changekey=self.changekey),
+            **kwargs
+        ).send()
 
     def cancel(self, **kwargs):
-        return CancelCalendarItem(account=self.account,
-                                  reference_item_id=ReferenceItemId(id=self.item_id, changekey=self.changekey),
-                                  **kwargs).send()
+        return CancelCalendarItem(
+            account=self.account,
+            reference_item_id=ReferenceItemId(id=self.id, changekey=self.changekey),
+            **kwargs
+        ).send()
 
     def decline(self, **kwargs):
-        return DeclineItem(reference_item_id=ReferenceItemId(id=self.item_id,
-                                                             changekey=self.changekey), **kwargs).send()
+        return DeclineItem(
+            reference_item_id=ReferenceItemId(id=self.id, changekey=self.changekey),
+            **kwargs
+        ).send()
 
     def tentatively_accept(self, **kwargs):
-        return TentativelyAcceptItem(reference_item_id=ReferenceItemId(id=self.item_id,
-                                                                       changekey=self.changekey), **kwargs).send()
+        return TentativelyAcceptItem(
+            reference_item_id=ReferenceItemId(id=self.id, changekey=self.changekey),
+            **kwargs
+        ).send()
 
     def _update_fieldnames(self):
         update_fields = super(CalendarItem, self)._update_fieldnames()
@@ -650,14 +676,14 @@ class Message(Item):
         # not yet exist in EWS.
         if not self.account:
             raise ValueError('Item must have an account')
-        if self.item_id:
+        if self.id:
             res = self.account.bulk_send(ids=[self], save_copy=save_copy, copy_to_folder=copy_to_folder)
             if len(res) != 1:
                 raise ValueError('Expected result length 1, but got %s' % res)
             if isinstance(res[0], Exception):
                 raise res[0]
             # The item will be deleted from the original folder
-            self.item_id, self.changekey = None, None
+            self.id, self.changekey = None, None
             self.folder = copy_to_folder
             return None
 
@@ -685,7 +711,7 @@ class Message(Item):
     def send_and_save(self, update_fields=None, conflict_resolution=AUTO_RESOLVE,
                       send_meeting_invitations=SEND_TO_NONE):
         # Sends Message and saves a copy in the parent folder. Does not return an ItemId.
-        if self.item_id:
+        if self.id:
             self._update(
                 update_fieldnames=update_fields,
                 message_disposition=SEND_AND_SAVE_COPY,
@@ -711,13 +737,13 @@ class Message(Item):
     def reply(self, subject, body, to_recipients=None, cc_recipients=None, bcc_recipients=None):
         if not self.account:
             raise ValueError('Item must have an account')
-        if not self.item_id:
+        if not self.id:
             raise ValueError('Item must have an ID')
         if not to_recipients and not self.author:
             raise ValueError("'to_recipients' must be set when message has no 'author'")
         ReplyToItem(
             account=self.account,
-            reference_item_id=ReferenceItemId(id=self.item_id, changekey=self.changekey),
+            reference_item_id=ReferenceItemId(id=self.id, changekey=self.changekey),
             subject=subject,
             new_body=body,
             to_recipients=to_recipients or [self.author],
@@ -728,11 +754,11 @@ class Message(Item):
     def reply_all(self, subject, body):
         if not self.account:
             raise ValueError('Item must have an account')
-        if not self.item_id:
+        if not self.id:
             raise ValueError('Item must have an ID')
         ReplyAllToItem(
             account=self.account,
-            reference_item_id=ReferenceItemId(id=self.item_id, changekey=self.changekey),
+            reference_item_id=ReferenceItemId(id=self.id, changekey=self.changekey),
             subject=subject,
             new_body=body,
             to_recipients=self.to_recipients or [self.author],
@@ -743,11 +769,11 @@ class Message(Item):
     def forward(self, subject, body, to_recipients, cc_recipients=None, bcc_recipients=None):
         if not self.account:
             raise ValueError('Item must have an account')
-        if not self.item_id:
+        if not self.id:
             raise ValueError('Item must have an ID')
         ForwardItem(
             account=self.account,
-            reference_item_id=ReferenceItemId(id=self.item_id, changekey=self.changekey),
+            reference_item_id=ReferenceItemId(id=self.id, changekey=self.changekey),
             subject=subject,
             new_body=body,
             to_recipients=to_recipients,
@@ -1065,19 +1091,25 @@ class MeetingRequest(BaseMeetingItem):
     ]
 
     def accept(self, **kwargs):
-        return AcceptItem(account=self.account,
-                          reference_item_id=ReferenceItemId(id=self.item_id, changekey=self.changekey),
-                          **kwargs).send()
+        return AcceptItem(
+            account=self.account,
+            reference_item_id=ReferenceItemId(id=self.id, changekey=self.changekey),
+            **kwargs
+        ).send()
 
     def decline(self, **kwargs):
-        return DeclineItem(account=self.account,
-                           reference_item_id=ReferenceItemId(id=self.item_id, changekey=self.changekey),
-                           **kwargs).send()
+        return DeclineItem(
+            account=self.account,
+            reference_item_id=ReferenceItemId(id=self.id, changekey=self.changekey),
+            **kwargs
+        ).send()
 
     def tentatively_accept(self, **kwargs):
-        return TentativelyAcceptItem(account=self.account,
-                                     reference_item_id=ReferenceItemId(id=self.item_id, changekey=self.changekey),
-                                     **kwargs).send()
+        return TentativelyAcceptItem(
+            account=self.account,
+            reference_item_id=ReferenceItemId(id=self.id, changekey=self.changekey),
+            **kwargs
+        ).send()
 
 
 class MeetingMessage(BaseMeetingItem):
@@ -1264,7 +1296,7 @@ class Persona(EWSElement):
         return super(Persona, self).__eq__(other)
 
     def __hash__(self):
-        # If we have an item_id and changekey, use that as key. Else return a hash of all attributes
+        # If we have a persona_id, use that as key. Else return a hash of all attributes
         if self.persona_id:
             return hash(self.persona_id)
         return super(Persona, self).__hash__()

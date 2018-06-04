@@ -139,7 +139,7 @@ class QuerySet(SearchableMixIn):
 
     @property
     def _item_id_field(self):
-        return self._get_field_path('item_id')
+        return self._get_field_path('id')
 
     @property
     def _changekey_field(self):
@@ -235,7 +235,7 @@ class QuerySet(SearchableMixIn):
 
             if complex_fields_requested:
                 # The FindItem service does not support complex field types. Tell find_items() to return
-                # (item_id, changekey) tuples, and pass that to fetch().
+                # (id, changekey) tuples, and pass that to fetch().
                 find_item_kwargs['additional_fields'] = None
                 items = self.folder_collection.account.fetch(
                     ids=self.folder_collection.find_items(self.q, **find_item_kwargs),
@@ -244,9 +244,9 @@ class QuerySet(SearchableMixIn):
                 )
             else:
                 if not additional_fields:
-                    # If additional_fields is the empty set, we only requested item_id and changekey fields. We can then
+                    # If additional_fields is the empty set, we only requested ID and changekey fields. We can then
                     # take a shortcut by using (shape=IdOnly, additional_fields=None) to tell find_items() to return
-                    # (item_id, changekey) tuples. We'll post-process those later.
+                    # (id, changekey) tuples. We'll post-process those later.
                     find_item_kwargs['additional_fields'] = None
                 items = self.folder_collection.find_items(self.q, **find_item_kwargs)
 
@@ -364,14 +364,14 @@ class QuerySet(SearchableMixIn):
         if self.only_fields:
             has_non_attribute_fields = bool({f for f in self.only_fields if not f.field.is_attribute})
             if not has_non_attribute_fields:
-                # _query() will return an iterator of (item_id, changekey) tuples
+                # _query() will return an iterator of (id, changekey) tuples
                 if self._changekey_field not in self.only_fields:
                     for i in iterable:
                         if isinstance(i, Exception):
                             yield i
                             continue
                         item_id, changekey = i
-                        yield Item(item_id=item_id)
+                        yield Item(id=item_id)
                 elif self._item_id_field not in self.only_fields:
                     for i in iterable:
                         if isinstance(i, Exception):
@@ -385,7 +385,7 @@ class QuerySet(SearchableMixIn):
                             yield i
                             continue
                         item_id, changekey = i
-                        yield Item(item_id=item_id, changekey=changekey)
+                        yield Item(id=item_id, changekey=changekey)
                 return
         for i in iterable:
             yield i
@@ -395,14 +395,14 @@ class QuerySet(SearchableMixIn):
             raise ValueError('values() requires at least one field name')
         has_non_attribute_fields = bool({f for f in self.only_fields if not f.field.is_attribute})
         if not has_non_attribute_fields:
-            # _query() will return an iterator of (item_id, changekey) tuples
+            # _query() will return an iterator of (id, changekey) tuples
             if self._changekey_field not in self.only_fields:
                 for i in iterable:
                     if isinstance(i, Exception):
                         yield i
                         continue
                     item_id, changekey = i
-                    yield {'item_id': item_id}
+                    yield {'id': item_id}
             elif self._item_id_field not in self.only_fields:
                 for i in iterable:
                     if isinstance(i, Exception):
@@ -416,7 +416,7 @@ class QuerySet(SearchableMixIn):
                         yield i
                         continue
                     item_id, changekey = i
-                    yield {'item_id': item_id, 'changekey': changekey}
+                    yield {'id': item_id, 'changekey': changekey}
             return
         for i in iterable:
             if isinstance(i, Exception):
@@ -429,7 +429,7 @@ class QuerySet(SearchableMixIn):
             raise ValueError('values_list() requires at least one field name')
         has_non_attribute_fields = bool({f for f in self.only_fields if not f.field.is_attribute})
         if not has_non_attribute_fields:
-            # _query() will return an iterator of (item_id, changekey) tuples
+            # _query() will return an iterator of (id, changekey) tuples
             if self._changekey_field not in self.only_fields:
                 for i in iterable:
                     if isinstance(i, Exception):
@@ -463,7 +463,7 @@ class QuerySet(SearchableMixIn):
             raise ValueError('flat=True requires exactly one field name')
         flat_field_path = self.only_fields[0]
         if flat_field_path == self._item_id_field:
-            # _query() will return an iterator of (item_id, changekey) tuples
+            # _query() will return an iterator of (id, changekey) tuples
             for i in iterable:
                 if isinstance(i, Exception):
                     yield i
@@ -472,7 +472,7 @@ class QuerySet(SearchableMixIn):
                 yield item_id
             return
         if flat_field_path == self._changekey_field:
-            # _query() will return an iterator of (item_id, changekey) tuples
+            # _query() will return an iterator of (id, changekey) tuples
             for i in iterable:
                 if isinstance(i, Exception):
                     yield i
@@ -608,11 +608,11 @@ class QuerySet(SearchableMixIn):
         if self.is_cached and not args and not kwargs:
             # We can only safely use the cache if get() is called without args
             items = self._cache
-        elif not args and set(kwargs.keys()) in ({'item_id'}, {'item_id', 'changekey'}):
-            # We allow calling get(item_id=..., changekey=...) to get a single item, but only if exactly these two
+        elif not args and set(kwargs.keys()) in ({'id'}, {'id', 'changekey'}):
+            # We allow calling get(id=..., changekey=...) to get a single item, but only if exactly these two
             # kwargs are present.
             account = self.folder_collection.account
-            item_id = self._item_id_field.field.clean(kwargs['item_id'], version=account.version)
+            item_id = self._item_id_field.field.clean(kwargs['id'], version=account.version)
             changekey = self._changekey_field.field.clean(kwargs.get('changekey'), version=account.version)
             items = list(account.fetch(ids=[(item_id, changekey)], only_fields=self.only_fields))
         else:

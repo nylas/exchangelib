@@ -647,9 +647,8 @@ class GetItem(EWSAccountService, EWSPooledMixIn):
         is_empty = True
         for item in items:
             is_empty = False
-            item_id = ItemId(*(item if isinstance(item, tuple) else (item.item_id, item.changekey)))
             log.debug('Getting item %s', item)
-            set_xml_value(item_ids, item_id, version=self.account.version)
+            set_xml_value(item_ids, to_item_id(item, ItemId), version=self.account.version)
         if is_empty:
             raise ValueError('"items" must not be empty')
         getitem.append(item_ids)
@@ -839,8 +838,8 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
             if not fieldnames:
                 raise ValueError('"fieldnames" must not be empty')
             itemchange = create_element('t:ItemChange')
-            log.debug('Updating item %s values %s', item.item_id, fieldnames)
-            set_xml_value(itemchange, ItemId(item.item_id, item.changekey), version=self.account.version)
+            log.debug('Updating item %s values %s', item.id, fieldnames)
+            set_xml_value(itemchange, ItemId(item.id, item.changekey), version=self.account.version)
             updates = create_element('t:Updates')
             for elem in self._get_item_update_elems(item=item, fieldnames=fieldnames):
                 updates.append(elem)
@@ -874,7 +873,7 @@ class DeleteItem(EWSAccountService, EWSPooledMixIn):
 
     def get_payload(self, items, delete_type, send_meeting_cancellations, affected_task_occurrences,
                     suppress_read_receipts):
-        # Takes a list of (item_id, changekey) tuples or Item objects and returns the XML for a DeleteItem request.
+        # Takes a list of (id, changekey) tuples or Item objects and returns the XML for a DeleteItem request.
         from .properties import ItemId
         if self.account.version.build >= EXCHANGE_2013_SP1:
             deleteitem = create_element(
@@ -896,9 +895,8 @@ class DeleteItem(EWSAccountService, EWSPooledMixIn):
         is_empty = True
         for item in items:
             is_empty = False
-            item_id = ItemId(*(item if isinstance(item, tuple) else (item.item_id, item.changekey)))
             log.debug('Deleting item %s', item)
-            set_xml_value(item_ids, item_id, version=self.account.version)
+            set_xml_value(item_ids, to_item_id(item, ItemId), version=self.account.version)
         if is_empty:
             raise ValueError('"items" must not be empty')
         deleteitem.append(item_ids)
@@ -1057,7 +1055,7 @@ class GetFolder(EWSAccountService):
                 continue
             if isinstance(folder, Folder):
                 f = folder.from_xml(elem=elem, account=self.account)
-                if folder.is_distinguished or (not folder.folder_id and folder.has_distinguished_name):
+                if folder.is_distinguished or (not folder.id and folder.has_distinguished_name):
                     f.is_distinguished = True
             else:
                 # 'folder' may be a FolderId/DistinguishedFolderId instance
@@ -1067,7 +1065,7 @@ class GetFolder(EWSAccountService):
             yield f
 
     def get_payload(self, folders, additional_fields, shape):
-        from .folders import FolderId
+        from .folders import Folder, FolderId, DistinguishedFolderId
         getfolder = create_element('m:%s' % self.SERVICE_NAME)
         foldershape = create_element('m:FolderShape')
         add_xml_child(foldershape, 't:BaseShape', shape)
@@ -1083,9 +1081,8 @@ class GetFolder(EWSAccountService):
         for folder in folders:
             is_empty = False
             log.debug('Getting folder %s', folder)
-            if isinstance(folder, tuple):
-                set_xml_value(folder_ids, FolderId(*folder), version=self.account.version)
-                continue
+            if not isinstance(folder, (Folder, FolderId, DistinguishedFolderId)):
+                folder = to_item_id(folder, FolderId)
             set_xml_value(folder_ids, folder, version=self.account.version)
         if is_empty:
             raise ValueError('"folders" must not be empty')
@@ -1111,11 +1108,12 @@ class CreateFolder(EWSAccountService):
                 yield elem
                 continue
             f = folder.from_xml(elem=elem, account=self.account)
-            if folder.is_distinguished or (not folder.folder_id and folder.has_distinguished_name):
+            if folder.is_distinguished or (not folder.id and folder.has_distinguished_name):
                 f.is_distinguished = True
             yield f
 
     def get_payload(self, parent_folder, folders):
+        from .folders import Folder, FolderId, DistinguishedFolderId
         create_folder = create_element('m:%s' % self.SERVICE_NAME)
         parentfolderid = create_element('m:ParentFolderId')
         set_xml_value(parentfolderid, parent_folder, version=self.account.version)
@@ -1125,6 +1123,8 @@ class CreateFolder(EWSAccountService):
         for folder in folders:
             is_empty = False
             log.debug('Creating folder %s', folder)
+            if not isinstance(folder, (Folder, FolderId, DistinguishedFolderId)):
+                folder = to_item_id(folder, FolderId)
             set_xml_value(folders_elem, folder, version=self.account.version)
         if is_empty:
             raise ValueError('"folders" must not be empty')
@@ -1148,7 +1148,7 @@ class UpdateFolder(EWSAccountService):
                 yield elem
                 continue
             f = folder.from_xml(elem=elem, account=self.account)
-            if folder.is_distinguished or (not folder.folder_id and folder.has_distinguished_name):
+            if folder.is_distinguished or (not folder.id and folder.has_distinguished_name):
                 f.is_distinguished = True
             yield f
 
@@ -1194,6 +1194,7 @@ class UpdateFolder(EWSAccountService):
             yield self._set_folder_elem(folder_model=folder_model, field_path=FieldPath(field=field), value=value)
 
     def get_payload(self, folders):
+        from .folders import Folder, FolderId, DistinguishedFolderId
         updatefolder = create_element('m:%s' % self.SERVICE_NAME)
         folderchanges = create_element('m:FolderChanges')
         is_empty = True
@@ -1201,6 +1202,8 @@ class UpdateFolder(EWSAccountService):
             is_empty = False
             log.debug('Updating folder %s', folder)
             folderchange = create_element('t:FolderChange')
+            if not isinstance(folder, (Folder, FolderId, DistinguishedFolderId)):
+                folder = to_item_id(folder, FolderId)
             set_xml_value(folderchange, folder, version=self.account.version)
             updates = create_element('t:Updates')
             for elem in self._get_folder_update_elems(folder=folder, fieldnames=fieldnames):
@@ -1224,17 +1227,15 @@ class DeleteFolder(EWSAccountService):
         return self._get_elements(payload=self.get_payload(folders=folders, delete_type=delete_type))
 
     def get_payload(self, folders, delete_type):
-        from .folders import FolderId
+        from .folders import Folder, FolderId, DistinguishedFolderId
         deletefolder = create_element('m:%s' % self.SERVICE_NAME, DeleteType=delete_type)
         folder_ids = create_element('m:FolderIds')
         is_empty = True
         for folder in folders:
             is_empty = False
             log.debug('Deleting folder %s', folder)
-            if isinstance(folder, tuple):
-                set_xml_value(folder_ids, FolderId(*folder) if isinstance(folder, tuple) else folder,
-                              version=self.account.version)
-                continue
+            if not isinstance(folder, (Folder, FolderId, DistinguishedFolderId)):
+                folder = to_item_id(folder, FolderId)
             set_xml_value(folder_ids, folder, version=self.account.version)
         if is_empty:
             raise ValueError('"folders" must not be empty')
@@ -1254,7 +1255,7 @@ class EmptyFolder(EWSAccountService):
                                                            delete_sub_folders=delete_sub_folders))
 
     def get_payload(self, folders, delete_type, delete_sub_folders):
-        from .folders import FolderId
+        from .folders import Folder, FolderId, DistinguishedFolderId
         emptyfolder = create_element('m:%s' % self.SERVICE_NAME, DeleteType=delete_type,
                                      DeleteSubFolders='true' if delete_sub_folders else 'false')
         folder_ids = create_element('m:FolderIds')
@@ -1262,10 +1263,8 @@ class EmptyFolder(EWSAccountService):
         for folder in folders:
             is_empty = False
             log.debug('Emptying folder %s', folder)
-            if isinstance(folder, tuple):
-                set_xml_value(folder_ids, FolderId(*folder) if isinstance(folder, tuple) else folder,
-                              version=self.account.version)
-                continue
+            if not isinstance(folder, (Folder, FolderId, DistinguishedFolderId)):
+                folder = to_item_id(folder, FolderId)
             set_xml_value(folder_ids, folder, version=self.account.version)
         if is_empty:
             raise ValueError('"folders" must not be empty')
@@ -1293,9 +1292,8 @@ class SendItem(EWSAccountService):
         is_empty = True
         for item in items:
             is_empty = False
-            item_id = ItemId(*(item if isinstance(item, tuple) else (item.item_id, item.changekey)))
             log.debug('Sending item %s', item)
-            set_xml_value(item_ids, item_id, version=self.account.version)
+            set_xml_value(item_ids, to_item_id(item, ItemId), version=self.account.version)
         if is_empty:
             raise ValueError('"items" must not be empty')
         senditem.append(item_ids)
@@ -1331,9 +1329,8 @@ class MoveItem(EWSAccountService):
         is_empty = True
         for item in items:
             is_empty = False
-            item_id = ItemId(*(item if isinstance(item, tuple) else (item.item_id, item.changekey)))
             log.debug('Moving item %s to %s', item, to_folder)
-            set_xml_value(item_ids, item_id, version=self.account.version)
+            set_xml_value(item_ids, to_item_id(item, ItemId), version=self.account.version)
         if is_empty:
             raise ValueError('"items" must not be empty')
         moveitem.append(item_ids)
@@ -1364,9 +1361,8 @@ class CopyItem(EWSAccountService):
         is_empty = True
         for item in items:
             is_empty = False
-            item_id = ItemId(*(item if isinstance(item, tuple) else (item.item_id, None)))
             log.debug('Copying item %s to %s', item, to_folder)
-            set_xml_value(item_ids, item_id, version=self.account.version)
+            set_xml_value(item_ids, to_item_id(item, ItemId), version=self.account.version)
         if is_empty:
             raise ValueError('"items" must not be empty')
         copyitem.append(item_ids)
@@ -1511,12 +1507,9 @@ class GetPersona(EWSService):
         from .items import Persona
         from .properties import PersonaId
         payload = create_element('m:%s' % self.SERVICE_NAME)
-        if isinstance(persona, PersonaId):
-            set_xml_value(payload, persona, version=self.protocol.version)
-        elif isinstance(persona, Persona):
-            set_xml_value(payload, persona.persona_id, version=self.protocol.version)
-        else:
-            set_xml_value(payload, PersonaId(*persona), version=self.protocol.version)
+        if isinstance(persona, Persona):
+            persona = persona.persona_id
+        set_xml_value(payload, to_item_id(persona, PersonaId), version=self.protocol.version)
         return payload
 
     @classmethod
@@ -1644,8 +1637,7 @@ class CreateAttachment(EWSAccountService):
     def get_payload(self, parent_item, items):
         from .properties import ParentItemId
         payload = create_element('m:%s' % self.SERVICE_NAME)
-        parent_id = ParentItemId(*(parent_item if isinstance(parent_item, tuple)
-                                   else (parent_item.item_id, parent_item.changekey)))
+        parent_id = to_item_id(parent_item, ParentItemId)
         payload.append(parent_id.to_xml(version=self.account.version))
         attachments = create_element('m:Attachments')
         is_empty = True
@@ -1713,9 +1705,7 @@ class ExportItems(EWSAccountService, EWSPooledMixIn):
         itemids = create_element('m:ItemIds')
         exportitems.append(itemids)
         for item in items:
-            item_id = ItemId(*(item if isinstance(item, tuple) else (item.item_id, item.changekey)))
-            set_xml_value(itemids, item_id, version=self.account.version)
-
+            set_xml_value(itemids, to_item_id(item, ItemId), version=self.account.version)
         return exportitems
 
     # We need to override this since ExportItemsResponseMessage is formatted a
@@ -1754,7 +1744,7 @@ class UploadItems(EWSAccountService, EWSPooledMixIn):
         uploaditems.append(itemselement)
         for parent_folder, data_str in items:
             item = create_element('t:Item', CreateAction='CreateNew')
-            parentfolderid = ParentFolderId(parent_folder.folder_id, parent_folder.changekey)
+            parentfolderid = ParentFolderId(parent_folder.id, parent_folder.changekey)
             set_xml_value(item, parentfolderid, version=self.account.version)
             add_xml_child(item, 't:Data', data_str)
             itemselement.append(item)
@@ -1961,3 +1951,15 @@ class GetSearchableMailboxes(EWSService):
                         yield c
                 else:
                     yield container_or_exc
+
+
+def to_item_id(item, item_cls):
+    # Coerce a tuple, dict or object to an 'item_cls' instance. Used to create [Parent][Item|Folder]Id instances from a
+    # variety of input.
+    if isinstance(item, item_cls):
+        return item
+    if isinstance(item, (tuple, list)):
+        return item_cls(*item)
+    if isinstance(item, dict):
+        return item_cls(**item)
+    return item_cls(item.id, item.changekey)

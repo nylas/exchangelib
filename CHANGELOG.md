@@ -1,6 +1,14 @@
 Change Log
 ==========
 
+HEAD
+----
+
+-   Renamed `Item.item_id`, `Folder.folder_id` and `Occurrence.item_id` to just `Item.id`,
+    `Folder.id` and `Occurrence.id`, respectively. This removes redundancy in the naming
+    and provides consistency. For all classes that have an ID, the ID can now be accessed
+    using the `id` attribute. Backwards compatibility and deprecation warnings were added.
+
 1.11.4
 ------
 

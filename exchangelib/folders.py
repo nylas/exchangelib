@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 from fnmatch import fnmatch
 import logging
 from operator import attrgetter
+import warnings
 
 from cached_property import threaded_cached_property
 from future.utils import python_2_unicode_compatible
@@ -180,7 +181,7 @@ class FolderCollection(SearchableMixIn):
         Private method to call the FindItem service
 
         :param q: a Q instance containing any restrictions
-        :param shape: controls whether to return (item_id, chanegkey) tuples or Item objects. If additional_fields is
+        :param shape: controls whether to return (id, chanegkey) tuples or Item objects. If additional_fields is
                non-null, we always return Item objects.
         :param depth: controls the whether to return soft-deleted items or not.
         :param additional_fields: the extra properties we want on the return objects. Default is no properties. Be
@@ -302,7 +303,7 @@ class Folder(RegisterMixIn, SearchableMixIn):
     LOCALIZED_NAMES = dict()  # A map of (str)locale: (tuple)localized_folder_names
     ITEM_MODEL_MAP = {cls.response_tag(): cls for cls in ITEM_CLASSES}
     FIELDS = [
-        IdField('folder_id', field_uri=FolderId.ID_ATTR),
+        IdField('id', field_uri=FolderId.ID_ATTR),
         IdField('changekey', field_uri=FolderId.CHANGEKEY_ATTR),
         EWSElementField('parent_folder_id', field_uri='folder:ParentFolderId', value_cls=ParentFolderId,
                         is_read_only=True),
@@ -313,6 +314,23 @@ class Folder(RegisterMixIn, SearchableMixIn):
         IntegerField('unread_count', field_uri='folder:UnreadCount', is_read_only=True),
         EffectiveRightsField('effective_rights', field_uri='folder:EffectiveRights', is_read_only=True),
     ]
+
+    @property
+    def folder_id(self):
+        warnings.warn("The 'folder_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
+        return self.id
+
+    @folder_id.setter
+    def folder_id(self, value):
+        warnings.warn("The 'folder_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
+        self.id = value
+
+    @classmethod
+    def get_field_by_fieldname(cls, fieldname):
+        if fieldname == 'folder_id':
+            warnings.warn("The 'folder_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
+            fieldname = 'id'
+        return super(Folder, cls).get_field_by_fieldname(fieldname)
 
     # Used to register extended properties
     INSERT_AFTER_FIELD = 'child_folder_count'
@@ -330,7 +348,7 @@ class Folder(RegisterMixIn, SearchableMixIn):
             if 'parent_folder_id' in kwargs:
                 if parent.id != kwargs['parent_folder_id']:
                     raise ValueError("'parent_folder_id' must match 'parent' ID")
-            kwargs['parent_folder_id'] = ParentFolderId(id=parent.folder_id, changekey=parent.changekey)
+            kwargs['parent_folder_id'] = ParentFolderId(id=parent.id, changekey=parent.changekey)
         super(Folder, self).__init__(**kwargs)
 
     @property
@@ -348,7 +366,7 @@ class Folder(RegisterMixIn, SearchableMixIn):
     def parent(self):
         if not self.parent_folder_id:
             return None
-        if self.parent_folder_id.id == self.folder_id:
+        if self.parent_folder_id.id == self.id:
             # Some folders have a parent that references itself. Avoid circular references here
             return None
         return self.account.root.get_folder(self.parent_folder_id.id)
@@ -360,7 +378,7 @@ class Folder(RegisterMixIn, SearchableMixIn):
         else:
             if not isinstance(value, Folder):
                 raise ValueError("'value' %r must be a Folder instance" % value)
-            self.parent_folder_id = ParentFolderId(id=value.folder_id, changekey=value.changekey)
+            self.parent_folder_id = ParentFolderId(id=value.id, changekey=value.changekey)
             self.account = value.account
 
     @property
@@ -584,7 +602,7 @@ class Folder(RegisterMixIn, SearchableMixIn):
         Private method to call the FindPeople service
 
         :param q: a Q instance containing any restrictions
-        :param shape: controls whether to return (item_id, chanegkey) tuples or Persona objects. If additional_fields is
+        :param shape: controls whether to return (id, chanegkey) tuples or Persona objects. If additional_fields is
                non-null, we always return Persona objects.
         :param depth: controls the whether to return soft-deleted items or not.
         :param additional_fields: the extra properties we want on the return objects. Default is no properties.
@@ -635,7 +653,7 @@ class Folder(RegisterMixIn, SearchableMixIn):
         return self.account.bulk_create(folder=self, items=items, *args, **kwargs)
 
     def save(self, update_fields=None):
-        if self.folder_id is None:
+        if self.id is None:
             # New folder
             if update_fields:
                 raise ValueError("'update_fields' is only valid for updates")
@@ -644,7 +662,7 @@ class Folder(RegisterMixIn, SearchableMixIn):
                 raise ValueError('Expected result length 1, but got %s' % res)
             if isinstance(res[0], Exception):
                 raise res[0]
-            self.folder_id, self.changekey = res[0].folder_id, res[0].changekey
+            self.id, self.changekey = res[0].id, res[0].changekey
             self.account.root.add_folder(self)  # Add this folder to the cache
             return self
 
@@ -666,9 +684,9 @@ class Folder(RegisterMixIn, SearchableMixIn):
             raise ValueError('Expected result length 1, but got %s' % res)
         if isinstance(res[0], Exception):
             raise res[0]
-        folder_id, changekey = res[0].folder_id, res[0].changekey
-        if self.folder_id != folder_id:
-            raise ValueError('folder_id mismatch')
+        folder_id, changekey = res[0].id, res[0].changekey
+        if self.id != folder_id:
+            raise ValueError('ID mismatch')
         # Don't check changekey value. It may not change on no-op updates
         self.changekey = changekey
         self.account.root.update_folder(self)  # Update the folder in the cache
@@ -683,7 +701,7 @@ class Folder(RegisterMixIn, SearchableMixIn):
         if isinstance(res[0], Exception):
             raise res[0]
         self.account.root.remove_folder(self)  # Remove the updated folder from the cache
-        self.folder_id, self.changekey = None, None
+        self.id, self.changekey = None, None
 
     def empty(self, delete_type=HARD_DELETE, delete_sub_folders=False):
         if delete_type not in DELETE_TYPE_CHOICES:
@@ -782,10 +800,10 @@ class Folder(RegisterMixIn, SearchableMixIn):
                     pass
             if folder_cls == Folder:
                 log.debug('Fallback to class Folder (folder_class %s, name %s)', kwargs['folder_class'], kwargs['name'])
-        return folder_cls(account=account, folder_id=fld_id, changekey=changekey, **kwargs)
+        return folder_cls(account=account, id=fld_id, changekey=changekey, **kwargs)
 
     def to_xml(self, version):
-        if self.is_distinguished or (not self.folder_id and self.has_distinguished_name):
+        if self.is_distinguished or (not self.id and self.has_distinguished_name):
             # Don't add the changekey here. When modifying folder content, we usually don't care if others have changed
             # the folder content since we fetched the changekey.
             if self.account:
@@ -794,13 +812,13 @@ class Folder(RegisterMixIn, SearchableMixIn):
                     mailbox=Mailbox(email_address=self.account.primary_smtp_address)
                 ).to_xml(version=version)
             return DistinguishedFolderId(id=self.DISTINGUISHED_FOLDER_ID).to_xml(version=version)
-        if self.folder_id:
-            return FolderId(id=self.folder_id, changekey=self.changekey).to_xml(version=version)
+        if self.id:
+            return FolderId(id=self.id, changekey=self.changekey).to_xml(version=version)
         return super(Folder, self).to_xml(version=version)
 
     @classmethod
     def supported_fields(cls, version=None):
-        return tuple(f for f in cls.FIELDS if f.name not in ('folder_id', 'changekey') and f.supports_version(version))
+        return tuple(f for f in cls.FIELDS if f.name not in ('id', 'changekey') and f.supports_version(version))
 
     @classmethod
     def get_distinguished(cls, account):
@@ -824,7 +842,7 @@ class Folder(RegisterMixIn, SearchableMixIn):
     def refresh(self):
         if not self.account:
             raise ValueError('Folder must have an account')
-        if not self.folder_id:
+        if not self.id:
             raise ValueError('Folder must have an ID')
         folders = list(FolderCollection(account=self.account, folders=[self]).get_folders())
         if not folders:
@@ -834,8 +852,8 @@ class Folder(RegisterMixIn, SearchableMixIn):
         fresh_folder = folders[0]
         if isinstance(fresh_folder, Exception):
             raise fresh_folder
-        if self.folder_id != fresh_folder.folder_id:
-            raise ValueError('folder_id mismatch')
+        if self.id != fresh_folder.id:
+            raise ValueError('ID mismatch')
         # Apparently, the changekey may get updated
         for f in self.FIELDS:
             setattr(self, f.name, getattr(fresh_folder, f.name))
@@ -858,7 +876,7 @@ class Folder(RegisterMixIn, SearchableMixIn):
     def __repr__(self):
         return self.__class__.__name__ + \
                repr((self.account, self.name, self.total_count, self.unread_count, self.child_folder_count,
-                     self.folder_class, self.folder_id, self.changekey))
+                     self.folder_class, self.id, self.changekey))
 
     def __str__(self):
         return '%s (%s)' % (self.__class__.__name__, self.name)
@@ -885,20 +903,20 @@ class Root(Folder):
         return self._folders_map.get(folder_id, None)
 
     def add_folder(self, folder):
-        if not folder.folder_id:
-            raise ValueError("'folder' must have a folder_id")
-        self._folders_map[folder.folder_id] = folder
+        if not folder.id:
+            raise ValueError("'folder' must have an ID")
+        self._folders_map[folder.id] = folder
 
     def update_folder(self, folder):
-        if not folder.folder_id:
-            raise ValueError("'folder' must have a folder_id")
-        self._folders_map[folder.folder_id] = folder
+        if not folder.id:
+            raise ValueError("'folder' must have an ID")
+        self._folders_map[folder.id] = folder
 
     def remove_folder(self, folder):
-        if not folder.folder_id:
-            raise ValueError("'folder' must have a folder_id")
+        if not folder.id:
+            raise ValueError("'folder' must have an ID")
         try:
-            del self._folders_map[folder.folder_id]
+            del self._folders_map[folder.id]
         except KeyError:
             pass
 
@@ -909,7 +927,7 @@ class Root(Folder):
         for f in self._folders_map.values():
             if not f.parent:
                 continue
-            if f.parent.folder_id == folder.folder_id:
+            if f.parent.id == folder.id:
                 yield f
 
     @property
@@ -919,7 +937,7 @@ class Root(Folder):
 
         # Map root, and all subfolders of root, at arbitrary depth by folder ID. First get distinguished folders, then
         # everything else. AdminAuditLogs folder is not retrievable and makes the entire request fail.
-        folders_map = {self.folder_id: self}
+        folders_map = {self.id: self}
         distinguished_folders = [
             cls(account=self.account, name=cls.DISTINGUISHED_FOLDER_ID) for cls in WELLKNOWN_FOLDERS
             if cls != AdminAuditLogs and cls.supports_version(self.account.version)
@@ -939,14 +957,14 @@ class Root(Folder):
                     continue
                 if isinstance(f, Exception):
                     raise f
-                folders_map[f.folder_id] = f
+                folders_map[f.id] = f
             for f in FolderCollection(account=self.account, folders=[self]).find_folders(depth=DEEP):
                 if isinstance(f, Exception):
                     raise f
-                if f.folder_id in folders_map:
+                if f.id in folders_map:
                     # Already exists. Probably a distinguished folder
                     continue
-                folders_map[f.folder_id] = f
+                folders_map[f.id] = f
         except ErrorAccessDenied:
             # We may not have GetFolder or FindFolder access
             pass
@@ -971,7 +989,7 @@ class Root(Folder):
             log.debug('Testing default %s folder with FindItem', folder_cls)
             fld = folder_cls(account=self.account, name=folder_cls.DISTINGUISHED_FOLDER_ID)
             fld.test_access()
-            return self._folders_map.get(fld.folder_id, fld)  # Use cached instance if available
+            return self._folders_map.get(fld.id, fld)  # Use cached instance if available
         except ErrorFolderNotFound:
             # There's no folder named fld_class.DISTINGUISHED_FOLDER_ID. Try to guess which folder is the default.
             # Exchange makes this unnecessarily difficult.
