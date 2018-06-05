@@ -32,7 +32,7 @@ from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, 
     ErrorItemSave, ErrorInvalidIdMalformed, ErrorMessageSizeExceeded, UnauthorizedError, \
     ErrorCannotDeleteTaskOccurrence, ErrorMimeContentConversionFailed, ErrorRecurrenceHasNoOccurrence, \
     ErrorNameResolutionMultipleResults, ErrorNameResolutionNoResults, ErrorNoPublicFolderReplicaAvailable, \
-    ErrorInvalidOperation
+    ErrorInvalidOperation, MalformedResponseError
 from .ewsdatetime import EWSDateTime, NaiveDateTimeNotAllowed
 from .transport import wrap, extra_headers, SOAPNS, TNS, MNS, ENS
 from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, ElementType, \
@@ -218,7 +218,7 @@ class EWSService(object):
             raise ValueError("'soap_response' %r must be an ElementType" % soap_response)
         body = soap_response.find('{%s}Body' % SOAPNS)
         if body is None:
-            raise TransportError('No Body element in SOAP response')
+            raise MalformedResponseError('No Body element in SOAP response')
         response = body.find('{%s}%sResponse' % (MNS, cls.SERVICE_NAME))
         if response is None:
             fault = body.find('{%s}Fault' % SOAPNS)
@@ -282,7 +282,7 @@ class EWSService(object):
                 return True
             container = message.find(name)
             if container is None:
-                raise TransportError('No %s elements in ResponseMessage (%s)' % (name, xml_to_str(message)))
+                raise MalformedResponseError('No %s elements in ResponseMessage (%s)' % (name, xml_to_str(message)))
             return container
         if response_code == 'NoError':
             return True
@@ -296,7 +296,7 @@ class EWSService(object):
                 log.warning(str(e))
                 container = message.find(name)
                 if container is None:
-                    raise TransportError('No %s elements in ResponseMessage (%s)' % (name, xml_to_str(message)))
+                    raise MalformedResponseError('No %s elements in ResponseMessage (%s)' % (name, xml_to_str(message)))
                 return container
         # rspclass == 'Error', or 'Success' and not 'NoError'
         try:
@@ -383,7 +383,7 @@ class PagingEWSMixIn(EWSService):
                 # We'll warn about this if we actually need to sleep
                 continue
             if len(response) != expected_message_count:
-                raise TransportError(
+                raise MalformedResponseError(
                     "Expected %s items in 'response', got %s (%s)" % (
                         expected_message_count, len(response), response)
                 )
@@ -394,7 +394,7 @@ class PagingEWSMixIn(EWSService):
                 if isinstance(rootfolder, ElementType):
                     container = rootfolder.find(self.element_container_name)
                     if container is None:
-                        raise TransportError('No %s elements in ResponseMessage (%s)' % (self.element_container_name,
+                        raise MalformedResponseError('No %s elements in ResponseMessage (%s)' % (self.element_container_name,
                                                                                          xml_to_str(rootfolder)))
                     for elem in self._get_elements_in_container(container=container):
                         paging_info['item_count'] += 1
@@ -409,7 +409,7 @@ class PagingEWSMixIn(EWSService):
                     continue
                 if paging_info['next_offset'] != paging_info['item_count']:
                     # Check paging offsets
-                    raise TransportError(
+                    raise MalformedResponseError(
                         'Unexpected next offset: %s -> %s' % (paging_info['item_count'], paging_info['next_offset'])
                     )
             # Also break out of outer loop
@@ -422,7 +422,7 @@ class PagingEWSMixIn(EWSService):
                 # Paging is done for all messages
                 break
             if len(unique_item_counts) > 1:
-                raise TransportError('Inconsistent next offsets: %s' % unique_item_counts)
+                raise MalformedResponseError('Inconsistent next offsets: %s' % unique_item_counts)
             common_next_offset = unique_item_counts.pop()
 
     def _get_page(self, message):
@@ -1459,13 +1459,13 @@ class FindPeople(EWSAccountService, PagingEWSMixIn):
                 continue
             if len(response) != 1:
                 # We can only query one folder, so there should only be one element in response
-                raise TransportError("Expected single item in 'response', got %s" % response)
+                raise MalformedResponseError("Expected single item in 'response', got %s" % response)
             rootfolder, total_items = self._get_page(response[0])
             if isinstance(rootfolder, ElementType):
                 container = rootfolder.find(self.element_container_name)
                 if container is None:
-                    raise TransportError('No %s elements in ResponseMessage (%s)' % (self.element_container_name,
-                                                                                     xml_to_str(rootfolder)))
+                    raise MalformedResponseError('No %s elements in ResponseMessage (%s)' % (
+                        self.element_container_name, xml_to_str(rootfolder)))
                 for elem in self._get_elements_in_container(container=container):
                     item_count += 1
                     yield elem
@@ -1518,7 +1518,7 @@ class GetPersona(EWSService):
             raise ValueError("'soap_response' %r must be an ElementType" % soap_response)
         body = soap_response.find('{%s}Body' % SOAPNS)
         if body is None:
-            raise TransportError('No Body element in SOAP response')
+            raise MalformedResponseError('No Body element in SOAP response')
         response = body.find('{%s}%sResponseMessage' % (MNS, cls.SERVICE_NAME))
         if response is None:
             fault = body.find('{%s}Fault' % SOAPNS)
@@ -1772,7 +1772,7 @@ class BaseUserOofSettings(EWSAccountService):
                 return True
             container = message.find(name)
             if container is None:
-                raise TransportError('No %s elements in ResponseMessage (%s)' % (name, xml_to_str(message)))
+                raise MalformedResponseError('No %s elements in ResponseMessage (%s)' % (name, xml_to_str(message)))
             return container
         if response_code == 'NoError':
             return True
@@ -1786,7 +1786,7 @@ class BaseUserOofSettings(EWSAccountService):
                 log.warning(str(e))
                 container = message.find(name)
                 if container is None:
-                    raise TransportError('No %s elements in ResponseMessage (%s)' % (name, xml_to_str(message)))
+                    raise MalformedResponseError('No %s elements in ResponseMessage (%s)' % (name, xml_to_str(message)))
                 return container
         # rspclass == 'Error', or 'Success' and not 'NoError'
         try:
@@ -1882,7 +1882,7 @@ class GetUserAvailability(EWSService):
             raise ValueError("'soap_response' %r must be an ElementType" % soap_response)
         body = soap_response.find('{%s}Body' % SOAPNS)
         if body is None:
-            raise TransportError('No Body element in SOAP response')
+            raise MalformedResponseError('No Body element in SOAP response')
         response = body.find('{%s}%sResponse' % (MNS, cls.SERVICE_NAME))
         if response is None:
             fault = body.find('{%s}Fault' % SOAPNS)
@@ -1945,7 +1945,13 @@ class GetSearchableMailboxes(EWSService):
             if not isinstance(msg, ElementType):
                 raise ValueError("'msg' %r must be an ElementType" % msg)
             for container_name in (self.element_container_name, self.failed_mailboxes_container_name):
-                container_or_exc = self._get_element_container(message=msg, name=container_name)
+                try:
+                    container_or_exc = self._get_element_container(message=msg, name=container_name)
+                except MalformedResponseError:
+                    # Responses bay contain no failed mailboxes. _get_element_container() does not accept this.
+                    if container_name == self.failed_mailboxes_container_name:
+                        continue
+                    raise
                 if isinstance(container_or_exc, ElementType):
                     for c in self._get_elements_in_container(container=container_or_exc):
                         yield c

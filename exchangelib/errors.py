@@ -42,6 +42,10 @@ class SOAPError(TransportError):
     pass
 
 
+class MalformedResponseError(TransportError):
+    pass
+
+
 class UnauthorizedError(EWSError):
     pass
 

@@ -328,10 +328,17 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
         ))
 
     def get_searchable_mailboxes(self, search_filter=None, expand_group_membership=False):
-        return GetSearchableMailboxes(protocol=self).call(
+        """This method is only available to users who have been assigned the Discovery Management RBAC role. See
+        https://technet.microsoft.com/en-us/library/jj200692(v=exchg.150).aspx.
+
+        :param search_filter: Is set, must be a single email alias
+        :param expand_group_membership: If True, returned distribution lists are expanded
+        :return: a list of SearchableMailbox, FailedMailbox or Exception instances
+        """
+        return list(GetSearchableMailboxes(protocol=self).call(
             search_filter=search_filter,
             expand_group_membership=expand_group_membership,
-        )
+        ))
 
     def __str__(self):
         return '''\
