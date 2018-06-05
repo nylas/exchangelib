@@ -803,7 +803,7 @@ class Folder(RegisterMixIn, SearchableMixIn):
         return folder_cls(account=account, id=fld_id, changekey=changekey, **kwargs)
 
     def to_xml(self, version):
-        if self.is_distinguished or (not self.id and self.has_distinguished_name):
+        if self.is_distinguished:
             # Don't add the changekey here. When modifying folder content, we usually don't care if others have changed
             # the folder content since we fetched the changekey.
             if self.account:
@@ -826,7 +826,9 @@ class Folder(RegisterMixIn, SearchableMixIn):
         if not cls.DISTINGUISHED_FOLDER_ID:
             raise ValueError('Class %s must have a DISTINGUISHED_FOLDER_ID value' % cls)
         folders = list(FolderCollection(
-            account=account, folders=[cls(account=account, name=cls.DISTINGUISHED_FOLDER_ID)]).get_folders()
+            account=account,
+            folders=[cls(account=account, name=cls.DISTINGUISHED_FOLDER_ID, is_distinguished=True)]
+        ).get_folders()
         )
         if not folders:
             raise ErrorFolderNotFound('Could not find distinguished folder %s' % cls.DISTINGUISHED_FOLDER_ID)
@@ -939,7 +941,8 @@ class Root(Folder):
         # everything else. AdminAuditLogs folder is not retrievable and makes the entire request fail.
         folders_map = {self.id: self}
         distinguished_folders = [
-            cls(account=self.account, name=cls.DISTINGUISHED_FOLDER_ID) for cls in WELLKNOWN_FOLDERS
+            cls(account=self.account, name=cls.DISTINGUISHED_FOLDER_ID, is_distinguished=True)
+            for cls in WELLKNOWN_FOLDERS
             if cls != AdminAuditLogs and cls.supports_version(self.account.version)
         ]
         try:
@@ -976,24 +979,36 @@ class Root(Folder):
         # folder was found, try as best we can to return the default folder of type 'folder_cls'
         if not folder_cls.DISTINGUISHED_FOLDER_ID:
             raise ValueError("'folder_cls' %s must have a DISTINGUISHED_FOLDER_ID value" % folder_cls)
+        # Use cached distinguished folder instance if available
+        for f in self._folders_map.values():
+            if isinstance(f, folder_cls) and f.is_distinguished:
+                log.debug('Found cached distinguished %s folder', folder_cls)
+                return f
         try:
-            # Get the default folder
-            log.debug('Testing default %s folder with GetFolder', folder_cls)
-            # Use cached instance if available
-            for f in self._folders_map.values():
-                if isinstance(f, folder_cls) and f.has_distinguished_name:
-                    return f
+            log.debug('Requesting distinguished %s folder explicitly', folder_cls)
             return folder_cls.get_distinguished(account=self.account)
         except ErrorAccessDenied:
             # Maybe we just don't have GetFolder access? Try FindItems instead
             log.debug('Testing default %s folder with FindItem', folder_cls)
-            fld = folder_cls(account=self.account, name=folder_cls.DISTINGUISHED_FOLDER_ID)
+            fld = folder_cls(account=self.account, name=folder_cls.DISTINGUISHED_FOLDER_ID, is_distinguished=True)
             fld.test_access()
             return self._folders_map.get(fld.id, fld)  # Use cached instance if available
         except ErrorFolderNotFound:
-            # There's no folder named fld_class.DISTINGUISHED_FOLDER_ID. Try to guess which folder is the default.
-            # Exchange makes this unnecessarily difficult.
-            log.debug('Searching default %s folder in full folder list', folder_cls)
+            # The Exchange server does not return a distinguished folder of this type
+            pass
+
+        # Try to pick a suitable default folder. we do this by:
+        #  1. Searching the full folder list for a folder with the distinguished folder name
+        #  2. Searhing TOIS for a direct child folder of the same type that is marked as distinguished
+        #  3. Searhing TOIS for a direct child folder of the same type that is has a localized name
+        #  4. Searhing root for a direct child folder of the same type that is marked as distinguished
+        #  5. Searhing root for a direct child folder of the same type that is has a localized name
+        log.debug('Searching default %s folder in full folder list', folder_cls)
+
+        for f in self._folders_map.values():
+            if isinstance(f, folder_cls) and f.has_distinguished_name:
+                log.debug('Found cached %s folder with default distinguished name', folder_cls)
+                return f
 
         candidates = []
         # Try direct children of TOIS first. TOIS might not exist.
@@ -1013,6 +1028,10 @@ class Root(Folder):
                     'Multiple possible default %s folders in TOIS: %s'
                     % (folder_cls, [text_type(f.name) for f in candidates])
                 )
+            if candidates[0].is_distinguished:
+                log.debug('Found cached distinguished %s folder in TOIS', folder_cls)
+            else:
+                log.debug('Found cached %s folder in TOIS with localized name', folder_cls)
             return candidates[0]
 
         # No candidates in TOIS. Try direct children of root.
@@ -1027,6 +1046,10 @@ class Root(Folder):
             if len(candidates) > 1:
                 raise ValueError('Multiple possible default %s folders in root: %s'
                                  % (folder_cls, [text_type(f.name) for f in candidates]))
+            if candidates[0].is_distinguished:
+                log.debug('Found cached distinguished %s folder in root', folder_cls)
+            else:
+                log.debug('Found cached %s folder in root with localized name', folder_cls)
             return candidates[0]
 
         raise ErrorFolderNotFound('No useable default %s folders' % folder_cls)

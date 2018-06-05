@@ -1055,7 +1055,7 @@ class GetFolder(EWSAccountService):
                 continue
             if isinstance(folder, Folder):
                 f = folder.from_xml(elem=elem, account=self.account)
-                if folder.is_distinguished or (not folder.id and folder.has_distinguished_name):
+                if folder.is_distinguished:
                     f.is_distinguished = True
             else:
                 # 'folder' may be a FolderId/DistinguishedFolderId instance
@@ -1108,7 +1108,7 @@ class CreateFolder(EWSAccountService):
                 yield elem
                 continue
             f = folder.from_xml(elem=elem, account=self.account)
-            if folder.is_distinguished or (not folder.id and folder.has_distinguished_name):
+            if folder.is_distinguished:
                 f.is_distinguished = True
             yield f
 
@@ -1148,7 +1148,7 @@ class UpdateFolder(EWSAccountService):
                 yield elem
                 continue
             f = folder.from_xml(elem=elem, account=self.account)
-            if folder.is_distinguished or (not folder.id and folder.has_distinguished_name):
+            if folder.is_distinguished:
                 f.is_distinguished = True
             yield f
 

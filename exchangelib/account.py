@@ -157,7 +157,8 @@ class Account(object):
     def calendar(self):
         # If the account contains a shared calendar from a different user, that calendar will be in the folder list.
         # Attempt not to return one of those. An account may not always have a calendar called "Calendar", but a
-        # Calendar folder with a localized name instead. Return that, if it's available.
+        # Calendar folder with a localized name instead. Return that, if it's available, but always prefer any
+        # distinguished folder returned by the server.
         return self.root.get_default_folder(Calendar)
 
     @threaded_cached_property

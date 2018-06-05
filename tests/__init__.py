@@ -802,7 +802,7 @@ class ItemTest(unittest.TestCase):
         # We reset status if complete_date is set
         self.assertEqual(task.status, Task.COMPLETED)
         # We also reset complete date to now() if it's in the future
-        self.assertEqual(task.complete_date.date(), EWSDate.today())
+        self.assertEqual(task.complete_date.date(), UTC_NOW().date())
 
         task = Task(complete_date=tz.localize(EWSDateTime(2017, 1, 1)), start_date=tz.localize(EWSDateTime(2017, 2, 1)))
         task.clean()
