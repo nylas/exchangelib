@@ -837,8 +837,8 @@ class Folder(RegisterMixIn, SearchableMixIn):
         folder = folders[0]
         if isinstance(folder, Exception):
             raise folder
-        if not isinstance(folder, cls):
-            raise ValueError("'folder' %r must be a %s instance" % (folder, cls))
+        if type(folder) != cls:
+            raise ValueError("Expected 'folder' %r to be a %s instance" % (folder, cls))
         return folder
 
     def refresh(self):
@@ -981,7 +981,8 @@ class Root(Folder):
             raise ValueError("'folder_cls' %s must have a DISTINGUISHED_FOLDER_ID value" % folder_cls)
         # Use cached distinguished folder instance if available
         for f in self._folders_map.values():
-            if isinstance(f, folder_cls) and f.is_distinguished:
+            # Require exact class to not match e.g. RecipientCache instead of Contacts
+            if type(f) == folder_cls and f.is_distinguished:
                 log.debug('Found cached distinguished %s folder', folder_cls)
                 return f
         try:
@@ -1006,7 +1007,8 @@ class Root(Folder):
         log.debug('Searching default %s folder in full folder list', folder_cls)
 
         for f in self._folders_map.values():
-            if isinstance(f, folder_cls) and f.has_distinguished_name:
+            # Require exact class to not match e.g. RecipientCache instead of Contacts
+            if type(f) == folder_cls and f.has_distinguished_name:
                 log.debug('Found cached %s folder with default distinguished name', folder_cls)
                 return f
 

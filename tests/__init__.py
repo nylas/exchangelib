@@ -2875,6 +2875,7 @@ class FolderTest(EWSTest):
 
 class BaseItemTest(EWSTest):
     TEST_FOLDER = None
+    FOLDER_CLASS = None
     ITEM_CLASS = None
 
     @classmethod
@@ -2886,6 +2887,7 @@ class BaseItemTest(EWSTest):
     def setUp(self):
         super(BaseItemTest, self).setUp()
         self.test_folder = getattr(self.account, self.TEST_FOLDER)
+        self.assertEqual(type(self.test_folder), self.FOLDER_CLASS)
         self.assertEqual(self.test_folder.DISTINGUISHED_FOLDER_ID, self.TEST_FOLDER)
         self.test_folder.filter(categories__contains=self.categories).delete()
 
@@ -5264,6 +5266,7 @@ class BaseItemTest(EWSTest):
 
 class CalendarTest(BaseItemTest):
     TEST_FOLDER = 'calendar'
+    FOLDER_CLASS = Calendar
     ITEM_CLASS = CalendarItem
 
     def test_update_to_non_utc_datetime(self):
@@ -5479,6 +5482,7 @@ class CalendarTest(BaseItemTest):
 class MessagesTest(BaseItemTest):
     # Just test one of the Message-type folders
     TEST_FOLDER = 'inbox'
+    FOLDER_CLASS = Messages
     ITEM_CLASS = Message
 
     def test_send(self):
@@ -5635,6 +5639,7 @@ class MessagesTest(BaseItemTest):
 
 class TasksTest(BaseItemTest):
     TEST_FOLDER = 'tasks'
+    FOLDER_CLASS = Tasks
     ITEM_CLASS = Task
 
     def test_complete(self):
@@ -5650,6 +5655,7 @@ class TasksTest(BaseItemTest):
 
 class ContactsTest(BaseItemTest):
     TEST_FOLDER = 'contacts'
+    FOLDER_CLASS = Contacts
     ITEM_CLASS = Contact
 
     def test_paging(self):
