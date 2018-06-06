@@ -5482,7 +5482,7 @@ class CalendarTest(BaseItemTest):
 class MessagesTest(BaseItemTest):
     # Just test one of the Message-type folders
     TEST_FOLDER = 'inbox'
-    FOLDER_CLASS = Messages
+    FOLDER_CLASS = Inbox
     ITEM_CLASS = Message
 
     def test_send(self):
