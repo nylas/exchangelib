@@ -1,6 +1,6 @@
 from __future__ import unicode_literals
 
-from exchangelib.fields import ItemField, FolderField
+from exchangelib.fields import ItemField, FolderField, IdAndChangekeyField
 from exchangelib.properties import EWSElement
 from exchangelib.transport import TNS
 
@@ -48,4 +48,8 @@ class UpdateFolderChange(FolderChange):
 
 
 class DeleteFolderChange(FolderChange):
+    FIELDS = [
+        IdAndChangekeyField('item_id', field_uri='FolderId'),
+    ]
+    __slots__ = ('item_id',)
     ELEMENT_NAME = 'Delete'
