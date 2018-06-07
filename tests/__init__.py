@@ -788,6 +788,13 @@ class ItemTest(unittest.TestCase):
             assert len(w) == 1
             assert issubclass(w[-1].category, PendingDeprecationWarning)
             assert "Use 'id' instead" in str(w[-1].message)
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            # Trigger a warning
+            Message(item_id='XXX')
+            assert len(w) == 1
+            assert issubclass(w[-1].category, PendingDeprecationWarning)
+            assert "Use 'id' instead" in str(w[-1].message)
 
     def test_task_validation(self):
         tz = EWSTimeZone.timezone('Europe/Copenhagen')
@@ -833,6 +840,13 @@ class RecurrenceTest(unittest.TestCase):
             warnings.simplefilter("always")
             # Trigger a warning
             Occurrence.get_field_by_fieldname('item_id')
+            assert len(w) == 1
+            assert issubclass(w[-1].category, PendingDeprecationWarning)
+            assert "Use 'id' instead" in str(w[-1].message)
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            # Trigger a warning
+            Occurrence(item_id='XXX')
             assert len(w) == 1
             assert issubclass(w[-1].category, PendingDeprecationWarning)
             assert "Use 'id' instead" in str(w[-1].message)
@@ -2586,6 +2600,13 @@ class FolderTest(EWSTest):
             warnings.simplefilter("always")
             # Trigger a warning
             Folder.get_field_by_fieldname('folder_id')
+            assert len(w) == 1
+            assert issubclass(w[-1].category, PendingDeprecationWarning)
+            assert "Use 'id' instead" in str(w[-1].message)
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            # Trigger a warning
+            Folder(folder_id='XXX')
             assert len(w) == 1
             assert issubclass(w[-1].category, PendingDeprecationWarning)
             assert "Use 'id' instead" in str(w[-1].message)

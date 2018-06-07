@@ -226,6 +226,12 @@ class Occurrence(EWSElement):
     ]
     __slots__ = ('id', 'changekey', 'start', 'end', 'original_start')
 
+    def __init__(self, **kwargs):
+        if 'item_id' in kwargs:
+            warnings.warn("The 'item_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
+            kwargs['id'] = kwargs.pop('item_id')
+        super(Occurrence, self).__init__(**kwargs)
+
     @property
     def item_id(self):
         warnings.warn("The 'item_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)

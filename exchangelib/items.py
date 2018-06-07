@@ -213,6 +213,9 @@ class Item(RegisterMixIn):
                     if self.account != self.folder.account:
                         raise ValueError("'account' does not match 'folder.account'")
                 self.account = self.folder.account
+        if 'item_id' in kwargs:
+            warnings.warn("The 'item_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
+            kwargs['id'] = kwargs.pop('item_id')
         super(Item, self).__init__(**kwargs)
         # pylint: disable=access-member-before-definition
         if self.attachments:

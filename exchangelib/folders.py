@@ -315,23 +315,6 @@ class Folder(RegisterMixIn, SearchableMixIn):
         EffectiveRightsField('effective_rights', field_uri='folder:EffectiveRights', is_read_only=True),
     ]
 
-    @property
-    def folder_id(self):
-        warnings.warn("The 'folder_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
-        return self.id
-
-    @folder_id.setter
-    def folder_id(self, value):
-        warnings.warn("The 'folder_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
-        self.id = value
-
-    @classmethod
-    def get_field_by_fieldname(cls, fieldname):
-        if fieldname == 'folder_id':
-            warnings.warn("The 'folder_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
-            fieldname = 'id'
-        return super(Folder, cls).get_field_by_fieldname(fieldname)
-
     # Used to register extended properties
     INSERT_AFTER_FIELD = 'child_folder_count'
 
@@ -349,7 +332,27 @@ class Folder(RegisterMixIn, SearchableMixIn):
                 if parent.id != kwargs['parent_folder_id']:
                     raise ValueError("'parent_folder_id' must match 'parent' ID")
             kwargs['parent_folder_id'] = ParentFolderId(id=parent.id, changekey=parent.changekey)
+        if 'folder_id' in kwargs:
+            warnings.warn("The 'folder_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
+            kwargs['id'] = kwargs.pop('folder_id')
         super(Folder, self).__init__(**kwargs)
+
+    @property
+    def folder_id(self):
+        warnings.warn("The 'folder_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
+        return self.id
+
+    @folder_id.setter
+    def folder_id(self, value):
+        warnings.warn("The 'folder_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
+        self.id = value
+
+    @classmethod
+    def get_field_by_fieldname(cls, fieldname):
+        if fieldname == 'folder_id':
+            warnings.warn("The 'folder_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
+            fieldname = 'id'
+        return super(Folder, cls).get_field_by_fieldname(fieldname)
 
     @property
     def is_deleteable(self):
