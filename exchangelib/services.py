@@ -500,6 +500,26 @@ class EWSService(object):
     def _get_elements_in_container(container):
         return [elem for elem in container]
 
+    def add_additional_properties_to_shape(self, shape_element, additional_fields):
+        if not additional_fields:
+            return
+
+        from .fields import FieldPath
+
+        additional_field_paths = []
+
+        for field in additional_fields:
+            if isinstance(field, FieldPath):
+                field_path = field
+            else:
+                field_path = FieldPath(field=field)
+            additional_field_paths.append(field_path)
+
+        additional_properties = create_element('t:AdditionalProperties')
+        expanded_fields = chain(*(f.expand(version=self.account.version) for f in additional_field_paths))
+        set_xml_value(additional_properties, sorted(expanded_fields, key=lambda f: f.path), self.account.version)
+        shape_element.append(additional_properties)
+
 
 class EWSAccountService(EWSService):
 
@@ -820,12 +840,7 @@ class GetItem(EWSAccountService, EWSPooledMixIn):
         getitem = create_element('m:%s' % self.SERVICE_NAME)
         itemshape = create_element('m:ItemShape')
         add_xml_child(itemshape, 't:BaseShape', shape)
-        if additional_fields:
-            additional_properties = create_element('t:AdditionalProperties')
-            expanded_fields = chain(*(f.expand(version=self.account.version) for f in additional_fields))
-            set_xml_value(additional_properties, sorted(expanded_fields, key=lambda f: f.path),
-                          version=self.account.version)
-            itemshape.append(additional_properties)
+        self.add_additional_properties_to_shape(itemshape, additional_fields)
         getitem.append(itemshape)
         item_ids = create_element('m:ItemIds')
         for item in items:
@@ -1196,12 +1211,7 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
         findfolder = create_element('m:%s' % self.SERVICE_NAME, Traversal=depth)
         foldershape = create_element('m:FolderShape')
         add_xml_child(foldershape, 't:BaseShape', shape)
-        if additional_fields:
-            additional_properties = create_element('t:AdditionalProperties')
-            expanded_fields = chain(*(f.expand(version=self.account.version) for f in additional_fields))
-            set_xml_value(additional_properties, sorted(expanded_fields, key=lambda f: f.path),
-                          version=self.account.version)
-            foldershape.append(additional_properties)
+        self.add_additional_properties_to_shape(foldershape, additional_fields)
         findfolder.append(foldershape)
         if self.account.version.build >= EXCHANGE_2010:
             indexedpageviewitem = create_element('m:IndexedPageFolderView', MaxEntriesReturned=text_type(page_size),
@@ -1263,12 +1273,7 @@ class GetFolder(EWSAccountService):
         getfolder = create_element('m:%s' % self.SERVICE_NAME)
         foldershape = create_element('m:FolderShape')
         add_xml_child(foldershape, 't:BaseShape', shape)
-        if additional_fields:
-            additional_properties = create_element('t:AdditionalProperties')
-            expanded_fields = chain(*(f.expand(version=self.account.version) for f in additional_fields))
-            set_xml_value(additional_properties, sorted(expanded_fields, key=lambda f: f.path),
-                          version=self.account.version)
-            foldershape.append(additional_properties)
+        self.add_additional_properties_to_shape(foldershape, additional_fields)
         getfolder.append(foldershape)
         folder_ids = create_element('m:FolderIds')
         for folder in folders:
@@ -1411,7 +1416,7 @@ class SyncFolderHierarchy(EWSAccountService):
     SERVICE_NAME = 'SyncFolderHierarchy'
     element_container_name = '{%s}Changes' % MNS
 
-    def call(self, shape, sync_state=None):
+    def call(self, shape, sync_state=None, additional_fields=None):
         from .changes import CreateFolderChange, UpdateFolderChange, DeleteFolderChange
 
         folder_change_classes_by_tag = {
@@ -1420,7 +1425,7 @@ class SyncFolderHierarchy(EWSAccountService):
             DeleteFolderChange.response_tag(): DeleteFolderChange,
         }
 
-        for change in self._get_elements(payload=self.get_payload(shape, sync_state)):
+        for change in self._get_elements(payload=self.get_payload(shape, sync_state, additional_fields)):
             cls = folder_change_classes_by_tag.get(change.tag)
             if not cls:
                 raise ValueError('Unknown Change tag: {}'.format(change.tag))
@@ -1430,10 +1435,11 @@ class SyncFolderHierarchy(EWSAccountService):
         else:
             yield self.sync_state.text
 
-    def get_payload(self, shape, sync_state=None):
+    def get_payload(self, shape, sync_state=None, additional_fields=None):
         sync_folder_hierarchy = create_element('m:%s' % self.SERVICE_NAME)
         foldershape = create_element('m:FolderShape')
         add_xml_child(foldershape, 't:BaseShape', shape)
+        self.add_additional_properties_to_shape(foldershape, additional_fields)
         sync_folder_hierarchy.append(foldershape)
         if sync_state is not None:
             syncstate = create_element('m:SyncState')

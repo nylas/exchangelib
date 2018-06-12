@@ -2213,6 +2213,17 @@ class AccountTest(EWSTest):
         for change in self.account.sync_folder_hierarchy(shape='AllProperties', sync_state=sync_state):
             assert not isinstance(change, Change)
 
+    def test_sync_folder_hierarchy_with_additional_fields(self):
+        parent_folder_id_field = Folder.get_field_by_fieldname('parent_folder_id')
+        for change in self.account.sync_folder_hierarchy(shape='IdOnly', additional_fields=[parent_folder_id_field]):
+            if isinstance(change, FolderChange):
+                assert change.folder is not None
+                assert change.folder.id is not None
+                assert change.folder.parent_folder_id is not None
+                # Check that an attribute that would normally be returned with the
+                # 'Default' shape isn't returned in this scenario
+                assert change.folder.total_count is None
+
 
 class AutodiscoverTest(EWSTest):
     def test_magic(self):

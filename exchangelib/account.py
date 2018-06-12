@@ -119,8 +119,8 @@ class Account(object):
             folders_map[f.__class__].append(f)
         return folders_map
 
-    def sync_folder_hierarchy(self, shape, sync_state=None):
-        return SyncFolderHierarchy(account=self).call(shape, sync_state)
+    def sync_folder_hierarchy(self, shape, sync_state=None, additional_fields=None):
+        return SyncFolderHierarchy(account=self).call(shape, sync_state, additional_fields)
 
     def subscribe_for_notifications(self, folders, event_types):
         return Subscribe(account=self, folders=folders).call(event_types)
