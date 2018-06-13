@@ -846,9 +846,9 @@ class Folder(RegisterMixIn, SearchableMixIn):
 
     def refresh(self):
         if not self.account:
-            raise ValueError('Folder must have an account')
+            raise ValueError('%s must have an account' % self.__class__.__name__)
         if not self.id:
-            raise ValueError('Folder must have an ID')
+            raise ValueError('%s must have an ID' % self.__class__.__name__)
         folders = list(FolderCollection(account=self.account, folders=[self]).get_folders())
         if not folders:
             raise ErrorFolderNotFound('Folder %s disappeared' % self)

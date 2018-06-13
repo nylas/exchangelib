@@ -280,7 +280,7 @@ class Item(RegisterMixIn):
 
     def _create(self, message_disposition, send_meeting_invitations):
         if not self.account:
-            raise ValueError('Item must have an account')
+            raise ValueError('%s must have an account' % self.__class__.__name__)
         # bulk_create() returns an Item because we want to return the ID of both the main item *and* attachments
         res = self.account.bulk_create(
             items=[self], folder=self.folder, message_disposition=message_disposition,
@@ -323,9 +323,9 @@ class Item(RegisterMixIn):
 
     def _update(self, update_fieldnames, message_disposition, conflict_resolution, send_meeting_invitations):
         if not self.account:
-            raise ValueError('Item must have an account')
+            raise ValueError('%s must have an account' % self.__class__.__name__)
         if not self.changekey:
-            raise ValueError('Item must have changekey')
+            raise ValueError('%s must have changekey' % self.__class__.__name__)
         if not update_fieldnames:
             # The fields to update was not specified explicitly. Update all fields where update is possible
             update_fieldnames = self._update_fieldnames()
@@ -347,9 +347,9 @@ class Item(RegisterMixIn):
     def refresh(self):
         # Updates the item based on fresh data from EWS
         if not self.account:
-            raise ValueError('Item must have an account')
+            raise ValueError('%s must have an account' % self.__class__.__name__)
         if not self.id:
-            raise ValueError('Item must have an ID')
+            raise ValueError('%s must have an ID' % self.__class__.__name__)
         res = list(self.account.fetch(ids=[self]))
         if len(res) != 1:
             raise ValueError('Expected result length 1, but got %s' % res)
@@ -363,9 +363,9 @@ class Item(RegisterMixIn):
 
     def copy(self, to_folder):
         if not self.account:
-            raise ValueError('Item must have an account')
+            raise ValueError('%s must have an account' % self.__class__.__name__)
         if not self.id:
-            raise ValueError('Item must have an ID')
+            raise ValueError('%s must have an ID' % self.__class__.__name__)
         res = self.account.bulk_copy(ids=[self], to_folder=to_folder)
         if len(res) != 1:
             raise ValueError('Expected result length 1, but got %s' % res)
@@ -375,9 +375,9 @@ class Item(RegisterMixIn):
 
     def move(self, to_folder):
         if not self.account:
-            raise ValueError('Item must have an account')
+            raise ValueError('%s must have an account' % self.__class__.__name__)
         if not self.id:
-            raise ValueError('Item must have an ID')
+            raise ValueError('%s must have an ID' % self.__class__.__name__)
         res = self.account.bulk_move(ids=[self], to_folder=to_folder)
         if not res:
             # Assume 'to_folder' is a public folder or a folder in a different mailbox
@@ -415,9 +415,9 @@ class Item(RegisterMixIn):
 
     def _delete(self, delete_type, send_meeting_cancellations, affected_task_occurrences, suppress_read_receipts):
         if not self.account:
-            raise ValueError('Item must have an account')
+            raise ValueError('%s must have an account' % self.__class__.__name__)
         if not self.id:
-            raise ValueError('Item must have an ID')
+            raise ValueError('%s must have an ID' % self.__class__.__name__)
         res = self.account.bulk_delete(
             ids=[self], delete_type=delete_type, send_meeting_cancellations=send_meeting_cancellations,
             affected_task_occurrences=affected_task_occurrences, suppress_read_receipts=suppress_read_receipts)
@@ -681,7 +681,7 @@ class Message(Item):
         # Only sends a message. The message can either be an existing draft stored in EWS or a new message that does
         # not yet exist in EWS.
         if not self.account:
-            raise ValueError('Item must have an account')
+            raise ValueError('%s must have an account' % self.__class__.__name__)
         if self.id:
             res = self.account.bulk_send(ids=[self], save_copy=save_copy, copy_to_folder=copy_to_folder)
             if len(res) != 1:
@@ -742,9 +742,9 @@ class Message(Item):
 
     def reply(self, subject, body, to_recipients=None, cc_recipients=None, bcc_recipients=None):
         if not self.account:
-            raise ValueError('Item must have an account')
+            raise ValueError('%s must have an account' % self.__class__.__name__)
         if not self.id:
-            raise ValueError('Item must have an ID')
+            raise ValueError('%s must have an ID' % self.__class__.__name__)
         if not to_recipients and not self.author:
             raise ValueError("'to_recipients' must be set when message has no 'author'")
         ReplyToItem(
@@ -759,9 +759,9 @@ class Message(Item):
 
     def reply_all(self, subject, body):
         if not self.account:
-            raise ValueError('Item must have an account')
+            raise ValueError('%s must have an account' % self.__class__.__name__)
         if not self.id:
-            raise ValueError('Item must have an ID')
+            raise ValueError('%s must have an ID' % self.__class__.__name__)
         ReplyAllToItem(
             account=self.account,
             reference_item_id=ReferenceItemId(id=self.id, changekey=self.changekey),
@@ -774,9 +774,9 @@ class Message(Item):
 
     def forward(self, subject, body, to_recipients, cc_recipients=None, bcc_recipients=None):
         if not self.account:
-            raise ValueError('Item must have an account')
+            raise ValueError('%s must have an account' % self.__class__.__name__)
         if not self.id:
-            raise ValueError('Item must have an ID')
+            raise ValueError('%s must have an ID' % self.__class__.__name__)
         ForwardItem(
             account=self.account,
             reference_item_id=ReferenceItemId(id=self.id, changekey=self.changekey),
@@ -1174,7 +1174,7 @@ class BaseMeetingReplyItem(Item):
 
     def send(self, message_disposition=SEND_AND_SAVE_COPY):
         if not self.account:
-            raise ValueError('Item must have an account')
+            raise ValueError('%s must have an account' % self.__class__.__name__)
 
         res = self.account.bulk_create(items=[self], folder=self.folder, message_disposition=message_disposition)
 
@@ -1232,7 +1232,7 @@ class BaseReplyItem(EWSElement):
 
     def send(self, save_copy=True, copy_to_folder=None):
         if not self.account:
-            raise ValueError('Item must have an account')
+            raise ValueError('%s must have an account' % self.__class__.__name__)
         if copy_to_folder:
             if not save_copy:
                 raise AttributeError("'save_copy' must be True when 'copy_to_folder' is set")
