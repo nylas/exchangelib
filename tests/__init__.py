@@ -77,7 +77,7 @@ from exchangelib.version import Build, Version, EXCHANGE_2007, EXCHANGE_2010, EX
 from exchangelib.winzone import generate_map, CLDR_TO_MS_TIMEZONE_MAP
 
 if PY2:
-    FileNotFoundError = OSError
+    FileNotFoundError = IOError
 
 string_type = string_types[0]
 
