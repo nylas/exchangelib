@@ -609,6 +609,7 @@ class CalendarItem(Item):
 
     def accept(self, **kwargs):
         return AcceptItem(
+            account=self.account,
             reference_item_id=ReferenceItemId(id=self.id, changekey=self.changekey),
             **kwargs
         ).send()
@@ -622,12 +623,14 @@ class CalendarItem(Item):
 
     def decline(self, **kwargs):
         return DeclineItem(
+            account=self.account,
             reference_item_id=ReferenceItemId(id=self.id, changekey=self.changekey),
             **kwargs
         ).send()
 
     def tentatively_accept(self, **kwargs):
         return TentativelyAcceptItem(
+            account=self.account,
             reference_item_id=ReferenceItemId(id=self.id, changekey=self.changekey),
             **kwargs
         ).send()
