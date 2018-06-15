@@ -877,6 +877,11 @@ end = tz.localize(EWSDateTime.now() + datetime.timedelta(hours=6))
 # Create a list of (account, attendee_type, exclude_conflicts) tuples
 accounts = [(account, 'Organizer', False)]
 a.protocol.get_free_busy_info(accounts=accounts, start=start, end=end)
+
+# Get searchable mailboxes. This method is only available to users who have been assigned
+# the Discovery Management RBAC role.
+for mailbox in a.protocol.get_searchable_mailboxes():
+    print(mailbox)
 ```
 
 ### Troubleshooting
