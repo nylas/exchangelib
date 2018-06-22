@@ -477,6 +477,23 @@ Response headers: %(response_headers)s
 Request data: %(xml_request)s
 Response data: %(xml_response)s
 ''')
+    log_vals = dict(
+        retry=retry,
+        wait=wait,
+        timeout=protocol.TIMEOUT,
+        session_id=session.session_id,
+        thread_id=thread_id,
+        auth=session.auth,
+        url=url,
+        adapter=session.get_adapter(url),
+        allow_redirects=allow_redirects,
+        response_time=None,
+        status_code=None,
+        request_headers=headers,
+        response_headers=None,
+        xml_request=data,
+        xml_response=None,
+    )
     try:
         while True:
             back_off_until = protocol.credentials.back_off_until
@@ -497,24 +514,16 @@ Response data: %(xml_response)s
             except CONNECTION_ERRORS as e:
                 log.debug('Session %s thread %s: connection error POST\'ing to %s', session.session_id, thread_id, url)
                 r = DummyResponse(url=url, headers={'TimeoutException': e}, request_headers=headers)
-            except Exception:
-                raise
             finally:
-                log_vals = dict(
+                log_vals.update(
                     retry=retry,
                     wait=wait,
-                    timeout=protocol.TIMEOUT,
                     session_id=session.session_id,
-                    thread_id=thread_id,
-                    auth=session.auth,
                     url=str(r.url),
-                    adapter=session.get_adapter(url),
-                    allow_redirects=allow_redirects,
                     response_time=time_func() - d_start,
                     status_code=r.status_code,
                     request_headers=r.request.headers,
                     response_headers=r.headers,
-                    xml_request=data,
                     xml_response=r.content,
                 )
             log.debug(log_msg, log_vals)
