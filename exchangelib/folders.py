@@ -517,6 +517,8 @@ class Folder(RegisterMixIn, SearchableMixIn):
         locale is a string, e.g. 'da_DK'
         """
         for folder_cls in WELLKNOWN_FOLDERS + NON_DELETEABLE_FOLDERS:
+            if folder_name == 'Deleted Items':
+                print('exchangelib folder_cls_from_folder_name', folder_cls, folder_cls.localized_names(locale), locale)
             if folder_name.lower() in folder_cls.localized_names(locale):
                 return folder_cls
         raise KeyError()
