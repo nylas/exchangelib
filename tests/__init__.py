@@ -5086,6 +5086,17 @@ class BaseItemTest(EWSTest):
         self.assertEqual(fresh_attachments[0].name, 'my_file_2.txt')
         self.assertEqual(fresh_attachments[0].content, binary_file_content)
 
+    def test_empty_file_attachment(self):
+        item = self.get_test_item(folder=self.test_folder)
+        att1 = FileAttachment(name='empty_file.txt', content=b'')
+        item.attach(att1)
+        item.save()
+        fresh_item = list(self.account.fetch(ids=[item]))[0]
+        self.assertEqual(
+            fresh_item.attachments[0].content,
+            b''
+        )
+
     def test_item_attachments(self):
         item = self.get_test_item(folder=self.test_folder)
         item.attachments = []

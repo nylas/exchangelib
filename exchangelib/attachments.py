@@ -160,7 +160,7 @@ class FileAttachment(Attachment):
         # Don't use get_xml_attr() here because we want to handle empty file content as '', not None
         val = elem.find('{%s}Content' % TNS)
         if val is None or val.text is None:
-            self._content = None
+            self._content = b''
         else:
             self._content = base64.b64decode(val.text)
         elem.clear()
