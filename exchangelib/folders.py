@@ -196,6 +196,9 @@ class FolderCollection(SearchableMixIn):
             raise ValueError("'shape' %s must be one of %s" % (shape, SHAPE_CHOICES))
         if depth not in ITEM_TRAVERSAL_CHOICES:
             raise ValueError("'depth' %s must be one of %s" % (depth, ITEM_TRAVERSAL_CHOICES))
+        if not self.folders:
+            log.debug('Folder list is empty')
+            return
         if additional_fields:
             allowed_fields = self.allowed_fields()
             complex_fields = self.complex_fields()
@@ -268,6 +271,9 @@ class FolderCollection(SearchableMixIn):
             raise ValueError("'shape' %s must be one of %s" % (shape, SHAPE_CHOICES))
         if depth not in FOLDER_TRAVERSAL_CHOICES:
             raise ValueError("'depth' %s must be one of %s" % (depth, FOLDER_TRAVERSAL_CHOICES))
+        if not self.folders:
+            log.debug('Folder list is empty')
+            return []
         additional_fields = self._get_folder_fields()
         # TODO: Support the Restriction class for folders, too
         return FindFolder(account=self.account, folders=self.folders, chunk_size=page_size).call(
@@ -278,6 +284,9 @@ class FolderCollection(SearchableMixIn):
         )
 
     def get_folders(self):
+        if not self.folders:
+            log.debug('Folder list is empty')
+            return []
         additional_fields = self._get_folder_fields()
         return GetFolder(account=self.account).call(
                 folders=self.folders,

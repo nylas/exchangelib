@@ -2813,9 +2813,16 @@ class FolderTest(EWSTest):
         self.assertEqual(len(list(self.account.root.glob('Top of*/%s' % self.account.contacts.name))), 1)
 
     def test_collection_filtering(self):
-        self.assertGreaterEqual(self.account.root.tois.children.all().exists(), 0)
-        self.assertGreaterEqual(self.account.root.tois.walk().all().exists(), 0)
-        self.assertGreaterEqual(self.account.root.tois.glob('*').all().exists(), 0)
+        self.assertGreaterEqual(self.account.root.tois.children.all().count(), 0)
+        self.assertGreaterEqual(self.account.root.tois.walk().all().count(), 0)
+        self.assertGreaterEqual(self.account.root.tois.glob('*').all().count(), 0)
+
+    def test_empty_collections(self):
+        self.assertEqual(self.account.trash.children.all().count(), 0)
+        self.assertEqual(self.account.trash.walk().all().count(), 0)
+        self.assertEqual(self.account.trash.glob('XXX').all().count(), 0)
+        self.assertEqual(list(self.account.trash.glob('XXX').get_folders()), [])
+        self.assertEqual(list(self.account.trash.glob('XXX').find_folders()), [])
 
     def test_div_navigation(self):
         self.assertEqual(
