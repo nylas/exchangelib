@@ -552,6 +552,9 @@ class Folder(RegisterMixIn, SearchableMixIn):
         fields = list(fields)
         has_start, has_end = False, False
         for i, field_path in enumerate(fields):
+            if field_path == 'item_id':
+                warnings.warn("The 'item_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
+                field_path = 'id'
             # Allow both FieldPath instances and string field paths as input
             if isinstance(field_path, string_types):
                 field_path = FieldPath.from_string(field_path, folder=self)
