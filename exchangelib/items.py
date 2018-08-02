@@ -569,11 +569,11 @@ class CalendarItem(Item):
         OccurrenceListField('deleted_occurrences', field_uri='calendar:DeletedOccurrences', value_cls=DeletedOccurrence,
                             is_read_only=True),
         TimeZoneField('_meeting_timezone', field_uri='calendar:MeetingTimeZone', deprecated_from=EXCHANGE_2010,
-                      is_read_only=True, is_searchable=False),
+                      is_searchable=False),
         TimeZoneField('_start_timezone', field_uri='calendar:StartTimeZone', supported_from=EXCHANGE_2010,
-                      is_read_only=True, is_searchable=False),
+                      is_searchable=False),
         TimeZoneField('_end_timezone', field_uri='calendar:EndTimeZone', supported_from=EXCHANGE_2010,
-                      is_read_only=True, is_searchable=False),
+                      is_searchable=False),
         EnumAsIntField('conference_type', field_uri='calendar:ConferenceType', enum=CONFERENCE_TYPES, min=0,
                        default=None, is_required_after_save=True),
         BooleanField('allow_new_time_proposal', field_uri='calendar:AllowNewTimeProposal', default=None,
@@ -589,15 +589,18 @@ class CalendarItem(Item):
         return [f for f in cls.FIELDS if isinstance(f, TimeZoneField)]
 
     def clean_timezone_fields(self, version):
-        # Sets proper values on the timezone fields and returns the fields that were set
+        # Sets proper values on the timezone fields if they are not already set
         if version.build < EXCHANGE_2010:
-            self._meeting_timezone = self.start.tzinfo if self.start else None
+            if self._meeting_timezone is None and self.start is not None:
+                self._meeting_timezone = self.start.tzinfo
             self._start_timezone = None
             self._end_timezone = None
         else:
             self._meeting_timezone = None
-            self._start_timezone = self.start.tzinfo if self.start else None
-            self._end_timezone = self.end.tzinfo if self.end else None
+            if self._start_timezone is None and self.start is not None:
+                self._start_timezone = self.start.tzinfo
+            if self._end_timezone is None and self.end is not None:
+                self._end_timezone = self.end.tzinfo
 
     def clean(self, version=None):
         # pylint: disable=access-member-before-definition

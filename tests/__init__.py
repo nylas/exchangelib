@@ -2960,6 +2960,9 @@ class BaseItemTest(EWSTest):
             if not f.supports_version(self.account.version):
                 # Cannot be used with this EWS version
                 continue
+            if self.ITEM_CLASS == CalendarItem and f in CalendarItem.timezone_fields():
+                # Timezone fields will (and must) be populated automatically from the timestamp
+                continue
             if f.is_read_only:
                 # These cannot be created
                 continue
@@ -3016,6 +3019,9 @@ class BaseItemTest(EWSTest):
         for f in self.ITEM_CLASS.FIELDS:
             if not f.supports_version(self.account.version):
                 # Cannot be used with this EWS version
+                continue
+            if self.ITEM_CLASS == CalendarItem and f in CalendarItem.timezone_fields():
+                # Timezone fields will (and must) be populated automatically from the timestamp
                 continue
             if f.is_read_only:
                 # These cannot be changed
@@ -4572,6 +4578,9 @@ class BaseItemTest(EWSTest):
             if not f.supports_version(self.account.version):
                 # Cannot be used with this EWS version
                 continue
+            if self.ITEM_CLASS == CalendarItem and f in CalendarItem.timezone_fields():
+                # Timezone fields will (and must) be populated automatically from the timestamp
+                continue
             if f.is_read_only:
                 continue
             if f.name == 'reminder_due_by':
@@ -4603,6 +4612,9 @@ class BaseItemTest(EWSTest):
         for f in self.ITEM_CLASS.FIELDS:
             if not f.supports_version(self.account.version):
                 # Cannot be used with this EWS version
+                continue
+            if self.ITEM_CLASS == CalendarItem and f in CalendarItem.timezone_fields():
+                # Timezone fields will (and must) be populated automatically from the timestamp
                 continue
             if f.is_read_only or f.is_read_only_after_send:
                 # These cannot be changed
@@ -4640,6 +4652,9 @@ class BaseItemTest(EWSTest):
             if not f.supports_version(self.account.version):
                 # Cannot be used with this EWS version
                 continue
+            if self.ITEM_CLASS == CalendarItem and f in CalendarItem.timezone_fields():
+                # Timezone fields will (and must) be populated automatically from the timestamp
+                continue
             if f.is_required or f.is_required_after_save:
                 # These cannot be deleted
                 continue
@@ -4659,6 +4674,9 @@ class BaseItemTest(EWSTest):
         for f in self.ITEM_CLASS.FIELDS:
             if not f.supports_version(self.account.version):
                 # Cannot be used with this EWS version
+                continue
+            if self.ITEM_CLASS == CalendarItem and f in CalendarItem.timezone_fields():
+                # Timezone fields will (and must) be populated automatically from the timestamp
                 continue
             if f.is_required or f.is_required_after_save:
                 continue
@@ -5158,6 +5176,9 @@ class BaseItemTest(EWSTest):
             # Normalize some values we don't control
             if f.is_read_only:
                 continue
+            if self.ITEM_CLASS == CalendarItem and f in CalendarItem.timezone_fields():
+                # Timezone fields will (and must) be populated automatically from the timestamp
+                continue
             if isinstance(f, ExtendedPropertyField):
                 # Attachments don't have these values. It may be possible to request it if we can find the FieldURI
                 continue
@@ -5196,6 +5217,9 @@ class BaseItemTest(EWSTest):
             # Normalize some values we don't control
             if f.is_read_only:
                 continue
+            if self.ITEM_CLASS == CalendarItem and f in CalendarItem.timezone_fields():
+                # Timezone fields will (and must) be populated automatically from the timestamp
+                continue
             if isinstance(f, ExtendedPropertyField):
                 # Attachments don't have these values. It may be possible to request it if we can find the FieldURI
                 continue
@@ -5220,6 +5244,9 @@ class BaseItemTest(EWSTest):
         for f in self.ITEM_CLASS.FIELDS:
             # Normalize some values we don't control
             if f.is_read_only:
+                continue
+            if self.ITEM_CLASS == CalendarItem and f in CalendarItem.timezone_fields():
+                # Timezone fields will (and must) be populated automatically from the timestamp
                 continue
             if isinstance(f, ExtendedPropertyField):
                 # Attachments don't have these values. It may be possible to request it if we can find the FieldURI
@@ -5250,6 +5277,9 @@ class BaseItemTest(EWSTest):
         for f in self.ITEM_CLASS.FIELDS:
             # Normalize some values we don't control
             if f.is_read_only:
+                continue
+            if self.ITEM_CLASS == CalendarItem and f in CalendarItem.timezone_fields():
+                # Timezone fields will (and must) be populated automatically from the timestamp
                 continue
             if isinstance(f, ExtendedPropertyField):
                 # Attachments don't have these values. It may be possible to request it if we can find the FieldURI
@@ -5337,6 +5367,36 @@ class CalendarTest(BaseItemTest):
     TEST_FOLDER = 'calendar'
     FOLDER_CLASS = Calendar
     ITEM_CLASS = CalendarItem
+
+    def test_updating_timestamps(self):
+        # Test that we can update an item without changing anything, and maintain the hidden timezone fields as local
+        # timezones, and that returned timestamps are in UTC.
+        item = self.get_test_item()
+        item.reminder_is_set = True
+        item.is_all_day = False
+        item.save()
+        for i in self.account.calendar.filter(categories__contains=self.categories).only('start', 'end', 'categories'):
+            self.assertEqual(i.start, item.start)
+            self.assertEqual(i.start.tzinfo, UTC)
+            self.assertEqual(i.end, item.end)
+            self.assertEqual(i.end.tzinfo, UTC)
+            self.assertEqual(i._start_timezone, self.account.default_timezone)
+            self.assertEqual(i._end_timezone, self.account.default_timezone)
+            i.save(update_fields=['start', 'end'])
+            self.assertEqual(i.start, item.start)
+            self.assertEqual(i.start.tzinfo, UTC)
+            self.assertEqual(i.end, item.end)
+            self.assertEqual(i.end.tzinfo, UTC)
+            self.assertEqual(i._start_timezone, self.account.default_timezone)
+            self.assertEqual(i._end_timezone, self.account.default_timezone)
+        for i in self.account.calendar.filter(categories__contains=self.categories).only('start', 'end', 'categories'):
+            self.assertEqual(i.start, item.start)
+            self.assertEqual(i.start.tzinfo, UTC)
+            self.assertEqual(i.end, item.end)
+            self.assertEqual(i.end.tzinfo, UTC)
+            self.assertEqual(i._start_timezone, self.account.default_timezone)
+            self.assertEqual(i._end_timezone, self.account.default_timezone)
+            i.delete()
 
     def test_update_to_non_utc_datetime(self):
         # Test updating with non-UTC datetime values. This is a separate code path in UpdateItem code

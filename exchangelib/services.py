@@ -741,15 +741,19 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
             if f.name in fieldnames:
                 yield f.name
 
-    def _get_timezone_fieldnames(self, item, fieldnames):
-        # For CalendarItem items where we update 'start' or 'end', we want to update internal timezone fields
+    def _get_item_update_elems(self, item, fieldnames):
+        from .fields import FieldPath, IndexedField
+        from .indexed_properties import MultiFieldIndexedElement
         from .items import CalendarItem
-        timezone_fieldnames = set()
+        item_model = item.__class__
+        fieldnames_set = set(fieldnames)
 
+        timezone_fieldnames = set()
         if item.__class__ == CalendarItem:
+            # For CalendarItem items where we update 'start' or 'end', we want to update internal timezone fields
             has_start = 'start' in fieldnames
             has_end = 'end' in fieldnames
-            item.clean_timezone_fields(version=self.account.version)
+            item.clean_timezone_fields(version=self.account.version)  # Possibly also sets timezone values
             meeting_tz_field, start_tz_field, end_tz_field = CalendarItem.timezone_fields()
             if self.account.version.build < EXCHANGE_2010:
                 if has_start or has_end:
@@ -759,15 +763,9 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
                     timezone_fieldnames.add(start_tz_field.name)
                 if has_end:
                     timezone_fieldnames.add(end_tz_field.name)
-        return timezone_fieldnames
-
-    def _get_item_update_elems(self, item, fieldnames):
-        from .fields import FieldPath, IndexedField
-        from .indexed_properties import MultiFieldIndexedElement
-        item_model = item.__class__
-        fieldnames_set = set(fieldnames)
-        timezone_fieldnames = self._get_timezone_fieldnames(item=item, fieldnames=fieldnames_set)
-        fieldnames_set.update(timezone_fieldnames)
+            fieldnames_set.update(timezone_fieldnames)
+        else:
+            meeting_tz_field, start_tz_field, end_tz_field = None, None, None
 
         for fieldname in self._sort_fieldnames(item_model=item_model, fieldnames=fieldnames_set):
             field = item_model.get_field_by_fieldname(fieldname)
@@ -775,6 +773,17 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
                 # Timezone fields are ok, even though they are marked read-only
                 raise ValueError('%s is a read-only field' % field.name)
             value = field.clean(getattr(item, field.name), version=self.account.version)  # Make sure the value is OK
+
+            if item.__class__ == CalendarItem:
+                # For CalendarItem items where we update 'start' or 'end', we want to send values in the local timezone
+                if self.account.version.build < EXCHANGE_2010:
+                    if fieldname in ('start', 'end'):
+                        value = value.astimezone(getattr(item, meeting_tz_field.name))
+                else:
+                    if fieldname == 'start':
+                        value = value.astimezone(getattr(item, start_tz_field.name))
+                    elif fieldname == 'end':
+                        value = value.astimezone(getattr(item, end_tz_field.name))
 
             if value is None or (field.is_list and not value):
                 # A value of None or [] means we want to remove this field from the item
