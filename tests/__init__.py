@@ -2611,6 +2611,15 @@ class FolderTest(EWSTest):
             assert issubclass(w[-1].category, PendingDeprecationWarning)
             assert "Use 'id' instead" in str(w[-1].message)
 
+    def test_item_id_deprecation(self):
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            # Trigger a warning
+            Messages(account=self.account, id='ZZZ').get(item_id='XXX')
+            assert len(w) == 1
+            assert issubclass(w[-1].category, PendingDeprecationWarning)
+            assert "Use 'id' instead" in str(w[-1].message)
+
     def test_folders(self):
         for f in self.account.root.walk():
             if isinstance(f, System):
