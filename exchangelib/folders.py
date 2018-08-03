@@ -994,12 +994,14 @@ class Root(Folder):
         # folder was found, try as best we can to return the default folder of type 'folder_cls'
         if not folder_cls.DISTINGUISHED_FOLDER_ID:
             raise ValueError("'folder_cls' %s must have a DISTINGUISHED_FOLDER_ID value" % folder_cls)
-        # Use cached distinguished folder instance if available
-        for f in self._folders_map.values():
-            # Require exact class to not match e.g. RecipientCache instead of Contacts
-            if type(f) == folder_cls and f.is_distinguished:
-                log.debug('Found cached distinguished %s folder', folder_cls)
-                return f
+        # Use cached distinguished folder instance, but only if cache has already been prepped. This is an optimization
+        # for accessing e.g. 'account.contacts' without fetching all folders of the account.
+        if self._subfolders:
+            for f in self._folders_map.values():
+                # Require exact class, to not match subclasses, e.g. RecipientCache instead of Contacts
+                if type(f) == folder_cls and f.is_distinguished:
+                    log.debug('Found cached distinguished %s folder', folder_cls)
+                    return f
         try:
             log.debug('Requesting distinguished %s folder explicitly', folder_cls)
             return folder_cls.get_distinguished(account=self.account)
