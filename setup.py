@@ -45,6 +45,7 @@ setup(
                       'isodate', 'requests_kerberos'],
     packages=['exchangelib'],
     tests_require=['PyYAML', 'requests_mock', 'psutil'],
+    python_requires=">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*",
     test_suite='tests',
     zip_safe=False,
     url='https://github.com/ecederstrand/exchangelib',
