@@ -1017,10 +1017,10 @@ class Root(Folder):
 
         # Try to pick a suitable default folder. we do this by:
         #  1. Searching the full folder list for a folder with the distinguished folder name
-        #  2. Searhing TOIS for a direct child folder of the same type that is marked as distinguished
-        #  3. Searhing TOIS for a direct child folder of the same type that is has a localized name
-        #  4. Searhing root for a direct child folder of the same type that is marked as distinguished
-        #  5. Searhing root for a direct child folder of the same type that is has a localized name
+        #  2. Searching TOIS for a direct child folder of the same type that is marked as distinguished
+        #  3. Searching TOIS for a direct child folder of the same type that is has a localized name
+        #  4. Searching root for a direct child folder of the same type that is marked as distinguished
+        #  5. Searching root for a direct child folder of the same type that is has a localized name
         log.debug('Searching default %s folder in full folder list', folder_cls)
 
         for f in self._folders_map.values():
