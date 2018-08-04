@@ -779,22 +779,22 @@ class ItemTest(unittest.TestCase):
             # Trigger a warning
             Message(id='XXX', changekey='YYY').item_id
             self.assertEqual(len(w), 1, w)
-            self.assertTrue(issubclass(w[-1].category, PendingDeprecationWarning), w[-1].category)
-            self.assertIn("Use 'id' instead", str(w[-1].message))
+            self.assertTrue(issubclass(w[0].category, PendingDeprecationWarning), w[0].category)
+            self.assertIn("Use 'id' instead", str(w[0].message))
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             # Trigger a warning
             Message.get_field_by_fieldname('item_id')
             self.assertEqual(len(w), 1, w)
-            self.assertTrue(issubclass(w[-1].category, PendingDeprecationWarning), w[-1].category)
-            self.assertIn("Use 'id' instead", str(w[-1].message))
+            self.assertTrue(issubclass(w[0].category, PendingDeprecationWarning), w[0].category)
+            self.assertIn("Use 'id' instead", str(w[0].message))
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             # Trigger a warning
             Message(item_id='XXX')
             self.assertEqual(len(w), 1, w)
-            self.assertTrue(issubclass(w[-1].category, PendingDeprecationWarning), w[-1].category)
-            self.assertIn("Use 'id' instead", str(w[-1].message))
+            self.assertTrue(issubclass(w[0].category, PendingDeprecationWarning), w[0].category)
+            self.assertIn("Use 'id' instead", str(w[0].message))
 
     def test_task_validation(self):
         tz = EWSTimeZone.timezone('Europe/Copenhagen')
@@ -834,22 +834,22 @@ class RecurrenceTest(unittest.TestCase):
             # Trigger a warning
             Occurrence(id='XXX', changekey='YYY').item_id
             self.assertEqual(len(w), 1, w)
-            self.assertTrue(issubclass(w[-1].category, PendingDeprecationWarning), w[-1].category)
-            self.assertIn("Use 'id' instead", str(w[-1].message))
+            self.assertTrue(issubclass(w[0].category, PendingDeprecationWarning), w[0].category)
+            self.assertIn("Use 'id' instead", str(w[0].message))
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             # Trigger a warning
             Occurrence.get_field_by_fieldname('item_id')
             self.assertEqual(len(w), 1, w)
-            self.assertTrue(issubclass(w[-1].category, PendingDeprecationWarning), w[-1].category)
-            self.assertIn("Use 'id' instead", str(w[-1].message))
+            self.assertTrue(issubclass(w[0].category, PendingDeprecationWarning), w[0].category)
+            self.assertIn("Use 'id' instead", str(w[0].message))
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             # Trigger a warning
             Occurrence(item_id='XXX')
             self.assertEqual(len(w), 1, w)
-            self.assertTrue(issubclass(w[-1].category, PendingDeprecationWarning), w[-1].category)
-            self.assertIn("Use 'id' instead", str(w[-1].message))
+            self.assertTrue(issubclass(w[0].category, PendingDeprecationWarning), w[0].category)
+            self.assertIn("Use 'id' instead", str(w[0].message))
 
     def test_magic(self):
         pattern = AbsoluteYearlyPattern(month=FEBRUARY, day_of_month=28)
@@ -2594,52 +2594,52 @@ class FolderTest(EWSTest):
             # Trigger a warning
             Folder(id='XXX', changekey='YYY').folder_id
             self.assertEqual(len(w), 1, w)
-            self.assertTrue(issubclass(w[-1].category, PendingDeprecationWarning), w[-1].category)
-            self.assertIn("Use 'id' instead", str(w[-1].message))
+            self.assertTrue(issubclass(w[0].category, PendingDeprecationWarning), w[0].category)
+            self.assertIn("Use 'id' instead", str(w[0].message))
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             # Trigger a warning
             Folder.get_field_by_fieldname('folder_id')
             self.assertEqual(len(w), 1, w)
-            self.assertTrue(issubclass(w[-1].category, PendingDeprecationWarning), w[-1].category)
-            self.assertIn("Use 'id' instead", str(w[-1].message))
+            self.assertTrue(issubclass(w[0].category, PendingDeprecationWarning), w[0].category)
+            self.assertIn("Use 'id' instead", str(w[0].message))
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             # Trigger a warning
             Folder(folder_id='XXX')
             self.assertEqual(len(w), 1, w)
-            self.assertTrue(issubclass(w[-1].category, PendingDeprecationWarning), w[-1].category)
-            self.assertIn("Use 'id' instead", str(w[-1].message))
+            self.assertTrue(issubclass(w[0].category, PendingDeprecationWarning), w[0].category)
+            self.assertIn("Use 'id' instead", str(w[0].message))
 
     def test_item_id_deprecation(self):
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             # Trigger a warning
             Messages(account=self.account, id='ZZZ').get(item_id='XXX')
-            self.assertEqual(len(w), 1, w)
-            self.assertTrue(issubclass(w[-1].category, PendingDeprecationWarning), w[-1].category)
-            self.assertIn("Use 'id' instead", str(w[-1].message))
+            self.assertGreaterEqual(len(w), 1)
+            self.assertTrue(issubclass(w[0].category, PendingDeprecationWarning), w[0].category)
+            self.assertIn("Use 'id' instead", str(w[0].message))
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             # Trigger a warning
             Messages(account=self.account, id='ZZZ').all().only('item_id')
-            self.assertEqual(len(w), 1, w)
-            self.assertTrue(issubclass(w[-1].category, PendingDeprecationWarning), w[-1].category)
-            self.assertIn("Use 'id' instead", str(w[-1].message))
+            self.assertGreaterEqual(len(w), 1)
+            self.assertTrue(issubclass(w[0].category, PendingDeprecationWarning), w[0].category)
+            self.assertIn("Use 'id' instead", str(w[0].message))
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             # Trigger a warning
             Messages(account=self.account, id='ZZZ').all().values('item_id')
-            self.assertEqual(len(w), 1, w)
-            self.assertTrue(issubclass(w[-1].category, PendingDeprecationWarning), w[-1].category)
-            self.assertIn("Use 'id' instead", str(w[-1].message))
+            self.assertGreaterEqual(len(w), 1)
+            self.assertTrue(issubclass(w[0].category, PendingDeprecationWarning), w[0].category)
+            self.assertIn("Use 'id' instead", str(w[0].message))
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             # Trigger a warning
             Messages(account=self.account, id='ZZZ').all().values_list('item_id')
-            self.assertEqual(len(w), 1, w)
-            self.assertTrue(issubclass(w[-1].category, PendingDeprecationWarning), w[-1].category)
-            self.assertIn("Use 'id' instead", str(w[-1].message))
+            self.assertGreaterEqual(len(w), 1)
+            self.assertTrue(issubclass(w[0].category, PendingDeprecationWarning), w[0].category)
+            self.assertIn("Use 'id' instead", str(w[0].message))
 
     def test_folders(self):
         for f in self.account.root.walk():
