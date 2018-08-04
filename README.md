@@ -34,30 +34,33 @@ for item in account.inbox.all().order_by('-datetime_received')[:100]:
 ## Installation
 You can install this package from PyPI:
 
-```
+```bash
 pip install exchangelib
 ```
 
 To install the very latest code, install directly from GitHub instead:
 
-```
+```bash
 pip install git+https://github.com/ecederstrand/exchangelib.git
 ```
 
 `exchangelib` uses the `lxml` package, and `pykerberos` to support Kerberos authentication.
 To be able to install these, you may need to install some additional operating system packages.
 
-On Linux (Ubuntu):
-```
+On Ubuntu:
+```bash
 apt-get install libxml2-dev libxslt-dev libkrb5-dev build-essential libssl-dev libffi-dev python-dev
+```
 
+On CentOS:
+```bash
+yum install gcc python-devel krb5-devel krb5-workstation python-devel
 ```
 
 On FreeBSD:
-```
+```bash
 pkg install libxml2 libxslt krb5
 CFLAGS=-I/usr/local/include pip install kerberos pykerberos lxml
-
 ```
 
 For other operating systems, please consult the documentation for the Python package that
