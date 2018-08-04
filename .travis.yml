@@ -5,9 +5,9 @@ os:
 
 python:
 - 2.7
-- 3.4
 - 3.5
 - 3.6
+- 3.7
 - nightly
 
 before_install:
@@ -35,5 +35,5 @@ jobs:
     - stage: wipe_test_account
       # Wipe contents of the test account after a complete build, to avoid account going over quota
       script: python tests/__init__.py -q EWSTest.wipe_test_account
-      python: 3.6
+      python: 3.7
       os: linux
