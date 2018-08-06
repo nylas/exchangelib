@@ -44,16 +44,16 @@ class HTMLBody(Body):
     body_type = 'HTML'
 
 
-class UID(text_type):
+class UID(bytes):
     """Helper class to encode Calendar UIDs. See issue #453. Example:
 
     class GOI(ExtendedProperty):
-        property_id = '6ED8DA90-450B-101B-98DA-00AA003F1305'
+        property_set_id = '6ED8DA90-450B-101B-98DA-00AA003F1305'
         property_name = 'PidLidGlobalObjectId'
         property_type = 'Binary'
 
-    CalendarItem.register('PidLidGlobalObjectId', GOI)
-    account.calendar.filter(global_object_id=UID('261cbc18-1f65-5a0a-bd11-23b1e224cc2f'))
+    CalendarItem.register('global_object_id', GOI)
+    account.calendar.filter(global_object_id=GOI(UID('261cbc18-1f65-5a0a-bd11-23b1e224cc2f')))
     """
     _HEADER = binascii.hexlify(bytearray((
         0x04, 0x00, 0x00, 0x00,
@@ -83,8 +83,7 @@ class UID(text_type):
         encoding = b''.join([
             cls._HEADER, cls._EXCEPTION_REPLACEMENT_TIME, cls._CREATION_TIME, cls._RESERVED, length, payload
         ])
-        b64_hex_encoded = binascii.b2a_base64(codecs.decode(encoding, 'hex'))[:-1]
-        return super(UID, cls).__new__(cls, b64_hex_encoded.decode('ascii'))
+        return super(UID, cls).__new__(cls, codecs.decode(encoding, 'hex'))
 
 
 class EWSElement(object):

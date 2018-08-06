@@ -1,4 +1,5 @@
 # coding=utf-8
+import base64
 import logging
 
 from future.utils import python_2_unicode_compatible
@@ -370,6 +371,7 @@ class Q(object):
         # Recursively build an XML tree structure of this Q object. If this is an empty leaf (the equivalent of Q()),
         # return None.
         from .indexed_properties import SingleFieldIndexedElement
+        from .extended_properties import ExtendedProperty
         # Don't check self.value just yet. We want to return error messages on the field path first, and then the value.
         # This is done in _get_field_path() and _get_clean_value(), respectively.
         self._check_integrity()
@@ -379,7 +381,10 @@ class Q(object):
             elem = self._op_to_xml(self.op)
             field_path = self._get_field_path(folders)
             clean_value = self._get_clean_value(field_path=field_path, version=version)
-            if issubclass(field_path.field.value_cls, SingleFieldIndexedElement) and not field_path.label:
+            if issubclass(field_path.field.value_cls, ExtendedProperty) and field_path.field.value_cls.is_binary_type():
+                # We need to base64-encode binary data
+                clean_value = base64.b64encode(clean_value.value).decode('ascii')
+            elif issubclass(field_path.field.value_cls, SingleFieldIndexedElement) and not field_path.label:
                 # We allow a filter shortcut of e.g. email_addresses__contains=EmailAddress(label='Foo', ...) instead of
                 # email_addresses__Foo_email_address=.... Set FieldPath label now so we can generate the field_uri.
                 field_path.label = clean_value.label

@@ -506,7 +506,7 @@ class PropertiesTest(unittest.TestCase):
         # Test translation of calendar UIDs. See #453
         self.assertEqual(
             UID('261cbc18-1f65-5a0a-bd11-23b1e224cc2f'),
-            'BAAAAIIA4AB0xbcQGoLgCAAAAAAAAAAAAAAAAAAAAAAAAAAAMQAAAHZDYWwtVWlkAQAAADI2MWNiYzE4LTFmNjUtNWEwYS1iZDExLTIzYjFlMjI0Y2MyZgA='
+            b'\x04\x00\x00\x00\x82\x00\xe0\x00t\xc5\xb7\x10\x1a\x82\xe0\x08\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x001\x00\x00\x00vCal-Uid\x01\x00\x00\x00261cbc18-1f65-5a0a-bd11-23b1e224cc2f\x00'
         )
 
     def test_internet_message_headers(self):

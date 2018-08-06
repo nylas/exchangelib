@@ -11,7 +11,7 @@ from .extended_properties import ExtendedProperty, ExternId
 from .folders import Folder, FolderCollection, SHALLOW, DEEP
 from .items import AcceptItem, TentativelyAcceptItem, DeclineItem
 from .items import CalendarItem, CancelCalendarItem, Contact, DistributionList, Message, PostItem, Task
-from .properties import Body, HTMLBody, ItemId, Mailbox, Attendee, Room, RoomList
+from .properties import Body, HTMLBody, ItemId, Mailbox, Attendee, Room, RoomList, UID
 from .restriction import Q
 from .transport import BASIC, DIGEST, NTLM, GSSAPI
 from .version import Build, Version
@@ -30,7 +30,7 @@ __all__ = [
     'ExtendedProperty',
     'AcceptItem', 'TentativelyAcceptItem', 'DeclineItem',
     'CalendarItem', 'CancelCalendarItem', 'Contact', 'DistributionList', 'Message', 'PostItem', 'Task',
-    'ItemId', 'Mailbox', 'Attendee', 'Room', 'RoomList', 'Body', 'HTMLBody',
+    'ItemId', 'Mailbox', 'Attendee', 'Room', 'RoomList', 'Body', 'HTMLBody', 'UID',
     'OofSettings',
     'Q',
     'Folder', 'FolderCollection', 'SHALLOW', 'DEEP',
