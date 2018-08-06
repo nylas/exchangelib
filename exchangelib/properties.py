@@ -1,8 +1,11 @@
 from __future__ import unicode_literals
 
 import abc
+import binascii
+import codecs
 import datetime
 import logging
+import struct
 
 from six import text_type, string_types
 
@@ -39,6 +42,49 @@ class HTMLBody(Body):
     # Helper to mark the 'body' field as a complex attribute.
     # MSDN: https://msdn.microsoft.com/en-us/library/office/jj219983(v=exchg.150).aspx
     body_type = 'HTML'
+
+
+class UID(text_type):
+    """Helper class to encode Calendar UIDs. See issue #453. Example:
+
+    class GOI(ExtendedProperty):
+        property_id = '6ED8DA90-450B-101B-98DA-00AA003F1305'
+        property_name = 'PidLidGlobalObjectId'
+        property_type = 'Binary'
+
+    CalendarItem.register('PidLidGlobalObjectId', GOI)
+    account.calendar.filter(global_object_id=UID('261cbc18-1f65-5a0a-bd11-23b1e224cc2f'))
+    """
+    _HEADER = binascii.hexlify(bytearray((
+        0x04, 0x00, 0x00, 0x00,
+        0x82, 0x00, 0xE0, 0x00,
+        0x74, 0xC5, 0xB7, 0x10,
+        0x1A, 0x82, 0xE0, 0x08)))
+
+    _EXCEPTION_REPLACEMENT_TIME = binascii.hexlify(bytearray((
+        0, 0, 0, 0)))
+
+    _CREATION_TIME = binascii.hexlify(bytearray((
+        0, 0, 0, 0,
+        0, 0, 0, 0)))
+
+    _RESERVED = binascii.hexlify(bytearray((
+        0, 0, 0, 0,
+        0, 0, 0, 0)))
+
+    # https://msdn.microsoft.com/en-us/library/ee157690(v=exchg.80).aspx
+    # https://msdn.microsoft.com/en-us/library/hh338153(v=exchg.80).aspx
+    # https://stackoverflow.com/questions/42259122
+    # https://stackoverflow.com/questions/33757805
+
+    def __new__(cls, uid):
+        payload = binascii.hexlify(bytearray('vCal-Uid\x01\x00\x00\x00{}\x00'.format(uid).encode('ascii')))
+        length = binascii.hexlify(bytearray(struct.pack('<I', int(len(payload)/2))))
+        encoding = b''.join([
+            cls._HEADER, cls._EXCEPTION_REPLACEMENT_TIME, cls._CREATION_TIME, cls._RESERVED, length, payload
+        ])
+        b64_hex_encoded = binascii.b2a_base64(codecs.decode(encoding, 'hex'))[:-1]
+        return super(UID, cls).__new__(cls, b64_hex_encoded.decode('ascii'))
 
 
 class EWSElement(object):

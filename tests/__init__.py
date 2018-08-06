@@ -60,7 +60,7 @@ from exchangelib.indexed_properties import EmailAddress, PhysicalAddress, PhoneN
     SingleFieldIndexedElement, MultiFieldIndexedElement
 from exchangelib.items import Item, CalendarItem, Message, Contact, Task, DistributionList, Persona
 from exchangelib.properties import Attendee, Mailbox, RoomList, MessageHeader, Room, ItemId, Member, EWSElement, Body, \
-    HTMLBody, TimeZone, FreeBusyView, PersonaId
+    HTMLBody, TimeZone, FreeBusyView, PersonaId, UID
 from exchangelib.protocol import BaseProtocol, Protocol, NoVerifyHTTPAdapter
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.recurrence import Recurrence, AbsoluteYearlyPattern, RelativeYearlyPattern, AbsoluteMonthlyPattern, \
@@ -502,6 +502,13 @@ class EWSDateTimeTest(unittest.TestCase):
 
 
 class PropertiesTest(unittest.TestCase):
+    def test_uid(self):
+        # Test translation of calendar UIDs. See #453
+        self.assertEqual(
+            UID('261cbc18-1f65-5a0a-bd11-23b1e224cc2f'),
+            'BAAAAIIA4AB0xbcQGoLgCAAAAAAAAAAAAAAAAAAAAAAAAAAAMQAAAHZDYWwtVWlkAQAAADI2MWNiYzE4LTFmNjUtNWEwYS1iZDExLTIzYjFlMjI0Y2MyZgA='
+        )
+
     def test_internet_message_headers(self):
         # Message headers are read-only, and an integration test is difficult because we can't reliably AND quickly
         # generate emails that pass through some relay server that adds headers. Create a unit test instead.
