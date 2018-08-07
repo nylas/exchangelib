@@ -94,7 +94,10 @@ credentials = ServiceAccount(username='FOO\\bar', password='topsecret')
 
 # An Account is the account on the Exchange server that you want to connect to. This can be
 # the account associated with the credentials you connect with, or any other account on the
-# server that you have been granted access to.
+# server that you have been granted access to. If, for example, you want to access a shared
+# folder, create an Account instance using the email address of the account that the shared 
+# folder belongs to, and access the shared folder through this account.
+
 # 'primary_smtp_address' is the primary SMTP address assigned the account. If you enable
 # autodiscover, an alias address will work, too. In this case, 'Account.primary_smtp_address'
 # will be set to the primary SMTP address.
