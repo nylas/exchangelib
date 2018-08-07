@@ -538,6 +538,14 @@ items = account.calendar.view(
 for item in items:
     print(item.start, item.end, item.subject, item.body, item.location)
 
+# You can combine view() with other modifiers. For example, to check for conflicts before 
+# adding a meeting from 8:00 to 10:00:
+has_conflicts = a.calendar.view(
+    start=a.default_timezone.localize(EWSDateTime(year, month, day, 8)),
+    end=a.default_timezone.localize(EWSDateTime(year, month, day, 10)),
+    max_items=1
+).exists()
+
 # The filtering syntax also works on collections of folders, so you can search multiple folders in 
 # a single request.
 my_folder.children.filter(subject='foo')
