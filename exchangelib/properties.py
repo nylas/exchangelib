@@ -47,13 +47,13 @@ class HTMLBody(Body):
 class UID(bytes):
     """Helper class to encode Calendar UIDs. See issue #453. Example:
 
-    class GOI(ExtendedProperty):
-        property_set_id = '6ED8DA90-450B-101B-98DA-00AA003F1305'
-        property_name = 'PidLidGlobalObjectId'
+    class GlobalObjectId(ExtendedProperty):
+        distinguished_property_set_id = 'Meeting'
+        property_id = 3
         property_type = 'Binary'
 
-    CalendarItem.register('global_object_id', GOI)
-    account.calendar.filter(global_object_id=GOI(UID('261cbc18-1f65-5a0a-bd11-23b1e224cc2f')))
+    CalendarItem.register('global_object_id', GlobalObjectId)
+    account.calendar.filter(global_object_id=GlobalObjectId(UID('261cbc18-1f65-5a0a-bd11-23b1e224cc2f')))
     """
     _HEADER = binascii.hexlify(bytearray((
         0x04, 0x00, 0x00, 0x00,
