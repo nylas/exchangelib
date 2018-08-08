@@ -8,8 +8,8 @@ when creating an Account.
 from __future__ import unicode_literals
 
 import logging
-import random
 from multiprocessing.pool import ThreadPool
+import os
 from threading import Lock
 
 import requests.adapters
@@ -360,7 +360,7 @@ XSD auth: %s''' % (
 class EWSSession(requests.sessions.Session):
     # A requests Session object that closes the underlying socket when we need it
     def __init__(self, protocol):
-        self.session_id = random.randint(1, 32767)  # Used for debugging messages in services
+        self.session_id = sum(map(ord, os.urandom(100)))  # Used for debugging messages in services
         self.protocol = protocol
         super(EWSSession, self).__init__()
 

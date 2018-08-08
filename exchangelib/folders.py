@@ -852,7 +852,7 @@ class Folder(RegisterMixIn, SearchableMixIn):
         folder = folders[0]
         if isinstance(folder, Exception):
             raise folder
-        if type(folder) != cls:
+        if folder.__class__ != cls:
             raise ValueError("Expected 'folder' %r to be a %s instance" % (folder, cls))
         return folder
 
@@ -999,7 +999,7 @@ class Root(Folder):
         if self._subfolders:
             for f in self._folders_map.values():
                 # Require exact class, to not match subclasses, e.g. RecipientCache instead of Contacts
-                if type(f) == folder_cls and f.is_distinguished:
+                if f.__class__ == folder_cls and f.is_distinguished:
                     log.debug('Found cached distinguished %s folder', folder_cls)
                     return f
         try:
@@ -1025,7 +1025,7 @@ class Root(Folder):
 
         for f in self._folders_map.values():
             # Require exact class to not match e.g. RecipientCache instead of Contacts
-            if type(f) == folder_cls and f.has_distinguished_name:
+            if f.__class__ == folder_cls and f.has_distinguished_name:
                 log.debug('Found cached %s folder with default distinguished name', folder_cls)
                 return f
 
