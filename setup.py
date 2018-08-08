@@ -19,9 +19,7 @@ with io.open(os.path.join(os.path.dirname(__file__), 'exchangelib/__init__.py'),
     for l in f:
         if not l.startswith('__version__'):
             continue
-        cxt = {}
-        exec(l, {}, cxt)
-        __version__ = cxt['__version__']
+        __version__ = l.split('=')[1].strip(' "\'')
         break
 
 

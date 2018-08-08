@@ -589,6 +589,7 @@ class CalendarItem(Item):
         return [f for f in cls.FIELDS if isinstance(f, TimeZoneField)]
 
     def clean_timezone_fields(self, version):
+        # pylint: disable=access-member-before-definition
         # Sets proper values on the timezone fields if they are not already set
         if version.build < EXCHANGE_2010:
             if self._meeting_timezone is None and self.start is not None:
