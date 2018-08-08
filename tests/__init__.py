@@ -1469,15 +1469,6 @@ class EWSTest(unittest.TestCase):
 
 
 class CommonTest(EWSTest):
-    @staticmethod
-    def pprint(xml_str):
-        return tostring(parse(
-            io.BytesIO(xml_str)),
-            xml_declaration=True,
-            encoding='utf-8',
-            pretty_print=True
-        ).replace(b'\t', b'    ').replace(b' xmlns:', b'\n    xmlns:')
-
     def test_wrap(self):
         # Test payload wrapper with both delegation, impersonation and timezones
         MockTZ = namedtuple('EWSTimeZone', ['ms_id'])
@@ -1487,7 +1478,7 @@ class CommonTest(EWSTest):
         account = MockAccount(DELEGATE, 'foo@example.com', MockTZ('XXX'))
         wrapped = wrap(content=content, version=version, account=account)
         self.assertEqual(
-            self.pprint(wrapped),
+            PrettyXmlHandler.prettify_xml(wrapped),
             b'''<?xml version='1.0' encoding='utf-8'?>
 <s:Envelope
     xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"
@@ -1507,7 +1498,7 @@ class CommonTest(EWSTest):
         account = MockAccount(IMPERSONATION, 'foo@example.com', MockTZ('XXX'))
         wrapped = wrap(content=content, version=version, account=account)
         self.assertEqual(
-            self.pprint(wrapped),
+            PrettyXmlHandler.prettify_xml(wrapped),
             b'''<?xml version='1.0' encoding='utf-8'?>
 <s:Envelope
     xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"

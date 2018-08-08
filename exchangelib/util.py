@@ -10,15 +10,14 @@ from multiprocessing import Lock
 import re
 import socket
 import time
-from xml.etree.ElementTree import ElementTree, Element
+from xml.etree.ElementTree import Element, tostring as etree_tostring
 
 from defusedxml.ElementTree import fromstring, ParseError
-from defusedxml.lxml import parse, tostring, RestrictedElement
+from defusedxml.lxml import parse, tostring, GlobalParserTLS
 from future.backports.misc import get_ident
 from future.moves.urllib.parse import urlparse
 from future.utils import PY2
 import isodate
-from lxml.etree import XMLParser, ElementDefaultClassLookup
 from pygments import highlight
 from pygments.lexers.html import XmlLexer
 from pygments.formatters.terminal import TerminalFormatter
@@ -107,19 +106,19 @@ def peek(iterable):
 def xml_to_str(tree, encoding=None, xml_declaration=False):
     # tostring() returns bytecode unless encoding is 'unicode', and does not reliably produce an XML declaration. We
     # ALWAYS want bytecode so we can convert to unicode explicitly.
-    if encoding is None:
-        if xml_declaration:
+    if xml_declaration and not encoding:
             raise ValueError("'xml_declaration' is not supported when 'encoding' is None")
-        if PY2:
-            stream = io.BytesIO()
-        else:
-            stream = io.StringIO()
-            encoding = 'unicode'
+    if PY2:
+        # Encode and remove XML declaration
+        xml_str = etree_tostring(tree, encoding='utf-8')
+        if encoding:
+            return b'<?xml version="1.0" encoding="%s"?>\n%s' % (str(encoding), xml_str)
+        return xml_str.decode('utf-8')
     else:
-        stream = io.BytesIO()
-        stream.write(('<?xml version="1.0" encoding="%s"?>' % encoding).encode(encoding))
-    ElementTree(tree).write(stream, encoding=encoding, xml_declaration=False, method='xml')
-    return stream.getvalue()
+        xml_str = etree_tostring(tree, encoding='unicode')
+        if encoding:
+            return ('<?xml version="1.0" encoding="%s"?>\n%s' % (encoding, xml_str)).encode(encoding=encoding)
+        return xml_str
 
 
 def get_xml_attr(tree, name):
@@ -239,6 +238,16 @@ def add_xml_child(tree, name, value):
     tree.append(set_xml_value(elem=create_element(name), value=value, version=None))
 
 
+class ForgivingParser(GlobalParserTLS):
+    parser_config = {
+        'resolve_entities': False,
+        'recover': True,  # This setting is non-default
+    }
+
+
+_forgiving_parser = ForgivingParser()
+
+
 def to_xml(text):
     try:
         if PY2:
@@ -248,11 +257,10 @@ def to_xml(text):
     except ParseError:
         # Exchange servers may spit out the weirdest XML. lxml is pretty good at recovering from errors
         log.warning('Fallback to lxml processing of faulty XML')
-        magical_parser = XMLParser(recover=True, resolve_entities=False)
-        magical_parser.set_element_class_lookup(ElementDefaultClassLookup(element=RestrictedElement))
+        forgiving_parser = _forgiving_parser.getDefaultParser()
         no_bom_text = text[BOM_LEN:] if text.startswith(BOM) else text
         try:
-            root = parse(io.BytesIO(no_bom_text.encode('utf-8')), parser=magical_parser)
+            root = parse(io.BytesIO(no_bom_text.encode('utf-8')), parser=forgiving_parser)
         except AssertionError as e:
             raise ParseError(*e.args)
         try:
@@ -288,10 +296,11 @@ class PrettyXmlHandler(logging.StreamHandler):
     def parse_bytes(xml_bytes):
         return parse(io.BytesIO(xml_bytes))
 
-    def prettify_xml(self, xml_bytes):
+    @classmethod
+    def prettify_xml(cls, xml_bytes):
         # Re-formats an XML document to a consistent style
         return tostring(
-            self.parse_bytes(xml_bytes),
+            cls.parse_bytes(xml_bytes),
             xml_declaration=True,
             encoding='utf-8',
             pretty_print=True
