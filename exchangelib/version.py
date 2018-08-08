@@ -212,9 +212,7 @@ class Version(object):
         log.debug('Getting %s with auth type %s', types_url, auth.__class__.__name__)
         # Some servers send an empty response if we send 'Connection': 'close' header
         from .protocol import BaseProtocol
-        with requests.sessions.Session() as s:
-            s.mount('http://', adapter=BaseProtocol.get_adapter())
-            s.mount('https://', adapter=BaseProtocol.get_adapter())
+        with BaseProtocol.raw_session() as s:
             r = s.get(url=types_url, auth=auth, allow_redirects=False, stream=False)
         log.debug('Request headers: %s', r.request.headers)
         log.debug('Response code: %s', r.status_code)

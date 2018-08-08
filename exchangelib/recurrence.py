@@ -10,6 +10,18 @@ from .properties import EWSElement, ItemId
 log = logging.getLogger(__name__)
 
 
+def _month_to_str(m):
+    return MONTHS[m-1] if isinstance(m, int) else m
+
+
+def _weekday_to_str(w):
+    return WEEKDAYS[w - 1] if isinstance(w, int) else w
+
+
+def _week_number_to_str(wn):
+    return WEEK_NUMBERS[wn - 1] if isinstance(wn, int) else wn
+
+
 class ExtraWeekdaysField(EnumListField):
     def __init__(self, *args, **kwargs):
         kwargs['enum'] = WEEKDAYS
@@ -55,8 +67,7 @@ class AbsoluteYearlyPattern(Pattern):
     __slots__ = ('month', 'day_of_month')
 
     def __str__(self):
-        month = MONTHS[self.month-1] if isinstance(self.month, int) else self.month
-        return 'Occurs on day %s of %s' % (self.day_of_month, month)
+        return 'Occurs on day %s of %s' % (self.day_of_month, _month_to_str(self.month))
 
 
 class RelativeYearlyPattern(Pattern):
@@ -77,10 +88,11 @@ class RelativeYearlyPattern(Pattern):
     __slots__ = ('weekdays', 'week_number', 'month')
 
     def __str__(self):
-        weekdays = [WEEKDAYS[i - 1] if isinstance(i, int) else i for i in self.weekdays]
-        week_number = WEEK_NUMBERS[self.week_number-1] if isinstance(self.week_number, int) else self.week_number
-        month = MONTHS[self.month-1] if isinstance(self.month, int) else self.month
-        return 'Occurs on weekdays %s in the %s week of %s' % (', '.join(weekdays), week_number, month)
+        return 'Occurs on weekdays %s in the %s week of %s' % (
+            ', '.join(_weekday_to_str(i) for i in self.weekdays),
+            _week_number_to_str(self.week_number),
+            _month_to_str(self.month)
+        )
 
 
 class AbsoluteMonthlyPattern(Pattern):
@@ -118,10 +130,10 @@ class RelativeMonthlyPattern(Pattern):
     __slots__ = ('interval', 'week_number', 'weekdays')
 
     def __str__(self):
-        weekdays = [WEEKDAYS[i - 1] if isinstance(i, int) else i for i in self.weekdays]
-        week_number = WEEK_NUMBERS[self.week_number-1] if isinstance(self.week_number, int) else self.week_number
         return 'Occurs on weekdays %s in the %s week of every %s month(s)' % (
-            ', '.join(weekdays), week_number, self.interval
+            ', '.join(_weekday_to_str(i) for i in self.weekdays),
+            _week_number_to_str(self.week_number),
+            self.interval
         )
 
 
@@ -143,13 +155,11 @@ class WeeklyPattern(Pattern):
         if isinstance(self.weekdays, string_types):
             weekdays = [self.weekdays]
         elif isinstance(self.weekdays, int):
-            weekdays = [WEEKDAYS[self.weekdays - 1]]
+            weekdays = [_weekday_to_str(self.weekdays)]
         else:
-            weekdays = [WEEKDAYS[i - 1] if isinstance(i, int) else i for i in self.weekdays]
-        first_day_of_week = WEEKDAYS[self.first_day_of_week - 1] if isinstance(self.first_day_of_week, int) \
-            else self.first_day_of_week
+            weekdays = [_weekday_to_str(i) for i in self.weekdays]
         return 'Occurs on weekdays %s of every %s week(s) where the first day of the week is %s' % (
-            ', '.join(weekdays), self.interval, first_day_of_week
+            ', '.join(weekdays), self.interval, _weekday_to_str(self.first_day_of_week)
         )
 
 

@@ -133,6 +133,13 @@ class BaseProtocol(object):
         log.debug('Server %s: Created session %s', self.server, session.session_id)
         return session
 
+    @classmethod
+    def raw_session(cls):
+        s = requests.sessions.Session()
+        s.mount('http://', adapter=BaseProtocol.get_adapter())
+        s.mount('https://', adapter=BaseProtocol.get_adapter())
+        return s
+
     def __repr__(self):
         return self.__class__.__name__ + repr((self.service_endpoint, self.credentials, self.auth_type))
 
