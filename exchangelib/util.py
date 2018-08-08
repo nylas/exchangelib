@@ -9,12 +9,12 @@ import re
 import socket
 import time
 
-from defusedxml.lxml import parse, fromstring, tostring, GlobalParserTLS
+from defusedxml.lxml import parse, fromstring, tostring, GlobalParserTLS, RestrictedElement
 from future.backports.misc import get_ident
 from future.moves.urllib.parse import urlparse
 from future.utils import PY2
 import isodate
-from lxml.etree import ParseError, Element, register_namespace
+from lxml.etree import ParseError, register_namespace
 from pygments import highlight
 from pygments.lexers.html import XmlLexer
 from pygments.formatters.terminal import TerminalFormatter
@@ -29,7 +29,6 @@ time_func = time.time if PY2 else time.monotonic
 
 log = logging.getLogger(__name__)
 
-ElementType = type(Element('x'))  # 'Element' type is auto-generated inside lxml.etree
 string_type = string_types[0]
 
 # Regex of UTF-8 control characters that are illegal in XML 1.0 (and XML 1.1)
@@ -186,7 +185,7 @@ def set_xml_value(elem, value, version):
     from .version import Version
     if isinstance(value, string_types + (bool, bytes, int, Decimal, datetime.time, EWSDate, EWSDateTime)):
         elem.text = value_to_xml_text(value)
-    elif isinstance(value, ElementType):
+    elif isinstance(value, RestrictedElement):
         elem.append(value)
     elif is_iterable(value, generators_allowed=True):
         for v in value:
@@ -196,7 +195,7 @@ def set_xml_value(elem, value, version):
                 if not isinstance(version, Version):
                     raise ValueError("'version' %r must be a Version instance" % version)
                 elem.append(v.to_xml(version=version))
-            elif isinstance(v, ElementType):
+            elif isinstance(v, RestrictedElement):
                 elem.append(v)
             elif isinstance(v, string_types):
                 add_xml_child(elem, 't:String', v)
@@ -222,7 +221,9 @@ def create_element(name, **attrs):
     if ':' in name:
         ns, name = name.split(':')
         name = '{%s}%s' % (ns_translation[ns], name)
-    return Element(name, **attrs)
+    elem = RestrictedElement(**attrs)
+    elem.tag = name
+    return elem
 
 
 def add_xml_child(tree, name, value):
