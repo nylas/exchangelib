@@ -77,13 +77,13 @@ class EWSDateTime(datetime.datetime):
 
     def __new__(cls, *args, **kwargs):
         """
-        Inherits datetime and adds extra formatting required by EWS.
+        Inherits datetime and adds extra formatting required by EWS. Do not set tzinfo directly. Use
+        EWSTimeZone.localize() instead.
         """
-        if 'tzinfo' in kwargs:
-            raise ValueError('Do not set tzinfo directly. Use EWSTimeZone.localize() instead')
-        # Some internal methods still need to set tzinfo in the constructor. Use a magic kwarg for that.
-        if 'ewstzinfo' in kwargs:
-            kwargs['tzinfo'] = kwargs.pop('ewstzinfo')
+        # We can't use the exact signature of datetime.datetime because we get pickle errors, and implementing pickle
+        # support requires copy-pasting lots of code from datetime.datetime.
+        if not isinstance(kwargs.get('tzinfo'), (EWSTimeZone, type(None))):
+            raise ValueError('tzinfo must be an EWSTimeZone instance')
         return super(EWSDateTime, cls).__new__(cls, *args, **kwargs)
 
     def ewsformat(self):
@@ -108,7 +108,7 @@ class EWSDateTime(datetime.datetime):
             tz = d.tzinfo
         else:
             tz = EWSTimeZone.from_pytz(d.tzinfo)
-        return cls(d.year, d.month, d.day, d.hour, d.minute, d.second, d.microsecond, ewstzinfo=tz)
+        return cls(d.year, d.month, d.day, d.hour, d.minute, d.second, d.microsecond, tzinfo=tz)
 
     def astimezone(self, tz=None):
         t = super(EWSDateTime, self).astimezone(tz=tz)

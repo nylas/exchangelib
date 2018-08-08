@@ -455,9 +455,6 @@ class EWSDateTimeTest(unittest.TestCase):
         # Test summertime
         dt = tz.localize(EWSDateTime(2000, 8, 2, 3, 4, 5))
         self.assertEqual(dt.astimezone(utc_tz).ewsformat(), '2000-08-02T01:04:05Z')
-        # Test error when tzinfo is set directly
-        with self.assertRaises(ValueError):
-            EWSDateTime(2000, 1, 1, tzinfo=tz)
         # Test normalize, for completeness
         self.assertEqual(tz.normalize(dt).ewsformat(), '2000-08-02T03:04:05+02:00')
         self.assertEqual(utc_tz.normalize(dt, is_dst=True).ewsformat(), '2000-08-02T01:04:05Z')
