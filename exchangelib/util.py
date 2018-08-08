@@ -1,12 +1,10 @@
 from __future__ import unicode_literals
 
-from copy import deepcopy
 import datetime
 from decimal import Decimal
 import io
 import itertools
 import logging
-from multiprocessing import Lock
 import re
 import socket
 import time
@@ -16,7 +14,7 @@ from future.backports.misc import get_ident
 from future.moves.urllib.parse import urlparse
 from future.utils import PY2
 import isodate
-from lxml.etree import Element, ParseError, register_namespace
+from lxml.etree import ParseError, Element, register_namespace
 from pygments import highlight
 from pygments.lexers.html import XmlLexer
 from pygments.formatters.terminal import TerminalFormatter
@@ -219,27 +217,12 @@ def safe_xml_value(value, replacement='?'):
     return text_type(_illegal_xml_chars_RE.sub(replacement, value))
 
 
-# Keeps a cache of Element objects to deepcopy
-_deepcopy_cache = dict()
-_deepcopy_cache_lock = Lock()
-
-
 def create_element(name, **attrs):
     # copy.deepcopy() is an order of magnitude faster than creating a new Element() every time
-    with_nsmap = attrs.pop('with_nsmap', False)
-    key = (name, tuple(attrs.items()))  # dict requires key to be immutable
-    try:
-        cached_elem = _deepcopy_cache[key]
-    except KeyError:
-        with _deepcopy_cache_lock:
-            # Use setdefault() because another thread may have filled the cache while we were waiting for the lock
-            if ':' in name:
-                ns, name = name.split(':')
-                name = '{%s}%s' % (ns_translation[ns], name)
-            if with_nsmap:
-                attrs['nsmap'] = ns_translation
-            cached_elem = _deepcopy_cache.setdefault(key, Element(name, **attrs))
-    return deepcopy(cached_elem)
+    if ':' in name:
+        ns, name = name.split(':')
+        name = '{%s}%s' % (ns_translation[ns], name)
+    return Element(name, **attrs)
 
 
 def add_xml_child(tree, name, value):

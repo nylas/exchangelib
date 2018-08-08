@@ -35,7 +35,7 @@ from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, 
     ErrorInvalidOperation, MalformedResponseError
 from .ewsdatetime import EWSDateTime, NaiveDateTimeNotAllowed
 from .transport import wrap, extra_headers
-from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, ElementType, \
+from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, \
     xml_to_str, set_xml_value, peek, xml_text_to_value, SOAPNS, TNS, MNS, ENS
 from .version import EXCHANGE_2010, EXCHANGE_2010_SP2, EXCHANGE_2013, EXCHANGE_2013_SP1
 
@@ -80,8 +80,6 @@ class EWSService(object):
     #     raise NotImplementedError()
 
     def _get_elements(self, payload):
-        if not isinstance(payload, ElementType):
-            raise ValueError("'payload' %r must be an ElementType" % payload)
         while True:
             try:
                 # Send the request, get the response and do basic sanity checking on the SOAP XML
@@ -136,8 +134,6 @@ class EWSService(object):
 
     def _get_response_xml(self, payload):
         # Takes an XML tree and returns SOAP payload as an XML tree
-        if not isinstance(payload, ElementType):
-            raise ValueError("'payload' %r must be an ElementType" % payload)
         # Microsoft really doesn't want to make our lives easy. The server may report one version in our initial version
         # guessing tango, but then the server may decide that any arbitrary legacy backend server may actually process
         # the request for an account. Prepare to handle ErrorInvalidSchemaVersionForMailboxVersion errors and set the
@@ -214,8 +210,6 @@ class EWSService(object):
 
     @classmethod
     def _get_soap_payload(cls, soap_response):
-        if not isinstance(soap_response, ElementType):
-            raise ValueError("'soap_response' %r must be an ElementType" % soap_response)
         body = soap_response.find('{%s}Body' % SOAPNS)
         if body is None:
             raise MalformedResponseError('No Body element in SOAP response')
@@ -234,8 +228,6 @@ class EWSService(object):
 
     @classmethod
     def _raise_soap_errors(cls, fault):
-        if not isinstance(fault, ElementType):
-            raise ValueError("'fault' %r must be an ElementType" % fault)
         # Fault: See http://www.w3.org/TR/2000/NOTE-SOAP-20000508/#_Toc478383507
         faultcode = get_xml_attr(fault, 'faultcode')
         faultstring = get_xml_attr(fault, 'faultstring')
@@ -269,8 +261,6 @@ class EWSService(object):
             faultcode, faultstring, faultactor, detail))
 
     def _get_element_container(self, message, name=None):
-        if not isinstance(message, ElementType):
-            raise ValueError("'message' %r must be an ElementType" % message)
         # ResponseClass: See http://msdn.microsoft.com/en-us/library/aa566424(v=EXCHG.140).aspx
         response_class = message.get('ResponseClass')
         # ResponseCode, MessageText: See http://msdn.microsoft.com/en-us/library/aa580757(v=EXCHG.140).aspx
@@ -325,14 +315,12 @@ class EWSService(object):
 
     def _get_elements_in_response(self, response):
         for msg in response:
-            if not isinstance(msg, ElementType):
-                raise ValueError("'msg' %r must be an ElementType" % msg)
             container_or_exc = self._get_element_container(message=msg, name=self.element_container_name)
-            if isinstance(container_or_exc, ElementType):
+            if isinstance(container_or_exc, (bool, Exception)):
+                yield container_or_exc
+            else:
                 for c in self._get_elements_in_container(container=container_or_exc):
                     yield c
-            else:
-                yield container_or_exc
 
     @staticmethod
     def _get_elements_in_container(container):
@@ -391,7 +379,7 @@ class PagingEWSMixIn(EWSService):
             parsed_pages = [self._get_page(message) for message in response]
             for (rootfolder, next_offset), paging_info in zip(parsed_pages, paging_infos):
                 paging_info['next_offset'] = next_offset
-                if isinstance(rootfolder, ElementType):
+                if rootfolder is not None:
                     container = rootfolder.find(self.element_container_name)
                     if container is None:
                         raise MalformedResponseError('No %s elements in ResponseMessage (%s)' % (self.element_container_name,
@@ -1491,7 +1479,7 @@ class FindPeople(EWSAccountService, PagingEWSMixIn):
                 # We can only query one folder, so there should only be one element in response
                 raise MalformedResponseError("Expected single item in 'response', got %s" % response)
             rootfolder, total_items = self._get_page(response[0])
-            if isinstance(rootfolder, ElementType):
+            if rootfolder is not None:
                 container = rootfolder.find(self.element_container_name)
                 if container is None:
                     raise MalformedResponseError('No %s elements in ResponseMessage (%s)' % (
@@ -1544,8 +1532,6 @@ class GetPersona(EWSService):
 
     @classmethod
     def _get_soap_payload(cls, soap_response):
-        if not isinstance(soap_response, ElementType):
-            raise ValueError("'soap_response' %r must be an ElementType" % soap_response)
         body = soap_response.find('{%s}Body' % SOAPNS)
         if body is None:
             raise MalformedResponseError('No Body element in SOAP response')
@@ -1788,8 +1774,6 @@ class UploadItems(EWSAccountService, EWSPooledMixIn):
 class BaseUserOofSettings(EWSAccountService):
     # Common response parsing for non-standard OOF services
     def _get_element_container(self, message, name=None):
-        if not isinstance(message, ElementType):
-            raise ValueError("'message' %r must be an ElementType" % message)
         # ResponseClass: See http://msdn.microsoft.com/en-us/library/aa566424(v=EXCHG.140).aspx
         response_message = message.find('{%s}ResponseMessage' % MNS)
         response_class = response_message.get('ResponseClass')
@@ -1846,10 +1830,8 @@ class GetUserOofSettings(BaseUserOofSettings):
         if len(response) != 1:
             raise ValueError("Expected 'response' length 1, got %s" % response)
         response = response[0]
-        if not isinstance(response, ElementType):
-            raise ValueError("'response' %r must be an ElementType" % response)
         container_or_exc = self._get_element_container(message=response, name=self.element_container_name)
-        if isinstance(container_or_exc, Exception):
+        if isinstance(container_or_exc, (bool, Exception)):
             # pylint: disable=raising-bad-type
             raise container_or_exc
         return OofSettings.from_xml(container_or_exc, account=self.account)
@@ -1908,8 +1890,6 @@ class GetUserAvailability(EWSService):
 
     @classmethod
     def _get_soap_payload(cls, soap_response):
-        if not isinstance(soap_response, ElementType):
-            raise ValueError("'soap_response' %r must be an ElementType" % soap_response)
         body = soap_response.find('{%s}Body' % SOAPNS)
         if body is None:
             raise MalformedResponseError('No Body element in SOAP response')
@@ -1924,8 +1904,6 @@ class GetUserAvailability(EWSService):
 
     def _get_elements_in_response(self, response):
         for msg in response:
-            if not isinstance(msg, ElementType):
-                raise ValueError("'msg' %r must be an ElementType" % msg)
             # Just check the response code and raise errors
             self._get_element_container(message=msg.find('{%s}ResponseMessage' % MNS))
             for c in self._get_elements_in_container(container=msg):
@@ -1969,8 +1947,6 @@ class GetSearchableMailboxes(EWSService):
 
     def _get_elements_in_response(self, response):
         for msg in response:
-            if not isinstance(msg, ElementType):
-                raise ValueError("'msg' %r must be an ElementType" % msg)
             for container_name in (self.element_container_name, self.failed_mailboxes_container_name):
                 try:
                     container_or_exc = self._get_element_container(message=msg, name=container_name)
@@ -1979,11 +1955,11 @@ class GetSearchableMailboxes(EWSService):
                     if container_name == self.failed_mailboxes_container_name:
                         continue
                     raise
-                if isinstance(container_or_exc, ElementType):
+                if isinstance(container_or_exc, (bool, Exception)):
+                    yield container_or_exc
+                else:
                     for c in self._get_elements_in_container(container=container_or_exc):
                         yield c
-                else:
-                    yield container_or_exc
 
 
 def to_item_id(item, item_cls):

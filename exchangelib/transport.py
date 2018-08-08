@@ -10,7 +10,7 @@ import requests_kerberos
 
 from .credentials import IMPERSONATION
 from .errors import UnauthorizedError, TransportError, RedirectError, RelativeRedirect
-from .util import create_element, add_xml_child, get_redirect_url, xml_to_str
+from .util import create_element, add_xml_child, get_redirect_url, xml_to_str, ns_translation
 
 log = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ def wrap(content, version, account=None):
     Generate the necessary boilerplate XML for a raw SOAP request. The XML is specific to the server version.
     ExchangeImpersonation allows to act as the user we want to impersonate.
     """
-    envelope = create_element('s:Envelope', with_nsmap=True)
+    envelope = create_element('s:Envelope', nsmap=ns_translation)
     header = create_element('s:Header')
     requestserverversion = create_element('t:RequestServerVersion', Version=version)
     header.append(requestserverversion)
