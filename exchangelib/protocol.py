@@ -277,13 +277,11 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
         requested_view_choices = {c.value for c in FreeBusyViewOptions.get_field_by_fieldname('requested_view').choices}
         if requested_view not in requested_view_choices:
             raise ValueError("'requested_view' value %r must be one of %s" % (requested_view, requested_view_choices))
-        tz = start.tzinfo  # The timezone of the start and end dates
-        for_year = start.year
         _, _, periods, transitions, transitions_groups = list(self.get_timezones(
-            timezones=[tz],
+            timezones=[start.tzinfo],
             return_full_timezone_data=True
         ))[0]
-        timezone = TimeZone.from_server_timezone(periods, transitions, transitions_groups, for_year=for_year)
+        timezone = TimeZone.from_server_timezone(periods, transitions, transitions_groups, for_year=start.year)
         mailbox_data = list(
             MailboxData(
                 email=account.primary_smtp_address,

@@ -284,7 +284,8 @@ def is_xml(text):
 
 class PrettyXmlHandler(logging.StreamHandler):
     """A steaming log handler that prettifies log statements containing XML when output is a terminal"""
-    def parse_bytes(self, xml_bytes):
+    @staticmethod
+    def parse_bytes(xml_bytes):
         return parse(io.BytesIO(xml_bytes))
 
     def prettify_xml(self, xml_bytes):
@@ -496,14 +497,7 @@ Response data: %(xml_response)s
     )
     try:
         while True:
-            back_off_until = protocol.credentials.back_off_until
-            if back_off_until:
-                sleep_secs = (back_off_until - datetime.datetime.now()).total_seconds()
-                # The back off value may have expired within the last few milliseconds
-                if sleep_secs > 0:
-                    log.warning('Server requested back off until %s. Sleeping %s seconds', back_off_until, sleep_secs)
-                    time.sleep(sleep_secs)
-
+            _back_off_if_needed(protocol.credentials.back_off_until)
             log.debug('Session %s thread %s: retry %s timeout %s POST\'ing to %s after %ss wait', session.session_id,
                       thread_id, retry, protocol.TIMEOUT, url, wait)
             d_start = time_func()
@@ -556,6 +550,15 @@ Response data: %(xml_response)s
         _raise_response_errors(r, protocol, log_msg, log_vals)  # Always raises an exception
     log.debug('Session %s thread %s: Useful response from %s', session.session_id, thread_id, url)
     return r, session
+
+
+def _back_off_if_needed(back_off_until):
+    if back_off_until:
+        sleep_secs = (back_off_until - datetime.datetime.now()).total_seconds()
+        # The back off value may have expired within the last few milliseconds
+        if sleep_secs > 0:
+            log.warning('Server requested back off until %s. Sleeping %s seconds', back_off_until, sleep_secs)
+            time.sleep(sleep_secs)
 
 
 def _may_retry_on_error(r, protocol, wait):

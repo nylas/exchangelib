@@ -473,63 +473,77 @@ class GetServerTimeZones(EWSService):
         return payload
 
     def _get_elements_in_container(self, container):
-        from .recurrence import WEEKDAY_NAMES
         for timezonedef in container:
             tz_id = timezonedef.get('Id')
             tz_name = timezonedef.get('Name')
-            periods = timezonedef.find('{%s}Periods' % TNS)
-            tz_periods = {}
-            for period in periods.findall('{%s}Period' % TNS):
-                # Convert e.g. "trule:Microsoft/Registry/W. Europe Standard Time/2006-Daylight" to (2006, 'Daylight')
-                p_year, p_type = period.get('Id').rsplit('/', 1)[1].split('-')
-                tz_periods[(int(p_year), p_type)] = dict(
-                    name=period.get('Name'),
-                    bias=xml_text_to_value(period.get('Bias'), datetime.timedelta)
-                )
-            tz_transitions_groups = {}
-            transitiongroups = timezonedef.find('{%s}TransitionsGroups' % TNS)
-            if transitiongroups is not None:
-                for transitiongroup in transitiongroups.findall('{%s}TransitionsGroup' % TNS):
-                    tg_id = int(transitiongroup.get('Id'))
-                    tz_transitions_groups[tg_id] = []
-                    for transition in transitiongroup.findall('{%s}Transition' % TNS):
-                        # Apply same conversion to To as for period IDs
-                        to_year, to_type = transition.find('{%s}To' % TNS).text.rsplit('/', 1)[1].split('-')
-                        tz_transitions_groups[tg_id].append(dict(
-                            to=(int(to_year), to_type),
-                        ))
-                    for transition in transitiongroup.findall('{%s}RecurringDayTransition' % TNS):
-                        # Apply same conversion to To as for period IDs
-                        to_year, to_type = transition.find('{%s}To' % TNS).text.rsplit('/', 1)[1].split('-')
-                        tz_transitions_groups[tg_id].append(dict(
-                            to=(int(to_year), to_type),
-                            offset=xml_text_to_value(transition.find('{%s}TimeOffset' % TNS).text, datetime.timedelta),
-                            iso_month=xml_text_to_value(transition.find('{%s}Month' % TNS).text, int),
-                            iso_weekday=WEEKDAY_NAMES.index(transition.find('{%s}DayOfWeek' % TNS).text) + 1,
-                            occurrence=xml_text_to_value(transition.find('{%s}Occurrence' % TNS).text, int),
-                        ))
-            tz_transitions = {}
-            transitions = timezonedef.find('{%s}Transitions' % TNS)
-            if transitions is not None:
-                for transition in transitions.findall('{%s}Transition' % TNS):
-                    to = transition.find('{%s}To' % TNS)
-                    if to.get('Kind') != 'Group':
-                        raise ValueError('Unexpected "Kind" XML attr: %s' % to.get('Kind'))
-                    tg_id = xml_text_to_value(to.text, int)
-                    tz_transitions[tg_id] = None
-                for transition in transitions.findall('{%s}AbsoluteDateTransition' % TNS):
-                    to = transition.find('{%s}To' % TNS)
-                    if to.get('Kind') != 'Group':
-                        raise ValueError('Unexpected "Kind" XML attr: %s' % to.get('Kind'))
-                    tg_id = xml_text_to_value(to.text, int)
-                    try:
-                        t_date = xml_text_to_value(transition.find('{%s}DateTime' % TNS).text, EWSDateTime).date()
-                    except NaiveDateTimeNotAllowed as e:
-                        # We encountered a naive datetime. Don't worry. we just need the date
-                        t_date = e.args[0].date()
-                    tz_transitions[tg_id] = t_date
-
+            tz_periods = self._get_periods(timezonedef)
+            tz_transitions_groups = self._get_transitions_groups(timezonedef)
+            tz_transitions = self._get_transitions(timezonedef)
             yield (tz_id, tz_name, tz_periods, tz_transitions, tz_transitions_groups)
+
+    @staticmethod
+    def _get_periods(timezonedef):
+        tz_periods = {}
+        periods = timezonedef.find('{%s}Periods' % TNS)
+        for period in periods.findall('{%s}Period' % TNS):
+            # Convert e.g. "trule:Microsoft/Registry/W. Europe Standard Time/2006-Daylight" to (2006, 'Daylight')
+            p_year, p_type = period.get('Id').rsplit('/', 1)[1].split('-')
+            tz_periods[(int(p_year), p_type)] = dict(
+                name=period.get('Name'),
+                bias=xml_text_to_value(period.get('Bias'), datetime.timedelta)
+            )
+        return tz_periods
+
+    @staticmethod
+    def _get_transitions_groups(timezonedef):
+        from .recurrence import WEEKDAY_NAMES
+        tz_transitions_groups = {}
+        transitiongroups = timezonedef.find('{%s}TransitionsGroups' % TNS)
+        if transitiongroups is not None:
+            for transitiongroup in transitiongroups.findall('{%s}TransitionsGroup' % TNS):
+                tg_id = int(transitiongroup.get('Id'))
+                tz_transitions_groups[tg_id] = []
+                for transition in transitiongroup.findall('{%s}Transition' % TNS):
+                    # Apply same conversion to To as for period IDs
+                    to_year, to_type = transition.find('{%s}To' % TNS).text.rsplit('/', 1)[1].split('-')
+                    tz_transitions_groups[tg_id].append(dict(
+                        to=(int(to_year), to_type),
+                    ))
+                for transition in transitiongroup.findall('{%s}RecurringDayTransition' % TNS):
+                    # Apply same conversion to To as for period IDs
+                    to_year, to_type = transition.find('{%s}To' % TNS).text.rsplit('/', 1)[1].split('-')
+                    tz_transitions_groups[tg_id].append(dict(
+                        to=(int(to_year), to_type),
+                        offset=xml_text_to_value(transition.find('{%s}TimeOffset' % TNS).text, datetime.timedelta),
+                        iso_month=xml_text_to_value(transition.find('{%s}Month' % TNS).text, int),
+                        iso_weekday=WEEKDAY_NAMES.index(transition.find('{%s}DayOfWeek' % TNS).text) + 1,
+                        occurrence=xml_text_to_value(transition.find('{%s}Occurrence' % TNS).text, int),
+                    ))
+        return tz_transitions_groups
+
+    @staticmethod
+    def _get_transitions(timezonedef):
+        tz_transitions = {}
+        transitions = timezonedef.find('{%s}Transitions' % TNS)
+        if transitions is not None:
+            for transition in transitions.findall('{%s}Transition' % TNS):
+                to = transition.find('{%s}To' % TNS)
+                if to.get('Kind') != 'Group':
+                    raise ValueError('Unexpected "Kind" XML attr: %s' % to.get('Kind'))
+                tg_id = xml_text_to_value(to.text, int)
+                tz_transitions[tg_id] = None
+            for transition in transitions.findall('{%s}AbsoluteDateTransition' % TNS):
+                to = transition.find('{%s}To' % TNS)
+                if to.get('Kind') != 'Group':
+                    raise ValueError('Unexpected "Kind" XML attr: %s' % to.get('Kind'))
+                tg_id = xml_text_to_value(to.text, int)
+                try:
+                    t_date = xml_text_to_value(transition.find('{%s}DateTime' % TNS).text, EWSDateTime).date()
+                except NaiveDateTimeNotAllowed as e:
+                    # We encountered a naive datetime. Don't worry. we just need the date
+                    t_date = e.args[0].date()
+                tz_transitions[tg_id] = t_date
+        return tz_transitions
 
 
 class GetRoomLists(EWSService):
@@ -742,13 +756,10 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
                 yield f.name
 
     def _get_item_update_elems(self, item, fieldnames):
-        from .fields import FieldPath, IndexedField
-        from .indexed_properties import MultiFieldIndexedElement
         from .items import CalendarItem
         item_model = item.__class__
         fieldnames_set = set(fieldnames)
 
-        timezone_fieldnames = set()
         if item.__class__ == CalendarItem:
             # For CalendarItem items where we update 'start' or 'end', we want to update internal timezone fields
             has_start = 'start' in fieldnames
@@ -757,66 +768,76 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
             meeting_tz_field, start_tz_field, end_tz_field = CalendarItem.timezone_fields()
             if self.account.version.build < EXCHANGE_2010:
                 if has_start or has_end:
-                    timezone_fieldnames.add(meeting_tz_field.name)
+                    fieldnames_set.add(meeting_tz_field.name)
             else:
                 if has_start:
-                    timezone_fieldnames.add(start_tz_field.name)
+                    fieldnames_set.add(start_tz_field.name)
                 if has_end:
-                    timezone_fieldnames.add(end_tz_field.name)
-            fieldnames_set.update(timezone_fieldnames)
+                    fieldnames_set.add(end_tz_field.name)
         else:
             meeting_tz_field, start_tz_field, end_tz_field = None, None, None
 
         for fieldname in self._sort_fieldnames(item_model=item_model, fieldnames=fieldnames_set):
             field = item_model.get_field_by_fieldname(fieldname)
-            if field.is_read_only and field.name not in timezone_fieldnames:
-                # Timezone fields are ok, even though they are marked read-only
+            if field.is_read_only:
                 raise ValueError('%s is a read-only field' % field.name)
-            value = field.clean(getattr(item, field.name), version=self.account.version)  # Make sure the value is OK
-
-            if item.__class__ == CalendarItem:
-                # For CalendarItem items where we update 'start' or 'end', we want to send values in the local timezone
-                if self.account.version.build < EXCHANGE_2010:
-                    if fieldname in ('start', 'end'):
-                        value = value.astimezone(getattr(item, meeting_tz_field.name))
-                else:
-                    if fieldname == 'start':
-                        value = value.astimezone(getattr(item, start_tz_field.name))
-                    elif fieldname == 'end':
-                        value = value.astimezone(getattr(item, end_tz_field.name))
-
+            value = self._get_item_value(item, field, meeting_tz_field, start_tz_field, end_tz_field)
             if value is None or (field.is_list and not value):
                 # A value of None or [] means we want to remove this field from the item
-                if field.is_required or field.is_required_after_save:
-                    raise ValueError('%s is a required field and may not be deleted' % field.name)
-                for field_path in FieldPath(field=field).expand(version=self.account.version):
-                    yield self._delete_item_elem(field_path=field_path)
-                continue
+                for elem in self._get_delete_item_elems(field=field):
+                    yield elem
+            else:
+                for elem in self._get_set_item_elems(item_model=item_model, field=field, value=value):
+                    yield elem
 
-            if isinstance(field, IndexedField):
-                # TODO: Maybe the set/delete logic should extend into subfields, not just overwrite the whole item.
-                for v in value:
-                    # TODO: We should also delete the labels that no longer exist in the list
-                    if issubclass(field.value_cls, MultiFieldIndexedElement):
-                        # We have subfields. Generate SetItem XML for each subfield. SetItem only accepts items that
-                        # have the one value set that we want to change. Create a new IndexedField object that has
-                        # only that value set.
-                        for subfield in field.value_cls.supported_fields(version=self.account.version):
-                            yield self._set_item_elem(
-                                item_model=item_model,
-                                field_path=FieldPath(field=field, label=v.label, subfield=subfield),
-                                value=field.value_cls(**{'label': v.label, subfield.name: getattr(v, subfield.name)}),
-                            )
-                    else:
-                        # The simpler IndexedFields with only one subfield
-                        subfield = field.value_cls.value_field(version=self.account.version)
+    def _get_item_value(self, item, field, meeting_tz_field, start_tz_field, end_tz_field):
+        from .items import CalendarItem
+        value = field.clean(getattr(item, field.name), version=self.account.version)  # Make sure the value is OK
+        if item.__class__ == CalendarItem:
+            # For CalendarItem items where we update 'start' or 'end', we want to send values in the local timezone
+            if self.account.version.build < EXCHANGE_2010:
+                if field.name in ('start', 'end'):
+                    value = value.astimezone(getattr(item, meeting_tz_field.name))
+            else:
+                if field.name == 'start':
+                    value = value.astimezone(getattr(item, start_tz_field.name))
+                elif field.name == 'end':
+                    value = value.astimezone(getattr(item, end_tz_field.name))
+        return value
+
+    def _get_delete_item_elems(self, field):
+        from .fields import FieldPath
+        if field.is_required or field.is_required_after_save:
+            raise ValueError('%s is a required field and may not be deleted' % field.name)
+        for field_path in FieldPath(field=field).expand(version=self.account.version):
+            yield self._delete_item_elem(field_path=field_path)
+
+    def _get_set_item_elems(self, item_model, field, value):
+        from .fields import FieldPath, IndexedField
+        from .indexed_properties import MultiFieldIndexedElement
+        if isinstance(field, IndexedField):
+            # TODO: Maybe the set/delete logic should extend into subfields, not just overwrite the whole item.
+            for v in value:
+                # TODO: We should also delete the labels that no longer exist in the list
+                if issubclass(field.value_cls, MultiFieldIndexedElement):
+                    # We have subfields. Generate SetItem XML for each subfield. SetItem only accepts items that
+                    # have the one value set that we want to change. Create a new IndexedField object that has
+                    # only that value set.
+                    for subfield in field.value_cls.supported_fields(version=self.account.version):
                         yield self._set_item_elem(
                             item_model=item_model,
                             field_path=FieldPath(field=field, label=v.label, subfield=subfield),
-                            value=v,
+                            value=field.value_cls(**{'label': v.label, subfield.name: getattr(v, subfield.name)}),
                         )
-                continue
-
+                else:
+                    # The simpler IndexedFields with only one subfield
+                    subfield = field.value_cls.value_field(version=self.account.version)
+                    yield self._set_item_elem(
+                        item_model=item_model,
+                        field_path=FieldPath(field=field, label=v.label, subfield=subfield),
+                        value=v,
+                    )
+        else:
             yield self._set_item_elem(item_model=item_model, field_path=FieldPath(field=field), value=value)
 
     def get_payload(self, items, conflict_resolution, message_disposition, send_meeting_invitations_or_cancellations,
