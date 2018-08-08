@@ -7,13 +7,13 @@ from .util import to_xml
 CLDR_WINZONE_URL = 'http://unicode.org/repos/cldr/trunk/common/supplemental/windowsZones.xml'
 
 
-def generate_map():
+def generate_map(timeout=10):
     """ Helper method to update the map if the CLDR database is updated """
-    r = requests.get(CLDR_WINZONE_URL)
+    r = requests.get(CLDR_WINZONE_URL, timeout=timeout)
     if r.status_code != 200:
         raise ValueError('Unexpected response: %s' % r)
     tz_map = {}
-    for e in to_xml(r.text).find('windowsZones').find('mapTimezones').findall('mapZone'):
+    for e in to_xml(r.content).find('windowsZones').find('mapTimezones').findall('mapZone'):
         for location in e.get('type').split(' '):
             tz_map[location] = e.get('other')
     return tz_map

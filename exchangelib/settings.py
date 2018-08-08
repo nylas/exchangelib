@@ -1,8 +1,7 @@
 from .ewsdatetime import UTC_NOW
 from .fields import DateTimeField, TextField, ChoiceField, Choice
 from .properties import EWSElement
-from .transport import TNS
-from .util import create_element, set_xml_value
+from .util import create_element, set_xml_value, TNS
 
 
 class ReplyField(TextField):

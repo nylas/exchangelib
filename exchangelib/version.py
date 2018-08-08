@@ -4,15 +4,15 @@ from __future__ import unicode_literals
 import logging
 import re
 
-from defusedxml.ElementTree import ParseError
 from future.utils import python_2_unicode_compatible
+from lxml.etree import ParseError
 import requests.sessions
 from six import text_type
 
 from .errors import TransportError, ErrorInvalidSchemaVersionForMailboxVersion, ErrorInvalidServerVersion, \
     ResponseMessageError
-from .transport import TNS, SOAPNS, get_auth_instance
-from .util import is_xml, to_xml
+from .transport import get_auth_instance
+from .util import is_xml, to_xml, TNS, SOAPNS
 
 log = logging.getLogger(__name__)
 
@@ -221,12 +221,12 @@ class Version(object):
         log.debug('Response headers: %s', r.headers)
         if r.status_code != 200:
             raise TransportError('Unexpected HTTP status %s when getting %s (%s)' % (r.status_code, types_url, r.text))
-        if not is_xml(r.text):
+        if not is_xml(r.content):
             raise TransportError('Unexpected result when getting %s. Maybe this is not an EWS server?%s' % (
                 types_url,
                 '\n\n%s[...]' % r.text[:200] if len(r.text) > 200 else '\n\n%s' % r.text if r.text else '',
             ))
-        return to_xml(r.text).get('version')
+        return to_xml(r.content).get('version')
 
     @classmethod
     def _guess_version_from_service(cls, protocol, hint=None):
@@ -254,7 +254,7 @@ class Version(object):
         try:
             header = to_xml(response).find('{%s}Header' % SOAPNS)
             if header is None:
-                raise ParseError()
+                raise ParseError('no header', '<not from file>', -1, 0)
         except ParseError:
             raise TransportError('Unknown XML response (%s)' % response)
 

@@ -8,9 +8,8 @@ from six import string_types
 
 from .ewsdatetime import EWSDateTime
 from .properties import EWSElement
-from .services import TNS
 from .util import create_element, add_xml_child, get_xml_attrs, get_xml_attr, set_xml_value, value_to_xml_text, \
-    xml_text_to_value, is_iterable
+    xml_text_to_value, is_iterable, TNS
 
 string_type = string_types[0]
 log = logging.getLogger(__name__)

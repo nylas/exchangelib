@@ -18,7 +18,7 @@ from itertools import chain
 import logging
 import traceback
 
-from defusedxml.ElementTree import ParseError
+from lxml.etree import ParseError
 from six import text_type
 
 from . import errors
@@ -34,9 +34,9 @@ from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, 
     ErrorNameResolutionMultipleResults, ErrorNameResolutionNoResults, ErrorNoPublicFolderReplicaAvailable, \
     ErrorInvalidOperation, MalformedResponseError
 from .ewsdatetime import EWSDateTime, NaiveDateTimeNotAllowed
-from .transport import wrap, extra_headers, SOAPNS, TNS, MNS, ENS
+from .transport import wrap, extra_headers
 from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, ElementType, \
-    xml_to_str, set_xml_value, peek, xml_text_to_value
+    xml_to_str, set_xml_value, peek, xml_text_to_value, SOAPNS, TNS, MNS, ENS
 from .version import EXCHANGE_2010, EXCHANGE_2010_SP2, EXCHANGE_2013, EXCHANGE_2013_SP1
 
 log = logging.getLogger(__name__)
@@ -164,7 +164,7 @@ class EWSService(object):
                 allow_redirects=False)
             self.protocol.release_session(session)
             try:
-                soap_response_payload = to_xml(r.text)
+                soap_response_payload = to_xml(r.content)
             except ParseError as e:
                 raise SOAPError('Bad SOAP response: %s' % e)
             try:
@@ -206,7 +206,7 @@ class EWSService(object):
             log.debug('Found new API version (%s -> %s)', hint.api_version, api_version)
         else:
             log.debug('Adding missing build number %s', api_version)
-        new_version = Version.from_response(requested_api_version=api_version, response=response.text)
+        new_version = Version.from_response(requested_api_version=api_version, response=response.content)
         if isinstance(self, EWSAccountService):
             self.account.version = new_version
         else:
@@ -1928,11 +1928,8 @@ class GetUserAvailability(EWSService):
                 raise ValueError("'msg' %r must be an ElementType" % msg)
             # Just check the response code and raise errors
             self._get_element_container(message=msg.find('{%s}ResponseMessage' % MNS))
-            if isinstance(msg, ElementType):
-                for c in self._get_elements_in_container(container=msg):
-                    yield c
-            else:
-                yield msg
+            for c in self._get_elements_in_container(container=msg):
+                yield c
 
     def _get_elements_in_container(self, container):
         return [container.find('{%s}FreeBusyView' % MNS)]

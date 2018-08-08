@@ -20,9 +20,8 @@ import unittest.util
 import warnings
 
 from dateutil.relativedelta import relativedelta
-from defusedxml.ElementTree import ParseError
-from defusedxml.lxml import parse, tostring
 import dns.resolver
+from lxml.etree import ParseError
 import psutil
 import pytz
 import requests
@@ -509,7 +508,7 @@ class PropertiesTest(unittest.TestCase):
     def test_internet_message_headers(self):
         # Message headers are read-only, and an integration test is difficult because we can't reliably AND quickly
         # generate emails that pass through some relay server that adds headers. Create a unit test instead.
-        payload = '''\
+        payload = b'''\
 <?xml version="1.0" encoding="utf-8"?>
 <Envelope xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
     <t:InternetMessageHeaders>
@@ -682,7 +681,7 @@ class FieldTest(unittest.TestCase):
         # Test that we can survive garbage input for common field types
         tz = EWSTimeZone.timezone('Europe/Copenhagen')
         account = namedtuple('Account', ['default_timezone'])(default_timezone=tz)
-        payload = '''\
+        payload = b'''\
 <?xml version="1.0" encoding="utf-8"?>
 <Envelope xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
     <t:Item>
@@ -695,7 +694,7 @@ class FieldTest(unittest.TestCase):
             self.assertEqual(field.from_xml(elem=elem, account=account), None)
 
         # Test MS timezones
-        payload = '''\
+        payload = b'''\
 <?xml version="1.0" encoding="utf-8"?>
 <Envelope xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
     <t:Item>
@@ -733,7 +732,7 @@ class FieldTest(unittest.TestCase):
         field = DateTimeField('foo', field_uri='item:DateTimeSent', default=default_value)
 
         # TZ-aware datetime string
-        payload = '''\
+        payload = b'''\
 <?xml version="1.0" encoding="utf-8"?>
 <Envelope xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
     <t:Item>
@@ -744,7 +743,7 @@ class FieldTest(unittest.TestCase):
         self.assertEqual(field.from_xml(elem=elem, account=account), UTC.localize(EWSDateTime(2017, 6, 21, 18, 40, 2)))
 
         # Naive datetime string is localized to tz of the account
-        payload = '''\
+        payload = b'''\
 <?xml version="1.0" encoding="utf-8"?>
 <Envelope xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
     <t:Item>
@@ -755,7 +754,7 @@ class FieldTest(unittest.TestCase):
         self.assertEqual(field.from_xml(elem=elem, account=account), tz.localize(EWSDateTime(2017, 6, 21, 18, 40, 2)))
 
         # Garbage string returns None
-        payload = '''\
+        payload = b'''\
 <?xml version="1.0" encoding="utf-8"?>
 <Envelope xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
     <t:Item>
@@ -766,7 +765,7 @@ class FieldTest(unittest.TestCase):
         self.assertEqual(field.from_xml(elem=elem, account=account), None)
 
         # Element not found returns default value
-        payload = '''\
+        payload = b'''\
 <?xml version="1.0" encoding="utf-8"?>
 <Envelope xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
     <t:Item>
@@ -900,28 +899,28 @@ class RestrictionTest(unittest.TestCase):
         start = tz.localize(EWSDateTime(1950, 9, 26, 8, 0, 0))
         end = tz.localize(EWSDateTime(2050, 9, 26, 11, 0, 0))
         result = '''\
-<m:Restriction>
-    <t:And>
+<m:Restriction xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages">
+    <t:And xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
         <t:Or>
             <t:Contains ContainmentComparison="Exact" ContainmentMode="Substring">
-                <t:FieldURI FieldURI="item:Categories" />
-                <t:Constant Value="FOO" />
+                <t:FieldURI FieldURI="item:Categories"/>
+                <t:Constant Value="FOO"/>
             </t:Contains>
             <t:Contains ContainmentComparison="Exact" ContainmentMode="Substring">
-                <t:FieldURI FieldURI="item:Categories" />
-                <t:Constant Value="BAR" />
+                <t:FieldURI FieldURI="item:Categories"/>
+                <t:Constant Value="BAR"/>
             </t:Contains>
         </t:Or>
         <t:IsGreaterThan>
-            <t:FieldURI FieldURI="calendar:End" />
+            <t:FieldURI FieldURI="calendar:End"/>
             <t:FieldURIOrConstant>
-                <t:Constant Value="1950-09-26T08:00:00+01:00" />
+                <t:Constant Value="1950-09-26T08:00:00+01:00"/>
             </t:FieldURIOrConstant>
         </t:IsGreaterThan>
         <t:IsLessThan>
-            <t:FieldURI FieldURI="calendar:Start" />
+            <t:FieldURI FieldURI="calendar:Start"/>
             <t:FieldURIOrConstant>
-                <t:Constant Value="2050-09-26T11:00:00+01:00" />
+                <t:Constant Value="2050-09-26T11:00:00+01:00"/>
             </t:FieldURIOrConstant>
         </t:IsLessThan>
     </t:And>
@@ -981,19 +980,19 @@ class RestrictionTest(unittest.TestCase):
         self.assertEqual(Q(foo__contains=('bar', 'baz')), ~~Q(foo__contains=('bar', 'baz')))
         # Test generated XML of 'Not' statement when there is only one child. Skip 't:And' between 't:Not' and 't:Or'.
         result = '''\
-<m:Restriction>
-    <t:Not>
+<m:Restriction xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages">
+    <t:Not xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
         <t:Or>
             <t:IsEqualTo>
-                <t:FieldURI FieldURI="item:Subject" />
+                <t:FieldURI FieldURI="item:Subject"/>
                 <t:FieldURIOrConstant>
-                    <t:Constant Value="bar" />
+                    <t:Constant Value="bar"/>
                 </t:FieldURIOrConstant>
             </t:IsEqualTo>
             <t:IsEqualTo>
-                <t:FieldURI FieldURI="item:Subject" />
+                <t:FieldURI FieldURI="item:Subject"/>
                 <t:FieldURIOrConstant>
-                    <t:Constant Value="baz" />
+                    <t:Constant Value="baz"/>
                 </t:FieldURIOrConstant>
             </t:IsEqualTo>
         </t:Or>
@@ -1262,13 +1261,13 @@ class UtilTest(unittest.TestCase):
             get_redirect_url(r, allow_relative=False)
 
     def test_to_xml(self):
-        to_xml('<?xml version="1.0" encoding="UTF-8"?><foo></foo>')
-        to_xml(BOM+'<?xml version="1.0" encoding="UTF-8"?><foo></foo>')
-        to_xml(BOM+'<?xml version="1.0" encoding="UTF-8"?><foo>&broken</foo>')
+        to_xml(b'<?xml version="1.0" encoding="UTF-8"?><foo></foo>')
+        to_xml(BOM+b'<?xml version="1.0" encoding="UTF-8"?><foo></foo>')
+        to_xml(BOM+b'<?xml version="1.0" encoding="UTF-8"?><foo>&broken</foo>')
         with self.assertRaises(ParseError):
-            to_xml('foo')
+            to_xml(b'foo')
         try:
-            to_xml('<t:Foo><t:Bar>Baz</t:Bar></t:Foo>')
+            to_xml(b'<t:Foo><t:Bar>Baz</t:Bar></t:Foo>')
         except ParseError as e:
             # Not all lxml versions throw an error here, so we can't use assertRaises
             self.assertIn('Offending text: [...]<t:Foo><t:Bar>Baz</t[...]', e.args[0])
@@ -1527,7 +1526,7 @@ class CommonTest(EWSTest):
     def test_error_server_busy(self):
         # Test that we can parse an ErrorServerBusy response
         ws = GetRoomLists(self.account.protocol)
-        xml = '''\
+        xml = b'''\
 <?xml version='1.0' encoding='utf-8'?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
   <s:Body>
@@ -1579,7 +1578,7 @@ class CommonTest(EWSTest):
     def test_get_roomlists_parsing(self):
         # Test static XML since server has no roomlists
         ws = GetRoomLists(self.account.protocol)
-        xml = '''\
+        xml = b'''\
 <?xml version="1.0" ?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
     <s:Header>
@@ -1632,7 +1631,7 @@ class CommonTest(EWSTest):
     def test_get_rooms_parsing(self):
         # Test static XML since server has no rooms
         ws = GetRooms(self.account.protocol)
-        xml = '''\
+        xml = b'''\
 <?xml version="1.0" ?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
     <s:Header>
@@ -1705,7 +1704,7 @@ class CommonTest(EWSTest):
     def test_resolvenames_parsing(self):
         # Test static XML since server has no roomlists
         ws = ResolveNames(self.account.protocol)
-        xml = '''\
+        xml = b'''\
 <?xml version="1.0" encoding="utf-8"?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
   <s:Header>
@@ -2051,23 +2050,23 @@ class CommonTest(EWSTest):
         with self.assertRaises(SOAPError) as e:
             ResolveNames._get_soap_payload(to_xml(soap_xml.format(
                 faultcode='YYY', faultstring='AAA', responsecode='XXX', message='ZZZ'
-            )))
+            ).encode('utf-8')))
         self.assertIn('AAA', e.exception.args[0])
         self.assertIn('YYY', e.exception.args[0])
         self.assertIn('ZZZ', e.exception.args[0])
         with self.assertRaises(ErrorNonExistentMailbox) as e:
             ResolveNames._get_soap_payload(to_xml(soap_xml.format(
                 faultcode='ErrorNonExistentMailbox', faultstring='AAA', responsecode='XXX', message='ZZZ'
-            )))
+            ).encode('utf-8')))
         self.assertIn('AAA', e.exception.args[0])
         with self.assertRaises(ErrorNonExistentMailbox) as e:
             ResolveNames._get_soap_payload(to_xml(soap_xml.format(
                 faultcode='XXX', faultstring='AAA', responsecode='ErrorNonExistentMailbox', message='YYY'
-            )))
+            ).encode('utf-8')))
         self.assertIn('YYY', e.exception.args[0])
 
         # Test bad XML (no body)
-        soap_xml = """\
+        soap_xml = b"""\
 <?xml version="1.0" encoding="utf-8" ?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Header>
@@ -2080,7 +2079,7 @@ class CommonTest(EWSTest):
             ResolveNames._get_soap_payload(to_xml(soap_xml))
 
         # Test bad XML (no fault)
-        soap_xml = """\
+        soap_xml = b"""\
 <?xml version="1.0" encoding="utf-8" ?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Header>
@@ -2097,7 +2096,7 @@ class CommonTest(EWSTest):
 
     def test_element_container(self):
         svc = ResolveNames(self.account.protocol)
-        soap_xml = """\
+        soap_xml = b"""\
 <?xml version="1.0" encoding="utf-8" ?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Body>
@@ -2426,14 +2425,14 @@ class AutodiscoverTest(EWSTest):
     def test_parse_response(self):
         from exchangelib.autodiscover import _parse_response
         with self.assertRaises(AutoDiscoverFailed):
-            _parse_response('XXX')  # Invalid response
+            _parse_response(b'XXX')  # Invalid response
 
-        xml = '''<?xml version="1.0" encoding="utf-8"?><foo>bar</foo>'''
+        xml = b'''<?xml version="1.0" encoding="utf-8"?><foo>bar</foo>'''
         with self.assertRaises(AutoDiscoverFailed):
             _parse_response(xml)  # Invalid XML response
 
         # Redirection
-        xml = '''\
+        xml = b'''\
 <?xml version="1.0" encoding="utf-8"?>
 <Autodiscover xmlns="http://schemas.microsoft.com/exchange/autodiscover/responseschema/2006">
     <Response xmlns="http://schemas.microsoft.com/exchange/autodiscover/outlook/responseschema/2006a">
@@ -2451,7 +2450,7 @@ class AutodiscoverTest(EWSTest):
         self.assertEqual(e.exception.redirect_email, 'foo@example.com')
 
         # Select EXPR if it's there, and there are multiple available
-        xml = '''\
+        xml = b'''\
 <?xml version="1.0" encoding="utf-8"?>
 <Autodiscover xmlns="http://schemas.microsoft.com/exchange/autodiscover/responseschema/2006">
     <Response xmlns="http://schemas.microsoft.com/exchange/autodiscover/outlook/responseschema/2006a">
@@ -2475,7 +2474,7 @@ class AutodiscoverTest(EWSTest):
         self.assertEqual(_parse_response(xml)[0], 'https://expr.example.com/EWS/Exchange.asmx')
 
         # Select EXPR if EXPR is unavailable
-        xml = '''\
+        xml = b'''\
 <?xml version="1.0" encoding="utf-8"?>
 <Autodiscover xmlns="http://schemas.microsoft.com/exchange/autodiscover/responseschema/2006">
     <Response xmlns="http://schemas.microsoft.com/exchange/autodiscover/outlook/responseschema/2006a">
@@ -2495,7 +2494,7 @@ class AutodiscoverTest(EWSTest):
         self.assertEqual(_parse_response(xml)[0], 'https://exch.example.com/EWS/Exchange.asmx')
 
         # Fail if neither EXPR nor EXPR are unavailable
-        xml = '''\
+        xml = b'''\
 <?xml version="1.0" encoding="utf-8"?>
 <Autodiscover xmlns="http://schemas.microsoft.com/exchange/autodiscover/responseschema/2006">
     <Response xmlns="http://schemas.microsoft.com/exchange/autodiscover/outlook/responseschema/2006a">

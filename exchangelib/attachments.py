@@ -9,7 +9,8 @@ from six import string_types
 from .fields import BooleanField, TextField, IntegerField, URIField, DateTimeField, EWSElementField, Base64Field, \
     ItemField, IdField
 from .properties import RootItemId, EWSElement
-from .services import TNS, GetAttachment, CreateAttachment, DeleteAttachment
+from .services import GetAttachment, CreateAttachment, DeleteAttachment
+from .util import TNS
 
 string_type = string_types[0]
 log = logging.getLogger(__name__)

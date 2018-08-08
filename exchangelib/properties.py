@@ -12,8 +12,7 @@ from six import text_type, string_types
 from .fields import SubField, TextField, EmailAddressField, ChoiceField, DateTimeField, EWSElementField, MailboxField, \
     Choice, BooleanField, IdField, ExtendedPropertyField, IntegerField, TimeField, EnumField, CharField, EmailField, \
     EWSElementListField, EnumListField, FreeBusyStatusField, WEEKDAY_NAMES
-from .services import MNS, TNS
-from .util import get_xml_attr, create_element, set_xml_value, value_to_xml_text
+from .util import get_xml_attr, create_element, set_xml_value, value_to_xml_text, MNS, TNS
 from .version import EXCHANGE_2013
 
 string_type = string_types[0]

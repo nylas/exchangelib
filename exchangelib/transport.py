@@ -14,12 +14,6 @@ from .util import create_element, add_xml_child, get_redirect_url, xml_to_str
 
 log = logging.getLogger(__name__)
 
-# XML namespaces
-SOAPNS = 'http://schemas.xmlsoap.org/soap/envelope/'
-MNS = 'http://schemas.microsoft.com/exchange/services/2006/messages'
-TNS = 'http://schemas.microsoft.com/exchange/services/2006/types'
-ENS = 'http://schemas.microsoft.com/exchange/services/2006/errors'
-
 # Authentication method enums
 NOAUTH = 'no authentication'
 NTLM = 'NTLM'
@@ -54,11 +48,7 @@ def wrap(content, version, account=None):
     Generate the necessary boilerplate XML for a raw SOAP request. The XML is specific to the server version.
     ExchangeImpersonation allows to act as the user we want to impersonate.
     """
-    envelope = create_element('s:Envelope', **{
-        'xmlns:s': SOAPNS,
-        'xmlns:t': TNS,
-        'xmlns:m': MNS,
-    })
+    envelope = create_element('s:Envelope', with_nsmap=True)
     header = create_element('s:Header')
     requestserverversion = create_element('t:RequestServerVersion', Version=version)
     header.append(requestserverversion)

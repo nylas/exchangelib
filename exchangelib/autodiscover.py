@@ -312,7 +312,7 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl):
     r = _get_response(protocol=autodiscover_protocol, email=email)
     domain = get_domain(email)
     try:
-        ews_url, primary_smtp_address = _parse_response(r.text)
+        ews_url, primary_smtp_address = _parse_response(r.content)
         if not primary_smtp_address:
             primary_smtp_address = email
     except (ErrorNonExistentMailbox, AutoDiscoverRedirect):
@@ -334,7 +334,7 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl):
 
 def _autodiscover_quick(credentials, email, protocol):
     r = _get_response(protocol=protocol, email=email)
-    ews_url, primary_smtp_address = _parse_response(r.text)
+    ews_url, primary_smtp_address = _parse_response(r.content)
     if not primary_smtp_address:
         primary_smtp_address = email
     log.debug('Autodiscover success: %s may connect to %s as primary email %s', email, ews_url, primary_smtp_address)
@@ -385,7 +385,7 @@ def _get_response(protocol, email):
         raise_from(
             AutoDiscoverFailed('No access to %s using %s' % (protocol.service_endpoint, protocol.auth_type)), None
         )
-    if not is_xml(r.text):
+    if not is_xml(r.content):
         # This is normal - e.g. a greedy webserver serving custom HTTP 404's as 200 OK
         log.debug('URL %s: This is not XML: %s', protocol.service_endpoint, r.text[:1000])
         raise AutoDiscoverFailed('URL %s: This is not XML: %s' % (protocol.service_endpoint, r.text[:1000]))

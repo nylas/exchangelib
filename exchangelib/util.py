@@ -10,14 +10,13 @@ from multiprocessing import Lock
 import re
 import socket
 import time
-from xml.etree.ElementTree import Element, tostring as etree_tostring
 
-from defusedxml.ElementTree import fromstring, ParseError
-from defusedxml.lxml import parse, tostring, GlobalParserTLS
+from defusedxml.lxml import parse, fromstring, tostring, GlobalParserTLS
 from future.backports.misc import get_ident
 from future.moves.urllib.parse import urlparse
 from future.utils import PY2
 import isodate
+from lxml.etree import Element, ParseError, register_namespace
 from pygments import highlight
 from pygments.lexers.html import XmlLexer
 from pygments.formatters.terminal import TerminalFormatter
@@ -32,14 +31,28 @@ time_func = time.time if PY2 else time.monotonic
 
 log = logging.getLogger(__name__)
 
-ElementType = type(Element('x'))  # Type is auto-generated inside ElementTree
+ElementType = type(Element('x'))  # 'Element' type is auto-generated inside lxml.etree
 string_type = string_types[0]
 
 # Regex of UTF-8 control characters that are illegal in XML 1.0 (and XML 1.1)
 _illegal_xml_chars_RE = re.compile('[\x00-\x08\x0b\x0c\x0e-\x1F\uD800-\uDFFF\uFFFE\uFFFF]')
 # UTF-8 byte order mark which may precede the XML from an Exchange server
-BOM = '\xef\xbb\xbf'
+BOM = b'\xef\xbb\xbf'
 BOM_LEN = len(BOM)
+
+# XML namespaces
+SOAPNS = 'http://schemas.xmlsoap.org/soap/envelope/'
+MNS = 'http://schemas.microsoft.com/exchange/services/2006/messages'
+TNS = 'http://schemas.microsoft.com/exchange/services/2006/types'
+ENS = 'http://schemas.microsoft.com/exchange/services/2006/errors'
+
+ns_translation = {
+    's': SOAPNS,
+    't': TNS,
+    'm': MNS,
+}
+for k, v in ns_translation.items():
+    register_namespace(k, v)
 
 
 def is_iterable(value, generators_allowed=False):
@@ -104,21 +117,12 @@ def peek(iterable):
 
 
 def xml_to_str(tree, encoding=None, xml_declaration=False):
-    # tostring() returns bytecode unless encoding is 'unicode', and does not reliably produce an XML declaration. We
-    # ALWAYS want bytecode so we can convert to unicode explicitly.
+    """Serialize an XML tree. Returns unicode if 'encoding' is None. Otherwise, we return encoded 'bytes'."""
     if xml_declaration and not encoding:
             raise ValueError("'xml_declaration' is not supported when 'encoding' is None")
-    if PY2:
-        # Encode and remove XML declaration
-        xml_str = etree_tostring(tree, encoding='utf-8')
-        if encoding:
-            return b'<?xml version="1.0" encoding="%s"?>\n%s' % (str(encoding), xml_str)
-        return xml_str.decode('utf-8')
-    else:
-        xml_str = etree_tostring(tree, encoding='unicode')
-        if encoding:
-            return ('<?xml version="1.0" encoding="%s"?>\n%s' % (encoding, xml_str)).encode(encoding=encoding)
-        return xml_str
+    if encoding:
+        return tostring(tree, encoding=encoding, xml_declaration=True)
+    return tostring(tree, encoding=text_type, xml_declaration=False)
 
 
 def get_xml_attr(tree, name):
@@ -184,6 +188,8 @@ def set_xml_value(elem, value, version):
     from .version import Version
     if isinstance(value, string_types + (bool, bytes, int, Decimal, datetime.time, EWSDate, EWSDateTime)):
         elem.text = value_to_xml_text(value)
+    elif isinstance(value, ElementType):
+        elem.append(value)
     elif is_iterable(value, generators_allowed=True):
         for v in value:
             if isinstance(v, (FieldPath, FieldOrder)):
@@ -204,8 +210,6 @@ def set_xml_value(elem, value, version):
         if not isinstance(version, Version):
             raise ValueError("'version' %s must be a Version instance" % version)
         elem.append(value.to_xml(version=version))
-    elif isinstance(value, ElementType):
-        elem.append(value)
     else:
         raise ValueError('Unsupported type %s for value %s on elem %s' % (type(value), value, elem))
     return elem
@@ -222,12 +226,18 @@ _deepcopy_cache_lock = Lock()
 
 def create_element(name, **attrs):
     # copy.deepcopy() is an order of magnitude faster than creating a new Element() every time
+    with_nsmap = attrs.pop('with_nsmap', False)
     key = (name, tuple(attrs.items()))  # dict requires key to be immutable
     try:
         cached_elem = _deepcopy_cache[key]
     except KeyError:
         with _deepcopy_cache_lock:
             # Use setdefault() because another thread may have filled the cache while we were waiting for the lock
+            if ':' in name:
+                ns, name = name.split(':')
+                name = '{%s}%s' % (ns_translation[ns], name)
+            if with_nsmap:
+                attrs['nsmap'] = ns_translation
             cached_elem = _deepcopy_cache.setdefault(key, Element(name, **attrs))
     return deepcopy(cached_elem)
 
@@ -252,42 +262,41 @@ def to_xml(text):
     try:
         if PY2:
             # On python2, fromstring expects an encoded string
-            return fromstring((text[BOM_LEN:] if text.startswith(BOM) else text).encode('utf-8'))
-        return fromstring(text[BOM_LEN:] if text.startswith(BOM) else text)
+            return fromstring((text[BOM_LEN:] if text[:BOM_LEN] == BOM else text).encode('utf-8'))
+        return fromstring(text[BOM_LEN:] if text[:BOM_LEN] == BOM else text)
     except ParseError:
         # Exchange servers may spit out the weirdest XML. lxml is pretty good at recovering from errors
         log.warning('Fallback to lxml processing of faulty XML')
         forgiving_parser = _forgiving_parser.getDefaultParser()
-        no_bom_text = text[BOM_LEN:] if text.startswith(BOM) else text
+        no_bom_text = text[BOM_LEN:] if text[:BOM_LEN] == BOM else text
         try:
-            root = parse(io.BytesIO(no_bom_text.encode('utf-8')), parser=forgiving_parser)
+            return parse(io.BytesIO(no_bom_text), parser=forgiving_parser)
         except AssertionError as e:
-            raise ParseError(*e.args)
-        try:
-            return fromstring(tostring(root))
+            raise ParseError(e.args[0], '<not from file>', -1, 0)
         except ParseError as e:
             if hasattr(e, 'position'):
                 e.lineno, e.offset = e.position
             if not e.lineno:
-                raise ParseError('%s' % text_type(e))
+                raise ParseError(text_type(e), '<not from file>', e.lineno, e.offset)
             try:
                 offending_line = no_bom_text.splitlines()[e.lineno - 1]
             except IndexError:
-                raise ParseError('%s' % text_type(e))
+                raise ParseError(text_type(e), '<not from file>', e.lineno, e.offset)
             else:
                 offending_excerpt = offending_line[max(0, e.offset - 20):e.offset + 20]
-                raise ParseError('%s\nOffending text: [...]%s[...]' % (text_type(e), offending_excerpt))
+                msg = '%s\nOffending text: [...]%s[...]' % (text_type(e), offending_excerpt)
+                raise ParseError(msg, e.lineno, e.offset)
         except TypeError:
-            raise ParseError('This is not XML: %s' % text)
+            raise ParseError('This is not XML: %s' % text, '<not from file>', -1, 0)
 
 
 def is_xml(text):
     """
     Helper function. Lightweight test if response is an XML doc
     """
-    if text.startswith(BOM):
-        return text[BOM_LEN:BOM_LEN + 5] == '<?xml'
-    return text[:5] == '<?xml'
+    if text[:BOM_LEN] == BOM:
+        return text[BOM_LEN:BOM_LEN + 5] == b'<?xml'
+    return text[:5] == b'<?xml'
 
 
 class PrettyXmlHandler(logging.StreamHandler):
@@ -323,7 +332,7 @@ class PrettyXmlHandler(logging.StreamHandler):
                     continue
                 if not isinstance(value, bytes):
                     continue
-                if not is_xml(value[:10].decode('utf-8', errors='ignore')):
+                if not is_xml(value[:10]):
                     continue
                 try:
                     if PY2:
@@ -551,7 +560,7 @@ Response data: %(xml_response)s
         log.error(str('%s: %s\n%s'), e.__class__.__name__, str(e), log_msg % log_vals)
         protocol.retire_session(session)
         raise
-    if r.status_code == 500 and r.text and is_xml(r.text):
+    if r.status_code == 500 and r.content and is_xml(r.content):
         # Some genius at Microsoft thinks it's OK to send a valid SOAP response as an HTTP 500
         log.debug('Got status code %s but trying to parse content anyway', r.status_code)
     elif r.status_code != 200:

@@ -21,7 +21,7 @@ from .properties import ItemId, Mailbox, EWSElement, ParentFolderId
 from .queryset import QuerySet, SearchableMixIn
 from .restriction import Restriction
 from .services import FindFolder, GetFolder, FindItem, CreateFolder, UpdateFolder, DeleteFolder, EmptyFolder, FindPeople
-from .transport import TNS, MNS
+from .util import TNS, MNS
 from .version import EXCHANGE_2007_SP1, EXCHANGE_2010_SP1, EXCHANGE_2013, EXCHANGE_2013_SP1
 
 string_type = string_types[0]
