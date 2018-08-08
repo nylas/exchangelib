@@ -1,20 +1,15 @@
 language: python
 
-os:
-- linux
-
-matrix:
-  include:
-    - python: "2.7"
-    - python: "3.5"
-    - python: "3.6"
-    - python: "3.7"
-      dist: xenial
-      sudo: true
-    - python: "3.8-dev"
-      dist: xenial
-      sudo: true
-    # - python: "pypy3"
+os: linux
+dist: xenial
+sudo: true
+python:
+- "2.7"
+- "3.5"
+- "3.6"
+- "3.7"
+- "3.8-dev"
+# - "pypy3"
 
 before_install:
 - openssl aes-256-cbc -K $encrypted_e7f042a9cf96_key -iv $encrypted_e7f042a9cf96_iv
@@ -41,5 +36,5 @@ jobs:
     - stage: wipe_test_account
       # Wipe contents of the test account after a complete build, to avoid account going over quota
       script: python tests/__init__.py -q EWSTest.wipe_test_account
-      python: 3.6
+      python: "3.6"
       os: linux
