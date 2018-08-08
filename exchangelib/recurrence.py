@@ -330,8 +330,6 @@ class Recurrence(EWSElement):
 
     @classmethod
     def from_xml(cls, elem, account):
-        if elem is None:
-            return None
         for pattern_cls in PATTERN_CLASSES:
             pattern_elem = elem.find(pattern_cls.response_tag())
             if pattern_elem is None:

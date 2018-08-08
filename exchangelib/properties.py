@@ -114,8 +114,6 @@ class EWSElement(object):
 
     @classmethod
     def from_xml(cls, elem, account):
-        if elem is None:
-            return None
         if elem.tag != cls.response_tag():
             raise ValueError('Unexpected element tag in class %s: %s vs %s' % (cls, elem.tag, cls.response_tag()))
         kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.FIELDS}
@@ -600,8 +598,6 @@ class FreeBusyView(EWSElement):
 
     @classmethod
     def from_xml(cls, elem, account):
-        if elem is None:
-            return None
         if elem.tag != cls.response_tag():
             raise ValueError('Unexpected element tag in class %s: %s vs %s' % (cls, elem.tag, cls.response_tag()))
         kwargs = {}
@@ -636,16 +632,15 @@ class Room(Mailbox):
 
     @classmethod
     def from_xml(cls, elem, account):
-        if elem is None:
-            return None
         if elem.tag != cls.response_tag():
             raise ValueError('Unexpected element tag in class %s: %s vs %s' % (cls, elem.tag, cls.response_tag()))
         id_elem = elem.find('{%s}Id' % TNS)
+        item_id_elem = id_elem.find(ItemId.response_tag())
         res = cls(
             name=get_xml_attr(id_elem, '{%s}Name' % TNS),
             email_address=get_xml_attr(id_elem, '{%s}EmailAddress' % TNS),
             mailbox_type=get_xml_attr(id_elem, '{%s}MailboxType' % TNS),
-            item_id=ItemId.from_xml(elem=id_elem.find(ItemId.response_tag()), account=account),
+            item_id=ItemId.from_xml(elem=item_id_elem, account=account) if item_id_elem else None,
         )
         elem.clear()
         return res

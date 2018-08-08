@@ -56,8 +56,6 @@ class OofSettings(EWSElement):
 
     @classmethod
     def from_xml(cls, elem, account):
-        if elem is None:
-            return None
         if elem.tag != cls.response_tag():
             raise ValueError('Unexpected element tag in class %s: %s vs %s' % (cls, elem.tag, cls.response_tag()))
         kwargs = {}

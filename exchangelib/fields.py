@@ -1188,6 +1188,3 @@ class EffectiveRightsField(EWSElementField):
         from .properties import EffectiveRights
         kwargs['value_cls'] = EffectiveRights
         super(EffectiveRightsField, self).__init__(*args, **kwargs)
-
-    def from_xml(self, elem, account):
-        return super(EffectiveRightsField, self).from_xml(elem=elem, account=account)

@@ -2137,12 +2137,9 @@ class CommonTest(EWSTest):
                     continue
                 if not issubclass(v, EWSElement):
                     continue
-                if issubclass(v, (Item, Folder, ExtendedProperty, Recurrence, Occurrence)):
-                    # These do not support None input
-                    with self.assertRaises(Exception):
-                        v.from_xml(elem=None, account=None)
-                    continue
-                v.from_xml(elem=None, account=None)  # This should work for all others
+                # from_xml() does not support None input
+                with self.assertRaises(Exception):
+                    v.from_xml(elem=None, account=None)
 
 
 class AccountTest(EWSTest):
