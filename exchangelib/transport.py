@@ -194,26 +194,26 @@ def _get_auth_method_from_response(response):
 
 def _tokenize(val):
     # Splits cookie auth values
-    tokens = []
-    token = ''
+    auth_tokens = []
+    auth_token = ''
     quote = False
     for c in val:
         if c in (' ', ',') and not quote:
-            if token not in ('', ','):
-                tokens.append(token)
-            token = ''
+            if auth_token not in ('', ','):
+                auth_tokens.append(auth_token)
+            auth_token = ''
             continue
         elif c == '"':
-            token += c
+            auth_token += c
             if quote:
-                tokens.append(token)
-                token = ''
+                auth_tokens.append(auth_token)
+                auth_token = ''
             quote = not quote
             continue
-        token += c
-    if token:
-        tokens.append(token)
-    return tokens
+        auth_token += c
+    if auth_token:
+        auth_tokens.append(auth_token)
+    return auth_tokens
 
 
 def dummy_xml(version, name):
