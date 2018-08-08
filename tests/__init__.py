@@ -2860,16 +2860,16 @@ class FolderTest(EWSTest):
 
     def test_div_navigation(self):
         self.assertEqual(
-            self.account.root / 'Top of Information Store' / self.account.calendar.name,
-            self.account.calendar
+            (self.account.root / 'Top of Information Store' / self.account.calendar.name).id,
+            self.account.calendar.id
         )
         self.assertEqual(
-            self.account.root / 'Top of Information Store' / '..',
-            self.account.root
+            (self.account.root / 'Top of Information Store' / '..').id,
+            self.account.root.id
         )
         self.assertEqual(
-            self.account.root / '.',
-            self.account.root
+            (self.account.root / '.').id,
+            self.account.root.id
         )
 
     def test_extended_properties(self):
