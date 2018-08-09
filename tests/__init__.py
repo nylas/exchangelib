@@ -3127,16 +3127,16 @@ class BaseItemTest(EWSTest):
         qs = self.test_folder.none()
         self.assertEqual(list(self.account.fetch(ids=qs)), [])
         with self.assertRaises(ValueError):
-            # bulk_update does not allow queryset input
+            # bulk_update() does not allow queryset input
             self.assertEqual(self.account.bulk_update(items=qs), [])
         self.assertEqual(self.account.bulk_delete(ids=qs), [])
         self.assertEqual(self.account.bulk_send(ids=qs), [])
         self.assertEqual(self.account.bulk_copy(ids=qs, to_folder=self.account.trash), [])
         self.assertEqual(self.account.bulk_move(ids=qs, to_folder=self.account.trash), [])
         with self.assertRaises(ValueError):
+            # upload() does not allow queryset input
             self.assertEqual(self.account.upload(data=qs), [])
-        with self.assertRaises(ValueError):
-            self.assertEqual(self.account.export(items=qs), [])
+        self.assertEqual(self.account.export(items=qs), [])
 
     def test_no_kwargs(self):
         self.assertEqual(self.test_folder.bulk_create([]), [])

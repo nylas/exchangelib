@@ -308,6 +308,21 @@ class Account(object):
             oof_settings=value,
         )
 
+    def _consume_item_service(self, service_cls, items, chunk_size, kwargs):
+        # 'items' could be an unevaluated QuerySet, e.g. if we ended up here via `some_folder.filter(...).delete()`. In
+        # that case, we want to use its iterator. Otherwise, peek() will start a count() which is wasteful because we
+        # need the item IDs immediately afterwards. iterator() will only do the bare minimum.
+        if isinstance(items, QuerySet):
+            items = items.iterator()
+        is_empty, items = peek(items)
+        if is_empty:
+            # We accept generators, so it's not always convenient for caller to know up-front if 'ids' is empty. Allow
+            # empty 'ids' and return early.
+            return
+        kwargs['items'] = items
+        for i in service_cls(account=self, chunk_size=chunk_size).call(**kwargs):
+            yield i
+
     def export(self, items, chunk_size=None):
         """Return export strings of the given items
 
@@ -316,12 +331,9 @@ class Account(object):
 
         :return A list of strings, the exported representation of the object
         """
-        is_empty, items = peek(items)
-        if is_empty:
-            # We accept generators, so it's not always convenient for caller to know up-front if 'items' is empty. Allow
-            # empty 'items' and return early.
-            return []
-        return list(ExportItems(account=self, chunk_size=chunk_size).call(items=items))
+        return list(
+            self._consume_item_service(service_cls=ExportItems, items=items, chunk_size=chunk_size, kwargs=dict())
+        )
 
     def upload(self, data, chunk_size=None):
         """Adds objects retrieved from export into the given folders
@@ -389,20 +401,14 @@ class Account(object):
             message_disposition,
             send_meeting_invitations,
         )
-        is_empty, items = peek(items)
-        if is_empty:
-            # We accept generators, so it's not always convenient for caller to know up-front if 'items' is empty. Allow
-            # empty 'items' and return early.
-            return []
         return list(
             i if isinstance(i, Exception)
             else BulkCreateResult.from_xml(elem=i, account=self)
-            for i in CreateItem(account=self, chunk_size=chunk_size).call(
-                items=items,
+            for i in self._consume_item_service(service_cls=CreateItem, items=items, chunk_size=chunk_size, kwargs=dict(
                 folder=folder,
                 message_disposition=message_disposition,
                 send_meeting_invitations=send_meeting_invitations,
-            )
+            ))
         )
 
     def bulk_update(self, items, conflict_resolution=AUTO_RESOLVE, message_disposition=SAVE_ONLY,
@@ -451,20 +457,14 @@ class Account(object):
             message_disposition,
             send_meeting_invitations_or_cancellations,
         )
-        is_empty, items = peek(items)
-        if is_empty:
-            # We accept generators, so it's not always convenient for caller to know up-front if 'items' is empty. Allow
-            # empty 'items' and return early.
-            return []
         return list(
             i if isinstance(i, Exception) else Item.id_from_xml(i)
-            for i in UpdateItem(account=self, chunk_size=chunk_size).call(
-                items=items,
+            for i in self._consume_item_service(service_cls=UpdateItem, items=items, chunk_size=chunk_size, kwargs=dict(
                 conflict_resolution=conflict_resolution,
                 message_disposition=message_disposition,
                 send_meeting_invitations_or_cancellations=send_meeting_invitations_or_cancellations,
                 suppress_read_receipts=suppress_read_receipts,
-            )
+            ))
         )
 
     def bulk_delete(self, ids, delete_type=HARD_DELETE, send_meeting_cancellations=SEND_TO_NONE,
@@ -504,23 +504,14 @@ class Account(object):
             send_meeting_cancellations,
             affected_task_occurrences,
         )
-        # 'ids' could be an unevaluated QuerySet, e.g. if we ended up here via `some_folder.filter(...).delete()`. In
-        # that case, we want to use its iterator. Otherwise, peek() will start a count() which is wasteful because we
-        # need the item IDs immediately afterwards. iterator() will only do the bare minimum.
-        if isinstance(ids, QuerySet):
-            ids = ids.iterator()
-        is_empty, ids = peek(ids)
-        if is_empty:
-            # We accept generators, so it's not always convenient for caller to know up-front if 'ids' is empty. Allow
-            # empty 'ids' and return early.
-            return []
-        return list(DeleteItem(account=self, chunk_size=chunk_size).call(
-            items=ids,
-            delete_type=delete_type,
-            send_meeting_cancellations=send_meeting_cancellations,
-            affected_task_occurrences=affected_task_occurrences,
-            suppress_read_receipts=suppress_read_receipts,
-        ))
+        return list(
+            self._consume_item_service(service_cls=DeleteItem, items=ids, chunk_size=chunk_size, kwargs=dict(
+                delete_type=delete_type,
+                send_meeting_cancellations=send_meeting_cancellations,
+                affected_task_occurrences=affected_task_occurrences,
+                suppress_read_receipts=suppress_read_receipts,
+            ))
+        )
 
     def bulk_send(self, ids, save_copy=True, copy_to_folder=None, chunk_size=None):
         """ Send existing draft messages. If requested, save a copy in 'copy_to_folder'
@@ -535,17 +526,11 @@ class Account(object):
             raise AttributeError("'save_copy' must be True when 'copy_to_folder' is set")
         if save_copy and not copy_to_folder:
             copy_to_folder = self.sent  # 'Sent' is default EWS behaviour
-        # 'ids' could be an unevaluated QuerySet, e.g. if we ended up here via `bulk_send(some_folder.filter(...))`. In
-        # that case, we want to use its iterator. Otherwise, peek() will start a count() which is wasteful because we
-        # need the item IDs immediately afterwards. iterator() will only do the bare minimum.
-        if isinstance(ids, QuerySet):
-            ids = ids.iterator()
-        is_empty, ids = peek(ids)
-        if is_empty:
-            # We accept generators, so it's not always convenient for caller to know up-front if 'ids' is empty. Allow
-            # empty 'ids' and return early.
-            return []
-        return list(SendItem(account=self, chunk_size=chunk_size).call(items=ids, saved_item_folder=copy_to_folder))
+        return list(
+            self._consume_item_service(service_cls=SendItem, items=ids, chunk_size=chunk_size, kwargs=dict(
+                saved_item_folder=copy_to_folder,
+            ))
+        )
 
     def bulk_copy(self, ids, to_folder, chunk_size=None):
         """ Copy items to another folder
@@ -557,19 +542,11 @@ class Account(object):
         """
         if not isinstance(to_folder, Folder):
             raise ValueError("'to_folder' %r must be a Folder instance" % to_folder)
-        # 'ids' could be an unevaluated QuerySet, e.g. if we ended up here via `bulk_copy(some_folder.filter(...))`. In
-        # that case, we want to use its iterator. Otherwise, peek() will start a count() which is wasteful because we
-        # need the item IDs immediately afterwards. iterator() will only do the bare minimum.
-        if isinstance(ids, QuerySet):
-            ids = ids.iterator()
-        is_empty, ids = peek(ids)
-        if is_empty:
-            # We accept generators, so it's not always convenient for caller to know up-front if 'ids' is empty. Allow
-            # empty 'ids' and return early.
-            return []
         return list(
             i if isinstance(i, Exception) else Item.id_from_xml(i)
-            for i in CopyItem(account=self, chunk_size=chunk_size).call(items=ids, to_folder=to_folder)
+            for i in self._consume_item_service(service_cls=CopyItem, items=ids, chunk_size=chunk_size, kwargs=dict(
+                to_folder=to_folder,
+            ))
         )
 
     def bulk_move(self, ids, to_folder, chunk_size=None):
@@ -583,19 +560,11 @@ class Account(object):
         """
         if not isinstance(to_folder, Folder):
             raise ValueError("'to_folder' %r must be a Folder instance" % to_folder)
-        # 'ids' could be an unevaluated QuerySet, e.g. if we ended up here via `bulk_move(some_folder.filter(...))`. In
-        # that case, we want to use its iterator. Otherwise, peek() will start a count() which is wasteful because we
-        # need the item IDs immediately afterwards. iterator() will only do the bare minimum.
-        if isinstance(ids, QuerySet):
-            ids = ids.iterator()
-        is_empty, ids = peek(ids)
-        if is_empty:
-            # We accept generators, so it's not always convenient for caller to know up-front if 'ids' is empty. Allow
-            # empty 'ids' and return early.
-            return []
         return list(
             i if isinstance(i, Exception) else Item.id_from_xml(i)
-            for i in MoveItem(account=self, chunk_size=chunk_size).call(items=ids, to_folder=to_folder)
+            for i in self._consume_item_service(service_cls=MoveItem, items=ids, chunk_size=chunk_size, kwargs=dict(
+                to_folder=to_folder,
+            ))
         )
 
     def fetch(self, ids, folder=None, only_fields=None, chunk_size=None):
@@ -611,24 +580,16 @@ class Account(object):
         # 'ids' could be an unevaluated QuerySet, e.g. if we ended up here via `fetch(ids=some_folder.filter(...))`. In
         # that case, we want to use its iterator. Otherwise, peek() will start a count() which is wasteful because we
         # need the item IDs immediately afterwards. iterator() will only do the bare minimum.
-        if isinstance(ids, QuerySet):
-            ids = ids.iterator()
-        is_empty, ids = peek(ids)
-        if is_empty:
-            # We accept generators, so it's not always convenient for caller to know up-front if 'ids' is empty. Allow
-            # empty 'ids' and return early.
-            return
         if only_fields is None:
             # We didn't restrict list of field paths. Get all fields from the server, including extended properties.
             additional_fields = {FieldPath(field=f) for f in validation_folder.allowed_fields()}
         else:
             additional_fields = validation_folder.validate_fields(fields=only_fields)
         # Always use IdOnly here, because AllProperties doesn't actually get *all* properties
-        for i in GetItem(account=self, chunk_size=chunk_size).call(
-                items=ids,
+        for i in self._consume_item_service(service_cls=GetItem, items=ids, chunk_size=chunk_size, kwargs=dict(
                 additional_fields=additional_fields,
                 shape=IdOnly,
-        ):
+        )):
             if isinstance(i, Exception):
                 yield i
             else:
