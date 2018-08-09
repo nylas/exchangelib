@@ -114,7 +114,7 @@ def peek(iterable):
 def xml_to_str(tree, encoding=None, xml_declaration=False):
     """Serialize an XML tree. Returns unicode if 'encoding' is None. Otherwise, we return encoded 'bytes'."""
     if xml_declaration and not encoding:
-            raise ValueError("'xml_declaration' is not supported when 'encoding' is None")
+        raise ValueError("'xml_declaration' is not supported when 'encoding' is None")
     if encoding:
         return tostring(tree, encoding=encoding, xml_declaration=True)
     return tostring(tree, encoding=text_type, xml_declaration=False)
@@ -558,37 +558,37 @@ def _back_off_if_needed(back_off_until):
             time.sleep(sleep_secs)
 
 
-def _may_retry_on_error(r, protocol, wait):
+def _may_retry_on_error(response, protocol, wait):
     # The genericerrorpage.htm/internalerror.asp is ridiculous behaviour for random outages. Redirect to
     # '/internalsite/internalerror.asp' or '/internalsite/initparams.aspx' is caused by e.g. TLS certificate
     # f*ckups on the Exchange server.
-    if (r.status_code == 401) \
-            or (r.headers.get('connection') == 'close') \
-            or (r.status_code == 302 and r.headers.get('location', '').lower() ==
+    if (response.status_code == 401) \
+            or (response.headers.get('connection') == 'close') \
+            or (response.status_code == 302 and response.headers.get('location', '').lower() ==
                 '/ews/genericerrorpage.htm?aspxerrorpath=/ews/exchange.asmx') \
-            or (r.status_code == 503):
-        if r.status_code not in (301, 302, 401, 503):
+            or (response.status_code == 503):
+        if response.status_code not in (301, 302, 401, 503):
             # Don't retry if we didn't get a status code that we can hope to recover from
             return False
         if protocol.credentials.fail_fast:
             return False
         if wait > protocol.credentials.max_wait:
             # We lost patience. Session is cleaned up in outer loop
-            raise RateLimitError('URL %s: Max timeout reached' % r.url)
+            raise RateLimitError('URL %s: Max timeout reached' % response.url)
         return True
     return False
 
 
-def _redirect_or_fail(r, redirects, allow_redirects):
+def _redirect_or_fail(response, redirects, allow_redirects):
     # Retry with no delay. If we let requests handle redirects automatically, it would issue a GET to that
     # URL. We still want to POST.
     try:
-        redirect_url = get_redirect_url(response=r, allow_relative=False)
+        redirect_url = get_redirect_url(response=response, allow_relative=False)
     except RelativeRedirect as e:
-        log.debug("'allow_redirects' only supports relative redirects (%s -> %s)", r.url, e.value)
+        log.debug("'allow_redirects' only supports relative redirects (%s -> %s)", response.url, e.value)
         raise RedirectError(url=e.value)
     if not allow_redirects:
-        raise TransportError('Redirect not allowed but we were redirected (%s -> %s)' % (r.url, redirect_url))
+        raise TransportError('Redirect not allowed but we were redirected (%s -> %s)' % (response.url, redirect_url))
     log.debug('HTTP redirected to %s', redirect_url)
     redirects += 1
     if redirects > MAX_REDIRECTS:
@@ -596,19 +596,19 @@ def _redirect_or_fail(r, redirects, allow_redirects):
     return redirect_url, redirects
 
 
-def _raise_response_errors(r, protocol, log_msg, log_vals):
-    cas_error = r.headers.get('X-CasErrorCode')
+def _raise_response_errors(response, protocol, log_msg, log_vals):
+    cas_error = response.headers.get('X-CasErrorCode')
     if cas_error:
-        raise CASError(cas_error=cas_error, response=r)
-    if r.status_code == 500 and ('The specified server version is invalid' in r.text or
-                                 'ErrorInvalidSchemaVersionForMailboxVersion' in r.text):
+        raise CASError(cas_error=cas_error, response=response)
+    if response.status_code == 500 and ('The specified server version is invalid' in response.text or
+                                        'ErrorInvalidSchemaVersionForMailboxVersion' in response.text):
         raise ErrorInvalidSchemaVersionForMailboxVersion('Invalid server version')
-    if 'The referenced account is currently locked out' in r.text:
+    if 'The referenced account is currently locked out' in response.text:
         raise TransportError('The service account is currently locked out')
-    if r.status_code == 401 and protocol.credentials.fail_fast:
+    if response.status_code == 401 and protocol.credentials.fail_fast:
         # This is a login failure
-        raise UnauthorizedError('Wrong username or password for %s' % r.url)
-    if 'TimeoutException' in r.headers:
-        raise r.headers['TimeoutException']
+        raise UnauthorizedError('Wrong username or password for %s' % response.url)
+    if 'TimeoutException' in response.headers:
+        raise response.headers['TimeoutException']
     # This could be anything. Let higher layers handle this. Add full context for better debugging.
     raise TransportError(str('Unknown failure\n') + log_msg % log_vals)
