@@ -244,9 +244,6 @@ _forgiving_parser = ForgivingParser()
 
 def to_xml(text):
     try:
-        if PY2:
-            # On python2, fromstring expects an encoded string
-            return fromstring((text[BOM_LEN:] if text[:BOM_LEN] == BOM else text).encode('utf-8'))
         return fromstring(text[BOM_LEN:] if text[:BOM_LEN] == BOM else text)
     except ParseError:
         # Exchange servers may spit out the weirdest XML. lxml is pretty good at recovering from errors
