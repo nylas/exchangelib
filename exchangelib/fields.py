@@ -153,8 +153,8 @@ class FieldPath(object):
         self.subfield = subfield
 
     @classmethod
-    def from_string(cls, s, folder, strict=False):
-        field, label, subfield = resolve_field_path(s, folder=folder, strict=strict)
+    def from_string(cls, field_path, folder, strict=False):
+        field, label, subfield = resolve_field_path(field_path, folder=folder, strict=strict)
         return cls(field=field, label=label, subfield=subfield)
 
     def get_value(self, item):
@@ -213,10 +213,11 @@ class FieldOrder(object):
         self.reverse = reverse
 
     @classmethod
-    def from_string(cls, s, folder):
-        field_path = FieldPath.from_string(s.lstrip('-'), folder=folder, strict=True)
-        reverse = s.startswith('-')
-        return cls(field_path=field_path, reverse=reverse)
+    def from_string(cls, field_path, folder):
+        return cls(
+            field_path=FieldPath.from_string(field_path.lstrip('-'), folder=folder, strict=True),
+            reverse=field_path.startswith('-')
+        )
 
     def to_xml(self):
         field_order = create_element('t:FieldOrder', Order='Descending' if self.reverse else 'Ascending')

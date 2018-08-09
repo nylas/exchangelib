@@ -124,7 +124,10 @@ class BaseProtocol(object):
         return self.create_session()
 
     def create_session(self):
-        session = EWSSession(self)
+        session = requests.sessions.Session()
+        # Add some extra info
+        session.session_id = sum(map(ord, str(os.urandom(100))))  # Used for debugging messages in services
+        session.protocol = self
         session.auth = get_auth_instance(credentials=self.credentials, auth_type=self.auth_type)
         # Create a copy of the headers because headers are mutable and session users may modify headers
         session.headers.update(DEFAULT_HEADERS.copy())
@@ -362,14 +365,6 @@ XSD auth: %s''' % (
             self.auth_type,
             self.docs_auth_type,
         )
-
-
-class EWSSession(requests.sessions.Session):
-    # A requests Session object that closes the underlying socket when we need it
-    def __init__(self, protocol):
-        self.session_id = sum(map(ord, str(os.urandom(100))))  # Used for debugging messages in services
-        self.protocol = protocol
-        super(EWSSession, self).__init__()
 
 
 class NoVerifyHTTPAdapter(requests.adapters.HTTPAdapter):
