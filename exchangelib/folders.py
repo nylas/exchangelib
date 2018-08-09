@@ -199,12 +199,10 @@ class FolderCollection(SearchableMixIn):
             log.debug('Folder list is empty')
             return
         if additional_fields:
-            allowed_fields = self.allowed_fields()
-            complex_fields = self.complex_fields()
             for f in additional_fields:
-                if f.field not in allowed_fields:
+                if f.field not in self.allowed_fields():
                     raise ValueError("'%s' is not a valid field on %s" % (f.field.name, self.supported_item_models))
-                if f.field in complex_fields:
+                if f.field in self.complex_fields():
                     raise ValueError("find_items() does not support field '%s'. Use fetch() instead" % f.field.name)
         if calendar_view is not None and not isinstance(calendar_view, CalendarView):
             raise ValueError("'calendar_view' %s must be a CalendarView instance" % calendar_view)
@@ -246,8 +244,7 @@ class FolderCollection(SearchableMixIn):
                 if isinstance(i, Exception):
                     yield i
                 else:
-                    item = Folder.item_model_from_tag(i.tag).from_xml(elem=i, account=self.account)
-                    yield item
+                    yield Folder.item_model_from_tag(i.tag).from_xml(elem=i, account=self.account)
 
     def _get_folder_fields(self):
         additional_fields = set()
@@ -631,11 +628,10 @@ class Folder(RegisterMixIn, SearchableMixIn):
             raise ValueError("'depth' %s must be one of %s" % (depth, ITEM_TRAVERSAL_CHOICES))
         if additional_fields:
             allowed_fields = Persona.supported_fields(version=self.account.version)
-            complex_fields = {f for f in allowed_fields if f.is_complex}
             for f in additional_fields:
                 if f.field not in allowed_fields:
                     raise ValueError("'%s' is not a valid field on %s" % (f.field.name, Persona))
-                if f.field in complex_fields:
+                if f.field.is_complex:
                     raise ValueError("find_people() does not support field '%s'" % f.field.name)
 
         # Build up any restrictions

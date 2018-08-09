@@ -29,8 +29,6 @@ time_func = time.time if PY2 else time.monotonic
 
 log = logging.getLogger(__name__)
 
-string_type = string_types[0]
-
 # Regex of UTF-8 control characters that are illegal in XML 1.0 (and XML 1.1)
 _illegal_xml_chars_RE = re.compile('[\x00-\x08\x0b\x0c\x0e-\x1F\uD800-\uDFFF\uFFFE\uFFFF]')
 # UTF-8 byte order mark which may precede the XML from an Exchange server
@@ -174,7 +172,7 @@ def xml_text_to_value(value, value_type):
         Decimal: Decimal,
         datetime.timedelta: isodate.parse_duration,
         EWSDateTime: EWSDateTime.from_string,
-        string_type: lambda v: v
+        string_types[0]: lambda v: v
     }[value_type](value)
 
 

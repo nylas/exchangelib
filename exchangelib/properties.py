@@ -389,11 +389,11 @@ class Email(AvailabilityMailbox):
 class MailboxData(EWSElement):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa566036(v=exchg.150).aspx
     ELEMENT_NAME = 'MailboxData'
+    ATTENDEE_TYPES = {'Optional', 'Organizer', 'Required', 'Resource', 'Room'}
+
     FIELDS = [
         EmailField('email'),
-        ChoiceField('attendee_type', field_uri='AttendeeType', choices={
-            Choice('Optional'), Choice('Organizer'), Choice('Required'), Choice('Resource'), Choice('Room')
-        }),
+        ChoiceField('attendee_type', field_uri='AttendeeType', choices={Choice(c) for c in ATTENDEE_TYPES}),
         BooleanField('exclude_conflicts', field_uri='ExcludeConflicts'),
     ]
 
@@ -418,15 +418,14 @@ class TimeWindow(EWSElement):
 class FreeBusyViewOptions(EWSElement):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa565063(v=exchg.150).aspx
     ELEMENT_NAME = 'FreeBusyViewOptions'
+    REQUESTED_VIEWS = {'MergedOnly', 'FreeBusy', 'FreeBusyMerged', 'Detailed', 'DetailedMerged'}
     FIELDS = [
         EWSElementField('time_window', value_cls=TimeWindow, is_required=True),
         # Interval value is in minutes
         IntegerField('merged_free_busy_interval', field_uri='MergedFreeBusyIntervalInMinutes', min=6, max=1440,
                      default=30, is_required=True),
-        ChoiceField('requested_view', field_uri='RequestedView', choices={
-            Choice('MergedOnly'), Choice('FreeBusy'), Choice('FreeBusyMerged'), Choice('Detailed'),
-            Choice('DetailedMerged'),
-        }, is_required=True),  # Choice('None') is also valid, but only for responses
+        ChoiceField('requested_view', field_uri='RequestedView', choices={Choice(c) for c in REQUESTED_VIEWS},
+                    is_required=True),  # Choice('None') is also valid, but only for responses
     ]
 
     __slots__ = ('time_window', 'merged_free_busy_interval', 'requested_view')

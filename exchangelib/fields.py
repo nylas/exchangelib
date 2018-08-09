@@ -14,7 +14,6 @@ from .ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, NaiveDateTimeNotAllo
 from .util import create_element, get_xml_attrs, set_xml_value, value_to_xml_text, is_iterable, TNS
 from .version import Build, EXCHANGE_2013
 
-string_type = string_types[0]
 log = logging.getLogger(__name__)
 
 
@@ -338,6 +337,12 @@ class FieldURIField(Field):
         else:
             self.field_uri_postfix = self.field_uri
 
+    def _get_val_from_elem(self, elem):
+        if self.is_attribute:
+            return elem.get(self.field_uri)
+        field_elem = elem.find(self.response_tag())
+        return None if field_elem is None else field_elem.text or None
+
     def from_xml(self, elem, account):
         raise NotImplementedError()
 
@@ -368,8 +373,7 @@ class BooleanField(FieldURIField):
     value_cls = bool
 
     def from_xml(self, elem, account):
-        field_elem = elem.find(self.response_tag())
-        val = None if field_elem is None else field_elem.text or None
+        val = self._get_val_from_elem(elem)
         if val is not None:
             try:
                 return {
@@ -408,8 +412,7 @@ class IntegerField(FieldURIField):
         return value
 
     def from_xml(self, elem, account):
-        field_elem = elem.find(self.response_tag())
-        val = None if field_elem is None else field_elem.text or None
+        val = self._get_val_from_elem(elem)
         if val is not None:
             try:
                 return self.value_cls(val)
@@ -457,8 +460,7 @@ class EnumField(IntegerField):
         return super(EnumField, self).clean(value, version=version)
 
     def from_xml(self, elem, account):
-        field_elem = elem.find(self.response_tag())
-        val = None if field_elem is None else field_elem.text or None
+        val = self._get_val_from_elem(elem)
         if val is not None:
             try:
                 if self.is_list:
@@ -483,8 +485,7 @@ class EnumListField(EnumField):
 class EnumAsIntField(EnumField):
     # Like EnumField, but communicates values with EWS in integers
     def from_xml(self, elem, account):
-        field_elem = elem.find(self.response_tag())
-        val = None if field_elem is None else field_elem.text or None
+        val = self._get_val_from_elem(elem)
         if val is not None:
             try:
                 return int(val)
@@ -508,8 +509,7 @@ class Base64Field(FieldURIField):
         super(Base64Field, self).__init__(*args, **kwargs)
 
     def from_xml(self, elem, account):
-        field_elem = elem.find(self.response_tag())
-        val = None if field_elem is None else field_elem.text or None
+        val = self._get_val_from_elem(elem)
         if val is not None:
             try:
                 return base64.b64decode(val)
@@ -527,8 +527,7 @@ class DateField(FieldURIField):
     value_cls = EWSDate
 
     def from_xml(self, elem, account):
-        field_elem = elem.find(self.response_tag())
-        val = None if field_elem is None else field_elem.text or None
+        val = self._get_val_from_elem(elem)
         if val is not None:
             try:
                 return self.value_cls.from_string(val)
@@ -542,8 +541,7 @@ class TimeField(FieldURIField):
     value_cls = datetime.time
 
     def from_xml(self, elem, account):
-        field_elem = elem.find(self.response_tag())
-        val = None if field_elem is None else field_elem.text or None
+        val = self._get_val_from_elem(elem)
         if val is not None:
             try:
                 # Assume an integer in minutes since midnight
@@ -562,8 +560,7 @@ class DateTimeField(FieldURIField):
         return super(DateTimeField, self).clean(value, version=version)
 
     def from_xml(self, elem, account):
-        field_elem = elem.find(self.response_tag())
-        val = None if field_elem is None else field_elem.text or None
+        val = self._get_val_from_elem(elem)
         if val is not None:
             try:
                 return self.value_cls.from_string(val)
@@ -604,15 +601,14 @@ class TimeZoneField(FieldURIField):
 
 class TextField(FieldURIField):
     # A field that stores a string value with no length limit
-    value_cls = string_type
+    value_cls = string_types[0]
     is_complex = True
 
     def from_xml(self, elem, account):
         if self.is_attribute:
             val = elem.get(self.field_uri)
         else:
-            field_elem = elem.find(self.response_tag())
-            val = None if field_elem is None else field_elem.text or None
+            val = self._get_val_from_elem(elem)
         if val is not None:
             return val
         return self.default
@@ -975,7 +971,7 @@ class LabelField(ChoiceField):
 
 class SubField(Field):
     # A field to hold the value on an SingleFieldIndexedElement
-    value_cls = string_type
+    value_cls = string_types[0]
 
     def from_xml(self, elem, account):
         return elem.text
@@ -993,7 +989,7 @@ class SubField(Field):
 
 class EmailSubField(SubField):
     # A field to hold the value on an SingleFieldIndexedElement
-    value_cls = string_type
+    value_cls = string_types[0]
 
     def from_xml(self, elem, account):
         return elem.text or elem.get('Name')  # Sometimes elem.text is empty. Exchange saves the same in 'Name' attr
@@ -1001,7 +997,7 @@ class EmailSubField(SubField):
 
 class NamedSubField(SubField):
     # A field to hold the value on an MultiFieldIndexedElement
-    value_cls = string_type
+    value_cls = string_types[0]
 
     def __init__(self, *args, **kwargs):
         self.field_uri = kwargs.pop('field_uri')

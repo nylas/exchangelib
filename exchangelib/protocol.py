@@ -272,36 +272,36 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
         :return: A generator of FreeBusyView objects
         """
         from .account import Account
-        attendee_type_choices = {c.value for c in MailboxData.get_field_by_fieldname('attendee_type').choices}
         for account, attendee_type, exclude_conflicts in accounts:
             if not isinstance(account, Account):
                 raise ValueError("'accounts' item %r must be an 'Account' instance" % account)
-            if attendee_type not in attendee_type_choices:
-                raise ValueError("'accounts' item %r must be one of %s" % (attendee_type, attendee_type_choices))
+            if attendee_type not in MailboxData.ATTENDEE_TYPES:
+                raise ValueError("'accounts' item %r must be one of %s" % (attendee_type, MailboxData.ATTENDEE_TYPES))
             if not isinstance(exclude_conflicts, bool):
                 raise ValueError("'accounts' item %r must be a 'bool' instance" % exclude_conflicts)
         if start >= end:
             raise ValueError("'start' must be less than 'end' (%s -> %s)" % (start, end))
         if not isinstance(merged_free_busy_interval, int):
             raise ValueError("'merged_free_busy_interval' value %r must be an 'int'" % merged_free_busy_interval)
-        requested_view_choices = {c.value for c in FreeBusyViewOptions.get_field_by_fieldname('requested_view').choices}
-        if requested_view not in requested_view_choices:
-            raise ValueError("'requested_view' value %r must be one of %s" % (requested_view, requested_view_choices))
+        if requested_view not in FreeBusyViewOptions.REQUESTED_VIEWS:
+            raise ValueError(
+                "'requested_view' value %r must be one of %s" % (requested_view, FreeBusyViewOptions.REQUESTED_VIEWS))
         _, _, periods, transitions, transitions_groups = list(self.get_timezones(
             timezones=[start.tzinfo],
             return_full_timezone_data=True
         ))[0]
-        timezone = TimeZone.from_server_timezone(periods, transitions, transitions_groups, for_year=start.year)
-        mailbox_data = list(
-            MailboxData(
-                email=account.primary_smtp_address,
-                attendee_type=attendee_type,
-                exclude_conflicts=exclude_conflicts
-            ) for account, attendee_type, exclude_conflicts in accounts
-        )
         return GetUserAvailability(self).call(
-                timezone=timezone,
-                mailbox_data=mailbox_data,
+                timezone=TimeZone.from_server_timezone(
+                    periods=periods,
+                    transitions=transitions,
+                    transitionsgroups=transitions_groups,
+                    for_year=start.year
+                ),
+                mailbox_data=[MailboxData(
+                    email=account.primary_smtp_address,
+                    attendee_type=attendee_type,
+                    exclude_conflicts=exclude_conflicts
+                ) for account, attendee_type, exclude_conflicts in accounts],
                 free_busy_view_options=FreeBusyViewOptions(
                     time_window=TimeWindow(start=start, end=end),
                     merged_free_busy_interval=merged_free_busy_interval,
