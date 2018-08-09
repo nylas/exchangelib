@@ -1028,48 +1028,34 @@ class Root(Folder):
                 log.debug('Found cached %s folder with default distinguished name', folder_cls)
                 return f
 
-        candidates = []
         # Try direct children of TOIS first. TOIS might not exist.
         try:
-            same_type = [f for f in self.tois.children if f.__class__ == folder_cls]
-            are_distinguished = [f for f in same_type if f.is_distinguished]
-            if are_distinguished:
-                candidates = are_distinguished
-            else:
-                candidates = [f for f in same_type if f.name.lower() in folder_cls.localized_names(self.account.locale)]
+            return self._get_candidate(folder_cls=folder_cls, folder_coll=self.tois.children)
         except ErrorFolderNotFound:
+            # No candidates, or TOIS does ot exist
             pass
 
-        if candidates:
-            if len(candidates) > 1:
-                raise ValueError(
-                    'Multiple possible default %s folders in TOIS: %s'
-                    % (folder_cls, [text_type(f.name) for f in candidates])
-                )
-            if candidates[0].is_distinguished:
-                log.debug('Found cached distinguished %s folder in TOIS', folder_cls)
-            else:
-                log.debug('Found cached %s folder in TOIS with localized name', folder_cls)
-            return candidates[0]
-
         # No candidates in TOIS. Try direct children of root.
-        same_type = [f for f in self.children if f.__class__ == folder_cls]
+        return self._get_candidate(folder_cls=folder_cls, folder_coll=self.children)
+
+    def _get_candidate(self, folder_cls, folder_coll):
+        # Get a single the folder of the same type in folder_coll
+        same_type = [f for f in folder_coll if f.__class__ == folder_cls]
         are_distinguished = [f for f in same_type if f.is_distinguished]
         if are_distinguished:
             candidates = are_distinguished
         else:
             candidates = [f for f in same_type if f.name.lower() in folder_cls.localized_names(self.account.locale)]
-
         if candidates:
             if len(candidates) > 1:
-                raise ValueError('Multiple possible default %s folders in root: %s'
-                                 % (folder_cls, [text_type(f.name) for f in candidates]))
+                raise ValueError(
+                    'Multiple possible default %s folders: %s'% (folder_cls, [text_type(f.name) for f in candidates])
+                )
             if candidates[0].is_distinguished:
-                log.debug('Found cached distinguished %s folder in root', folder_cls)
+                log.debug('Found cached distinguished %s folder', folder_cls)
             else:
-                log.debug('Found cached %s folder in root with localized name', folder_cls)
+                log.debug('Found cached %s folder with localized name', folder_cls)
             return candidates[0]
-
         raise ErrorFolderNotFound('No useable default %s folders' % folder_cls)
 
 
