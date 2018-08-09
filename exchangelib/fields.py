@@ -209,13 +209,17 @@ class FieldPath(object):
 class FieldOrder(object):
     """ Holds values needed to call server-side sorting on a single field path """
     def __init__(self, field_path, reverse=False):
+        if not isinstance(field_path, FieldPath):
+            raise ValueError("'field_path' %r must be a FieldPath instance" % field_path)
+        if not isinstance(reverse, bool):
+            raise ValueError("'reverse' %r must be a boolean" % reverse)
         self.field_path = field_path
         self.reverse = reverse
 
     @classmethod
     def from_string(cls, field_path, folder):
         return cls(
-            field_path=FieldPath.from_string(field_path.lstrip('-'), folder=folder, strict=True),
+            field_path=FieldPath.from_string(field_path=field_path.lstrip('-'), folder=folder, strict=True),
             reverse=field_path.startswith('-')
         )
 

@@ -120,24 +120,24 @@ class QuerySet(SearchableMixIn):
             return FieldPath(field=Persona.get_field_by_fieldname(field_path))
         for folder in self.folder_collection:
             try:
-                return FieldPath.from_string(field_path, folder=folder)
+                return FieldPath.from_string(field_path=field_path, folder=folder)
             except ValueError:
                 pass
-        raise ValueError("Unknown fieldname '%s' on folders '%s'" % (s, self.folder_collection.folders))
+        raise ValueError("Unknown fieldname '%s' on folders '%s'" % (field_path, self.folder_collection.folders))
 
     def _get_field_order(self, field_path):
         from .items import Persona
         if self.request_type == self.PERSONA:
             return FieldOrder(
-                field_path=field_path.startswith('-'),
-                reverse=FieldPath(field=Persona.get_field_by_fieldname(field_path.lstrip('-')))
+                field_path=FieldPath(field=Persona.get_field_by_fieldname(field_path.lstrip('-'))),
+                reverse=field_path.startswith('-'),
             )
         for folder in self.folder_collection:
             try:
-                return FieldOrder.from_string(s, folder=folder)
+                return FieldOrder.from_string(field_path=field_path, folder=folder)
             except ValueError:
                 pass
-        raise ValueError("Unknown fieldname '%s' on folders '%s'" % (s, self.folder_collection.folders))
+        raise ValueError("Unknown fieldname '%s' on folders '%s'" % (field_path, self.folder_collection.folders))
 
     @property
     def _item_id_field(self):

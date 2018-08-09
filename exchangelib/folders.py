@@ -556,7 +556,7 @@ class Folder(RegisterMixIn, SearchableMixIn):
                 field_path = 'id'
             # Allow both FieldPath instances and string field paths as input
             if isinstance(field_path, string_types):
-                field_path = FieldPath.from_string(field_path, folder=self)
+                field_path = FieldPath.from_string(field_path=field_path, folder=self)
                 fields[i] = field_path
             if not isinstance(field_path, FieldPath):
                 raise ValueError("Field %r must be a string or FieldPath object" % field_path)

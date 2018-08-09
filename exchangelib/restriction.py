@@ -348,7 +348,7 @@ class Q(object):
         from .fields import FieldPath
         for folder in folders:
             try:
-                field_path = FieldPath.from_string(self.field_path, folder=folder)
+                field_path = FieldPath.from_string(field_path=self.field_path, folder=folder)
                 self._validate_field_path(field_path=field_path, folder=folder)
                 break
             except ValueError:
