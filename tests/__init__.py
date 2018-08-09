@@ -26,7 +26,7 @@ import psutil
 import pytz
 import requests
 import requests_mock
-from six import PY2, string_types
+from six import PY2
 from yaml import safe_load
 
 from exchangelib import close_connections
@@ -77,8 +77,6 @@ from exchangelib.winzone import generate_map, CLDR_TO_MS_TIMEZONE_MAP
 
 if PY2:
     FileNotFoundError = IOError
-
-string_type = string_types[0]
 
 mock_account = namedtuple('mock_account', ('protocol', 'version'))
 mock_protocol = namedtuple('mock_protocol', ('version', 'service_endpoint'))

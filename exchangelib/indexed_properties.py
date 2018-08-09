@@ -2,12 +2,11 @@ from __future__ import unicode_literals
 
 import logging
 
-from six import string_types, text_type
+from six import text_type
 
 from .fields import EmailSubField, LabelField, SubField, NamedSubField, Choice
 from .properties import EWSElement
 
-string_type = string_types[0]
 log = logging.getLogger(__name__)
 
 

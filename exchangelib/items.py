@@ -5,7 +5,6 @@ import logging
 import warnings
 
 from future.utils import python_2_unicode_compatible
-from six import string_types
 
 from .ewsdatetime import UTC_NOW
 from .extended_properties import ExtendedProperty
@@ -21,7 +20,6 @@ from .recurrence import FirstOccurrence, LastOccurrence, Occurrence, DeletedOccu
 from .util import is_iterable
 from .version import EXCHANGE_2007_SP1, EXCHANGE_2010, EXCHANGE_2013
 
-string_type = string_types[0]
 log = logging.getLogger(__name__)
 
 # Overall Types Schema: https://msdn.microsoft.com/en-us/library/hh354700(v=exchg.150).aspx

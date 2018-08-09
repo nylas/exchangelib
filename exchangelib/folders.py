@@ -24,7 +24,6 @@ from .services import FindFolder, GetFolder, FindItem, CreateFolder, UpdateFolde
 from .util import TNS, MNS
 from .version import EXCHANGE_2007_SP1, EXCHANGE_2010_SP1, EXCHANGE_2013, EXCHANGE_2013_SP1
 
-string_type = string_types[0]
 log = logging.getLogger(__name__)
 
 # Traversal enums
