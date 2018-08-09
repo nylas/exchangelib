@@ -495,8 +495,21 @@ class TimeZone(EWSElement):
     @classmethod
     def from_server_timezone(cls, periods, transitions, transitionsgroups, for_year):
         # Creates a TimeZone object from the result of a GetServerTimeZones call with full timezone data
-        kwargs = {}
 
+        # Get the default bias
+        bias = cls._get_bias(periods=periods, for_year=for_year)
+
+        # Get a relevant transition ID
+        valid_tg_id = cls._get_valid_transition_id(transitions=transitions, for_year=for_year)
+        transitiongroup = transitionsgroups[valid_tg_id]
+        if not 0 <= len(transitiongroup) <= 2:
+            raise ValueError('Expected 0-2 transitions in transitionsgroup %s' % transitiongroup)
+
+        standard_time, daylight_time = cls._get_std_and_dst(transitiongroup=transitiongroup, periods=periods, bias=bias)
+        return cls(bias=bias, standard_time=standard_time, daylight_time=daylight_time)
+
+    @staticmethod
+    def _get_bias(periods, for_year):
         # Set a default bias
         valid_period = None
         for (year, period_type), period in sorted(periods.items()):
@@ -507,8 +520,10 @@ class TimeZone(EWSElement):
             valid_period = period
         if valid_period is None:
             raise ValueError('No standard bias found in periods %s' % periods)
-        kwargs['bias'] = int(valid_period['bias'].total_seconds()) // 60  # Convert to minutes
+        return int(valid_period['bias'].total_seconds()) // 60  # Convert to minutes
 
+    @staticmethod
+    def _get_valid_transition_id(transitions, for_year):
         # Look through the transitions, and pick the relevant one according to the 'for_year' value
         valid_tg_id = None
         for tg_id, from_date in sorted(transitions.items()):
@@ -517,12 +532,13 @@ class TimeZone(EWSElement):
             valid_tg_id = tg_id
         if valid_tg_id is None:
             raise ValueError('No valid transition for year %s: %s' % (for_year, transitions))
+        return valid_tg_id
 
-        # Set or reset the 'standard_time' and 'daylight_time' kwargs. We do unnecessary work here, but it keeps
-        # code simple
-        if not 0 <= len(transitionsgroups[valid_tg_id]) <= 2:
-            raise ValueError('Expected 0-2 transitions in transitionsgroup %s' % transitionsgroups[valid_tg_id])
-        for transition in transitionsgroups[valid_tg_id]:
+    @staticmethod
+    def _get_std_and_dst(transitiongroup, periods, bias):
+        # Return 'standard_time' and 'daylight_time' objects. We do unnecessary work here, but it keeps code simple.
+        standard_time, daylight_time = None, None
+        for transition in transitiongroup:
             period = periods[transition['to']]
             if len(transition.keys()) == 1:
                 # This is a simple transition to STD time. That cannot be represented by this class
@@ -538,17 +554,15 @@ class TimeZone(EWSElement):
             )
             if period['name'] == 'Standard':
                 transition_kwargs['bias'] = 0
-                kwargs['standard_time'] = StandardTime(**transition_kwargs)
+                standard_time = StandardTime(**transition_kwargs)
                 continue
             if period['name'] == 'Daylight':
-                std_bias = kwargs['bias']
                 dst_bias = int(period['bias'].total_seconds()) // 60  # Convert to minutes
-                transition_kwargs['bias'] = dst_bias - std_bias
-                kwargs['daylight_time'] = DaylightTime(**transition_kwargs)
+                transition_kwargs['bias'] = dst_bias - bias
+                daylight_time = DaylightTime(**transition_kwargs)
                 continue
             raise ValueError('Unknown transition: %s' % transition)
-
-        return cls(**kwargs)
+        return standard_time, daylight_time
 
 
 class CalendarEvent(EWSElement):

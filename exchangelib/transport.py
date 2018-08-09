@@ -4,7 +4,6 @@ from __future__ import unicode_literals
 import logging
 
 import requests.auth
-import requests.sessions
 import requests_ntlm
 import requests_kerberos
 
@@ -91,9 +90,7 @@ def get_autodiscover_authtype(service_endpoint, data):
     # was no redirect, continue trying a POST request with a valid payload.
     log.debug('Getting autodiscover auth type for %s', service_endpoint)
     from .autodiscover import AutodiscoverProtocol
-    with requests.sessions.Session() as s:
-        s.mount('http://', adapter=AutodiscoverProtocol.get_adapter())
-        s.mount('https://', adapter=AutodiscoverProtocol.get_adapter())
+    with AutodiscoverProtocol.raw_session() as s:
         r = s.head(url=service_endpoint, headers=DEFAULT_HEADERS.copy(), timeout=AutodiscoverProtocol.TIMEOUT,
                    allow_redirects=False)
         if r.status_code in (301, 302):
@@ -127,9 +124,7 @@ def get_service_authtype(service_endpoint, versions, name):
     # We don't know the API version yet, but we need it to create a valid request because some Exchange servers only
     # respond when given a valid request. Try all known versions. Gross.
     from .protocol import BaseProtocol
-    with requests.sessions.Session() as s:
-        s.mount('http://', adapter=BaseProtocol.get_adapter())
-        s.mount('https://', adapter=BaseProtocol.get_adapter())
+    with BaseProtocol.raw_session() as s:
         for version in versions:
             data = dummy_xml(version=version, name=name)
             log.debug('Requesting %s from %s', data, service_endpoint)

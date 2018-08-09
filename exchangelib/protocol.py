@@ -136,8 +136,8 @@ class BaseProtocol(object):
     @classmethod
     def raw_session(cls):
         s = requests.sessions.Session()
-        s.mount('http://', adapter=BaseProtocol.get_adapter())
-        s.mount('https://', adapter=BaseProtocol.get_adapter())
+        s.mount('http://', adapter=cls.get_adapter())
+        s.mount('https://', adapter=cls.get_adapter())
         return s
 
     def __repr__(self):

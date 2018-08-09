@@ -18,7 +18,6 @@ from itertools import chain
 import logging
 import traceback
 
-from lxml.etree import ParseError
 from six import text_type
 
 from . import errors
@@ -36,7 +35,7 @@ from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, 
 from .ewsdatetime import EWSDateTime, NaiveDateTimeNotAllowed
 from .transport import wrap, extra_headers
 from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, \
-    xml_to_str, set_xml_value, peek, xml_text_to_value, SOAPNS, TNS, MNS, ENS
+    xml_to_str, set_xml_value, peek, xml_text_to_value, SOAPNS, TNS, MNS, ENS, ParseError
 from .version import EXCHANGE_2010, EXCHANGE_2010_SP2, EXCHANGE_2013, EXCHANGE_2013_SP1
 
 log = logging.getLogger(__name__)

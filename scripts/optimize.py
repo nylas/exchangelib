@@ -40,7 +40,7 @@ account.calendar.filter(categories__contains=categories).delete()
 
 
 # Calendar item generator
-def generate_items(n):
+def generate_items(count):
     start = tz.localize(EWSDateTime(2000, 3, 1, 8, 30, 0))
     end = tz.localize(EWSDateTime(2000, 3, 1, 9, 15, 0))
     tpl_item = CalendarItem(
@@ -51,7 +51,7 @@ def generate_items(n):
         location="It's safe to delete this",
         categories=categories,
     )
-    for j in range(n):
+    for j in range(count):
         item = copy.copy(tpl_item)
         item.subject = 'Performance optimization test %s by exchangelib' % j,
         yield item

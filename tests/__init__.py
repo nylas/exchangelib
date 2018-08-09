@@ -21,7 +21,6 @@ import warnings
 
 from dateutil.relativedelta import relativedelta
 import dns.resolver
-from lxml.etree import ParseError
 import psutil
 import pytz
 import requests
@@ -71,7 +70,7 @@ from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, Get
     TNS
 from exchangelib.transport import NOAUTH, BASIC, DIGEST, NTLM, wrap, _get_auth_method_from_response
 from exchangelib.util import chunkify, peek, get_redirect_url, to_xml, BOM, get_domain, value_to_xml_text, \
-    post_ratelimited, create_element, CONNECTION_ERRORS, PrettyXmlHandler, xml_to_str
+    post_ratelimited, create_element, CONNECTION_ERRORS, PrettyXmlHandler, xml_to_str, ParseError
 from exchangelib.version import Build, Version, EXCHANGE_2007, EXCHANGE_2010, EXCHANGE_2013
 from exchangelib.winzone import generate_map, CLDR_TO_MS_TIMEZONE_MAP
 

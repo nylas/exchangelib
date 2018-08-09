@@ -5,14 +5,12 @@ import logging
 import re
 
 from future.utils import python_2_unicode_compatible
-from lxml.etree import ParseError
-import requests.sessions
 from six import text_type
 
 from .errors import TransportError, ErrorInvalidSchemaVersionForMailboxVersion, ErrorInvalidServerVersion, \
     ResponseMessageError
 from .transport import get_auth_instance
-from .util import is_xml, to_xml, TNS, SOAPNS
+from .util import is_xml, to_xml, TNS, SOAPNS, ParseError
 
 log = logging.getLogger(__name__)
 
@@ -243,16 +241,16 @@ class Version(object):
         return protocol.version
 
     @staticmethod
-    def _is_invalid_version_string(s):
+    def _is_invalid_version_string(version):
         # Check if a version string is bogus, e.g. V2_, V2015_ or V2018_
-        return re.match(r'V[0-9]{1,4}_.*', s)
+        return re.match(r'V[0-9]{1,4}_.*', version)
 
     @classmethod
     def from_response(cls, requested_api_version, response):
         try:
             header = to_xml(response).find('{%s}Header' % SOAPNS)
             if header is None:
-                raise ParseError('no header', '<not from file>', -1, 0)
+                raise TransportError('No header in XML response (%s)' % response)
         except ParseError:
             raise TransportError('Unknown XML response (%s)' % response)
 
