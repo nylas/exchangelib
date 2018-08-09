@@ -215,8 +215,7 @@ class QuerySet(SearchableMixIn):
         if self.request_type == self.PERSONA:
             if len(self.folder_collection) != 1:
                 raise ValueError('Personas can only be queried on a single folder')
-            folder = list(self.folder_collection)[0]
-            items = folder.find_people(
+            items = list(self.folder_collection)[0].find_people(
                 self.q,
                 shape=IdOnly,
                 depth=SHALLOW,
@@ -258,22 +257,9 @@ class QuerySet(SearchableMixIn):
         # Resort to client-side sorting of the order_by fields. This is greedy. Sorting in Python is stable, so when
         # sorting on multiple fields, we can just do a sort on each of the requested fields in reverse order. Reverse
         # each sort operation if the field was marked as such.
-        def get_value_or_default(item, field_order):
-            # Python can only sort values when <, > and = are implemented for the two types. Try as best we can to sort
-            # items, even when the item may have a None value for the field in question, or when the item is an
-            # Exception. If the field to be sorted by does not have a default value, there's really nothing we can do
-            # about it; we'll eventually raise a TypeError. If it does, we sort all None values and exceptions as the
-            # default value.
-            if isinstance(item, Exception):
-                return field_order.field_path.field.default
-            val = field_order.field_path.get_value(item)
-            if val is None:
-                return field_order.field_path.field.default
-            return val
-
         for f in reversed(self.order_fields):
             try:
-                items = sorted(items, key=lambda i: get_value_or_default(i, f), reverse=f.reverse)
+                items = sorted(items, key=lambda i: _get_value_or_default(i, f), reverse=f.reverse)
             except TypeError as e:
                 if 'unorderable types' not in e.args[0]:
                     raise
@@ -284,14 +270,8 @@ class QuerySet(SearchableMixIn):
         if not extra_order_fields:
             return items
 
-        # Nullify the fields we only needed for sorting. Make sure to handle exceptions.
-        def clean_item(i):
-            if isinstance(i, Exception):
-                return i
-            for f in extra_order_fields:
-                setattr(i, f.field.name, None)
-            return i
-        return (clean_item(i) for i in items)
+        # Nullify the fields we only needed for sorting before returning
+        return (_rinse_item(i, extra_order_fields) for i in items)
 
     def __iter__(self):
         # Fill cache if this is the first iteration. Return an iterator over the results. Make this non-greedy by
@@ -677,3 +657,26 @@ class QuerySet(SearchableMixIn):
         if self.is_cached:
             fmt_args.append(('len', str(len(self))))
         return self.__class__.__name__ + '(%s)' % ', '.join('%s=%s' % (k, v) for k, v in fmt_args)
+
+
+def _get_value_or_default(item, field_order):
+    # Python can only sort values when <, > and = are implemented for the two types. Try as best we can to sort
+    # items, even when the item may have a None value for the field in question, or when the item is an
+    # Exception. If the field to be sorted by does not have a default value, there's really nothing we can do
+    # about it; we'll eventually raise a TypeError. If it does, we sort all None values and exceptions as the
+    # default value.
+    if isinstance(item, Exception):
+        return field_order.field_path.field.default
+    val = field_order.field_path.get_value(item)
+    if val is None:
+        return field_order.field_path.field.default
+    return val
+
+
+def _rinse_item(i, fields_to_nullify):
+    # Set fields in fields_to_nullify to None. Make sure to accept exceptions.
+    if isinstance(i, Exception):
+        return i
+    for f in fields_to_nullify:
+        setattr(i, f.field.name, None)
+    return i
