@@ -341,132 +341,76 @@ class QuerySet(SearchableMixIn):
             self.max_items = s.stop
         return islice(self.__iter__(), s.start, s.stop, s.step)
 
-    def _as_items(self, iterable):
-        from .items import Item
+    def _item_yielder(self, iterable, item_func, id_only_func, changekey_only_func, id_and_changekey_func):
+        # Transforms results from the server according to the given transform functions. Makes sure to pass on
+        # Exception instances unaltered.
         if self.only_fields:
             has_non_attribute_fields = bool({f for f in self.only_fields if not f.field.is_attribute})
-            if not has_non_attribute_fields:
-                # _query() will return an iterator of (id, changekey) tuples
-                if self._changekey_field not in self.only_fields:
-                    for i in iterable:
-                        if isinstance(i, Exception):
-                            yield i
-                            continue
-                        item_id, changekey = i
-                        yield Item(id=item_id)
-                elif self._item_id_field not in self.only_fields:
-                    for i in iterable:
-                        if isinstance(i, Exception):
-                            yield i
-                            continue
-                        item_id, changekey = i
-                        yield Item(changekey=changekey)
-                else:
-                    for i in iterable:
-                        if isinstance(i, Exception):
-                            yield i
-                            continue
-                        item_id, changekey = i
-                        yield Item(id=item_id, changekey=changekey)
-                return
+        else:
+            has_non_attribute_fields = True
+        if not has_non_attribute_fields:
+            # _query() will return an iterator of (id, changekey) tuples
+            if self._changekey_field not in self.only_fields:
+                transform_func = id_only_func
+            elif self._item_id_field not in self.only_fields:
+                transform_func = changekey_only_func
+            else:
+                transform_func = id_and_changekey_func
+            for i in iterable:
+                if isinstance(i, Exception):
+                    yield i
+                    continue
+                yield transform_func(*i)
+            return
         for i in iterable:
-            yield i
+            if isinstance(i, Exception):
+                yield i
+                continue
+            yield item_func(i)
+
+    def _as_items(self, iterable):
+        from .items import Item
+        return self._item_yielder(
+            iterable=iterable,
+            item_func=lambda i: i,
+            id_only_func=lambda item_id, changekey: Item(id=item_id),
+            changekey_only_func=lambda item_id, changekey: Item(changekey=changekey),
+            id_and_changekey_func=lambda item_id, changekey: Item(id=item_id, changekey=changekey),
+        )
 
     def _as_values(self, iterable):
         if not self.only_fields:
             raise ValueError('values() requires at least one field name')
-        has_non_attribute_fields = bool({f for f in self.only_fields if not f.field.is_attribute})
-        if not has_non_attribute_fields:
-            # _query() will return an iterator of (id, changekey) tuples
-            if self._changekey_field not in self.only_fields:
-                for i in iterable:
-                    if isinstance(i, Exception):
-                        yield i
-                        continue
-                    item_id, changekey = i
-                    yield {'id': item_id}
-            elif self._item_id_field not in self.only_fields:
-                for i in iterable:
-                    if isinstance(i, Exception):
-                        yield i
-                        continue
-                    item_id, changekey = i
-                    yield {'changekey': changekey}
-            else:
-                for i in iterable:
-                    if isinstance(i, Exception):
-                        yield i
-                        continue
-                    item_id, changekey = i
-                    yield {'id': item_id, 'changekey': changekey}
-            return
-        for i in iterable:
-            if isinstance(i, Exception):
-                yield i
-                continue
-            yield {f.path: f.get_value(i) for f in self.only_fields}
+        return self._item_yielder(
+            iterable=iterable,
+            item_func=lambda i: {f.path: f.get_value(i) for f in self.only_fields},
+            id_only_func=lambda item_id, changekey: {'id': item_id},
+            changekey_only_func=lambda item_id, changekey: {'changekey': changekey},
+            id_and_changekey_func=lambda item_id, changekey: {'id': item_id, 'changekey': changekey},
+        )
 
     def _as_values_list(self, iterable):
         if not self.only_fields:
             raise ValueError('values_list() requires at least one field name')
-        has_non_attribute_fields = bool({f for f in self.only_fields if not f.field.is_attribute})
-        if not has_non_attribute_fields:
-            # _query() will return an iterator of (id, changekey) tuples
-            if self._changekey_field not in self.only_fields:
-                for i in iterable:
-                    if isinstance(i, Exception):
-                        yield i
-                        continue
-                    item_id, changekey = i
-                    yield (item_id,)
-            elif self._item_id_field not in self.only_fields:
-                for i in iterable:
-                    if isinstance(i, Exception):
-                        yield i
-                        continue
-                    item_id, changekey = i
-                    yield (changekey,)
-            else:
-                for i in iterable:
-                    if isinstance(i, Exception):
-                        yield i
-                        continue
-                    item_id, changekey = i
-                    yield (item_id, changekey)
-            return
-        for i in iterable:
-            if isinstance(i, Exception):
-                yield i
-                continue
-            yield tuple(f.get_value(i) for f in self.only_fields)
+        return self._item_yielder(
+            iterable=iterable,
+            item_func=lambda i: tuple(f.get_value(i) for f in self.only_fields),
+            id_only_func=lambda item_id, changekey: (item_id,),
+            changekey_only_func=lambda item_id, changekey: (changekey,),
+            id_and_changekey_func=lambda item_id, changekey: (item_id, changekey),
+        )
 
     def _as_flat_values_list(self, iterable):
         if not self.only_fields or len(self.only_fields) != 1:
             raise ValueError('flat=True requires exactly one field name')
         flat_field_path = self.only_fields[0]
-        if flat_field_path == self._item_id_field:
-            # _query() will return an iterator of (id, changekey) tuples
-            for i in iterable:
-                if isinstance(i, Exception):
-                    yield i
-                    continue
-                item_id, changekey = i
-                yield item_id
-            return
-        if flat_field_path == self._changekey_field:
-            # _query() will return an iterator of (id, changekey) tuples
-            for i in iterable:
-                if isinstance(i, Exception):
-                    yield i
-                    continue
-                item_id, changekey = i
-                yield changekey
-            return
-        for i in iterable:
-            if isinstance(i, Exception):
-                yield i
-                continue
-            yield flat_field_path.get_value(i)
+        return self._item_yielder(
+            iterable=iterable,
+            item_func=lambda i: flat_field_path.get_value(i),
+            id_only_func=lambda item_id, changekey: item_id,
+            changekey_only_func=lambda item_id, changekey: changekey,
+            id_and_changekey_func=None,  # Can never be called
+        )
 
     ###############################
     #
