@@ -114,23 +114,24 @@ class QuerySet(SearchableMixIn):
     def is_cached(self):
         return self._cache is not None
 
-    def _get_field_path(self, s):
+    def _get_field_path(self, field_path):
         from .items import Persona
         if self.request_type == self.PERSONA:
-            return FieldPath(field=Persona.get_field_by_fieldname(s))
+            return FieldPath(field=Persona.get_field_by_fieldname(field_path))
         for folder in self.folder_collection:
             try:
-                return FieldPath.from_string(s, folder=folder)
+                return FieldPath.from_string(field_path, folder=folder)
             except ValueError:
                 pass
         raise ValueError("Unknown fieldname '%s' on folders '%s'" % (s, self.folder_collection.folders))
 
-    def _get_field_order(self, s):
+    def _get_field_order(self, field_path):
         from .items import Persona
         if self.request_type == self.PERSONA:
-            field_path = FieldPath(field=Persona.get_field_by_fieldname(s.lstrip('-')))
-            reverse = s.startswith('-')
-            return FieldOrder(field_path=field_path, reverse=reverse)
+            return FieldOrder(
+                field_path=field_path.startswith('-'),
+                reverse=FieldPath(field=Persona.get_field_by_fieldname(field_path.lstrip('-')))
+            )
         for folder in self.folder_collection:
             try:
                 return FieldOrder.from_string(s, folder=folder)

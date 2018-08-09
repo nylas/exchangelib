@@ -172,8 +172,6 @@ class FileAttachment(Attachment):
 
     @classmethod
     def from_xml(cls, elem, account):
-        if elem.tag != cls.response_tag():
-            raise ValueError('Unexpected element tag in class %s: %s vs %s' % (cls, elem.tag, cls.response_tag()))
         kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.FIELDS}
         kwargs['content'] = kwargs.pop('_content')
         elem.clear()
@@ -233,8 +231,6 @@ class ItemAttachment(Attachment):
 
     @classmethod
     def from_xml(cls, elem, account):
-        if elem.tag != cls.response_tag():
-            raise ValueError('Unexpected element tag in class %s: %s vs %s' % (cls, elem.tag, cls.response_tag()))
         kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.FIELDS}
         kwargs['item'] = kwargs.pop('_item')
         elem.clear()

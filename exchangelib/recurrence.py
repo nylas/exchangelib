@@ -10,16 +10,16 @@ from .properties import EWSElement, ItemId
 log = logging.getLogger(__name__)
 
 
-def _month_to_str(m):
-    return MONTHS[m-1] if isinstance(m, int) else m
+def _month_to_str(month):
+    return MONTHS[month-1] if isinstance(month, int) else month
 
 
-def _weekday_to_str(w):
-    return WEEKDAYS[w - 1] if isinstance(w, int) else w
+def _weekday_to_str(weekday):
+    return WEEKDAYS[weekday - 1] if isinstance(weekday, int) else weekday
 
 
-def _week_number_to_str(wn):
-    return WEEK_NUMBERS[wn - 1] if isinstance(wn, int) else wn
+def _week_number_to_str(week_number):
+    return WEEK_NUMBERS[week_number - 1] if isinstance(week_number, int) else week_number
 
 
 class ExtraWeekdaysField(EnumListField):
@@ -268,8 +268,6 @@ class Occurrence(EWSElement):
 
     @classmethod
     def from_xml(cls, elem, account):
-        if elem.tag != cls.response_tag():
-            raise ValueError('Unexpected element tag in class %s: %s vs %s' % (cls, elem.tag, cls.response_tag()))
         item_id, changekey = cls.id_from_xml(elem)
         kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.supported_fields()}
         elem.clear()

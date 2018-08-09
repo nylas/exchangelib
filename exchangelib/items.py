@@ -469,8 +469,6 @@ class Item(RegisterMixIn):
 
     @classmethod
     def from_xml(cls, elem, account):
-        if elem.tag != cls.response_tag():
-            raise ValueError('Unexpected element tag in class %s: %s vs %s' % (cls, elem.tag, cls.response_tag()))
         item_id, changekey = cls.id_from_xml(elem=elem)
         kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.supported_fields()}
         elem.clear()
@@ -498,13 +496,6 @@ class BulkCreateResult(Item):
         IdField('changekey', field_uri=ItemId.CHANGEKEY_ATTR, is_required=True, is_read_only=True),
         AttachmentField('attachments', field_uri='item:Attachments'),  # ItemAttachment or FileAttachment
     ]
-
-    @classmethod
-    def from_xml(cls, elem, account):
-        item_id, changekey = cls.id_from_xml(elem)
-        kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.supported_fields()}
-        elem.clear()
-        return cls(id=item_id, changekey=changekey, **kwargs)
 
 
 # CalendarItemType enums
