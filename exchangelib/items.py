@@ -70,19 +70,19 @@ ASSOCIATED = 'Associated'
 ITEM_TRAVERSAL_CHOICES = (SHALLOW, SOFT_DELETED, ASSOCIATED)
 
 # Shape enums
-IdOnly = 'IdOnly'
-Default = 'Default'
+ID_ONLY = 'IdOnly'
+DEFAULT = 'Default'
 # AllProperties doesn't actually get all properties in FindItem, just the "first-class" ones. See
 #    http://msdn.microsoft.com/en-us/library/office/dn600367(v=exchg.150).aspx
-AllProperties = 'AllProperties'
-SHAPE_CHOICES = (IdOnly, Default, AllProperties)
+ALL_PROPERTIES = 'AllProperties'
+SHAPE_CHOICES = (ID_ONLY, DEFAULT, ALL_PROPERTIES)
 
 # Contacts search (ResolveNames) scope enums
-ActiveDirectory = 'ActiveDirectory'
-ActiveDirectoryContacts = 'ActiveDirectoryContacts'
-Contacts = 'Contacts'
-ContactsActiveDirectory = 'ContactsActiveDirectory'
-SEARCH_SCOPE_CHOICES = (ActiveDirectory, ActiveDirectoryContacts, Contacts, ContactsActiveDirectory)
+ACTIVE_DIRECTORY = 'ActiveDirectory'
+ACTIVE_DIRECTORY_CONTACTS = 'ActiveDirectoryContacts'
+CONTACTS = 'Contacts'
+CONTACTS_ACTIVE_DIRECTORY = 'ContactsActiveDirectory'
+SEARCH_SCOPE_CHOICES = (ACTIVE_DIRECTORY, ACTIVE_DIRECTORY_CONTACTS, CONTACTS, CONTACTS_ACTIVE_DIRECTORY)
 
 
 class RegisterMixIn(EWSElement):

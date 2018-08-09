@@ -27,7 +27,7 @@ from .items import Item, BulkCreateResult, HARD_DELETE, \
     AUTO_RESOLVE, SEND_TO_NONE, SAVE_ONLY, SEND_AND_SAVE_COPY, SEND_ONLY, ALL_OCCURRENCIES, \
     DELETE_TYPE_CHOICES, MESSAGE_DISPOSITION_CHOICES, CONFLICT_RESOLUTION_CHOICES, AFFECTED_TASK_OCCURRENCES_CHOICES, \
     SEND_MEETING_INVITATIONS_CHOICES, SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES, \
-    SEND_MEETING_CANCELLATIONS_CHOICES, IdOnly
+    SEND_MEETING_CANCELLATIONS_CHOICES, ID_ONLY
 from .properties import Mailbox
 from .protocol import Protocol
 from .queryset import QuerySet
@@ -588,7 +588,7 @@ class Account(object):
         # Always use IdOnly here, because AllProperties doesn't actually get *all* properties
         for i in self._consume_item_service(service_cls=GetItem, items=ids, chunk_size=chunk_size, kwargs=dict(
                 additional_fields=additional_fields,
-                shape=IdOnly,
+                shape=ID_ONLY,
         )):
             if isinstance(i, Exception):
                 yield i

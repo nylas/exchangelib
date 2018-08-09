@@ -15,8 +15,8 @@ from .errors import ErrorAccessDenied, ErrorFolderNotFound, ErrorCannotEmptyFold
 from .fields import IntegerField, TextField, DateTimeField, FieldPath, EffectiveRightsField, MailboxField, IdField, \
     EWSElementField
 from .items import Item, CalendarItem, Contact, Message, Task, MeetingRequest, MeetingResponse, MeetingCancellation, \
-    DistributionList, RegisterMixIn, ITEM_CLASSES, ITEM_TRAVERSAL_CHOICES, SHAPE_CHOICES, IdOnly, DELETE_TYPE_CHOICES, \
-    HARD_DELETE, Persona
+    DistributionList, RegisterMixIn, Persona, ITEM_CLASSES, ITEM_TRAVERSAL_CHOICES, SHAPE_CHOICES, ID_ONLY, \
+    DELETE_TYPE_CHOICES, HARD_DELETE
 from .properties import ItemId, Mailbox, EWSElement, ParentFolderId
 from .queryset import QuerySet, SearchableMixIn
 from .restriction import Restriction
@@ -174,7 +174,7 @@ class FolderCollection(SearchableMixIn):
     def supported_item_models(self):
         return tuple(item_model for folder in self.folders for item_model in folder.supported_item_models)
 
-    def find_items(self, q, shape=IdOnly, depth=SHALLOW, additional_fields=None, order_fields=None,
+    def find_items(self, q, shape=ID_ONLY, depth=SHALLOW, additional_fields=None, order_fields=None,
                    calendar_view=None, page_size=None, max_items=None):
         """
         Private method to call the FindItem service
@@ -236,7 +236,7 @@ class FolderCollection(SearchableMixIn):
             calendar_view=calendar_view,
             max_items=calendar_view.max_items if calendar_view else max_items,
         )
-        if shape == IdOnly and additional_fields is None:
+        if shape == ID_ONLY and additional_fields is None:
             for i in items:
                 yield i if isinstance(i, Exception) else Item.id_from_xml(i)
         else:
@@ -259,7 +259,7 @@ class FolderCollection(SearchableMixIn):
                 )
         return additional_fields
 
-    def find_folders(self, shape=IdOnly, depth=DEEP, page_size=None):
+    def find_folders(self, shape=ID_ONLY, depth=DEEP, page_size=None):
         # 'depth' controls whether to return direct children or recurse into sub-folders
         if not self.account:
             raise ValueError('Folder must have an account')
@@ -287,7 +287,7 @@ class FolderCollection(SearchableMixIn):
         return GetFolder(account=self.account).call(
                 folders=self.folders,
                 additional_fields=additional_fields,
-                shape=IdOnly
+                shape=ID_ONLY
         )
 
 
@@ -607,7 +607,7 @@ class Folder(RegisterMixIn, SearchableMixIn):
             request_type=QuerySet.PERSONA,
         )
 
-    def find_people(self, q, shape=IdOnly, depth=SHALLOW, additional_fields=None, order_fields=None, page_size=None,
+    def find_people(self, q, shape=ID_ONLY, depth=SHALLOW, additional_fields=None, order_fields=None, page_size=None,
                     max_items=None):
         """
         Private method to call the FindPeople service

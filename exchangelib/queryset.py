@@ -8,7 +8,7 @@ import warnings
 
 from future.utils import python_2_unicode_compatible
 
-from .items import CalendarItem, IdOnly
+from .items import CalendarItem, ID_ONLY
 from .fields import FieldPath, FieldOrder
 from .restriction import Q
 from .version import EXCHANGE_2010
@@ -217,7 +217,7 @@ class QuerySet(SearchableMixIn):
                 raise ValueError('Personas can only be queried on a single folder')
             items = list(self.folder_collection)[0].find_people(
                 self.q,
-                shape=IdOnly,
+                shape=ID_ONLY,
                 depth=SHALLOW,
                 additional_fields=additional_fields,
                 order_fields=order_fields,
@@ -226,7 +226,7 @@ class QuerySet(SearchableMixIn):
             )
         else:
             find_item_kwargs = dict(
-                shape=IdOnly,  # Always use IdOnly here, because AllProperties doesn't actually get *all* properties
+                shape=ID_ONLY,  # Always use IdOnly here, because AllProperties doesn't actually get *all* properties
                 additional_fields=additional_fields,
                 order_fields=order_fields,
                 calendar_view=self.calendar_view,
@@ -246,7 +246,7 @@ class QuerySet(SearchableMixIn):
             else:
                 if not additional_fields:
                     # If additional_fields is the empty set, we only requested ID and changekey fields. We can then
-                    # take a shortcut by using (shape=IdOnly, additional_fields=None) to tell find_items() to return
+                    # take a shortcut by using (shape=ID_ONLY, additional_fields=None) to tell find_items() to return
                     # (id, changekey) tuples. We'll post-process those later.
                     find_item_kwargs['additional_fields'] = None
                 items = self.folder_collection.find_items(self.q, **find_item_kwargs)
@@ -406,7 +406,7 @@ class QuerySet(SearchableMixIn):
         flat_field_path = self.only_fields[0]
         return self._item_yielder(
             iterable=iterable,
-            item_func=lambda i: flat_field_path.get_value(i),
+            item_func=flat_field_path.get_value,
             id_only_func=lambda item_id, changekey: item_id,
             changekey_only_func=lambda item_id, changekey: changekey,
             id_and_changekey_func=None,  # Can never be called

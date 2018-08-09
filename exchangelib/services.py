@@ -1407,7 +1407,7 @@ class FindPeople(EWSAccountService, PagingEWSMixIn):
         :param max_items: the max number of items to return
         :return: XML elements for the matching items
         """
-        from .items import Persona, IdOnly
+        from .items import Persona, ID_ONLY
         personas = self._paged_call(payload_func=self.get_payload, max_items=max_items, **dict(
             folder=folder,
             additional_fields=additional_fields,
@@ -1418,7 +1418,7 @@ class FindPeople(EWSAccountService, PagingEWSMixIn):
             depth=depth,
             page_size=self.chunk_size,
         ))
-        if shape == IdOnly and additional_fields is None:
+        if shape == ID_ONLY and additional_fields is None:
             for p in personas:
                 yield p if isinstance(p, Exception) else Persona.id_from_xml(p)
         else:

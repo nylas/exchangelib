@@ -30,7 +30,7 @@ time_func = time.time if PY2 else time.monotonic
 log = logging.getLogger(__name__)
 
 # Regex of UTF-8 control characters that are illegal in XML 1.0 (and XML 1.1)
-_illegal_xml_chars_RE = re.compile('[\x00-\x08\x0b\x0c\x0e-\x1F\uD800-\uDFFF\uFFFE\uFFFF]')
+_ILLEGAL_XML_CHARS_RE = re.compile('[\x00-\x08\x0b\x0c\x0e-\x1F\uD800-\uDFFF\uFFFE\uFFFF]')
 # UTF-8 byte order mark which may precede the XML from an Exchange server
 BOM = b'\xef\xbb\xbf'
 BOM_LEN = len(BOM)
@@ -211,7 +211,7 @@ def set_xml_value(elem, value, version):
 
 
 def safe_xml_value(value, replacement='?'):
-    return text_type(_illegal_xml_chars_RE.sub(replacement, value))
+    return text_type(_ILLEGAL_XML_CHARS_RE.sub(replacement, value))
 
 
 def create_element(name, **attrs):
