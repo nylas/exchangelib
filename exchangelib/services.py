@@ -147,15 +147,12 @@ class EWSService(object):
         api_versions = [hint.api_version] + [v for v in API_VERSIONS if v != hint.api_version]
         for api_version in api_versions:
             log.debug('Trying API version %s for account %s', api_version, account)
-            session = self.protocol.get_session()
-            soap_payload = wrap(content=payload, version=api_version, account=account)
-            http_headers = extra_headers(account=account)
             r, session = post_ratelimited(
                 protocol=self.protocol,
-                session=session,
+                session=self.protocol.get_session(),
                 url=self.protocol.service_endpoint,
-                headers=http_headers,
-                data=soap_payload,
+                headers=extra_headers(account=account),
+                data=wrap(content=payload, version=api_version, account=account),
                 allow_redirects=False)
             self.protocol.release_session(session)
             try:
@@ -740,28 +737,25 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
 
     def _get_item_update_elems(self, item, fieldnames):
         from .items import CalendarItem
-        item_model = item.__class__
         fieldnames_set = set(fieldnames)
 
         if item.__class__ == CalendarItem:
             # For CalendarItem items where we update 'start' or 'end', we want to update internal timezone fields
-            has_start = 'start' in fieldnames
-            has_end = 'end' in fieldnames
             item.clean_timezone_fields(version=self.account.version)  # Possibly also sets timezone values
             meeting_tz_field, start_tz_field, end_tz_field = CalendarItem.timezone_fields()
             if self.account.version.build < EXCHANGE_2010:
-                if has_start or has_end:
+                if 'start' in fieldnames_set or 'end' in fieldnames_set:
                     fieldnames_set.add(meeting_tz_field.name)
             else:
-                if has_start:
+                if 'start' in fieldnames_set:
                     fieldnames_set.add(start_tz_field.name)
-                if has_end:
+                if 'end' in fieldnames_set:
                     fieldnames_set.add(end_tz_field.name)
         else:
             meeting_tz_field, start_tz_field, end_tz_field = None, None, None
 
-        for fieldname in self._sort_fieldnames(item_model=item_model, fieldnames=fieldnames_set):
-            field = item_model.get_field_by_fieldname(fieldname)
+        for fieldname in self._sort_fieldnames(item_model=item.__class__, fieldnames=fieldnames_set):
+            field = item.get_field_by_fieldname(fieldname)
             if field.is_read_only:
                 raise ValueError('%s is a read-only field' % field.name)
             value = self._get_item_value(item, field, meeting_tz_field, start_tz_field, end_tz_field)
@@ -770,7 +764,7 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
                 for elem in self._get_delete_item_elems(field=field):
                     yield elem
             else:
-                for elem in self._get_set_item_elems(item_model=item_model, field=field, value=value):
+                for elem in self._get_set_item_elems(item_model=item.__class__, field=field, value=value):
                     yield elem
 
     def _get_item_value(self, item, field, meeting_tz_field, start_tz_field, end_tz_field):
