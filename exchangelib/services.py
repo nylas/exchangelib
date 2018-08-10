@@ -340,8 +340,11 @@ class EWSFolderService(EWSAccountService):
 
 class PagingEWSMixIn(EWSService):
     def _paged_call(self, payload_func, max_items, **kwargs):
-        account = self.account if isinstance(self, EWSAccountService) else None
-        log_prefix = 'EWS %s, account %s, service %s' % (self.protocol.service_endpoint, account, self.SERVICE_NAME)
+        if isinstance(self, EWSAccountService):
+            log_prefix = 'EWS %s, account %s, service %s' % (
+                self.protocol.service_endpoint, self.account, self.SERVICE_NAME)
+        else:
+            log_prefix = 'EWS %s, service %s' % (self.protocol.service_endpoint, self.SERVICE_NAME)
         if isinstance(self, EWSFolderService):
             expected_message_count = len(self.folders)
         else:
@@ -374,8 +377,8 @@ class PagingEWSMixIn(EWSService):
                 if rootfolder is not None:
                     container = rootfolder.find(self.element_container_name)
                     if container is None:
-                        raise MalformedResponseError('No %s elements in ResponseMessage (%s)' % (self.element_container_name,
-                                                                                         xml_to_str(rootfolder)))
+                        raise MalformedResponseError('No %s elements in ResponseMessage (%s)' % (
+                            self.element_container_name, xml_to_str(rootfolder)))
                     for elem in self._get_elements_in_container(container=container):
                         paging_info['item_count'] += 1
                         yield elem
@@ -940,11 +943,12 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
         itemshape = create_element('m:ItemShape')
         add_xml_child(itemshape, 't:BaseShape', shape)
         if additional_fields:
-            additional_properties = create_element('t:AdditionalProperties')
             expanded_fields = chain(*(f.expand(version=self.account.version) for f in additional_fields))
-            set_xml_value(additional_properties, sorted(expanded_fields, key=lambda f: f.path),
-                          version=self.account.version)
-            itemshape.append(additional_properties)
+            itemshape.append(set_xml_value(
+                create_element('t:AdditionalProperties'),
+                sorted(expanded_fields, key=lambda f: f.path),
+                version=self.account.version
+            ))
         finditem.append(itemshape)
         if calendar_view is None:
             view_type = create_element('m:IndexedPageItemView',
@@ -957,12 +961,16 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
         if restriction:
             finditem.append(restriction.to_xml(version=self.account.version))
         if order_fields:
-            sort_order = create_element('m:SortOrder')
-            set_xml_value(sort_order, order_fields, version=self.account.version)
-            finditem.append(sort_order)
-        parentfolderids = create_element('m:ParentFolderIds')
-        set_xml_value(parentfolderids, self.folders, version=self.account.version)
-        finditem.append(parentfolderids)
+            finditem.append(set_xml_value(
+                create_element('m:SortOrder'),
+                order_fields,
+                version=self.account.version
+            ))
+        finditem.append(set_xml_value(
+            create_element('m:ParentFolderIds'),
+            self.folders,
+            version=self.account.version
+        ))
         if query_string:
             finditem.append(query_string.to_xml(version=self.account.version))
         return finditem
@@ -1397,11 +1405,12 @@ class FindPeople(EWSAccountService, PagingEWSMixIn):
         personashape = create_element('m:PersonaShape')
         add_xml_child(personashape, 't:BaseShape', shape)
         if additional_fields:
-            additional_properties = create_element('t:AdditionalProperties')
             expanded_fields = chain(*(f.expand(version=self.account.version) for f in additional_fields))
-            set_xml_value(additional_properties, sorted(expanded_fields, key=lambda f: f.path),
-                          version=self.account.version)
-            personashape.append(additional_properties)
+            personashape.append(set_xml_value(
+                create_element('t:AdditionalProperties'),
+                sorted(expanded_fields, key=lambda f: f.path),
+                version=self.account.version
+            ))
         findpeople.append(personashape)
         view_type = create_element('m:IndexedPageItemView',
                                    MaxEntriesReturned=text_type(page_size),
@@ -1411,12 +1420,16 @@ class FindPeople(EWSAccountService, PagingEWSMixIn):
         if restriction:
             findpeople.append(restriction.to_xml(version=self.account.version))
         if order_fields:
-            sort_order = create_element('m:SortOrder')
-            set_xml_value(sort_order, order_fields, version=self.account.version)
-            findpeople.append(sort_order)
-        parentfolderid = create_element('m:ParentFolderId')
-        set_xml_value(parentfolderid, folder, version=self.account.version)
-        findpeople.append(parentfolderid)
+            findpeople.append(set_xml_value(
+                create_element('m:SortOrder'),
+                order_fields,
+                version=self.account.version
+            ))
+        findpeople.append(set_xml_value(
+            create_element('m:ParentFolderId'),
+            folder,
+            version=self.account.version
+        ))
         if query_string:
             findpeople.append(query_string.to_xml(version=self.account.version))
         return findpeople
