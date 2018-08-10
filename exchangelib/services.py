@@ -89,9 +89,7 @@ class EWSService(object):
                 log.debug('Got ErrorServerBusy (back off %s seconds)', e.back_off)
                 if self.protocol.credentials.fail_fast:
                     raise
-                back_off = e.back_off or 60  # Back off 60 seconds if we didn't get an explicit suggested value
-                back_off_until = datetime.datetime.now() + datetime.timedelta(seconds=back_off)
-                self.protocol.credentials.back_off_until = back_off_until
+                self.protocol.credentials.back_off(e.back_off)
                 # We'll warn about this if we actually need to sleep
                 continue
             except (
@@ -361,9 +359,7 @@ class PagingEWSMixIn(EWSService):
                 log.debug('Got ErrorServerBusy (back off %s seconds)', e.back_off)
                 if self.protocol.credentials.fail_fast:
                     raise
-                back_off = e.back_off or 60  # Back off 60 seconds if we didn't get an explicit suggested value
-                back_off_until = datetime.datetime.now() + datetime.timedelta(seconds=back_off)
-                self.protocol.credentials.back_off_until = back_off_until
+                self.protocol.credentials.back_off(e.back_off)
                 # We'll warn about this if we actually need to sleep
                 continue
             if len(response) != expected_message_count:
@@ -1439,9 +1435,7 @@ class FindPeople(EWSAccountService, PagingEWSMixIn):
                 log.debug('Got ErrorServerBusy (back off %s seconds)', e.back_off)
                 if self.protocol.credentials.fail_fast:
                     raise
-                back_off = e.back_off or 60  # Back off 60 seconds if we didn't get an explicit suggested value
-                back_off_until = datetime.datetime.now() + datetime.timedelta(seconds=back_off)
-                self.protocol.credentials.back_off_until = back_off_until
+                self.protocol.credentials.back_off(e.back_off)
                 # We'll warn about this if we actually need to sleep
                 continue
             if len(response) != 1:

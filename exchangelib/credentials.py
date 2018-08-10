@@ -105,3 +105,9 @@ class ServiceAccount(Credentials):
     def back_off_until(self, value):
         with self._back_off_lock:
             self._back_off_until = value
+
+    def back_off(self, seconds):
+        seconds = seconds or 60  # Back off 60 seconds if we didn't get an explicit suggested value
+        value = datetime.datetime.now() + datetime.timedelta(seconds=seconds)
+        with self._back_off_lock:
+            self._back_off_until = value
