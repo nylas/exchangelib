@@ -9,12 +9,11 @@ import re
 import socket
 import time
 
-from defusedxml.lxml import parse, fromstring, tostring, GlobalParserTLS, RestrictedElement
+from defusedxml.lxml import parse, fromstring, tostring, GlobalParserTLS, RestrictedElement, _etree
 from future.backports.misc import get_ident
 from future.moves.urllib.parse import urlparse
 from future.utils import PY2
 import isodate
-from lxml.etree import ParseError, register_namespace
 from pygments import highlight
 from pygments.lexers.html import XmlLexer
 from pygments.formatters.terminal import TerminalFormatter
@@ -26,6 +25,9 @@ from .errors import TransportError, RateLimitError, RedirectError, RelativeRedir
 
 time_func = time.time if PY2 else time.monotonic
 
+# Import these via defusedxml instead of directly from lxml.etree to silence overly strict linters
+ParseError = _etree.ParseError
+register_namespace = _etree.register_namespace
 
 log = logging.getLogger(__name__)
 
