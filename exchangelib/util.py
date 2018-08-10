@@ -9,6 +9,7 @@ import re
 import socket
 import time
 
+# Import _etree via defusedxml instead of directly from lxml.etree, to silence overly strict linters
 from defusedxml.lxml import parse, fromstring, tostring, GlobalParserTLS, RestrictedElement, _etree
 from future.backports.misc import get_ident
 from future.moves.urllib.parse import urlparse
@@ -24,12 +25,12 @@ from .errors import TransportError, RateLimitError, RedirectError, RelativeRedir
     ErrorInvalidSchemaVersionForMailboxVersion
 
 time_func = time.time if PY2 else time.monotonic
-
-# Import these via defusedxml instead of directly from lxml.etree to silence overly strict linters
-ParseError = _etree.ParseError
-register_namespace = _etree.register_namespace
-
 log = logging.getLogger(__name__)
+
+
+class ParseError(_etree.ParseError):
+    # Wrap lxml ParseError in our own class
+    pass
 
 # Regex of UTF-8 control characters that are illegal in XML 1.0 (and XML 1.1)
 _ILLEGAL_XML_CHARS_RE = re.compile('[\x00-\x08\x0b\x0c\x0e-\x1F\uD800-\uDFFF\uFFFE\uFFFF]')
@@ -49,7 +50,7 @@ ns_translation = {
     'm': MNS,
 }
 for k, v in ns_translation.items():
-    register_namespace(k, v)
+    _etree.register_namespace(k, v)
 
 
 def is_iterable(value, generators_allowed=False):
@@ -245,7 +246,7 @@ _forgiving_parser = ForgivingParser()
 def to_xml(text):
     try:
         return fromstring(text[BOM_LEN:] if text[:BOM_LEN] == BOM else text)
-    except ParseError:
+    except _etree.ParseError:
         # Exchange servers may spit out the weirdest XML. lxml is pretty good at recovering from errors
         log.warning('Fallback to lxml processing of faulty XML')
         forgiving_parser = _forgiving_parser.getDefaultParser()
@@ -254,7 +255,7 @@ def to_xml(text):
             return parse(io.BytesIO(no_bom_text), parser=forgiving_parser)
         except AssertionError as e:
             raise ParseError(e.args[0], '<not from file>', -1, 0)
-        except ParseError as e:
+        except _etree.ParseError as e:
             if hasattr(e, 'position'):
                 e.lineno, e.offset = e.position
             if not e.lineno:
