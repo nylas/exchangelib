@@ -2003,14 +2003,17 @@ class CommonTest(EWSTest):
         protocol.credentials = ServiceAccount(username=credentials.username, password=credentials.password, max_wait=1)
         session.post = mock_post(url, 503, {'connection': 'close'})
         protocol.renew_session = lambda s: s  # Return the same session so it's still mocked
-        with self.assertRaises(RateLimitError):
+        with self.assertRaises(RateLimitError) as rle:
             r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
+        self.assertEqual(rle.exception.url, url)
+        self.assertEqual(rle.exception.status_code, 503)
         # Test something larger than the default wait, so we retry at least once
         protocol.credentials.max_wait = 15
         session.post = mock_post(url, 503, {'connection': 'close'})
-        with self.assertRaises(RateLimitError):
+        with self.assertRaises(RateLimitError) as rle:
             r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
-
+        self.assertEqual(rle.exception.url, url)
+        self.assertEqual(rle.exception.status_code, 503)
         protocol.release_session(session)
         protocol.credentials = credentials
 

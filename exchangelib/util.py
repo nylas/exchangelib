@@ -577,7 +577,8 @@ def _may_retry_on_error(response, protocol, wait):
             return False
         if wait > protocol.credentials.max_wait:
             # We lost patience. Session is cleaned up in outer loop
-            raise RateLimitError('URL %s: Max timeout reached' % response.url)
+            raise RateLimitError(
+                'Max timeout reached', url=response.url, status_code=response.status_code, total_wait=wait)
         return True
     return False
 
