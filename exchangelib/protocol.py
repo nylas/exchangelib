@@ -370,4 +370,6 @@ XSD auth: %s''' % (
 class NoVerifyHTTPAdapter(requests.adapters.HTTPAdapter):
     # An HTTP adapter that ignores TLS validation errors. Use at own risk.
     def cert_verify(self, conn, url, verify, cert):
+        # pylint: disable=unused-argument
+        # We're overiding a method so we have to keep the signature
         super(NoVerifyHTTPAdapter, self).cert_verify(conn=conn, url=url, verify=False, cert=cert)

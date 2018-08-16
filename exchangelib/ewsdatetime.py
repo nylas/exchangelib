@@ -76,6 +76,8 @@ class EWSDateTime(datetime.datetime):
     __slots__ = '_year', '_month', '_day', '_hour', '_minute', '_second', '_microsecond', '_tzinfo', '_hashcode'
 
     def __new__(cls, *args, **kwargs):
+        # pylint: disable: arguments-differ
+        # Not all Python versions have the same signature for datetime.datetime
         """
         Inherits datetime and adds extra formatting required by EWS. Do not set tzinfo directly. Use
         EWSTimeZone.localize() instead.
