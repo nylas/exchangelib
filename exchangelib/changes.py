@@ -26,6 +26,10 @@ class UpdateItemChange(ItemChange):
 
 class DeleteItemChange(ItemChange):
     ELEMENT_NAME = 'Delete'
+    FIELDS = [
+        IdAndChangekeyField('item_id', field_uri='ItemId'),
+    ]
+    __slots__ = ('item_id',)
 
 
 class ReadFlagChange(ItemChange):
