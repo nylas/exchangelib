@@ -603,6 +603,9 @@ def _redirect_or_fail(response, redirects, allow_redirects):
 def _raise_response_errors(response, protocol, log_msg, log_vals):
     cas_error = response.headers.get('X-CasErrorCode')
     if cas_error:
+        if cas_error.startswith('CAS error:'):
+            # Remove unnecessary text
+            cas_error = cas_error.split(':', 1)[1].strip()
         raise CASError(cas_error=cas_error, response=response)
     if response.status_code == 500 and ('The specified server version is invalid' in response.text or
                                         'ErrorInvalidSchemaVersionForMailboxVersion' in response.text):
