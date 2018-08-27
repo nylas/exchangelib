@@ -542,8 +542,12 @@ Response data: %(xml_response)s
         protocol.retire_session(session)
         raise
     except Exception as e:
-        # Let higher layers handle this. Add full context for better debugging.
-        log.error(str('%s: %s\n%s'), e.__class__.__name__, str(e), log_msg % log_vals)
+        try:
+            # Let higher layers handle this. Add full context for better debugging.
+            log.error(str('%s: %s\n%s'), e.__class__.__name__, str(e), log_msg % log_vals)
+        except UnboundLocalError:
+            # In some cases, an Exception is raised before log_vals is assigned
+            log.error(str('%s: %s'), e.__class__.__name__, str(e))
         protocol.retire_session(session)
         raise
     if r.status_code == 500 and r.text and is_xml(r.text):
