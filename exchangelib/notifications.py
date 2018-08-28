@@ -2,7 +2,7 @@ from __future__ import unicode_literals
 
 from exchangelib.fields import TextField, BooleanField, SubField, EventListField
 from exchangelib.properties import EWSElement
-from exchangelib.transport import TNS, MNS
+from exchangelib.util import TNS, MNS
 
 
 class Notification(EWSElement):

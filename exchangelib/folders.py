@@ -24,7 +24,7 @@ from .queryset import QuerySet, SearchableMixIn
 from .restriction import Restriction
 from .services import FindFolder, GetFolder, FindItem, CreateFolder, UpdateFolder, DeleteFolder, EmptyFolder, FindPeople, \
     SyncFolderItems
-from .transport import TNS, MNS
+from .util import TNS, MNS
 from .version import EXCHANGE_2007_SP1, EXCHANGE_2010_SP1, EXCHANGE_2013, EXCHANGE_2013_SP1
 
 log = logging.getLogger(__name__)
@@ -1006,14 +1006,12 @@ class Root(Folder):
         # folder was found, try as best we can to return the default folder of type 'folder_cls'
         if not folder_cls.DISTINGUISHED_FOLDER_ID:
             raise ValueError("'folder_cls' %s must have a DISTINGUISHED_FOLDER_ID value" % folder_cls)
-        # Use cached distinguished folder instance, but only if cache has already been prepped. This is an optimization
-        # for accessing e.g. 'account.contacts' without fetching all folders of the account.
-        if self._subfolders:
-            for f in self._folders_map.values():
-                # Require exact class, to not match subclasses, e.g. RecipientCache instead of Contacts
-                if f.__class__ == folder_cls and f.is_distinguished:
-                    log.debug('Found cached distinguished %s folder', folder_cls)
-                    return f
+
+        for f in self._folders_map.values():
+            # Require exact class, to not match subclasses, e.g. RecipientCache instead of Contacts
+            if f.__class__ == folder_cls and f.is_distinguished:
+                log.debug('Found cached distinguished %s folder', folder_cls)
+                return f
         try:
             log.debug('Requesting distinguished %s folder explicitly', folder_cls)
             return folder_cls.get_distinguished(account=self.account)

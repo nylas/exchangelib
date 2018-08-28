@@ -6,7 +6,7 @@ from typing import List
 
 from exchangelib.fields import DateTimeField, IdField, Field, IntegerField, TextField, IdAndChangekeyField
 from exchangelib.properties import EWSElement
-from exchangelib.transport import TNS
+from exchangelib.util import TNS
 
 
 class Event(EWSElement):
