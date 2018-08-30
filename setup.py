@@ -40,7 +40,10 @@ setup(
     keywords='Exchange EWS autodiscover',
     install_requires=['requests>=2.7', 'requests_ntlm>=0.2.0', 'dnspython>=1.14.0', 'pytz', 'lxml>3.0',
                       'cached_property', 'future', 'six', 'tzlocal', 'python-dateutil', 'pygments', 'defusedxml',
-                      'isodate', 'requests_kerberos'],
+                      'isodate'],
+    extras_require={
+        'kerberos': ['requests_kerberos'],
+    },
     packages=['exchangelib'],
     tests_require=['PyYAML', 'requests_mock', 'psutil'],
     python_requires=">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*",

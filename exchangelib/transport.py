@@ -5,7 +5,6 @@ import logging
 
 import requests.auth
 import requests_ntlm
-import requests_kerberos
 
 from .credentials import IMPERSONATION
 from .errors import UnauthorizedError, TransportError, RedirectError, RelativeRedirect
@@ -24,9 +23,14 @@ AUTH_TYPE_MAP = {
     NTLM: requests_ntlm.HttpNtlmAuth,
     BASIC: requests.auth.HTTPBasicAuth,
     DIGEST: requests.auth.HTTPDigestAuth,
-    GSSAPI: requests_kerberos.HTTPKerberosAuth,
     NOAUTH: None,
 }
+try:
+    import requests_kerberos
+    AUTH_TYPE_MAP[GSSAPI] = requests_kerberos.HTTPKerberosAuth
+except ImportError:
+    # Kerberos auth is optional
+    pass
 
 DEFAULT_ENCODING = 'utf-8'
 DEFAULT_HEADERS = {'Content-Type': 'text/xml; charset=%s' % DEFAULT_ENCODING, 'Accept-Encoding': 'compress, gzip'}
