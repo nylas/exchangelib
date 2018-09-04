@@ -56,7 +56,7 @@ To be able to install these, you may need to install some additional operating s
 
 On Ubuntu:
 ```bash
-apt-get install libxml2-dev libxslt-dev
+apt-get install libxml2-dev libxslt1-dev
 
 # For Kerberos support, also install these:
 apt-get install libkrb5-dev build-essential libssl-dev libffi-dev python-dev
