@@ -36,8 +36,9 @@ from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, 
     ErrorInvalidOperation, ErrorSubscriptionUnsubscribed, MalformedResponseError
 from .ewsdatetime import EWSDateTime, NaiveDateTimeNotAllowed
 from .transport import wrap, extra_headers
-from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, ElementType, \
-    xml_to_str, set_xml_value, peek, xml_text_to_value, PrettyXmlHandler, SOAPNS, TNS, MNS, ENS, ParseError
+from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, \
+    xml_to_str, set_xml_value, peek, xml_text_to_value, PrettyXmlHandler, SOAPNS, TNS, MNS, ENS, ParseError, \
+    RestrictedElement
 from .version import EXCHANGE_2010, EXCHANGE_2010_SP2, EXCHANGE_2013, EXCHANGE_2013_SP1
 
 log = logging.getLogger(__name__)
@@ -111,8 +112,8 @@ class EWSService(object):
     #     raise NotImplementedError()
 
     def _get_elements(self, payload, headers=None):
-        if not isinstance(payload, ElementType):
-            raise ValueError("'payload' %r must be an ElementType" % payload)
+        if not isinstance(payload, RestrictedElement):
+            raise ValueError("'payload' %r must be an RestrictedElement" % payload)
         while True:
             try:
                 # Send the request, get the response and do basic sanity checking on the SOAP XML
@@ -175,8 +176,8 @@ class EWSService(object):
         return self._get_elements_in_response(response=response)
 
     def _stream_elements(self, payload, timeout, headers=None):
-        if not isinstance(payload, ElementType):
-            raise ValueError("'payload' %r must be an ElementType" % payload)
+        if not isinstance(payload, RestrictedElement):
+            raise ValueError("'payload' %r must be an RestrictedElement" % payload)
         try:
             # Send the request, get the response and do basic sanity checking on the SOAP XML
             for response in self._stream_response_xml(payload=payload, timeout=timeout, headers=headers):
@@ -210,8 +211,8 @@ class EWSService(object):
 
     def _stream_response_xml(self, payload, timeout, headers=None):
         # Takes an XML tree and returns SOAP payload as an XML tree
-        if not isinstance(payload, ElementType):
-            raise ValueError("'payload' %r must be an ElementType" % payload)
+        if not isinstance(payload, RestrictedElement):
+            raise ValueError("'payload' %r must be an RestrictedElement" % payload)
 
         global req_id
         account, hint = self._get_account_and_version_hint()
@@ -284,8 +285,8 @@ class EWSService(object):
 
     def _get_response_xml(self, payload, headers=None):
         # Takes an XML tree and returns SOAP payload as an XML tree
-        if not isinstance(payload, ElementType):
-            raise ValueError("'payload' %r must be an ElementType" % payload)
+        if not isinstance(payload, RestrictedElement):
+            raise ValueError("'payload' %r must be an RestrictedElement" % payload)
 
         account, hint = self._get_account_and_version_hint()
         api_versions = self._get_versions_to_try(hint)
@@ -294,7 +295,6 @@ class EWSService(object):
 
         for api_version in api_versions:
             log.debug('Trying API version %s for account %s', api_version, account)
-            session = self.protocol.get_session()
             soap_payload = wrap(content=payload, version=api_version, account=account)
             http_headers = extra_headers(account=account)
             req_id += 1
@@ -1458,9 +1458,9 @@ class SyncStateFinish(object):
     def __init__(self, sync_state=None, includes_last_item_in_range=None):
         self.sync_state = sync_state
         self.includes_last_item_in_range = includes_last_item_in_range
-        if isinstance(sync_state, ElementType):
+        if isinstance(sync_state, RestrictedElement):
             self.sync_state = sync_state.text
-        if isinstance(includes_last_item_in_range, ElementType):
+        if isinstance(includes_last_item_in_range, RestrictedElement):
             self.includes_last_item_in_range = includes_last_item_in_range.text == 'true'
 
 
@@ -1595,14 +1595,14 @@ class GetStreamingEvents(EWSSubscriptionService):
                                      headers=headers)
 
     def get_payload(self, subscription_id, timeout_minutes):
-        get_streaming_events = create_element('{%s}GetStreamingEvents' % MNS)
-        subscription_ids_elem = create_element('{%s}SubscriptionIds' % MNS)
-        subscription_id_elem = create_element('{%s}SubscriptionId' % TNS)
+        get_streaming_events = create_element('m:GetStreamingEvents')
+        subscription_ids_elem = create_element('m:SubscriptionIds')
+        subscription_id_elem = create_element('t:SubscriptionId')
         subscription_id_elem.text = subscription_id
         subscription_ids_elem.append(subscription_id_elem)
         get_streaming_events.append(subscription_ids_elem)
 
-        timeout_elem = create_element('{%s}ConnectionTimeout' % MNS)
+        timeout_elem = create_element('m:ConnectionTimeout')
         timeout_elem.text = str(timeout_minutes)
         get_streaming_events.append(timeout_elem)
         return get_streaming_events
@@ -1613,8 +1613,8 @@ class GetStreamingEvents(EWSSubscriptionService):
         if len(response) != 1:
             raise ValueError("Expected 'response' length 1, got %s" % response)
         response = response[0]
-        if not isinstance(response, ElementType):
-            raise ValueError("'response' %r must be an ElementType" % response)
+        if not isinstance(response, RestrictedElement):
+            raise ValueError("'response' %r must be an RestrictedElement" % response)
 
         container_or_exc = None
         elem_cls = None
@@ -1656,8 +1656,8 @@ class Unsubscribe(EWSSubscriptionService):
             pass
 
     def get_payload(self, subscription_id):
-        unsubscribe = create_element('{%s}Unsubscribe' % MNS)
-        subscription_id_elem = create_element('{%s}SubscriptionId' % MNS)
+        unsubscribe = create_element('m:Unsubscribe')
+        subscription_id_elem = create_element('m:SubscriptionId')
         subscription_id_elem.text = subscription_id
         unsubscribe.append(subscription_id_elem)
         return unsubscribe

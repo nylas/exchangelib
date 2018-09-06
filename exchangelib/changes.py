@@ -2,7 +2,7 @@ from __future__ import unicode_literals
 
 from exchangelib.fields import ItemField, FolderField, IdAndChangekeyField
 from exchangelib.properties import EWSElement
-from exchangelib.transport import TNS
+from exchangelib.util import TNS
 
 
 class Change(EWSElement):

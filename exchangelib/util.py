@@ -245,7 +245,10 @@ _forgiving_parser = ForgivingParser()
 
 def to_xml(text):
     try:
-        return fromstring(text[BOM_LEN:] if text[:BOM_LEN] == BOM else text)
+        if text.encode('utf-8')[:BOM_LEN] == BOM:
+            return fromstring(text[BOM_LEN:])
+        else:
+            return fromstring(text)
     except _etree.ParseError:
         # Exchange servers may spit out the weirdest XML. lxml is pretty good at recovering from errors
         log.warning('Fallback to lxml processing of faulty XML')
