@@ -245,7 +245,7 @@ _forgiving_parser = ForgivingParser()
 
 def to_xml(text):
     try:
-        if text.encode('utf-8')[:BOM_LEN] == BOM:
+        if text[:BOM_LEN] == BOM:
             return fromstring(text[BOM_LEN:])
         else:
             return fromstring(text)
