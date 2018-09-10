@@ -264,7 +264,7 @@ class EWSService(object):
                 f.write(u'REQUEST {} >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> {}\n'.format(req_id, now))
             elif ftype == 'response':
                 f.write(u'RESPONSE {} <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< {}\n'.format(req_id, now))
-            f.write(PrettyXmlHandler.prettify_xml(xml_str) + '\n')
+            f.write(PrettyXmlHandler.prettify_xml(xml_str) + b'\n')
 
     def _parse_envelopes(self, response):
         try:
