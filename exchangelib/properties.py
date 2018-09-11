@@ -326,7 +326,7 @@ class Mailbox(EWSElement):
     FIELDS = [
         TextField('name', field_uri='Name'),
         EmailAddressField('email_address', field_uri='EmailAddress'),
-        ChoiceField('routing_type', field_uri='RoutingType', choices={Choice('SMTP')}, default='SMTP'),
+        ChoiceField('routing_type', field_uri='RoutingType', choices={Choice('SMTP'), Choice('EX')}, default='SMTP'),
         ChoiceField('mailbox_type', field_uri='MailboxType', choices={
             Choice('Mailbox'), Choice('PublicDL'), Choice('PrivateDL'), Choice('Contact'), Choice('PublicFolder'),
             Choice('Unknown'), Choice('OneOff'), Choice('GroupMailbox', supported_from=EXCHANGE_2013)
