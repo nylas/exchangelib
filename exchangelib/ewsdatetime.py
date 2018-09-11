@@ -102,7 +102,7 @@ class EWSDateTime(datetime.datetime):
             except ValueError:
                 # strftime doesn't work for dates with a year less than 1900. For reasons unknown, Exchange
                 # sometimes sends datetimes with a year < 1900. In this case, we manually return the string.
-                return '{}-{}-{}T{}:{}:{}Z'.format(self.year, self.month, self.day, self.hour, self.minute, self.second)
+                return '{:04d}-{:02d}-{:02d}T{:02d}:{:02d}:{:02d}Z'.format(self.year, self.month, self.day, self.hour, self.minute, self.second)
         return self.replace(microsecond=0).isoformat()
 
     @classmethod
