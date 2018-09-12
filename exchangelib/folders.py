@@ -287,7 +287,7 @@ class FolderCollection(SearchableMixIn):
         return GetFolder(account=self.account).call(
                 folders=self.folders,
                 additional_fields=additional_fields,
-                shape=ID_ONLY
+                shape=ID_ONLY,
         )
 
 
@@ -894,22 +894,15 @@ class Folder(RegisterMixIn, SearchableMixIn):
         return '%s (%s)' % (self.__class__.__name__, self.name)
 
 
-class Root(Folder):
-    DISTINGUISHED_FOLDER_ID = 'root'
-
+class RootOfHierarchy(Folder):
+    # A special folder that acts as the top of a folder hierarchy. Finds and caches subfolders at arbitrary depth.
     def __init__(self, **kwargs):
-        super(Root, self).__init__(**kwargs)
+        super(RootOfHierarchy, self).__init__(**kwargs)
         self._subfolders = None  # See self._folders_map()
 
     def refresh(self):
         self._subfolders = None
-        super(Root, self).refresh()
-
-    @property
-    def tois(self):
-        # 'Top of Information Store' is a folder available in some Exchange accounts. It usually contains the
-        # distinguished folders belonging to the account (inbox, calendar, trash etc.).
-        return self / 'Top of Information Store'
+        super(RootOfHierarchy, self).refresh()
 
     def get_folder(self, folder_id):
         return self._folders_map.get(folder_id, None)
@@ -941,6 +934,37 @@ class Root(Folder):
                 continue
             if f.parent.id == folder.id:
                 yield f
+
+    @property
+    def _folders_map(self):
+        if self._subfolders is not None:
+            return self._subfolders
+
+        # Map root, and all subfolders of root, at arbitrary depth by folder ID
+        folders_map = {self.id: self}
+        try:
+            for f in FolderCollection(account=self.account, folders=[self]).find_folders(depth=DEEP):
+                if isinstance(f, Exception):
+                    raise f
+                if f.id in folders_map:
+                    # Already exists. Probably a distinguished folder
+                    continue
+                folders_map[f.id] = f
+        except ErrorAccessDenied:
+            # We may not have GetFolder or FindFolder access
+            pass
+        self._subfolders = folders_map
+        return folders_map
+
+
+class Root(RootOfHierarchy):
+    DISTINGUISHED_FOLDER_ID = 'root'
+
+    @property
+    def tois(self):
+        # 'Top of Information Store' is a folder available in some Exchange accounts. It usually contains the
+        # distinguished folders belonging to the account (inbox, calendar, trash etc.).
+        return self.get_default_folder(MsgFolderRoot)
 
     @property
     def _folders_map(self):
@@ -1254,7 +1278,7 @@ class ArchiveRecoverableItemsVersions(WellknownFolder):
     supported_from = EXCHANGE_2010_SP1
 
 
-class ArchiveRoot(WellknownFolder):
+class ArchiveRoot(RootOfHierarchy):
     DISTINGUISHED_FOLDER_ID = 'archiveroot'
     supported_from = EXCHANGE_2010_SP1
 
@@ -1297,6 +1321,7 @@ class LocalFailures(WellknownFolder):
 
 
 class MsgFolderRoot(WellknownFolder):
+    # Also known as the 'Top of Information Store' folder
     DISTINGUISHED_FOLDER_ID = 'msgfolderroot'
 
 
@@ -1319,7 +1344,7 @@ class PeopleConnect(WellknownFolder):
     supported_from = EXCHANGE_2013
 
 
-class PublicFoldersRoot(WellknownFolder):
+class PublicFoldersRoot(RootOfHierarchy):
     DISTINGUISHED_FOLDER_ID = 'publicfoldersroot'
     supported_from = EXCHANGE_2007_SP1
 

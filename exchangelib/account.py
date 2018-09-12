@@ -123,35 +123,35 @@ class Account(object):
 
     @threaded_cached_property
     def archive_deleted_items(self):
-        return self.root.get_default_folder(ArchiveDeletedItems)
+        return self.archive_root.get_default_folder(ArchiveDeletedItems)
 
     @threaded_cached_property
     def archive_inbox(self):
-        return self.root.get_default_folder(ArchiveInbox)
+        return self.archive_root.get_default_folder(ArchiveInbox)
 
     @threaded_cached_property
     def archive_msg_folder_root(self):
-        return self.root.get_default_folder(ArchiveMsgFolderRoot)
+        return self.archive_root.get_default_folder(ArchiveMsgFolderRoot)
 
     @threaded_cached_property
     def archive_recoverable_items_deletions(self):
-        return self.root.get_default_folder(ArchiveRecoverableItemsDeletions)
+        return self.archive_root.get_default_folder(ArchiveRecoverableItemsDeletions)
 
     @threaded_cached_property
     def archive_recoverable_items_purges(self):
-        return self.root.get_default_folder(ArchiveRecoverableItemsPurges)
+        return self.archive_root.get_default_folder(ArchiveRecoverableItemsPurges)
 
     @threaded_cached_property
     def archive_recoverable_items_root(self):
-        return self.root.get_default_folder(ArchiveRecoverableItemsRoot)
+        return self.archive_root.get_default_folder(ArchiveRecoverableItemsRoot)
 
     @threaded_cached_property
     def archive_recoverable_items_versions(self):
-        return self.root.get_default_folder(ArchiveRecoverableItemsVersions)
+        return self.archive_root.get_default_folder(ArchiveRecoverableItemsVersions)
 
     @threaded_cached_property
     def archive_root(self):
-        return self.root.get_default_folder(ArchiveRoot)
+        return ArchiveRoot.get_distinguished(account=self)
 
     @threaded_cached_property
     def calendar(self):
@@ -227,7 +227,7 @@ class Account(object):
 
     @threaded_cached_property
     def public_folders_root(self):
-        return self.root.get_default_folder(PublicFoldersRoot)
+        return PublicFoldersRoot.get_distinguished(self)
 
     @threaded_cached_property
     def quick_contacts(self):
