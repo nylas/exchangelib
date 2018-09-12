@@ -154,7 +154,7 @@ class AutodiscoverCache(object):
         # pylint: disable=bare-except
         try:
             self.close()
-        except:
+        except:  # nosec
             # __del__ should never fail
             pass
 
