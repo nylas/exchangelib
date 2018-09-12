@@ -38,6 +38,13 @@ You can install this package from PyPI:
 pip install exchangelib
 ```
 
+The default installation does not support Kerberos. For additional Kerberos support, install
+with the extra `kerberos` dependencies:
+
+```bash
+pip install exchangelib[kerberos]
+```
+
 To install the very latest code, install directly from GitHub instead:
 
 ```bash
@@ -49,18 +56,26 @@ To be able to install these, you may need to install some additional operating s
 
 On Ubuntu:
 ```bash
-apt-get install libxml2-dev libxslt-dev libkrb5-dev build-essential libssl-dev libffi-dev python-dev
+apt-get install libxml2-dev libxslt1-dev
+
+# For Kerberos support, also install these:
+apt-get install libkrb5-dev build-essential libssl-dev libffi-dev python-dev
 ```
 
 On CentOS:
 ```bash
+# For Kerberos support, install these:
 yum install gcc python-devel krb5-devel krb5-workstation python-devel
 ```
 
-On FreeBSD:
+On FreeBSD, `pip` needs a little help:
 ```bash
-pkg install libxml2 libxslt krb5
-CFLAGS=-I/usr/local/include pip install kerberos pykerberos lxml
+pkg install libxml2 libxslt
+CFLAGS=-I/usr/local/include pip install lxml
+
+# For Kerberos support, also install these:
+pkg install krb5
+CFLAGS=-I/usr/local/include pip install kerberos pykerberos
 ```
 
 For other operating systems, please consult the documentation for the Python package that

@@ -70,7 +70,7 @@ CLDR_TO_MS_TIMEZONE_MAP = {
     'Africa/Nouakchott': 'Greenwich Standard Time',
     'Africa/Ouagadougou': 'Greenwich Standard Time',
     'Africa/Porto-Novo': 'W. Central Africa Standard Time',
-    'Africa/Sao_Tome': 'W. Central Africa Standard Time',
+    'Africa/Sao_Tome': 'Sao Tome Standard Time',
     'Africa/Tripoli': 'Libya Standard Time',
     'Africa/Tunis': 'W. Central Africa Standard Time',
     'Africa/Windhoek': 'Namibia Standard Time',
