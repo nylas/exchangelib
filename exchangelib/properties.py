@@ -339,14 +339,20 @@ class Mailbox(EWSElement):
     def clean(self, version=None):
         super(Mailbox, self).clean(version=version)
         if not self.email_address and not self.item_id:
-            # See "Remarks" section of https://msdn.microsoft.com/en-us/library/office/aa565036(v=exchg.150).aspx
-            raise ValueError("Mailbox must have either 'email_address' or 'item_id' set")
+            if self.mailbox_type != 'OneOff':
+                # A OneOff Mailbox (a one-off member of a personal distribution list) may lack these fields
+                # But other Mailboxes require at least one.
+                # See "Remarks" section of https://msdn.microsoft.com/en-us/library/office/aa565036(v=exchg.150).aspx
+                err_msg = "Mailbox type {} must have either 'email_address' or 'item_id' set".format(self.mailbox_type)
+                raise ValueError(err_msg)
 
     def __hash__(self):
         # Exchange may add 'mailbox_type' and 'name' on insert. We're satisfied if the item_id or email address matches.
         if self.item_id:
             return hash(self.item_id)
-        return hash(self.email_address.lower())
+        if self.email_address:
+            return hash(self.email_address.lower())
+        return hash(self.name)
 
 
 class AvailabilityMailbox(EWSElement):
