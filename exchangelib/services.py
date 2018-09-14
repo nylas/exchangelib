@@ -390,23 +390,30 @@ class PagingEWSMixIn(EWSService):
                 if not paging_info['next_offset']:
                     # Paging is done for this message
                     continue
+                # Check sanity of paging offsets, but don't fail. When we are iterating huge collections that take a
+                # long time to complete, the collection may change while we are iterating. This can affect the
+                # 'next_offset' value and make it inconsistent with the number of already collected items.
                 if paging_info['next_offset'] != paging_info['item_count']:
-                    # Check paging offsets
-                    raise MalformedResponseError(
-                        'Unexpected next offset: %s -> %s' % (paging_info['item_count'], paging_info['next_offset'])
-                    )
+                    log.warning('Unexpected next offset: %s -> %s. Maybe the server-side collection has changed?'
+                                % (paging_info['item_count'], paging_info['next_offset']))
             # Also break out of outer loop
             if max_items and total_item_count >= max_items:
                 log.debug("'max_items' count reached (outer)")
                 break
-            # Make sure all messages that have a next_offset also have the *same* next_offset
-            unique_item_counts = {p['next_offset'] for p in paging_infos if p['next_offset'] is not None}
-            if not unique_item_counts:
+            next_offsets = {p['next_offset'] for p in paging_infos if p['next_offset'] is not None}
+            if not next_offsets:
                 # Paging is done for all messages
                 break
-            if len(unique_item_counts) > 1:
-                raise MalformedResponseError('Inconsistent next offsets: %s' % unique_item_counts)
-            common_next_offset = unique_item_counts.pop()
+            # We cannot guarantee that all messages that have a next_offset also have the *same* next_offset. This is
+            # because the collections that we are iterating may change while iterating. We'll do our best but we cannot
+            # guarantee 100% consistency when large collections are simultaneously being changed on the server.
+            #
+            # It's not possible to supply a per-folder offset when iterating multiple folders, so we'll just have to
+            # choose something that is most likely to work. Select the lowest of all the values to at least make sure
+            # we don't miss any items, although we may then get duplicates ¯\_(ツ)_/¯
+            if len(next_offsets) > 1:
+                log.warning('Inconsistent next_offset values: %r. Using lowest value', next_offsets)
+            common_next_offset = min(next_offsets)
 
     def _get_page(self, message):
         rootfolder = self._get_element_container(message=message, name='{%s}RootFolder' % MNS)
