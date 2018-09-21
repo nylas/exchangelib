@@ -455,8 +455,13 @@ items_for_2017 = my_calendar.filter(start__range=(
     tz.localize(EWSDateTime(2017, 1, 1)),
     tz.localize(EWSDateTime(2018, 1, 1))
 ))  # Filter by a date range
+
 # Same as filter() but throws an error if exactly one item isn't returned
 item = my_folder.get(subject='unique_string')
+
+# If you only have the ID and possibly the changekey of an item, you can get the full item:
+item = my_folder.get(id='AAMkADQy=')
+item = my_folder.get(id='AAMkADQy=', changekey='FwAAABYA')
 
 # You can sort by a single or multiple fields. Prefix a field with '-' to reverse the sorting. 
 # Sorting is efficient since it is done server-side.
