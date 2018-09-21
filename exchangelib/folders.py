@@ -324,15 +324,17 @@ class Folder(RegisterMixIn, SearchableMixIn):
     INSERT_AFTER_FIELD = 'child_folder_count'
 
     def __init__(self, **kwargs):
-        self.account = kwargs.pop('account', None)
+        self.root = kwargs.pop('root', None)  # This is a pointer to the root of the folder hierarchy
+        if self.root is None and isinstance(self, RootOfHierarchy):
+            self.root = self  # Add a self.reference to short-circuit recursive functions
         self.is_distinguished = kwargs.pop('is_distinguished', False)
         parent = kwargs.pop('parent', None)
         if parent:
-            if self.account:
-                if parent.account != self.account:
-                    raise ValueError("'parent.account' must match 'account'")
+            if self.root:
+                if parent.root != self.root:
+                    raise ValueError("'parent.root' must match 'root'")
             else:
-                self.account = parent.account
+                self.root = parent.root
             if 'parent_folder_id' in kwargs:
                 if parent.id != kwargs['parent_folder_id']:
                     raise ValueError("'parent_folder_id' must match 'parent' ID")
@@ -365,10 +367,9 @@ class Folder(RegisterMixIn, SearchableMixIn):
 
     def clean(self, version=None):
         super(Folder, self).clean(version=version)
-        if self.account is not None:
-            from .account import Account
-            if not isinstance(self.account, Account):
-                raise ValueError("'account' %r must be an Account instance" % self.account)
+        if self.root:
+            if not isinstance(self.root, RootOfHierarchy):
+                raise ValueError("'root' %r must be a RootOfHierarchy instance" % self.root)
 
     @property
     def parent(self):
@@ -377,7 +378,7 @@ class Folder(RegisterMixIn, SearchableMixIn):
         if self.parent_folder_id.id == self.id:
             # Some folders have a parent that references itself. Avoid circular references here
             return None
-        return self.account.root.get_folder(self.parent_folder_id.id)
+        return self.root.get_folder(self.parent_folder_id.id)
 
     @parent.setter
     def parent(self, value):
@@ -386,14 +387,14 @@ class Folder(RegisterMixIn, SearchableMixIn):
         else:
             if not isinstance(value, Folder):
                 raise ValueError("'value' %r must be a Folder instance" % value)
+            self.root = value.root
             self.parent_folder_id = ParentFolderId(id=value.id, changekey=value.changekey)
-            self.account = value.account
 
     @property
     def children(self):
         # It's dangerous to return a generator here because we may then call methods on a child that result in the
         # cache being updated while it's iterated.
-        return FolderCollection(account=self.account, folders=self.account.root.get_children(self))
+        return FolderCollection(account=self.root.account, folders=self.root.get_children(self))
 
     @property
     def parts(self):
@@ -403,10 +404,6 @@ class Folder(RegisterMixIn, SearchableMixIn):
             parts.insert(0, f)
             f = f.parent
         return parts
-
-    @property
-    def root(self):
-        return self.parts[0]
 
     @property
     def absolute(self):
@@ -419,7 +416,7 @@ class Folder(RegisterMixIn, SearchableMixIn):
                 yield f
 
     def walk(self):
-        return FolderCollection(account=self.account, folders=self._walk())
+        return FolderCollection(account=self.root.account, folders=self._walk())
 
     def _glob(self, pattern):
         split_pattern = pattern.rsplit('/', 1)
@@ -451,7 +448,7 @@ class Folder(RegisterMixIn, SearchableMixIn):
                     yield f
 
     def glob(self, pattern):
-        return FolderCollection(account=self.account, folders=self._glob(pattern))
+        return FolderCollection(account=self.root.account, folders=self._glob(pattern))
 
     def tree(self):
         """
@@ -512,17 +509,6 @@ class Folder(RegisterMixIn, SearchableMixIn):
                 return folder_cls
         raise KeyError()
 
-    @staticmethod
-    def folder_cls_from_folder_name(folder_name, locale):
-        """Returns the folder class that matches a localized folder name.
-
-        locale is a string, e.g. 'da_DK'
-        """
-        for folder_cls in WELLKNOWN_FOLDERS + NON_DELETEABLE_FOLDERS:
-            if folder_name.lower() in folder_cls.localized_names(locale):
-                return folder_cls
-        raise KeyError()
-
     @classmethod
     def item_model_from_tag(cls, tag):
         try:
@@ -533,8 +519,11 @@ class Folder(RegisterMixIn, SearchableMixIn):
     def allowed_fields(self):
         # Return non-ID fields of all item classes allowed in this folder type
         fields = set()
+        version = self.root.account.version if self.root and self.root.account else None
         for item_model in self.supported_item_models:
-            fields.update(set(item_model.supported_fields(version=self.account.version if self.account else None)))
+            fields.update(
+                set(item_model.supported_fields(version=version))
+            )
         return fields
 
     def complex_fields(self):
@@ -567,7 +556,7 @@ class Folder(RegisterMixIn, SearchableMixIn):
         # For CalendarItem items, we want to inject internal timezone fields. See also CalendarItem.clean()
         if CalendarItem in self.supported_item_models:
             meeting_tz_field, start_tz_field, end_tz_field = CalendarItem.timezone_fields()
-            if self.account.version.build < EXCHANGE_2010:
+            if self.root.account.version.build < EXCHANGE_2010:
                 if has_start or has_end:
                     fields.append(FieldPath(field=meeting_tz_field))
             else:
@@ -587,23 +576,23 @@ class Folder(RegisterMixIn, SearchableMixIn):
         raise ValueError("Unknown fieldname '%s' on class '%s'" % (fieldname, cls.__name__))
 
     def get(self, *args, **kwargs):
-        return FolderCollection(account=self.account, folders=[self]).get(*args, **kwargs)
+        return FolderCollection(account=self.root.account, folders=[self]).get(*args, **kwargs)
 
     def all(self):
-        return FolderCollection(account=self.account, folders=[self]).all()
+        return FolderCollection(account=self.root.account, folders=[self]).all()
 
     def none(self):
-        return FolderCollection(account=self.account, folders=[self]).none()
+        return FolderCollection(account=self.root.account, folders=[self]).none()
 
     def filter(self, *args, **kwargs):
-        return FolderCollection(account=self.account, folders=[self]).filter(*args, **kwargs)
+        return FolderCollection(account=self.root.account, folders=[self]).filter(*args, **kwargs)
 
     def exclude(self, *args, **kwargs):
-        return FolderCollection(account=self.account, folders=[self]).exclude(*args, **kwargs)
+        return FolderCollection(account=self.root.account, folders=[self]).exclude(*args, **kwargs)
 
     def people(self):
         return QuerySet(
-            folder_collection=FolderCollection(account=self.account, folders=[self]),
+            folder_collection=FolderCollection(account=self.root.account, folders=[self]),
             request_type=QuerySet.PERSONA,
         )
 
@@ -627,7 +616,7 @@ class Folder(RegisterMixIn, SearchableMixIn):
         if depth not in ITEM_TRAVERSAL_CHOICES:
             raise ValueError("'depth' %s must be one of %s" % (depth, ITEM_TRAVERSAL_CHOICES))
         if additional_fields:
-            allowed_fields = Persona.supported_fields(version=self.account.version)
+            allowed_fields = Persona.supported_fields(version=self.root.account.version)
             for f in additional_fields:
                 if f.field not in allowed_fields:
                     raise ValueError("'%s' is not a valid field on %s" % (f.field.name, Persona))
@@ -644,7 +633,7 @@ class Folder(RegisterMixIn, SearchableMixIn):
         else:
             restriction = Restriction(q, folders=[self])
             query_string = None
-        personas = FindPeople(account=self.account, chunk_size=page_size).call(
+        personas = FindPeople(account=self.root.account, chunk_size=page_size).call(
                 folder=self,
                 additional_fields=additional_fields,
                 restriction=restriction,
@@ -660,27 +649,27 @@ class Folder(RegisterMixIn, SearchableMixIn):
             yield p
 
     def bulk_create(self, items, *args, **kwargs):
-        return self.account.bulk_create(folder=self, items=items, *args, **kwargs)
+        return self.root.account.bulk_create(folder=self, items=items, *args, **kwargs)
 
     def save(self, update_fields=None):
         if self.id is None:
             # New folder
             if update_fields:
                 raise ValueError("'update_fields' is only valid for updates")
-            res = list(CreateFolder(account=self.account).call(parent_folder=self.parent, folders=[self]))
+            res = list(CreateFolder(account=self.root.account).call(parent_folder=self.parent, folders=[self]))
             if len(res) != 1:
                 raise ValueError('Expected result length 1, but got %s' % res)
             if isinstance(res[0], Exception):
                 raise res[0]
             self.id, self.changekey = res[0].id, res[0].changekey
-            self.account.root.add_folder(self)  # Add this folder to the cache
+            self.root.add_folder(self)  # Add this folder to the cache
             return self
 
         # Update folder
         if not update_fields:
             # The fields to update was not specified explicitly. Update all fields where update is possible
             update_fields = []
-            for f in self.supported_fields(version=self.account.version):
+            for f in self.supported_fields(version=self.root.account.version):
                 if f.is_read_only:
                     # These cannot be changed
                     continue
@@ -689,7 +678,7 @@ class Folder(RegisterMixIn, SearchableMixIn):
                         # These are required and cannot be deleted
                         continue
                 update_fields.append(f.name)
-        res = list(UpdateFolder(account=self.account).call(folders=[(self, update_fields)]))
+        res = list(UpdateFolder(account=self.root.account).call(folders=[(self, update_fields)]))
         if len(res) != 1:
             raise ValueError('Expected result length 1, but got %s' % res)
         if isinstance(res[0], Exception):
@@ -699,32 +688,32 @@ class Folder(RegisterMixIn, SearchableMixIn):
             raise ValueError('ID mismatch')
         # Don't check changekey value. It may not change on no-op updates
         self.changekey = changekey
-        self.account.root.update_folder(self)  # Update the folder in the cache
+        self.root.update_folder(self)  # Update the folder in the cache
         return None
 
     def delete(self, delete_type=HARD_DELETE):
         if delete_type not in DELETE_TYPE_CHOICES:
             raise ValueError("'delete_type' %s must be one of %s" % (delete_type, DELETE_TYPE_CHOICES))
-        res = list(DeleteFolder(account=self.account).call(folders=[self], delete_type=delete_type))
+        res = list(DeleteFolder(account=self.root.account).call(folders=[self], delete_type=delete_type))
         if len(res) != 1:
             raise ValueError('Expected result length 1, but got %s' % res)
         if isinstance(res[0], Exception):
             raise res[0]
-        self.account.root.remove_folder(self)  # Remove the updated folder from the cache
+        self.root.remove_folder(self)  # Remove the updated folder from the cache
         self.id, self.changekey = None, None
 
     def empty(self, delete_type=HARD_DELETE, delete_sub_folders=False):
         if delete_type not in DELETE_TYPE_CHOICES:
             raise ValueError("'delete_type' %s must be one of %s" % (delete_type, DELETE_TYPE_CHOICES))
-        res = list(EmptyFolder(account=self.account).call(folders=[self], delete_type=delete_type,
-                                                          delete_sub_folders=delete_sub_folders))
+        res = list(EmptyFolder(account=self.root.account).call(folders=[self], delete_type=delete_type,
+                                                               delete_sub_folders=delete_sub_folders))
         if len(res) != 1:
             raise ValueError('Expected result length 1, but got %s' % res)
         if isinstance(res[0], Exception):
             raise res[0]
         if delete_sub_folders:
             # We don't know exactly what was deleted, so invalidate the entire folder cache to be safe
-            self.account.root.clear_cache()
+            self.root.clear_cache()
 
     def wipe(self):
         # Recursively deletes all items in this folder, and all subfolders and their content. Attempts to protect
@@ -766,12 +755,12 @@ class Folder(RegisterMixIn, SearchableMixIn):
         return True
 
     @classmethod
-    def from_xml(cls, elem, account):
+    def from_xml(cls, elem, root):
         # fld_type = re.sub('{.*}', '', elem.tag)
         fld_id_elem = elem.find(FolderId.response_tag())
         fld_id = fld_id_elem.get(FolderId.ID_ATTR)
         changekey = fld_id_elem.get(FolderId.CHANGEKEY_ATTR)
-        kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.supported_fields()}
+        kwargs = {f.name: f.from_xml(elem=elem, account=root.account) for f in cls.supported_fields()}
         if not kwargs['name']:
             # Some folders are returned with an empty 'DisplayName' element. Assign a default name to them.
             # TODO: Only do this if we actually requested the 'name' field.
@@ -797,7 +786,8 @@ class Folder(RegisterMixIn, SearchableMixIn):
             if kwargs['name']:
                 try:
                     # TODO: fld_class.LOCALIZED_NAMES is most definitely neither complete nor authoritative
-                    folder_cls = cls.folder_cls_from_folder_name(folder_name=kwargs['name'], locale=account.locale)
+                    folder_cls = root.folder_cls_from_folder_name(folder_name=kwargs['name'],
+                                                                  locale=root.account.locale)
                     log.debug('Folder class %s matches localized folder name %s', folder_cls, kwargs['name'])
                 except KeyError:
                     pass
@@ -810,16 +800,16 @@ class Folder(RegisterMixIn, SearchableMixIn):
                     pass
             if folder_cls == Folder:
                 log.debug('Fallback to class Folder (folder_class %s, name %s)', kwargs['folder_class'], kwargs['name'])
-        return folder_cls(account=account, id=fld_id, changekey=changekey, **kwargs)
+        return folder_cls(root=root, id=fld_id, changekey=changekey, **kwargs)
 
     def to_xml(self, version):
         if self.is_distinguished:
             # Don't add the changekey here. When modifying folder content, we usually don't care if others have changed
             # the folder content since we fetched the changekey.
-            if self.account:
+            if self.root and self.root.account:
                 return DistinguishedFolderId(
                     id=self.DISTINGUISHED_FOLDER_ID,
-                    mailbox=Mailbox(email_address=self.account.primary_smtp_address)
+                    mailbox=Mailbox(email_address=self.root.account.primary_smtp_address)
                 ).to_xml(version=version)
             return DistinguishedFolderId(id=self.DISTINGUISHED_FOLDER_ID).to_xml(version=version)
         if self.id:
@@ -831,13 +821,13 @@ class Folder(RegisterMixIn, SearchableMixIn):
         return tuple(f for f in cls.FIELDS if f.name not in ('id', 'changekey') and f.supports_version(version))
 
     @classmethod
-    def get_distinguished(cls, account):
+    def get_distinguished(cls, root):
         """Gets the distinguished folder for this folder class"""
         if not cls.DISTINGUISHED_FOLDER_ID:
             raise ValueError('Class %s must have a DISTINGUISHED_FOLDER_ID value' % cls)
         folders = list(FolderCollection(
-            account=account,
-            folders=[cls(account=account, name=cls.DISTINGUISHED_FOLDER_ID, is_distinguished=True)]
+            account=root.account,
+            folders=[cls(root=root, name=cls.DISTINGUISHED_FOLDER_ID, is_distinguished=True)]
         ).get_folders()
         )
         if not folders:
@@ -852,11 +842,11 @@ class Folder(RegisterMixIn, SearchableMixIn):
         return folder
 
     def refresh(self):
-        if not self.account:
-            raise ValueError('%s must have an account' % self.__class__.__name__)
+        if not self.root:
+            raise ValueError('%s must have a root' % self.__class__.__name__)
         if not self.id:
             raise ValueError('%s must have an ID' % self.__class__.__name__)
-        folders = list(FolderCollection(account=self.account, folders=[self]).get_folders())
+        folders = list(FolderCollection(account=self.root.account, folders=[self]).get_folders())
         if not folders:
             raise ErrorFolderNotFound('Folder %s disappeared' % self)
         if len(folders) != 1:
@@ -887,196 +877,11 @@ class Folder(RegisterMixIn, SearchableMixIn):
 
     def __repr__(self):
         return self.__class__.__name__ + \
-               repr((self.account, self.name, self.total_count, self.unread_count, self.child_folder_count,
+               repr((self.root, self.name, self.total_count, self.unread_count, self.child_folder_count,
                      self.folder_class, self.id, self.changekey))
 
     def __str__(self):
         return '%s (%s)' % (self.__class__.__name__, self.name)
-
-
-class RootOfHierarchy(Folder):
-    # A special folder that acts as the top of a folder hierarchy. Finds and caches subfolders at arbitrary depth.
-    def __init__(self, **kwargs):
-        super(RootOfHierarchy, self).__init__(**kwargs)
-        self._subfolders = None  # See self._folders_map()
-
-    def refresh(self):
-        self._subfolders = None
-        super(RootOfHierarchy, self).refresh()
-
-    def get_folder(self, folder_id):
-        return self._folders_map.get(folder_id, None)
-
-    def add_folder(self, folder):
-        if not folder.id:
-            raise ValueError("'folder' must have an ID")
-        self._folders_map[folder.id] = folder
-
-    def update_folder(self, folder):
-        if not folder.id:
-            raise ValueError("'folder' must have an ID")
-        self._folders_map[folder.id] = folder
-
-    def remove_folder(self, folder):
-        if not folder.id:
-            raise ValueError("'folder' must have an ID")
-        try:
-            del self._folders_map[folder.id]
-        except KeyError:
-            pass
-
-    def clear_cache(self):
-        self._subfolders = None
-
-    def get_children(self, folder):
-        for f in self._folders_map.values():
-            if not f.parent:
-                continue
-            if f.parent.id == folder.id:
-                yield f
-
-    @property
-    def _folders_map(self):
-        if self._subfolders is not None:
-            return self._subfolders
-
-        # Map root, and all subfolders of root, at arbitrary depth by folder ID
-        folders_map = {self.id: self}
-        try:
-            for f in FolderCollection(account=self.account, folders=[self]).find_folders(depth=DEEP):
-                if isinstance(f, Exception):
-                    raise f
-                if f.id in folders_map:
-                    # Already exists. Probably a distinguished folder
-                    continue
-                folders_map[f.id] = f
-        except ErrorAccessDenied:
-            # We may not have GetFolder or FindFolder access
-            pass
-        self._subfolders = folders_map
-        return folders_map
-
-
-class Root(RootOfHierarchy):
-    DISTINGUISHED_FOLDER_ID = 'root'
-
-    @property
-    def tois(self):
-        # 'Top of Information Store' is a folder available in some Exchange accounts. It usually contains the
-        # distinguished folders belonging to the account (inbox, calendar, trash etc.).
-        return self.get_default_folder(MsgFolderRoot)
-
-    @property
-    def _folders_map(self):
-        if self._subfolders is not None:
-            return self._subfolders
-
-        # Map root, and all subfolders of root, at arbitrary depth by folder ID. First get distinguished folders, then
-        # everything else. AdminAuditLogs folder is not retrievable and makes the entire request fail.
-        folders_map = {self.id: self}
-        distinguished_folders = [
-            cls(account=self.account, name=cls.DISTINGUISHED_FOLDER_ID, is_distinguished=True)
-            for cls in WELLKNOWN_FOLDERS
-            if cls != AdminAuditLogs and cls.supports_version(self.account.version)
-        ]
-        try:
-            for f in FolderCollection(account=self.account, folders=distinguished_folders).get_folders():
-                if isinstance(f, (ErrorFolderNotFound, ErrorNoPublicFolderReplicaAvailable)):
-                    # This is just a distinguished folder the server does not have
-                    continue
-                if isinstance(f, ErrorInvalidOperation):
-                    # This is probably a distinguished folder the server does not have. We previously tested the exact
-                    # error message (f.value), but some Exchange servers return localized error messages, so that's not
-                    # possible to do reliably.
-                    continue
-                if isinstance(f, ErrorItemNotFound):
-                    # Another way of telling us that this is a distinguished folder the server does not have
-                    continue
-                if isinstance(f, Exception):
-                    raise f
-                folders_map[f.id] = f
-            for f in FolderCollection(account=self.account, folders=[self]).find_folders(depth=DEEP):
-                if isinstance(f, Exception):
-                    raise f
-                if f.id in folders_map:
-                    # Already exists. Probably a distinguished folder
-                    continue
-                folders_map[f.id] = f
-        except ErrorAccessDenied:
-            # We may not have GetFolder or FindFolder access
-            pass
-        self._subfolders = folders_map
-        return folders_map
-
-    def get_default_folder(self, folder_cls):
-        # Returns the distinguished folder instance of type folder_cls belonging to this account. If no distinguished
-        # folder was found, try as best we can to return the default folder of type 'folder_cls'
-        if not folder_cls.DISTINGUISHED_FOLDER_ID:
-            raise ValueError("'folder_cls' %s must have a DISTINGUISHED_FOLDER_ID value" % folder_cls)
-        # Use cached distinguished folder instance, but only if cache has already been prepped. This is an optimization
-        # for accessing e.g. 'account.contacts' without fetching all folders of the account.
-        if self._subfolders:
-            for f in self._folders_map.values():
-                # Require exact class, to not match subclasses, e.g. RecipientCache instead of Contacts
-                if f.__class__ == folder_cls and f.is_distinguished:
-                    log.debug('Found cached distinguished %s folder', folder_cls)
-                    return f
-        try:
-            log.debug('Requesting distinguished %s folder explicitly', folder_cls)
-            return folder_cls.get_distinguished(account=self.account)
-        except ErrorAccessDenied:
-            # Maybe we just don't have GetFolder access? Try FindItems instead
-            log.debug('Testing default %s folder with FindItem', folder_cls)
-            fld = folder_cls(account=self.account, name=folder_cls.DISTINGUISHED_FOLDER_ID, is_distinguished=True)
-            fld.test_access()
-            return self._folders_map.get(fld.id, fld)  # Use cached instance if available
-        except ErrorFolderNotFound:
-            # The Exchange server does not return a distinguished folder of this type
-            pass
-
-        # Try to pick a suitable default folder. we do this by:
-        #  1. Searching the full folder list for a folder with the distinguished folder name
-        #  2. Searching TOIS for a direct child folder of the same type that is marked as distinguished
-        #  3. Searching TOIS for a direct child folder of the same type that is has a localized name
-        #  4. Searching root for a direct child folder of the same type that is marked as distinguished
-        #  5. Searching root for a direct child folder of the same type that is has a localized name
-        log.debug('Searching default %s folder in full folder list', folder_cls)
-
-        for f in self._folders_map.values():
-            # Require exact class to not match e.g. RecipientCache instead of Contacts
-            if f.__class__ == folder_cls and f.has_distinguished_name:
-                log.debug('Found cached %s folder with default distinguished name', folder_cls)
-                return f
-
-        # Try direct children of TOIS first. TOIS might not exist.
-        try:
-            return self._get_candidate(folder_cls=folder_cls, folder_coll=self.tois.children)
-        except ErrorFolderNotFound:
-            # No candidates, or TOIS does ot exist
-            pass
-
-        # No candidates in TOIS. Try direct children of root.
-        return self._get_candidate(folder_cls=folder_cls, folder_coll=self.children)
-
-    def _get_candidate(self, folder_cls, folder_coll):
-        # Get a single the folder of the same type in folder_coll
-        same_type = [f for f in folder_coll if f.__class__ == folder_cls]
-        are_distinguished = [f for f in same_type if f.is_distinguished]
-        if are_distinguished:
-            candidates = are_distinguished
-        else:
-            candidates = [f for f in same_type if f.name.lower() in folder_cls.localized_names(self.account.locale)]
-        if candidates:
-            if len(candidates) > 1:
-                raise ValueError(
-                    'Multiple possible default %s folders: %s'% (folder_cls, [text_type(f.name) for f in candidates])
-                )
-            if candidates[0].is_distinguished:
-                log.debug('Found cached distinguished %s folder', folder_cls)
-            else:
-                log.debug('Found cached %s folder with localized name', folder_cls)
-            return candidates[0]
-        raise ErrorFolderNotFound('No useable default %s folders' % folder_cls)
 
 
 class Calendar(Folder):
@@ -1099,7 +904,7 @@ class Calendar(Folder):
     }
 
     def view(self, *args, **kwargs):
-        return FolderCollection(account=self.account, folders=[self]).view(*args, **kwargs)
+        return FolderCollection(account=self.root.account, folders=[self]).view(*args, **kwargs)
 
 
 class DeletedItems(Folder):
@@ -1278,11 +1083,6 @@ class ArchiveRecoverableItemsVersions(WellknownFolder):
     supported_from = EXCHANGE_2010_SP1
 
 
-class ArchiveRoot(RootOfHierarchy):
-    DISTINGUISHED_FOLDER_ID = 'archiveroot'
-    supported_from = EXCHANGE_2010_SP1
-
-
 class Conflicts(WellknownFolder):
     DISTINGUISHED_FOLDER_ID = 'conflicts'
     supported_from = EXCHANGE_2013
@@ -1342,11 +1142,6 @@ class Notes(WellknownFolder):
 class PeopleConnect(WellknownFolder):
     DISTINGUISHED_FOLDER_ID = 'peopleconnect'
     supported_from = EXCHANGE_2013
-
-
-class PublicFoldersRoot(RootOfHierarchy):
-    DISTINGUISHED_FOLDER_ID = 'publicfoldersroot'
-    supported_from = EXCHANGE_2007_SP1
 
 
 class QuickContacts(WellknownFolder):
@@ -1410,54 +1205,6 @@ class ToDoSearch(WellknownFolder):
 
 class VoiceMail(WellknownFolder):
     DISTINGUISHED_FOLDER_ID = 'voicemail'
-
-
-# See http://msdn.microsoft.com/en-us/library/microsoft.exchange.webservices.data.wellknownfoldername(v=exchg.80).aspx
-# and https://msdn.microsoft.com/en-us/library/office/aa580808(v=exchg.150).aspx
-WELLKNOWN_FOLDERS = [
-    AdminAuditLogs,
-    ArchiveDeletedItems,
-    ArchiveInbox,
-    ArchiveMsgFolderRoot,
-    ArchiveRecoverableItemsDeletions,
-    ArchiveRecoverableItemsPurges,
-    ArchiveRecoverableItemsRoot,
-    ArchiveRecoverableItemsVersions,
-    ArchiveRoot,
-    Calendar,
-    Conflicts,
-    Contacts,
-    ConversationHistory,
-    DeletedItems,
-    Directory,
-    Drafts,
-    Favorites,
-    IMContactList,
-    Inbox,
-    Journal,
-    JunkEmail,
-    LocalFailures,
-    MsgFolderRoot,
-    MyContacts,
-    Notes,
-    Outbox,
-    PeopleConnect,
-    PublicFoldersRoot,
-    QuickContacts,
-    RecipientCache,
-    RecoverableItemsDeletions,
-    RecoverableItemsPurges,
-    RecoverableItemsRoot,
-    RecoverableItemsVersions,
-    Root,
-    SearchFolders,
-    SentItems,
-    ServerFailures,
-    SyncIssues,
-    Tasks,
-    ToDoSearch,
-    VoiceMail,
-]
 
 
 class NonDeleteableFolderMixin:
@@ -1623,6 +1370,293 @@ class WorkingSet(NonDeleteableFolderMixin, Folder):
     LOCALIZED_NAMES = {
         None: (u'Working Set',),
     }
+
+
+class RootOfHierarchy(Folder):
+    # A list of wellknown, or "distinguished", folders that are belong in this folder hierarchy. See
+    # http://msdn.microsoft.com/en-us/library/microsoft.exchange.webservices.data.wellknownfoldername(v=exchg.80).aspx
+    # and https://msdn.microsoft.com/en-us/library/office/aa580808(v=exchg.150).aspx
+    # 'RootOfHierarchy' subclasses must not be in this list.
+    WELLKNOWN_FOLDERS = None
+
+    # A special folder that acts as the top of a folder hierarchy. Finds and caches subfolders at arbitrary depth.
+    def __init__(self, **kwargs):
+        self.account = kwargs.pop('account', None)  # A pointer back to the account holding the folder hierarchy
+        if kwargs.pop('root', None):
+            raise ValueError("RootOfHierarchy folders do not have a root")
+        kwargs['root'] = self
+        super(RootOfHierarchy, self).__init__(**kwargs)
+        self._subfolders = None  # See self._folders_map()
+
+    def refresh(self):
+        self._subfolders = None
+        super(RootOfHierarchy, self).refresh()
+
+    def get_folder(self, folder_id):
+        return self._folders_map.get(folder_id, None)
+
+    def add_folder(self, folder):
+        if not folder.id:
+            raise ValueError("'folder' must have an ID")
+        self._folders_map[folder.id] = folder
+
+    def update_folder(self, folder):
+        if not folder.id:
+            raise ValueError("'folder' must have an ID")
+        self._folders_map[folder.id] = folder
+
+    def remove_folder(self, folder):
+        if not folder.id:
+            raise ValueError("'folder' must have an ID")
+        try:
+            del self._folders_map[folder.id]
+        except KeyError:
+            pass
+
+    def clear_cache(self):
+        self._subfolders = None
+
+    def get_children(self, folder):
+        for f in self._folders_map.values():
+            if not f.parent:
+                continue
+            if f.parent.id == folder.id:
+                yield f
+
+    @classmethod
+    def get_distinguished(cls, account):
+        """Gets the distinguished folder for this folder class"""
+        if not cls.DISTINGUISHED_FOLDER_ID:
+            raise ValueError('Class %s must have a DISTINGUISHED_FOLDER_ID value' % cls)
+        folders = list(FolderCollection(
+            account=account,
+            folders=[cls(account=account, name=cls.DISTINGUISHED_FOLDER_ID, is_distinguished=True)]
+        ).get_folders()
+        )
+        if not folders:
+            raise ErrorFolderNotFound('Could not find distinguished folder %s' % cls.DISTINGUISHED_FOLDER_ID)
+        if len(folders) != 1:
+            raise ValueError('Expected result length 1, but got %s' % folders)
+        folder = folders[0]
+        if isinstance(folder, Exception):
+            raise folder
+        if folder.__class__ != cls:
+            raise ValueError("Expected 'folder' %r to be a %s instance" % (folder, cls))
+        return folder
+
+    def get_default_folder(self, folder_cls):
+        # Returns the distinguished folder instance of type folder_cls belonging to this account. If no distinguished
+        # folder was found, try as best we can to return the default folder of type 'folder_cls'
+        if not folder_cls.DISTINGUISHED_FOLDER_ID:
+            raise ValueError("'folder_cls' %s must have a DISTINGUISHED_FOLDER_ID value" % folder_cls)
+        # Use cached distinguished folder instance, but only if cache has already been prepped. This is an optimization
+        # for accessing e.g. 'account.contacts' without fetching all folders of the account.
+        if self._subfolders:
+            for f in self._folders_map.values():
+                # Require exact class, to not match subclasses, e.g. RecipientCache instead of Contacts
+                if f.__class__ == folder_cls and f.is_distinguished:
+                    log.debug('Found cached distinguished %s folder', folder_cls)
+                    return f
+        try:
+            log.debug('Requesting distinguished %s folder explicitly', folder_cls)
+            return folder_cls.get_distinguished(root=self.root)
+        except ErrorAccessDenied:
+            # Maybe we just don't have GetFolder access? Try FindItems instead
+            log.debug('Testing default %s folder with FindItem', folder_cls)
+            fld = folder_cls(root=self.root, name=folder_cls.DISTINGUISHED_FOLDER_ID, is_distinguished=True)
+            fld.test_access()
+            return self._folders_map.get(fld.id, fld)  # Use cached instance if available
+        except ErrorFolderNotFound:
+            # The Exchange server does not return a distinguished folder of this type
+            pass
+        raise ErrorFolderNotFound('No useable default %s folders' % folder_cls)
+
+    @property
+    def _folders_map(self):
+        if self._subfolders is not None:
+            return self._subfolders
+
+        # Map root, and all subfolders of root, at arbitrary depth by folder ID. First get distinguished folders, so we
+        # are sure to apply the correct Folder class, then fetch all subfolders of this root. AdminAuditLogs folder is
+        # not retrievable and makes the entire request fail.
+        folders_map = {self.id: self}
+        distinguished_folders = [
+            cls(root=self, name=cls.DISTINGUISHED_FOLDER_ID, is_distinguished=True)
+            for cls in self.WELLKNOWN_FOLDERS
+            if cls != AdminAuditLogs and cls.supports_version(self.account.version)
+        ]
+        try:
+            for f in FolderCollection(account=self.account, folders=distinguished_folders).get_folders():
+                if isinstance(f, (ErrorFolderNotFound, ErrorNoPublicFolderReplicaAvailable)):
+                    # This is just a distinguished folder the server does not have
+                    continue
+                if isinstance(f, ErrorInvalidOperation):
+                    # This is probably a distinguished folder the server does not have. We previously tested the exact
+                    # error message (f.value), but some Exchange servers return localized error messages, so that's not
+                    # possible to do reliably.
+                    continue
+                if isinstance(f, ErrorItemNotFound):
+                    # Another way of telling us that this is a distinguished folder the server does not have
+                    continue
+                if isinstance(f, Exception):
+                    raise f
+                folders_map[f.id] = f
+            for f in FolderCollection(account=self.account, folders=[self]).find_folders(depth=DEEP):
+                if isinstance(f, Exception):
+                    raise f
+                if f.id in folders_map:
+                    # Already exists. Probably a distinguished folder
+                    continue
+                folders_map[f.id] = f
+        except ErrorAccessDenied:
+            # We may not have GetFolder or FindFolder access
+            pass
+        self._subfolders = folders_map
+        return folders_map
+
+    @classmethod
+    def from_xml(cls, elem, account):
+        # fld_type = re.sub('{.*}', '', elem.tag)
+        fld_id_elem = elem.find(FolderId.response_tag())
+        fld_id = fld_id_elem.get(FolderId.ID_ATTR)
+        changekey = fld_id_elem.get(FolderId.CHANGEKEY_ATTR)
+        kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.supported_fields()}
+        if not kwargs['name']:
+            # Some folders are returned with an empty 'DisplayName' element. Assign a default name to them.
+            # TODO: Only do this if we actually requested the 'name' field.
+            kwargs['name'] = cls.DISTINGUISHED_FOLDER_ID
+        elem.clear()
+        return cls(account=account, id=fld_id, changekey=changekey, **kwargs)
+
+    @classmethod
+    def folder_cls_from_folder_name(cls, folder_name, locale):
+        """Returns the folder class that matches a localized folder name.
+
+        locale is a string, e.g. 'da_DK'
+        """
+        for folder_cls in cls.WELLKNOWN_FOLDERS + NON_DELETEABLE_FOLDERS:
+            if folder_name.lower() in folder_cls.localized_names(locale):
+                return folder_cls
+        raise KeyError()
+
+    def __repr__(self):
+        # Let's not create an infinite loop when printing self.root
+        return self.__class__.__name__ + \
+               repr((self.account, '[self]', self.name, self.total_count, self.unread_count, self.child_folder_count,
+                     self.folder_class, self.id, self.changekey))
+
+
+class Root(RootOfHierarchy):
+    DISTINGUISHED_FOLDER_ID = 'root'
+    WELLKNOWN_FOLDERS = [
+        AdminAuditLogs,
+        Calendar,
+        Conflicts,
+        Contacts,
+        ConversationHistory,
+        DeletedItems,
+        Directory,
+        Drafts,
+        Favorites,
+        IMContactList,
+        Inbox,
+        Journal,
+        JunkEmail,
+        LocalFailures,
+        MsgFolderRoot,
+        MyContacts,
+        Notes,
+        Outbox,
+        PeopleConnect,
+        QuickContacts,
+        RecipientCache,
+        RecoverableItemsDeletions,
+        RecoverableItemsPurges,
+        RecoverableItemsRoot,
+        RecoverableItemsVersions,
+        SearchFolders,
+        SentItems,
+        ServerFailures,
+        SyncIssues,
+        Tasks,
+        ToDoSearch,
+        VoiceMail,
+    ]
+
+    @property
+    def tois(self):
+        # 'Top of Information Store' is a folder available in some Exchange accounts. It usually contains the
+        # distinguished folders belonging to the account (inbox, calendar, trash etc.).
+        return self.get_default_folder(MsgFolderRoot)
+
+    def get_default_folder(self, folder_cls):
+        try:
+            return super(Root, self).get_default_folder(folder_cls)
+        except ErrorFolderNotFound:
+            pass
+
+        # Try to pick a suitable default folder. we do this by:
+        #  1. Searching the full folder list for a folder with the distinguished folder name
+        #  2. Searching TOIS for a direct child folder of the same type that is marked as distinguished
+        #  3. Searching TOIS for a direct child folder of the same type that is has a localized name
+        #  4. Searching root for a direct child folder of the same type that is marked as distinguished
+        #  5. Searching root for a direct child folder of the same type that is has a localized name
+        log.debug('Searching default %s folder in full folder list', folder_cls)
+
+        for f in self._folders_map.values():
+            # Require exact class to not match e.g. RecipientCache instead of Contacts
+            if f.__class__ == folder_cls and f.has_distinguished_name:
+                log.debug('Found cached %s folder with default distinguished name', folder_cls)
+                return f
+
+        # Try direct children of TOIS first. TOIS might not exist.
+        try:
+            return self._get_candidate(folder_cls=folder_cls, folder_coll=self.tois.children)
+        except ErrorFolderNotFound:
+            # No candidates, or TOIS does ot exist
+            pass
+
+        # No candidates in TOIS. Try direct children of root.
+        return self._get_candidate(folder_cls=folder_cls, folder_coll=self.children)
+
+    def _get_candidate(self, folder_cls, folder_coll):
+        # Get a single the folder of the same type in folder_coll
+        same_type = [f for f in folder_coll if f.__class__ == folder_cls]
+        are_distinguished = [f for f in same_type if f.is_distinguished]
+        if are_distinguished:
+            candidates = are_distinguished
+        else:
+            candidates = [f for f in same_type if f.name.lower() in folder_cls.localized_names(self.account.locale)]
+        if candidates:
+            if len(candidates) > 1:
+                raise ValueError(
+                    'Multiple possible default %s folders: %s'% (folder_cls, [text_type(f.name) for f in candidates])
+                )
+            if candidates[0].is_distinguished:
+                log.debug('Found cached distinguished %s folder', folder_cls)
+            else:
+                log.debug('Found cached %s folder with localized name', folder_cls)
+            return candidates[0]
+        raise ErrorFolderNotFound('No useable default %s folders' % folder_cls)
+
+
+class PublicFoldersRoot(RootOfHierarchy):
+    DISTINGUISHED_FOLDER_ID = 'publicfoldersroot'
+    supported_from = EXCHANGE_2007_SP1
+
+
+class ArchiveRoot(RootOfHierarchy):
+    DISTINGUISHED_FOLDER_ID = 'archiveroot'
+    supported_from = EXCHANGE_2010_SP1
+    WELLKNOWN_FOLDERS = [
+        ArchiveDeletedItems,
+        ArchiveInbox,
+        ArchiveMsgFolderRoot,
+        ArchiveRecoverableItemsDeletions,
+        ArchiveRecoverableItemsPurges,
+        ArchiveRecoverableItemsRoot,
+        ArchiveRecoverableItemsVersions,
+    ]
 
 
 # Folders that return 'ErrorDeleteDistinguishedFolder' when we try to delete them. I can't find any official docs

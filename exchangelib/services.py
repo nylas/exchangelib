@@ -994,6 +994,10 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
         :return: XML elements for the matching folders
         """
         from .folders import Folder
+        roots = {f.root for f in self.folders}
+        if len(roots) != 1:
+            raise ValueError('FindFolder must be called with folders in the same root hierarchy (%r)' % roots)
+        root = roots.pop()
         for elem in self._paged_call(payload_func=self.get_payload, max_items=max_items, **dict(
             additional_fields=additional_fields,
             shape=shape,
@@ -1003,7 +1007,7 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
             if isinstance(elem, Exception):
                 yield elem
                 continue
-            yield Folder.from_xml(elem=elem, account=self.account)
+            yield Folder.from_xml(elem=elem, root=root)
 
     def get_payload(self, additional_fields, shape, depth, page_size, offset=0):
         findfolder = create_element('m:%s' % self.SERVICE_NAME, Traversal=depth)
@@ -1050,7 +1054,7 @@ class GetFolder(EWSAccountService):
         """
         # We can't easily find the correct folder class from the returned XML. Instead, return objects with the same
         # class as the folder instance it was requested with.
-        from .folders import Folder, DistinguishedFolderId
+        from .folders import Folder, DistinguishedFolderId, RootOfHierarchy
         folders_list = list(folders)  # Convert to a list, in case 'folders' is a generator
         for folder, elem in zip(folders_list, self._get_elements(payload=self.get_payload(
             folders=folders,
@@ -1060,15 +1064,18 @@ class GetFolder(EWSAccountService):
             if isinstance(elem, Exception):
                 yield elem
                 continue
-            if isinstance(folder, Folder):
+            if isinstance(folder, RootOfHierarchy):
                 f = folder.from_xml(elem=elem, account=self.account)
-                if folder.is_distinguished:
-                    f.is_distinguished = True
+            elif isinstance(folder, Folder):
+                f = folder.from_xml(elem=elem, root=folder.root)
             else:
-                # 'folder' may be a FolderId/DistinguishedFolderId instance
-                f = Folder.from_xml(elem=elem, account=self.account)
-                if isinstance(folder, DistinguishedFolderId):
-                    f.is_distinguished = True
+                # 'folder' may be a FolderId/DistinguishedFolderId instance. We don't know the root so assume
+                # account.root.
+                f = Folder.from_xml(elem=elem, root=self.account.root)
+            if isinstance(folder, DistinguishedFolderId):
+                f.is_distinguished = True
+            elif isinstance(folder, Folder) and folder.is_distinguished:
+                f.is_distinguished = True
             yield f
 
     def get_payload(self, folders, additional_fields, shape):
@@ -1106,13 +1113,17 @@ class CreateFolder(EWSAccountService):
         # We can't easily find the correct folder class from the returned XML. Instead, return objects with the same
         # class as the folder instance it was requested with.
         folders_list = list(folders)  # Convert to a list, in case 'folders' is a generator
+        from .folders import RootOfHierarchy
         for folder, elem in zip(folders_list, self._get_elements(payload=self.get_payload(
                 parent_folder=parent_folder, folders=folders
         ))):
             if isinstance(elem, Exception):
                 yield elem
                 continue
-            f = folder.from_xml(elem=elem, account=self.account)
+            if isinstance(folder, RootOfHierarchy):
+                f = folder.from_xml(elem=elem, account=self.account)
+            else:
+                f = folder.from_xml(elem=elem, root=folder.root)
             if folder.is_distinguished:
                 f.is_distinguished = True
             yield f
@@ -1145,12 +1156,16 @@ class UpdateFolder(EWSAccountService):
     def call(self, folders):
         # We can't easily find the correct folder class from the returned XML. Instead, return objects with the same
         # class as the folder instance it was requested with.
+        from .folders import RootOfHierarchy
         folders_list = list(f[0] for f in folders)  # Convert to a list, in case 'folders' is a generator
         for folder, elem in zip(folders_list, self._get_elements(payload=self.get_payload(folders=folders))):
             if isinstance(elem, Exception):
                 yield elem
                 continue
-            f = folder.from_xml(elem=elem, account=self.account)
+            if isinstance(folder, RootOfHierarchy):
+                f = folder.from_xml(elem=elem, account=self.account)
+            else:
+                f = folder.from_xml(elem=elem, root=folder.root)
             if folder.is_distinguished:
                 f.is_distinguished = True
             yield f

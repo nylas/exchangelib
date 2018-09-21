@@ -1015,20 +1015,21 @@ class QuerySetTest(unittest.TestCase):
     def test_magic(self):
         self.assertEqual(
             str(QuerySet(
-                folder_collection=FolderCollection(account=None, folders=[Inbox(account='XXX', name='FooBox')]))
+                folder_collection=FolderCollection(account=None, folders=[Inbox(root='XXX', name='FooBox')]))
             ),
             'QuerySet(q=Q(), folders=[Inbox (FooBox)])'
         )
 
     def test_from_folder(self):
-        folder = Inbox(account='XXX')
+        MockRoot = namedtuple('Root', ['account'])
+        folder = Inbox(root=MockRoot(account='XXX'))
         self.assertIsInstance(folder.all(), QuerySet)
         self.assertIsInstance(folder.none(), QuerySet)
         self.assertIsInstance(folder.filter(subject='foo'), QuerySet)
         self.assertIsInstance(folder.exclude(subject='foo'), QuerySet)
 
     def test_queryset_copy(self):
-        qs = QuerySet(folder_collection=FolderCollection(account=None, folders=[Inbox(account='XXX')]))
+        qs = QuerySet(folder_collection=FolderCollection(account=None, folders=[Inbox(root='XXX')]))
         qs.q = Q()
         qs.only_fields = ('a', 'b')
         qs.order_fields = ('c', 'd')
@@ -2171,7 +2172,7 @@ class AccountTest(EWSTest):
 
         class MockCalendar(Calendar):
             @classmethod
-            def get_distinguished(cls, account, shape=None):
+            def get_distinguished(cls, root):
                 raise ErrorAccessDenied('foo')
 
         # Test an indirect folder lookup with FindItems
@@ -2182,7 +2183,7 @@ class AccountTest(EWSTest):
 
         class MockCalendar(Calendar):
             @classmethod
-            def get_distinguished(cls, account, shape=None):
+            def get_distinguished(cls, root):
                 raise ErrorFolderNotFound('foo')
 
         # Test using the one folder of this folder type
@@ -2606,28 +2607,28 @@ class FolderTest(EWSTest):
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             # Trigger a warning
-            Messages(account=self.account, id='ZZZ').get(item_id='XXX')
+            Messages(root=self.account.root, id='ZZZ').get(item_id='XXX')
             self.assertGreaterEqual(len(w), 1)
             self.assertTrue(issubclass(w[0].category, PendingDeprecationWarning), w[0].category)
             self.assertIn("Use 'id' instead", str(w[0].message))
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             # Trigger a warning
-            Messages(account=self.account, id='ZZZ').all().only('item_id')
+            Messages(root=self.account.root, id='ZZZ').all().only('item_id')
             self.assertGreaterEqual(len(w), 1)
             self.assertTrue(issubclass(w[0].category, PendingDeprecationWarning), w[0].category)
             self.assertIn("Use 'id' instead", str(w[0].message))
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             # Trigger a warning
-            Messages(account=self.account, id='ZZZ').all().values('item_id')
+            Messages(root=self.account.root, id='ZZZ').all().values('item_id')
             self.assertGreaterEqual(len(w), 1)
             self.assertTrue(issubclass(w[0].category, PendingDeprecationWarning), w[0].category)
             self.assertIn("Use 'id' instead", str(w[0].message))
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             # Trigger a warning
-            Messages(account=self.account, id='ZZZ').all().values_list('item_id')
+            Messages(root=self.account.root, id='ZZZ').all().values_list('item_id')
             self.assertGreaterEqual(len(w), 1)
             self.assertTrue(issubclass(w[0].category, PendingDeprecationWarning), w[0].category)
             self.assertIn("Use 'id' instead", str(w[0].message))
@@ -2786,7 +2787,7 @@ class FolderTest(EWSTest):
         folder = Folder()
         with self.assertRaises(ValueError):
             folder.refresh()  # Must have an account
-        folder.account = 'XXX'
+        folder.root = 'XXX'
         with self.assertRaises(ValueError):
             folder.refresh()  # Must have an id
 
@@ -3157,7 +3158,7 @@ class BaseItemTest(EWSTest):
         # Test bulk_create
         with self.assertRaises(ValueError):
             # Folder must belong to account
-            self.account.bulk_create(folder=Folder(account=None), items=[])
+            self.account.bulk_create(folder=Folder(root=None), items=[])
         with self.assertRaises(AttributeError):
             # Must have folder on save
             self.account.bulk_create(folder=None, items=[], message_disposition=SAVE_ONLY)
@@ -4328,6 +4329,7 @@ class BaseItemTest(EWSTest):
         item.delete()
 
     def test_only_fields(self):
+        assert self.account.root.account
         item = self.get_test_item()
         self.test_folder.bulk_create(items=[item, item])
         items = self.test_folder.filter(categories__contains=item.categories)

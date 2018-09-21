@@ -96,14 +96,6 @@ class Account(object):
         # We may need to override the default server version on a per-account basis because Microsoft may report one
         # server version up-front but delegate account requests to an older backend server.
         self.version = self.protocol.version
-        try:
-            self.root = Root.get_distinguished(account=self)
-        except ErrorAccessDenied:
-            # We may not have access to folder services. This will leave the account severely crippled, but at least
-            # survive the error.
-            log.warning('Access denied to root folder')
-            self.root = Root(account=self)
-
         if not isinstance(self.protocol, Protocol):
             raise ValueError("Expected 'protocol' to be a Protocol, got %s" % self.protocol)
         log.debug('Added account: %s', self)
@@ -227,7 +219,7 @@ class Account(object):
 
     @threaded_cached_property
     def public_folders_root(self):
-        return PublicFoldersRoot.get_distinguished(self)
+        return PublicFoldersRoot.get_distinguished(account=self)
 
     @threaded_cached_property
     def quick_contacts(self):
@@ -252,6 +244,10 @@ class Account(object):
     @threaded_cached_property
     def recoverable_items_versions(self):
         return self.root.get_default_folder(RecoverableItemsVersions)
+
+    @threaded_cached_property
+    def root(self):
+        return Root.get_distinguished(account=self)
 
     @threaded_cached_property
     def search_folders(self):
@@ -383,7 +379,7 @@ class Account(object):
         if folder is not None:
             if not isinstance(folder, Folder):
                 raise ValueError("'folder' %r must be a Folder instance" % folder)
-            if folder.account != self:
+            if not folder.root or folder.root.account != self:
                 raise ValueError('"Folder must belong to this account')
         if message_disposition == SAVE_ONLY and folder is None:
             raise AttributeError("Folder must be supplied when in save-only mode")
@@ -576,7 +572,7 @@ class Account(object):
         :param chunk_size: The number of items to send to the server in a single request
         :return: A generator of Item objects, in the same order as the input
         """
-        validation_folder = folder or Folder(account=self)  # Default to a folder type that supports all item types
+        validation_folder = folder or Folder(root=self.root)  # Default to a folder type that supports all item types
         # 'ids' could be an unevaluated QuerySet, e.g. if we ended up here via `fetch(ids=some_folder.filter(...))`. In
         # that case, we want to use its iterator. Otherwise, peek() will start a count() which is wasteful because we
         # need the item IDs immediately afterwards. iterator() will only do the bare minimum.

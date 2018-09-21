@@ -195,7 +195,7 @@ class Item(RegisterMixIn):
     def __init__(self, **kwargs):
         # 'account' is optional but allows calling 'send()' and 'delete()'
         # 'folder' is optional but allows calling 'save()'. If 'folder' has an account, and 'account' is not set,
-        # we use folder.account.
+        # we use folder.root.account.
         from .folders import Folder
         from .account import Account
         self.account = kwargs.pop('account', None)
@@ -205,12 +205,12 @@ class Item(RegisterMixIn):
         if self.folder is not None:
             if not isinstance(self.folder, Folder):
                 raise ValueError("'folder' %r must be a Folder instance" % self.folder)
-            if self.folder.account is not None:
+            if self.folder.root.account is not None:
                 if self.account is not None:
                     # Make sure the account from kwargs matches the folder account
-                    if self.account != self.folder.account:
-                        raise ValueError("'account' does not match 'folder.account'")
-                self.account = self.folder.account
+                    if self.account != self.folder.root.account:
+                        raise ValueError("'account' does not match 'folder.root.account'")
+                self.account = self.folder.root.account
         if 'item_id' in kwargs:
             warnings.warn("The 'item_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
             kwargs['id'] = kwargs.pop('item_id')
