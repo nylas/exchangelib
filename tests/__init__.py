@@ -4329,7 +4329,6 @@ class BaseItemTest(EWSTest):
         item.delete()
 
     def test_only_fields(self):
-        assert self.account.root.account
         item = self.get_test_item()
         self.test_folder.bulk_create(items=[item, item])
         items = self.test_folder.filter(categories__contains=item.categories)
