@@ -1390,6 +1390,7 @@ class RootOfHierarchy(Folder):
     # and https://msdn.microsoft.com/en-us/library/office/aa580808(v=exchg.150).aspx
     # 'RootOfHierarchy' subclasses must not be in this list.
     WELLKNOWN_FOLDERS = []
+    TRAVERSAL_DEPTH = DEEP
 
     # A special folder that acts as the top of a folder hierarchy. Finds and caches subfolders at arbitrary depth.
     def __init__(self, **kwargs):
@@ -1513,7 +1514,7 @@ class RootOfHierarchy(Folder):
                 if isinstance(f, Exception):
                     raise f
                 folders_map[f.id] = f
-            for f in FolderCollection(account=self.account, folders=[self]).find_folders(depth=DEEP):
+            for f in FolderCollection(account=self.account, folders=[self]).find_folders(depth=self.TRAVERSAL_DEPTH):
                 if isinstance(f, Exception):
                     raise f
                 if f.id in folders_map:
@@ -1654,6 +1655,7 @@ class Root(RootOfHierarchy):
 
 class PublicFoldersRoot(RootOfHierarchy):
     DISTINGUISHED_FOLDER_ID = 'publicfoldersroot'
+    TRAVERSAL_DEPTH = SHALLOW
     supported_from = EXCHANGE_2007_SP1
 
 
