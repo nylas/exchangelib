@@ -241,7 +241,8 @@ class EWSService(object):
                     if result is None:
                         break
                     for r in result:
-                        self._save_xml('response', local_req_id, r.text)
+                        if r.text is not None:
+                            self._save_xml('response', local_req_id, r.text)
                     got_envelopes = True
                     yield result
             finally:

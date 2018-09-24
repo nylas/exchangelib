@@ -530,7 +530,7 @@ Response data: %(xml_response)s
                     request_headers=r.request.headers,
                     response_headers=None if stream else r.headers,
                     xml_request=data,
-                    xml_response=r.content,
+                    xml_response=None if stream else r.content,
                 )
             log.debug(log_msg, log_vals)
             if _may_retry_on_error(r, protocol, wait):
