@@ -1389,7 +1389,7 @@ class RootOfHierarchy(Folder):
     # http://msdn.microsoft.com/en-us/library/microsoft.exchange.webservices.data.wellknownfoldername(v=exchg.80).aspx
     # and https://msdn.microsoft.com/en-us/library/office/aa580808(v=exchg.150).aspx
     # 'RootOfHierarchy' subclasses must not be in this list.
-    WELLKNOWN_FOLDERS = None
+    WELLKNOWN_FOLDERS = []
 
     # A special folder that acts as the top of a folder hierarchy. Finds and caches subfolders at arbitrary depth.
     def __init__(self, **kwargs):
