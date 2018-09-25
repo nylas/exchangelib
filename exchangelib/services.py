@@ -313,6 +313,8 @@ class EWSService(object):
             self._save_xml('response', local_req_id, r.text)
             try:
                 soap_response_payload = to_xml(r.content)
+                print('*******soap_response_payload************')
+                print(r.content)
             except ParseError as e:
                 raise SOAPError('Bad SOAP response: %s' % e)
             try:
@@ -386,6 +388,9 @@ class EWSService(object):
     @classmethod
     def _get_soap_payload(cls, soap_response):
         body = soap_response.find('{%s}Body' % SOAPNS)
+        print('************body**************')
+        print(body.items())
+        print(body.__repr__)
         if body is None:
             raise MalformedResponseError('No Body element in SOAP response')
         response = body.find('{%s}%sResponse' % (MNS, cls.SERVICE_NAME))
