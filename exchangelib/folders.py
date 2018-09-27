@@ -213,9 +213,9 @@ class FolderCollection(SearchableMixIn):
             query_string = None
         elif q.query_string:
             restriction = None
-            query_string = Restriction(q, folders=self.folders)
+            query_string = Restriction(q, folders=self.folders, applies_to=Restriction.ITEMS)
         else:
-            restriction = Restriction(q, folders=self.folders)
+            restriction = Restriction(q, folders=self.folders, applies_to=Restriction.ITEMS)
             query_string = None
         log.debug(
             'Finding %s items un folders %s (shape: %s, depth: %s, additional_fields: %s, restriction: %s)',
@@ -626,9 +626,9 @@ class Folder(RegisterMixIn, SearchableMixIn):
             query_string = None
         elif q.query_string:
             restriction = None
-            query_string = Restriction(q, folders=[self])
+            query_string = Restriction(q, folders=[self], applies_to=Restriction.ITEMS)
         else:
-            restriction = Restriction(q, folders=[self])
+            restriction = Restriction(q, folders=[self], applies_to=Restriction.ITEMS)
             query_string = None
         personas = FindPeople(account=self.root.account, chunk_size=page_size).call(
                 folder=self,
