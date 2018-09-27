@@ -325,8 +325,6 @@ class Folder(RegisterMixIn, SearchableMixIn):
 
     def __init__(self, **kwargs):
         self.root = kwargs.pop('root', None)  # This is a pointer to the root of the folder hierarchy
-        if self.root is None and isinstance(self, RootOfHierarchy):
-            self.root = self  # Add a self.reference to short-circuit recursive functions
         self.is_distinguished = kwargs.pop('is_distinguished', False)
         parent = kwargs.pop('parent', None)
         if parent:
@@ -367,9 +365,8 @@ class Folder(RegisterMixIn, SearchableMixIn):
 
     def clean(self, version=None):
         super(Folder, self).clean(version=version)
-        if self.root:
-            if not isinstance(self.root, RootOfHierarchy):
-                raise ValueError("'root' %r must be a RootOfHierarchy instance" % self.root)
+        if self.root and not isinstance(self.root, RootOfHierarchy):
+            raise ValueError("'root' %r must be a RootOfHierarchy instance" % self.root)
 
     @property
     def parent(self):
@@ -1472,11 +1469,11 @@ class RootOfHierarchy(Folder):
                     return f
         try:
             log.debug('Requesting distinguished %s folder explicitly', folder_cls)
-            return folder_cls.get_distinguished(root=self.root)
+            return folder_cls.get_distinguished(root=self)
         except ErrorAccessDenied:
             # Maybe we just don't have GetFolder access? Try FindItems instead
             log.debug('Testing default %s folder with FindItem', folder_cls)
-            fld = folder_cls(root=self.root, name=folder_cls.DISTINGUISHED_FOLDER_ID, is_distinguished=True)
+            fld = folder_cls(root=self, name=folder_cls.DISTINGUISHED_FOLDER_ID, is_distinguished=True)
             fld.test_access()
             return self._folders_map.get(fld.id, fld)  # Use cached instance if available
         except ErrorFolderNotFound:

@@ -13,7 +13,7 @@ from exchangelib.services import GetUserOofSettings, SetUserOofSettings
 from exchangelib.settings import OofSettings
 from .autodiscover import discover
 from .credentials import DELEGATE, IMPERSONATION, ACCESS_TYPES
-from .errors import ErrorAccessDenied, UnknownTimeZone
+from .errors import UnknownTimeZone
 from .ewsdatetime import EWSTimeZone, UTC
 from .fields import FieldPath
 from .folders import Folder, AdminAuditLogs, ArchiveDeletedItems, ArchiveInbox, ArchiveMsgFolderRoot, \
