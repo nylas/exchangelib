@@ -4065,7 +4065,8 @@ class BaseItemTest(EWSTest):
     def test_filter_with_querystring(self):
         # QueryString is only supported from Exchange 2010
         with self.assertRaises(NotImplementedError):
-            Q('subject:XXX').to_xml(self.test_folder, version=mock_version(build=EXCHANGE_2007))
+            Q('subject:XXX').to_xml(self.test_folder, version=mock_version(build=EXCHANGE_2007),
+                                    applies_to=Restriction.ITEMS)
 
         # We don't allow QueryString in combination with other restrictions
         with self.assertRaises(ValueError):

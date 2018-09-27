@@ -185,7 +185,7 @@ class Q(object):
         # Do some basic checks on the attributes, using a generic folder and no Exchange version restrictions. to_xml()
         # does a really good job of validating. There's no reason to replicate much of that here.
         from .folders import Folder
-        self.to_xml(folders=[Folder()], version=None)
+        self.to_xml(folders=[Folder()], version=None, applies_to=Restriction.ITEMS)
 
     @classmethod
     def _lookup_to_op(cls, lookup):
