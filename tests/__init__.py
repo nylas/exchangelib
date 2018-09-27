@@ -923,13 +923,13 @@ class RestrictionTest(unittest.TestCase):
     </t:And>
 </m:Restriction>'''
         q = Q(Q(categories__contains='FOO') | Q(categories__contains='BAR'), start__lt=end, end__gt=start)
-        r = Restriction(q, folders=[Calendar()])
+        r = Restriction(q, folders=[Calendar()], applies_to=Restriction.ITEMS)
         self.assertEqual(str(r), ''.join(l.lstrip() for l in result.split('\n')))
         # Test empty Q
         q = Q()
-        self.assertEqual(q.to_xml(folders=[Calendar()], version=None), None)
+        self.assertEqual(q.to_xml(folders=[Calendar()], version=None, applies_to=Restriction.ITEMS), None)
         with self.assertRaises(ValueError):
-            Restriction(q, folders=[Calendar()])
+            Restriction(q, folders=[Calendar()], applies_to=Restriction.ITEMS)
         # Test validation
         with self.assertRaises(ValueError):
             Q(datetime_created__range=(1,))  # Must have exactly 2 args
@@ -997,7 +997,7 @@ class RestrictionTest(unittest.TestCase):
 </m:Restriction>'''
         q = ~(Q(subject='bar') | Q(subject='baz'))
         self.assertEqual(
-            xml_to_str(q.to_xml(folders=[Calendar()], version=None)),
+            xml_to_str(q.to_xml(folders=[Calendar()], version=None, applies_to=Restriction.ITEMS)),
             ''.join(l.lstrip() for l in result.split('\n'))
         )
 
