@@ -990,7 +990,7 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
     SERVICE_NAME = 'FindFolder'
     element_container_name = '{%s}Folders' % TNS
 
-    def call(self, additional_fields, shape, depth, max_items):
+    def call(self, additional_fields, restriction, shape, depth, max_items):
         """
         Find subfolders of a folder.
 
@@ -1007,6 +1007,7 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
         root = roots.pop()
         for elem in self._paged_call(payload_func=self.get_payload, max_items=max_items, **dict(
             additional_fields=additional_fields,
+            restriction=restriction,
             shape=shape,
             depth=depth,
             page_size=self.chunk_size,
@@ -1016,7 +1017,7 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
                 continue
             yield Folder.from_xml(elem=elem, root=root)
 
-    def get_payload(self, additional_fields, shape, depth, page_size, offset=0):
+    def get_payload(self, additional_fields, restriction, shape, depth, page_size, offset=0):
         findfolder = create_element('m:%s' % self.SERVICE_NAME, Traversal=depth)
         foldershape = create_element('m:FolderShape')
         add_xml_child(foldershape, 't:BaseShape', shape)
@@ -1034,6 +1035,8 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
         else:
             if offset != 0:
                 raise ValueError('Offsets are only supported from Exchange 2010')
+        if restriction:
+            findfolder.append(restriction.to_xml(version=self.account.version))
         parentfolderids = create_element('m:ParentFolderIds')
         set_xml_value(parentfolderids, self.folders, version=self.account.version)
         findfolder.append(parentfolderids)

@@ -2669,6 +2669,24 @@ class FolderTest(EWSTest):
         )]).get_folders())
         self.assertGreaterEqual(len(folders), 0, sorted(f.name for f in folders))
 
+    def test_find_folders_with_restriction(self):
+        # Exact match
+        folders = list(FolderCollection(account=self.account, folders=[self.account.root])
+                       .find_folders(q=Q(name='Top of Information Store')))
+        self.assertEqual(len(folders), 1, sorted(f.name for f in folders))
+        # Startswith
+        folders = list(FolderCollection(account=self.account, folders=[self.account.root])
+                       .find_folders(q=Q(name__startswith='Top of ')))
+        self.assertEqual(len(folders), 1, sorted(f.name for f in folders))
+        # Wrong case
+        folders = list(FolderCollection(account=self.account, folders=[self.account.root])
+                       .find_folders(q=Q(name__startswith='top of ')))
+        self.assertEqual(len(folders), 0, sorted(f.name for f in folders))
+        # Case insensitive
+        folders = list(FolderCollection(account=self.account, folders=[self.account.root])
+                       .find_folders(q=Q(name__istartswith='top of ')))
+        self.assertEqual(len(folders), 1, sorted(f.name for f in folders))
+
     def test_get_folders(self):
         folders = list(FolderCollection(account=self.account, folders=[self.account.root]).get_folders())
         self.assertEqual(len(folders), 1, sorted(f.name for f in folders))
@@ -5740,7 +5758,7 @@ class MessagesTest(BaseItemTest):
         reply2 = sent_item.create_forward(subject=new_subject, body='Hello reply', to_recipients=[item.author])
         reply2 = reply2.save(self.account.drafts)
         self.assertIsInstance(reply2, Message)
-        
+
         self.account.bulk_delete([sent_item, reply, reply2])
 
     def test_mime_content(self):

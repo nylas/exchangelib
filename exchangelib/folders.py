@@ -259,10 +259,14 @@ class FolderCollection(SearchableMixIn):
                 )
         return additional_fields
 
-    def find_folders(self, shape=ID_ONLY, depth=DEEP, page_size=None):
+    def find_folders(self, q=None, shape=ID_ONLY, depth=DEEP, page_size=None):
         # 'depth' controls whether to return direct children or recurse into sub-folders
         if not self.account:
             raise ValueError('Folder must have an account')
+        if q is None or q.is_empty():
+            restriction = None
+        else:
+            restriction = Restriction(q, folders=self.folders, applies_to=Restriction.FOLDERS)
         if shape not in SHAPE_CHOICES:
             raise ValueError("'shape' %s must be one of %s" % (shape, SHAPE_CHOICES))
         if depth not in FOLDER_TRAVERSAL_CHOICES:
@@ -274,6 +278,7 @@ class FolderCollection(SearchableMixIn):
         # TODO: Support the Restriction class for folders, too
         return FindFolder(account=self.account, folders=self.folders, chunk_size=page_size).call(
                 additional_fields=additional_fields,
+                restriction=restriction,
                 shape=shape,
                 depth=depth,
                 max_items=None,
