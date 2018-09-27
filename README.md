@@ -229,6 +229,14 @@ All wellknown folders are available as properties on the account, e.g. as `accou
 ```python
 # There are multiple ways of navigating the folder tree and searching for folders. Globbing and 
 # absolute path may create unexpected results if your folder names contain slashes.
+
+# The folder structure is cached after first access to a folder hierarchy. This means that external
+# changes to the folder structure will not show up until you clear the cache. Here's how to clear
+# the cache of each of the currently supported folder hierarchies:
+account.root.refresh()
+account.public_folders_root.refresh()
+account.archive_root.refresh()
+
 some_folder.parent
 some_folder.parent.parent.parent
 some_folder.root  # Returns the root of the folder structure, at any level. Same as Account.root
@@ -240,6 +248,10 @@ some_folder.glob('foo*')  # Return child folders matching the pattern
 some_folder.glob('*/foo')  # Return subfolders named 'foo' in any child folder
 some_folder.glob('**/foo')  # Return subfolders named 'foo' at any depth
 some_folder / 'sub_folder' / 'even_deeper' / 'leaf'  # Works like pathlib.Path
+# You can also drill down into the folder structure without using the cache. This works like
+# the single slash syntax, but does not start by creating a cache the folder hierarchy. This is
+# useful if your account contains a huge number of folders, and you already know where to go.
+some_folder // 'sub_folder' // 'even_deeper' // 'leaf'
 some_folder.parts  # returns some_folder and all its parents, as Folder instances
 # tree() returns a string representation of the tree structure at the given level
 print(root.tree())
@@ -259,8 +271,6 @@ account.inbox.child_folder_count
 account.inbox.unread_count
 # Update the counters
 account.inbox.refresh()
-# The folder structure is cached after first access. To clear the cache, refresh the root folder
-account.root.refresh()
 
 # Folders can be created, updated and deleted:
 f = Folder(parent=self.account.inbox, name='My New Folder')

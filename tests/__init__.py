@@ -2878,6 +2878,29 @@ class FolderTest(EWSTest):
             self.account.root.id
         )
 
+    def test_double_div_navigation(self):
+        self.account.root.refresh()  # Clear the cache
+
+        # Test normal navigation
+        self.assertEqual(
+            (self.account.root // 'Top of Information Store' // self.account.calendar.name).id,
+            self.account.calendar.id
+        )
+        self.assertIsNone(self.account.root._subfolders)
+
+        # Test parent ('..') syntax. Should not work
+        with self.assertRaises(ValueError) as e:
+            self.account.root // 'Top of Information Store' // '..'
+        self.assertEqual(e.exception.args[0], 'Cannot get parent without a folder cache')
+        self.assertIsNone(self.account.root._subfolders)
+
+        # Test self ('.') syntax
+        self.assertEqual(
+            (self.account.root // '.').id,
+            self.account.root.id
+        )
+        self.assertIsNone(self.account.root._subfolders)
+
     def test_extended_properties(self):
         # Extended properties also work with folders. Here's an example of getting the size (in bytes) of a folder:
         class FolderSize(ExtendedProperty):

@@ -9,6 +9,8 @@ HEAD
     `Folder.id` and `Occurrence.id`, respectively. This removes redundancy in the naming
     and provides consistency. For all classes that have an ID, the ID can now be accessed
     using the `id` attribute. Backwards compatibility and deprecation warnings were added.
+-   Support folder traversal without creating a full cache of the folder hierarchy first,
+    using the `some_folder // 'sub_folder' // 'even_deeper' // 'leaf'` (double-slash) syntax.
 
 1.11.4
 ------

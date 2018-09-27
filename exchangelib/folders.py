@@ -7,7 +7,7 @@ from operator import attrgetter
 import warnings
 
 from cached_property import threaded_cached_property
-from future.utils import python_2_unicode_compatible
+from future.utils import python_2_unicode_compatible, PY2
 from six import text_type, string_types
 
 from .errors import ErrorAccessDenied, ErrorFolderNotFound, ErrorCannotEmptyFolder, ErrorCannotDeleteObject, \
@@ -19,7 +19,7 @@ from .items import Item, CalendarItem, Contact, Message, Task, MeetingRequest, M
     DELETE_TYPE_CHOICES, HARD_DELETE
 from .properties import ItemId, Mailbox, EWSElement, ParentFolderId
 from .queryset import QuerySet, SearchableMixIn
-from .restriction import Restriction
+from .restriction import Restriction, Q
 from .services import FindFolder, GetFolder, FindItem, CreateFolder, UpdateFolder, DeleteFolder, EmptyFolder, FindPeople
 from .util import TNS, MNS
 from .version import EXCHANGE_2007_SP1, EXCHANGE_2010_SP1, EXCHANGE_2013, EXCHANGE_2013_SP1
@@ -862,7 +862,26 @@ class Folder(RegisterMixIn, SearchableMixIn):
         for f in self.FIELDS:
             setattr(self, f.name, getattr(fresh_folder, f.name))
 
+    def __floordiv__(self, other):
+        """Same as __truediv__ but does not touch the folder cache.
+
+        This is useful if the folder hierarchy contains a huge number of folders and you don't want to fetch them all"""
+        if other == '..':
+            raise ValueError('Cannot get parent without a folder cache')
+
+        if other == '.':
+            return self
+
+        # Assume an exact match on the folder name in a shallow search will only return at most one folder
+        for f in FolderCollection(account=self.root.account, folders=[self]).find_folders(
+                q=Q(name=other), depth=SHALLOW
+        ):
+            return f
+        else:
+            raise ErrorFolderNotFound("No subfolder with name '%s'" % other)
+
     def __truediv__(self, other):
+        # Support the some_folder / 'child_folder' / 'child_of_child_folder' navigation syntax
         if other == '..':
             if not self.parent:
                 raise ValueError('Already at top')
@@ -874,8 +893,9 @@ class Folder(RegisterMixIn, SearchableMixIn):
                 return c
         raise ErrorFolderNotFound("No subfolder with name '%s'" % other)
 
-    # Python 2 requires __div__
-    __div__ = __truediv__
+    if PY2:
+        # Python 2 requires __div__
+        __div__ = __truediv__
 
     def __repr__(self):
         return self.__class__.__name__ + \
