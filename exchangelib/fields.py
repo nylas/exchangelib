@@ -140,7 +140,7 @@ def resolve_field_path(field_path, folder, strict=True):
 
 
 class FieldPath(object):
-    """ Holds values needed to point to a single field. For indexed properties, we allow setting eiterh field,
+    """ Holds values needed to point to a single field. For indexed properties, we allow setting either field,
     field and label, or field, label and subfield. This allows pointing to either the full indexed property set, a
     property with a specific label, or a particular subfield field on that property. """
     def __init__(self, field, label=None, subfield=None):
