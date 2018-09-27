@@ -1658,6 +1658,33 @@ class PublicFoldersRoot(RootOfHierarchy):
     TRAVERSAL_DEPTH = SHALLOW
     supported_from = EXCHANGE_2007_SP1
 
+    def get_children(self, folder):
+        # EWS does not allow deep traversal of public folders, so self._folders_map will only polulate the top-level
+        # subfolders. To traverse public folders at arbitrary depth, we need to get child folders on demand.
+
+        # Let's check if this folder already has any cached children. If so, assume we can just return those.
+        # TODO: We should also return early here if we already checked that the folder does not have children. This is
+        # not possible with the current folder cache model.
+        children = list(super(PublicFoldersRoot, self).get_children(folder=folder))
+        if children:
+            # Return a generator like our parent does
+            for f in children:
+                yield f
+            return
+
+        children_map = {}
+        for f in FolderCollection(account=self.account, folders=[folder]).find_folders(depth=self.TRAVERSAL_DEPTH):
+            if isinstance(f, Exception):
+                raise f
+            self.children_map[f.id] = f
+
+        # Let's update the cache atomically, to avoid partial reads of the cache.
+        self._subfolders.update(children_map)
+
+        # Child folders have been cached now. Try super().get_children() again.
+        for f in super(PublicFoldersRoot, self).get_children(folder=folder):
+            yield f
+
 
 class ArchiveRoot(RootOfHierarchy):
     DISTINGUISHED_FOLDER_ID = 'archiveroot'
