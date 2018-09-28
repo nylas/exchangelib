@@ -610,9 +610,9 @@ value. For example, if you want to retrieve and save emails with large attachmen
 you can change this value on a per-queryset basis:
 
 ```python
-qs = a.inbox.all().only('mime_content').iterator()
+qs = a.inbox.all().only('mime_content')
 qs.page_size = 5
-for msg in qs:
+for msg in qs.iterator():
     with open('%s.eml' % msg.item_id, 'wb') as f:
         f.write(msg.mime_content)
 ```
