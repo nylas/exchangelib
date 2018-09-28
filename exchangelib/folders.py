@@ -1695,10 +1695,14 @@ class PublicFoldersRoot(RootOfHierarchy):
             return
 
         children_map = {}
-        for f in FolderCollection(account=self.account, folders=[folder]).find_folders(depth=self.TRAVERSAL_DEPTH):
-            if isinstance(f, Exception):
-                raise f
-            self.children_map[f.id] = f
+        try:
+            for f in FolderCollection(account=self.account, folders=[folder]).find_folders(depth=self.TRAVERSAL_DEPTH):
+                if isinstance(f, Exception):
+                    raise f
+                children_map[f.id] = f
+        except ErrorAccessDenied:
+            # No access to this folder
+            pass
 
         # Let's update the cache atomically, to avoid partial reads of the cache.
         self._subfolders.update(children_map)
