@@ -595,6 +595,36 @@ my_folder.glob('foo*').filter(subject='foo')
 FolderCollection(account=account, folders=[account.inbox, account.calendar]).filter(subject='foo')
 ```
 
+### Paging
+
+Paging EWS services, e.g. FindItem and, have a default page size of 100. You can
+change this value globally if you want:
+
+```python
+import exchangelib.services
+exchangelib.services.CHUNK_SIZE = 25
+```
+
+If you are working with very small or very large items, this may not be a reasonable
+value. For example, if you want to retrieve and save emails with large attachments,
+you can change this value on a per-queryset basis:
+
+```python
+qs = a.inbox.all().only('mime_content').iterator()
+qs.page_size = 5
+for msg in qs:
+    with open('%s.eml' % msg.item_id, 'wb') as f:
+        f.write(msg.mime_content)
+```
+
+Finally, the bulk methods defined on the `Account` class have an optional `chunk_size`
+argument that you can use to set a non-default page size when fetching, creating, updating
+or deleting items.
+
+```python
+return_ids = account.bulk_create(folder=account.inbox, items=huge_items, chunk_size=5)
+```
+
 ### Meetings
 
 The `CalendarItem` class allows you send out requests for meetings that
