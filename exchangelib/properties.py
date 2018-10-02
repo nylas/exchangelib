@@ -504,6 +504,51 @@ class TimeZone(EWSElement):
 
     __slots__ = ('bias', 'standard_time', 'daylight_time')
 
+    def to_server_timezone(self, timezones, for_year):
+        """Returns the Microsoft timezone ID corresponding to this timezone. There may not be a match at all, and there
+        may be multiple matches. If so, we return a random timezone ID.
+
+        :param timezones: A list of server timezones, as returned by
+            list(account.protocol.get_timezones(return_full_timezone_data=True))
+        :param for_year:
+        :return: A Microsoft timezone ID, as a string
+        """
+        candidates = set()
+        for tz_id, tz_name, tz_periods, tz_transitions, tz_transitions_groups in timezones:
+            candidate = self.from_server_timezone(tz_periods, tz_transitions, tz_transitions_groups, for_year)
+            if candidate == self:
+                log.debug('Found exact candidate: %s (%s)', tz_id, tz_name)
+                # We prefer this timezone over anything else. Return immediately.
+                return tz_id
+            # Reduce list based on base bias and standard / daylight bias values
+            if candidate.bias != self.bias:
+                continue
+            if candidate.standard_time is None:
+                if self.standard_time is not None:
+                    continue
+            else:
+                if self.standard_time is None:
+                    continue
+                if candidate.standard_time.bias != self.standard_time.bias:
+                    continue
+            if candidate.daylight_time is None:
+                if self.daylight_time is not None:
+                    continue
+            else:
+                if self.daylight_time is None:
+                    continue
+                if candidate.daylight_time.bias != self.daylight_time.bias:
+                    continue
+            log.debug('Found candidate with matching biases: %s (%s)', tz_id, tz_name)
+            candidates.add(tz_id)
+        if not candidates:
+            raise ValueError('No server timezones match this timezone definition')
+        if len(candidates) == 1:
+            log.info('Could not find an exact timezone match for %s. Selecting the best candidate', self)
+        else:
+            log.warning('Could not find an exact timezone match for %s. Selecting a random candidate', self)
+        return candidates.pop()
+
     @classmethod
     def from_server_timezone(cls, periods, transitions, transitionsgroups, for_year):
         # Creates a TimeZone object from the result of a GetServerTimeZones call with full timezone data
