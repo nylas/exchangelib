@@ -226,7 +226,7 @@ class EWSService(object):
                 req_id += 1
                 local_req_id = req_id
                 soap_payload = wrap(content=payload, version=api_version, account=account)
-                self._save_xml('request', local_req_id, soap_payload)
+                self._write_xml('request', local_req_id, soap_payload)
                 r, session = post_ratelimited(
                     protocol=self.protocol,
                     session=session,
@@ -243,7 +243,7 @@ class EWSService(object):
                         break
                     for r in result:
                         if r.text is not None:
-                            self._save_xml('response', local_req_id, r.text)
+                            self._write_xml('response', local_req_id, r.text)
                     got_envelopes = True
                     yield result
             finally:
@@ -256,7 +256,7 @@ class EWSService(object):
             raise ErrorInvalidSchemaVersionForMailboxVersion(
                 'Tried versions %s but all were invalid for account %s' % (api_versions, account))
 
-    def _save_xml(self, ftype, req_id, xml_str):
+    def _write_xml(self, ftype, req_id, xml_str):
         if os.environ.get('TRACE_EWS') is None:
             return
         now = time.time()
@@ -299,7 +299,7 @@ class EWSService(object):
             http_headers = extra_headers(account=account)
             req_id += 1
             local_req_id = req_id
-            self._save_xml('request', local_req_id, soap_payload)
+            self._write_xml('request', local_req_id, soap_payload)
             r, session = post_ratelimited(
                 protocol=self.protocol,
                 session=self.protocol.get_session(),
@@ -309,7 +309,7 @@ class EWSService(object):
                 allow_redirects=False,
                 stream=False)
             self.protocol.release_session(session)
-            self._save_xml('response', local_req_id, r.text)
+            self._write_xml('response', local_req_id, r.text)
             try:
                 soap_response_payload = to_xml(r.content)
             except ParseError as e:
