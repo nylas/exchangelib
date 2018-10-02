@@ -659,9 +659,11 @@ class FreeBusyView(EWSElement):
         # A string of digits. Each digit points to a position in FREE_BUSY_CHOICES
         CharField('merged', field_uri='MergedFreeBusy'),
         EWSElementListField('calendar_events', field_uri='CalendarEventArray', value_cls=CalendarEvent),
-        # WorkingPeriod is located inside WorkingHours element. WorkingHours also has timezone info that we
-        # hopefully don't care about.
+        # WorkingPeriod is located inside the WorkingPeriodArray element which is inside the WorkingHours element
         EWSElementListField('working_hours', field_uri='WorkingPeriodArray', value_cls=WorkingPeriod),
+        # TimeZone is also inside the WorkingHours element. It contains information about the timezone which the
+        # account is located in.
+        EWSElementField('working_hours_timezone', field_uri='TimeZone', value_cls=TimeZone),
     ]
 
     __slots__ = tuple(f.name for f in FIELDS)
@@ -670,7 +672,7 @@ class FreeBusyView(EWSElement):
     def from_xml(cls, elem, account):
         kwargs = {}
         for f in cls.FIELDS:
-            if f.name == 'working_hours':
+            if f.name in ['working_hours', 'working_hours_timezone']:
                 kwargs[f.name] = f.from_xml(elem=elem.find('{%s}WorkingHours' % TNS), account=account)
                 continue
             kwargs[f.name] = f.from_xml(elem=elem, account=account)

@@ -1559,11 +1559,15 @@ class CommonTest(EWSTest):
 
     def test_get_free_busy_info(self):
         tz = EWSTimeZone.timezone('Europe/Copenhagen')
+        server_timezones = list(self.account.protocol.get_timezones(return_full_timezone_data=True))
         start = tz.localize(EWSDateTime.now())
         end = tz.localize(EWSDateTime.now() + datetime.timedelta(hours=6))
         accounts = [(self.account, 'Organizer', False)]
         for view_info in self.account.protocol.get_free_busy_info(accounts=accounts, start=start, end=end):
             self.assertIsInstance(view_info, FreeBusyView)
+            self.assertIsInstance(view_info.working_hours_timezone, TimeZone)
+            ms_id = view_info.working_hours_timezone.to_server_timezone(server_timezones, start.year)
+            self.assertIn(ms_id, CLDR_TO_MS_TIMEZONE_MAP.values())
 
     def test_get_roomlists(self):
         # The test server is not guaranteed to have any room lists which makes this test less useful
