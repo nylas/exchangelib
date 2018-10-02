@@ -502,12 +502,16 @@ class GetServerTimeZones(EWSService):
                 for transition in transitiongroup.findall('{%s}RecurringDayTransition' % TNS):
                     # Apply same conversion to To as for period IDs
                     to_year, to_type = transition.find('{%s}To' % TNS).text.rsplit('/', 1)[1].split('-')
+                    occurrence = xml_text_to_value(transition.find('{%s}Occurrence' % TNS).text, int)
+                    if occurrence == -1:
+                        # See TimeZoneTransition.from_xml()
+                        occurrence = 5
                     tz_transitions_groups[tg_id].append(dict(
                         to=(int(to_year), to_type),
                         offset=xml_text_to_value(transition.find('{%s}TimeOffset' % TNS).text, datetime.timedelta),
                         iso_month=xml_text_to_value(transition.find('{%s}Month' % TNS).text, int),
                         iso_weekday=WEEKDAY_NAMES.index(transition.find('{%s}DayOfWeek' % TNS).text) + 1,
-                        occurrence=xml_text_to_value(transition.find('{%s}Occurrence' % TNS).text, int),
+                        occurrence=occurrence,
                     ))
         return tz_transitions_groups
 

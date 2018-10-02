@@ -464,6 +464,21 @@ class TimeZoneTransition(EWSElement):
 
     __slots__ = ('bias', 'time', 'occurrence', 'iso_month', 'weekday')
 
+    @classmethod
+    def from_xml(cls, *args, **kwargs):
+        res = super(TimeZoneTransition, cls).from_xml(*args, **kwargs)
+        # Some parts of EWS use '5' to mean 'last occurrence in month', others use '-1'. Let's settle on '5' because
+        # only '5' is accepted in requests.
+        if res.occurrence == -1:
+            res.occurrence = 5
+        return res
+
+    def clean(self, version=None):
+        super(TimeZoneTransition, self).clean(version=version)
+        if self.occurrence == -1:
+            # See from_xml()
+            self.occurrence = 5
+
 
 class StandardTime(TimeZoneTransition):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa563445(v=exchg.150).aspx
@@ -545,7 +560,7 @@ class TimeZone(EWSElement):
                 raise ValueError("'offset' value %s must be be between 0 and 24 hours" % transition['offset'])
             transition_kwargs = dict(
                 time=(datetime.datetime(2000, 1, 1) + transition['offset']).time(),
-                occurrence=transition['occurrence'] if transition['occurrence'] >= 1 else 1,  # Value can be -1
+                occurrence=transition['occurrence'],
                 iso_month=transition['iso_month'],
                 weekday=transition['iso_weekday'],
             )
