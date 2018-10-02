@@ -548,8 +548,12 @@ class TimeField(FieldURIField):
         val = self._get_val_from_elem(elem)
         if val is not None:
             try:
-                # Assume an integer in minutes since midnight
-                return (datetime.datetime(2000, 1, 1) + datetime.timedelta(minutes=int(val))).time()
+                if ':' in val:
+                    # Assume a string of the form HH:MM:SS
+                    return datetime.datetime.strptime(val, '%H:%M:%S').time()
+                else:
+                    # Assume an integer in minutes since midnight
+                    return (datetime.datetime(2000, 1, 1) + datetime.timedelta(minutes=int(val))).time()
             except ValueError:
                 pass
         return self.default
