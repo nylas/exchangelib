@@ -18,6 +18,7 @@ import datetime
 import time
 from itertools import chain
 import logging
+from sys import stdout
 import traceback
 
 from six import text_type
@@ -256,16 +257,14 @@ class EWSService(object):
                 'Tried versions %s but all were invalid for account %s' % (api_versions, account))
 
     def _save_xml(self, ftype, req_id, xml_str):
-        if os.environ.get('SAVE_RAW_XML_PATH') is None:
+        if os.environ.get('TRACE_EWS') is None:
             return
-        fname = os.environ.get('SAVE_RAW_XML_PATH')
-        with file(fname, 'a') as f:
-            now = time.time()
-            if ftype == 'request':
-                f.write(u'REQUEST {} >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> {}\n'.format(req_id, now))
-            elif ftype == 'response':
-                f.write(u'RESPONSE {} <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< {}\n'.format(req_id, now))
-            f.write(PrettyXmlHandler.prettify_xml(xml_str) + b'\n')
+        now = time.time()
+        if ftype == 'request':
+            stdout.write(u'REQUEST {} >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> {}\n'.format(req_id, now))
+        elif ftype == 'response':
+            stdout.write(u'RESPONSE {} <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< {}\n'.format(req_id, now))
+        stdout.write(PrettyXmlHandler.prettify_xml(xml_str) + b'\n')
 
     def _parse_envelopes(self, response):
         try:
