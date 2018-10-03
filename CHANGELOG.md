@@ -1,23 +1,35 @@
 Change Log
 ==========
 
-HEAD
-----
+1.12.0
+------
 
--   Add a MAINFEST.in to ensure the LICENSE file gets included + CHANGELOG.md/README.md to sdist tarball
--   Renamed `Item.item_id`, `Folder.folder_id` and `Occurrence.item_id` to just `Item.id`,
-    `Folder.id` and `Occurrence.id`, respectively. This removes redundancy in the naming
-    and provides consistency. For all classes that have an ID, the ID can now be accessed
-    using the `id` attribute. Backwards compatibility and deprecation warnings were added.
--   Support folder traversal without creating a full cache of the folder hierarchy first,
-    using the `some_folder // 'sub_folder' // 'even_deeper' // 'leaf'` (double-slash) syntax.
+-   Add a MAINFEST.in to ensure the LICENSE file gets included + CHANGELOG.md
+    and README.md to sdist tarball
+-   Renamed `Item.item_id`, `Folder.folder_id` and `Occurrence.item_id` to just
+    `Item.id`, `Folder.id` and `Occurrence.id`, respectively. This removes
+    redundancy in the naming and provides consistency. For all classes that
+    have an ID, the ID can now be accessed using the `id` attribute. Backwards
+    compatibility and deprecation warnings were added.
+-   Support folder traversal without creating a full cache of the folder
+    hierarchy first, using the `some_folder // 'sub_folder' // 'leaf'`
+    (double-slash) syntax.
+-   Fix a bug in traversal of public and archive folders. These folder
+    hierarchies are now fully supported.
+-   Fix a bug where the timezone of a calendar item changed when the item was
+    fetched and then saved.
+-   Kerberos support is now optional and Kerberos dependencies are not
+    installed by default. Install as `pip install exchangelib[kerberos]` to get
+    Kerberos support.
 
 1.11.4
 ------
 
--   Improve back off handling when receiving `ErrorServerBusy` error messages from the server
--   Fixed bug where `Account.root` and its children would point to the root folder of the
-    connecting account instead of the target account when connecting to other accounts.
+-   Improve back off handling when receiving `ErrorServerBusy` error messages
+    from the server
+-   Fixed bug where `Account.root` and its children would point to the root
+    folder of the connecting account instead of the target account when
+    connecting to other accounts.
 
 1.11.3
 ------

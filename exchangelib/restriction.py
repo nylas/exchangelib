@@ -497,6 +497,7 @@ class Restriction(object):
     # The type of item the restriction applies to
     FOLDERS = 'folders'
     ITEMS = 'items'
+    RESTRICTION_TYPES = (FOLDERS, ITEMS)
 
     def __init__(self, q, folders, applies_to):
         if not isinstance(q, Q):
@@ -507,7 +508,8 @@ class Restriction(object):
         for folder in folders:
             if not isinstance(folder, Folder):
                 raise ValueError("'folder' value %r must be a Folder instance" % folder)
-        assert applies_to in (self.ITEMS, self.FOLDERS)
+        if applies_to not in self.RESTRICTION_TYPES:
+            raise ValueError("'applies_to' must be one of %s" % (self.RESTRICTION_TYPES,))
         self.q = q
         self.folders = folders
         self.applies_to = applies_to

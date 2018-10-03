@@ -42,7 +42,7 @@ from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalid
     ErrorFolderNotFound, ErrorInvalidRequest, SOAPError, ErrorInvalidServerVersion, NaiveDateTimeNotAllowed, \
     AmbiguousTimeError, NonExistentTimeError, ErrorUnsupportedPathForQuery, ErrorInvalidPropertyForOperation, \
     ErrorInvalidValueForProperty, ErrorPropertyUpdate, ErrorDeleteDistinguishedFolder, \
-    ErrorNoPublicFolderReplicaAvailable, ErrorServerBusy, ErrorInvalidPropertySet
+    ErrorNoPublicFolderReplicaAvailable, ErrorServerBusy, ErrorInvalidPropertySet, ErrorObjectTypeChanged
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.extended_properties import ExtendedProperty, ExternId
 from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextField, EmailAddressField, URIField, \
@@ -2930,8 +2930,9 @@ class FolderTest(EWSTest):
         f.refresh()
         self.assertEqual(f.name, new_name)
 
-        with self.assertRaises(ValueError):
-            # FolderClass may not be deleted
+        with self.assertRaises(ErrorObjectTypeChanged):
+            # FolderClass may not be changed
+            f.folder_class = get_random_string(16)
             f.save(update_fields=['folder_class'])
 
         # Create a subfolder

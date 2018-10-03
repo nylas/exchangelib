@@ -474,6 +474,7 @@ class TimeZoneTransition(EWSElement):
         return res
 
     def clean(self, version=None):
+        # pylint: disable=access-member-before-definition
         super(TimeZoneTransition, self).clean(version=version)
         if self.occurrence == -1:
             # See from_xml()
