@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 from collections import defaultdict
 from locale import getlocale
 from logging import getLogger
+import warnings
 
 from cached_property import threaded_cached_property
 from future.utils import python_2_unicode_compatible
@@ -102,7 +103,6 @@ class Account(object):
 
     @property
     def folders(self):
-        import warnings
         warnings.warn('The Account.folders mapping is deprecated. Use Account.root.walk() instead')
         folders_map = defaultdict(list)
         for f in self.root.walk():
