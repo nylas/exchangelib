@@ -2210,13 +2210,24 @@ class AccountTest(EWSTest):
         # Test that we can pickle various objects
         item = Message(folder=self.account.inbox, subject='XXX', categories=self.categories).save()
         pickle.dumps(item)
-        item.delete()
-        pickle.dumps(self.account.protocol)
-        pickle.dumps(self.account.root)
-        pickle.dumps(self.account.inbox)
-        pickle.dumps(self.account)
-        pickle.dumps(Credentials('XXX', 'YYY'))
-        pickle.dumps(ServiceAccount('XXX', 'YYY'))
+        try:
+            for o in (
+                item,
+                self.account.protocol,
+                self.account.root,
+                self.account.inbox,
+                self.account,
+                Credentials('XXX', 'YYY'),
+                ServiceAccount('XXX', 'YYY'),
+            ):
+                pickled_o = pickle.dumps(o)
+                unpickled_o = pickle.loads(pickled_o)
+                self.assertIsInstance(unpickled_o, type(o))
+                if not isinstance(o, (Account, Protocol)):
+                    # __eq__ is not defined on Protocol and Account
+                    self.assertEqual(o, unpickled_o)
+        finally:
+            item.delete()
 
 
 class AutodiscoverTest(EWSTest):

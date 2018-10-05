@@ -144,8 +144,8 @@ class Build(object):
             return {k: getattr(self, k) for k in self.__slots__}
 
         def __setstate__(self, state):
-            for k, v in state:
-                setattr(self, k, v)
+            for k in self.__slots__:
+                setattr(self, k, state.get(k))
 
     def __str__(self):
         return '%s.%s.%s.%s' % (self.major_version, self.minor_version, self.major_build, self.minor_build)
@@ -290,8 +290,8 @@ class Version(object):
             return {k: getattr(self, k) for k in self.__slots__}
 
         def __setstate__(self, state):
-            for k, v in state:
-                setattr(self, k, v)
+            for k in self.__slots__:
+                setattr(self, k, state.get(k))
 
     def __repr__(self):
         return self.__class__.__name__ + repr((self.build, self.api_version))

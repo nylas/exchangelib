@@ -208,11 +208,19 @@ class EWSElement(object):
 
     if PY2:
         def __getstate__(self):
-            return {k: getattr(self, k) for k in self.__slots__}
+            try:
+                return self.__dict__.copy()
+            except AttributeError:
+                # This is a class where __slots__ is defined
+                return {k: getattr(self, k) for k in self.__class__.__slots__}
 
         def __setstate__(self, state):
-            for k, v in state:
-                setattr(self, k, v)
+            try:
+                self.__dict__.update(state)
+            except AttributeError:
+                # This is a class where __slots__ is defined
+                for k, v in state.items():
+                    setattr(self, k, v)
 
     def __str__(self):
         return self.__class__.__name__ + '(%s)' % ', '.join(
