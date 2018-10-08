@@ -4539,6 +4539,21 @@ class BaseItemTest(EWSTest):
         item.refresh()
         self.assertEqual(item.subject, 'XXX')
         self.assertNotEqual(item.body, 'YYY')
+
+        # Test invalid 'update_fields' input
+        with self.assertRaises(ValueError) as e:
+            item.save(update_fields=['xxx'])
+        self.assertEqual(
+            e.exception.args[0],
+            "Field name(s) 'xxx' are not valid for a '%s' item" % self.ITEM_CLASS.__name__
+        )
+        with self.assertRaises(ValueError) as e:
+            item.save(update_fields='subject')
+        self.assertEqual(
+            e.exception.args[0],
+            "Field name(s) 's', 'u', 'b', 'j', 'e', 'c', 't' are not valid for a '%s' item" % self.ITEM_CLASS.__name__
+        )
+
         self.bulk_delete([item])
 
     def test_soft_delete(self):

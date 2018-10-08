@@ -13,6 +13,7 @@ Exchange EWS references:
 from __future__ import unicode_literals
 
 import abc
+from collections import OrderedDict
 import datetime
 from itertools import chain
 import logging
@@ -739,33 +740,38 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
         return setitemfield
 
     @staticmethod
-    def _sort_fieldnames(item_model, fieldnames):
-        # Take a list of fieldnames and return the fields in the order they are mentioned in item_class.FIELDS.
+    def _sorted_fields(item_model, fieldnames):
+        # Take a list of fieldnames and return the (unique) fields in the order they are mentioned in item_class.FIELDS.
+        # Checks that all fieldnames are valid.
+        unique_fieldnames = list(OrderedDict.fromkeys(fieldnames))  # Make field names unique ,but keep ordering
         for f in item_model.FIELDS:
-            if f.name in fieldnames:
-                yield f.name
+            if f.name in unique_fieldnames:
+                unique_fieldnames.remove(f.name)
+                yield f
+        if unique_fieldnames:
+            raise ValueError("Field name(s) %s are not valid for a '%s' item" % (
+                ', '.join("'%s'" % f for f in unique_fieldnames), item_model.__name__))
 
     def _get_item_update_elems(self, item, fieldnames):
         from .items import CalendarItem
-        fieldnames_set = set(fieldnames)
+        fieldnames_copy = list(fieldnames)
 
         if item.__class__ == CalendarItem:
             # For CalendarItem items where we update 'start' or 'end', we want to update internal timezone fields
             item.clean_timezone_fields(version=self.account.version)  # Possibly also sets timezone values
             meeting_tz_field, start_tz_field, end_tz_field = CalendarItem.timezone_fields()
             if self.account.version.build < EXCHANGE_2010:
-                if 'start' in fieldnames_set or 'end' in fieldnames_set:
-                    fieldnames_set.add(meeting_tz_field.name)
+                if 'start' in fieldnames_copy or 'end' in fieldnames_copy:
+                    fieldnames_copy.append(meeting_tz_field.name)
             else:
-                if 'start' in fieldnames_set:
-                    fieldnames_set.add(start_tz_field.name)
-                if 'end' in fieldnames_set:
-                    fieldnames_set.add(end_tz_field.name)
+                if 'start' in fieldnames_copy:
+                    fieldnames_copy.append(start_tz_field.name)
+                if 'end' in fieldnames_copy:
+                    fieldnames_copy.append(end_tz_field.name)
         else:
             meeting_tz_field, start_tz_field, end_tz_field = None, None, None
 
-        for fieldname in self._sort_fieldnames(item_model=item.__class__, fieldnames=fieldnames_set):
-            field = item.get_field_by_fieldname(fieldname)
+        for field in self._sorted_fields(item_model=item.__class__, fieldnames=fieldnames_copy):
             if field.is_read_only:
                 raise ValueError('%s is a read-only field' % field.name)
             value = self._get_item_value(item, field, meeting_tz_field, start_tz_field, end_tz_field)
