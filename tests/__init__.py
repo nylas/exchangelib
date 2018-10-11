@@ -68,7 +68,7 @@ from exchangelib.recurrence import Recurrence, AbsoluteYearlyPattern, RelativeYe
 from exchangelib.restriction import Restriction, Q
 from exchangelib.settings import OofSettings
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, GetAttachment, ResolveNames, GetPersona, \
-    TNS
+    GetFolder, TNS
 from exchangelib.transport import NOAUTH, BASIC, DIGEST, NTLM, wrap, _get_auth_method_from_response
 from exchangelib.util import chunkify, peek, get_redirect_url, to_xml, BOM, get_domain, value_to_xml_text, \
     post_ratelimited, create_element, CONNECTION_ERRORS, PrettyXmlHandler, xml_to_str, ParseError
@@ -2725,6 +2725,19 @@ class FolderTest(EWSTest):
             mailbox=Mailbox(email_address=self.account.primary_smtp_address)
         )]).get_folders())
         self.assertEqual(len(folders), 1, sorted(f.name for f in folders))
+
+    def test_get_folders_with_distinguished_id(self):
+        # Test that we return an Inbox instance and not a generic Messages or Folder instance when we call GetFolder
+        # with a DistinguishedFolderId instance with an ID of Inbox.DISTINGUISHED_FOLDER_ID.
+        inbox = list(GetFolder(account=self.account).call(
+            folders=[DistinguishedFolderId(
+                id=Inbox.DISTINGUISHED_FOLDER_ID,
+                mailbox=Mailbox(email_address=self.account.primary_smtp_address))
+            ],
+            shape='IdOnly',
+            additional_fields=[],
+        ))[0]
+        self.assertIsInstance(inbox, Inbox)
 
     def test_folder_grouping(self):
         # If you get errors here, you probably need to fill out [folder class].LOCALIZED_NAMES for your locale.

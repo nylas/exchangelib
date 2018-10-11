@@ -1088,9 +1088,16 @@ class GetFolder(EWSAccountService):
                 f = folder.from_xml(elem=elem, account=self.account)
             elif isinstance(folder, Folder):
                 f = folder.from_xml(elem=elem, root=folder.root)
+            elif isinstance(folder, DistinguishedFolderId):
+                # We don't know the root, so assume account.root.
+                for folder_cls in self.account.root.WELLKNOWN_FOLDERS:
+                    if folder_cls.DISTINGUISHED_FOLDER_ID == folder.id:
+                        break
+                else:
+                    raise ValueError('Unknown distinguished folder ID: %s', folder.id)
+                f = folder_cls.from_xml(elem=elem, root=self.account.root)
             else:
-                # 'folder' may be a FolderId/DistinguishedFolderId instance. We don't know the root so assume
-                # account.root.
+                # 'folder' is a generic FolderId instance. We don't know the root so assume account.root.
                 f = Folder.from_xml(elem=elem, root=self.account.root)
             if isinstance(folder, DistinguishedFolderId):
                 f.is_distinguished = True
