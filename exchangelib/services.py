@@ -244,6 +244,10 @@ class EWSService(object):
                 except (TypeError, AttributeError):
                     pass
                 raise ErrorServerBusy(msg, back_off=back_off)
+            elif code == 'ErrorSchemaValidation' and msg_xml is not None:
+                violation = get_xml_attr(msg_xml, '{%s}Violation' % TNS)
+                if violation is not None:
+                    msg = '%s %s' % (msg, violation)
             try:
                 raise vars(errors)[code](msg)
             except KeyError:
