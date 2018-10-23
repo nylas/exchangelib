@@ -5903,10 +5903,6 @@ class ContactsTest(BaseItemTest):
     FOLDER_CLASS = Contacts
     ITEM_CLASS = Contact
 
-    def test_paging(self):
-        # TODO: This test throws random ErrorIrresolvableConflict errors on item creation for some reason.
-        pass
-
     def test_distribution_lists(self):
         dl = DistributionList(folder=self.test_folder, display_name=get_random_string(255), categories=self.categories)
         dl.save()
