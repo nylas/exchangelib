@@ -1,6 +1,11 @@
 Change Log
 ==========
 
+HEAD
+----
+-   Lower the session pool size automatically in response to ErrorServerBusy and
+    ErrorTooManyObjectsOpened errors from the server.
+
 1.12.0
 ------
 
