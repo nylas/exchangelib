@@ -11,6 +11,7 @@ from future.utils import python_2_unicode_compatible
 from .items import CalendarItem, ID_ONLY
 from .fields import FieldPath, FieldOrder
 from .restriction import Q
+from .services import CHUNK_SIZE
 from .version import EXCHANGE_2010
 
 log = logging.getLogger(__name__)
@@ -78,6 +79,7 @@ class QuerySet(SearchableMixIn):
         self.calendar_view = None
         self.page_size = None
         self.max_items = None
+        self.offset = 0
 
         self._cache = None
 
@@ -108,6 +110,7 @@ class QuerySet(SearchableMixIn):
         new_qs.calendar_view = self.calendar_view
         new_qs.page_size = self.page_size
         new_qs.max_items = self.max_items
+        new_qs.offset = self.offset
         return new_qs
 
     @property
@@ -223,6 +226,7 @@ class QuerySet(SearchableMixIn):
                 order_fields=order_fields,
                 page_size=self.page_size,
                 max_items=self.max_items,
+                offset=self.offset,
             )
         else:
             find_item_kwargs = dict(
@@ -232,6 +236,7 @@ class QuerySet(SearchableMixIn):
                 calendar_view=self.calendar_view,
                 page_size=self.page_size,
                 max_items=self.max_items,
+                offset=self.offset,
             )
 
             if complex_fields_requested:
@@ -304,8 +309,6 @@ class QuerySet(SearchableMixIn):
     def __getitem__(self, idx_or_slice):
         # Support indexing and slicing. This is non-greedy when possible (slicing start, stop and step are not negative,
         # and we're ordering on at most one field), and will only fill the cache if the entire query is iterated.
-        # TODO: We could optimize this for large indexes or slices (e.g. [999] or [999:1002]) by letting the FindItem
-        # service expose the 'offset' value, so we don't need to get the first 999 items.
         if isinstance(idx_or_slice, int):
             return self._getitem_idx(idx_or_slice)
         return self._getitem_slice(idx_or_slice)
@@ -317,16 +320,15 @@ class QuerySet(SearchableMixIn):
             # Support negative indexes by reversing the queryset and negating the index value
             reverse_idx = -(idx+1)
             return self.reverse()[reverse_idx]
-        else:
-            if not self.is_cached and idx < 100:
-                # If idx is small, optimize a bit by setting self.page_size to only get as many items as strictly needed
-                self.page_size = idx + 1
-                self.max_items = idx + 1
-            # Support non-negative indexes by consuming the iterator up to the index
-            for i, val in enumerate(self.__iter__()):
-                if i == idx:
-                    return val
-            raise IndexError()
+        # Optimize by setting an exact offset and fetching only 1 item
+        new_qs = self.copy()
+        new_qs.max_items = 1
+        new_qs.page_size = 1
+        new_qs.offset = idx
+        # The iterator will return at most 1 item
+        for item in new_qs.__iter__():
+            return item
+        raise IndexError()
 
     def _getitem_slice(self, s):
         if ((s.start or 0) < 0) or ((s.stop or 0) < 0) or ((s.step or 0) < 0):
@@ -334,12 +336,20 @@ class QuerySet(SearchableMixIn):
             # query result, and then slice on the cache.
             list(self.__iter__())
             return self._cache[s]
-        if not self.is_cached and s.stop is not None and s.stop < 100:
-            # If the range is small, optimize a bit by setting self.page_size to only get as many items as strictly
-            # needed.
-            self.page_size = s.stop
-            self.max_items = s.stop
-        return islice(self.__iter__(), s.start, s.stop, s.step)
+        if self.is_cached:
+            return islice(self.__iter__(), s.start, s.stop, s.step)
+        # Optimize by setting an exact offset and max_items value
+        new_qs = self.copy()
+        if s.start is not None and s.stop is not None:
+            new_qs.offset = s.start
+            new_qs.max_items = s.stop - s.start
+        elif s.start is not None:
+            new_qs.offset = s.start
+        elif s.stop is not None:
+            new_qs.max_items = s.stop
+        if new_qs.page_size is None and new_qs.max_items is not None and new_qs.max_items < CHUNK_SIZE:
+            new_qs.page_size = new_qs.max_items
+        return islice(new_qs.__iter__(), None, None, s.step)
 
     def _item_yielder(self, iterable, item_func, id_only_func, changekey_only_func, id_and_changekey_func):
         # Transforms results from the server according to the given transform functions. Makes sure to pass on

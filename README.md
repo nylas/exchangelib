@@ -509,16 +509,15 @@ values_as_list = my_folder.all().values_list('subject', 'body')
 # Return values as a flat list
 all_subjects = my_folder.all().values_list('physical_addresses__Home__street', flat=True)
 
-# A QuerySet can be sliced like a normal Python list. Slicing from the start of the QuerySet
-# is efficient (it only fetches the necessary items), but more exotic slicing requires many or all
-# items to be fetched from the server. Slicing from the end is also efficient, but then you might
-# as well just reverse the sorting.
-first_ten = my_folder.all().order_by('-subject')[:10]  # Efficient
+# A QuerySet can be indexed and sliced like a normal Python list. Slicing and indexing of the
+# QuerySet is efficient because it only fetches the necessary items to perform the slicing.
+# Slicing from the end is also efficient, but then you might as well reverse the sorting.
+first_ten = my_folder.all().order_by('-subject')[:10]  # Efficient. We only fetch 10 items
 last_ten = my_folder.all().order_by('-subject')[:-10]  # Efficient, but convoluted
-next_ten = my_folder.all().order_by('-subject')[10:20]  # Somewhat efficient, but we fetch 20 items
-single_item = my_folder.all().order_by('-subject')[34298]  # This is looking for trouble
-single_item = my_folder.all().order_by('-subject')[3420:3430]  # This is also looking for trouble
-random_emails = my_folder.all().order_by('-subject')[::3]  # This is just stupid
+next_ten = my_folder.all().order_by('-subject')[10:20]  # Efficient. We only fetch 10 items
+single_item = my_folder.all().order_by('-subject')[34298]  # Efficient. We only fetch 1 item
+single_item = my_folder.all().order_by('-subject')[3420:3430]  # Efficient. We only fetch 10 items
+random_emails = my_folder.all().order_by('-subject')[::3]  # This is just stupid, but works
 
 # The syntax for filter() is modeled after Django QuerySet filters. The following filter lookup 
 # types are supported. Some lookups only work with string attributes. Range and less/greater 

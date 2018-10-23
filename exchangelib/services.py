@@ -359,7 +359,7 @@ class PagingEWSMixIn(EWSService):
         else:
             expected_message_count = 1
         paging_infos = [dict(item_count=0, next_offset=None) for _ in range(expected_message_count)]
-        common_next_offset = 0
+        common_next_offset = kwargs['offset']
         total_item_count = 0
         while True:
             log.debug('%s: Getting items at offset %s (max_items %s)', log_prefix, common_next_offset, max_items)
@@ -939,7 +939,8 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
     SERVICE_NAME = 'FindItem'
     element_container_name = '{%s}Items' % TNS
 
-    def call(self, additional_fields, restriction, order_fields, shape, query_string, depth, calendar_view, max_items):
+    def call(self, additional_fields, restriction, order_fields, shape, query_string, depth, calendar_view, max_items,
+             offset):
         """
         Find items in an account.
 
@@ -951,6 +952,7 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
         :param depth: How deep in the folder structure to search for items
         :param calendar_view: If set, returns recurring calendar items unfolded
         :param max_items: the max number of items to return
+        :param offset: the offset relative to the first item in the item collection. Usually 0.
         :return: XML elements for the matching items
         """
         return self._paged_call(payload_func=self.get_payload, max_items=max_items, **dict(
@@ -962,6 +964,7 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
             depth=depth,
             calendar_view=calendar_view,
             page_size=self.chunk_size,
+            offset=offset,
         ))
 
     def get_payload(self, additional_fields, restriction, order_fields, query_string, shape, depth, calendar_view,
@@ -1010,7 +1013,7 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
     SERVICE_NAME = 'FindFolder'
     element_container_name = '{%s}Folders' % TNS
 
-    def call(self, additional_fields, restriction, shape, depth, max_items):
+    def call(self, additional_fields, restriction, shape, depth, max_items, offset):
         """
         Find subfolders of a folder.
 
@@ -1018,6 +1021,7 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
         :param shape: The set of attributes to return
         :param depth: How deep in the folder structure to search for folders
         :param max_items: The maximum number of items to return
+        :param offset: the offset relative to the first item in the item collection. Usually 0.
         :return: XML elements for the matching folders
         """
         from .folders import Folder
@@ -1031,6 +1035,7 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
             shape=shape,
             depth=depth,
             page_size=self.chunk_size,
+            offset=offset,
         )):
             if isinstance(elem, Exception):
                 yield elem
@@ -1419,7 +1424,7 @@ class FindPeople(EWSAccountService, PagingEWSMixIn):
     SERVICE_NAME = 'FindPeople'
     element_container_name = '{%s}People' % MNS
 
-    def call(self, folder, additional_fields, restriction, order_fields, shape, query_string, depth, max_items):
+    def call(self, folder, additional_fields, restriction, order_fields, shape, query_string, depth, max_items, offset):
         """
         Find items in an account.
 
@@ -1431,6 +1436,7 @@ class FindPeople(EWSAccountService, PagingEWSMixIn):
         :param query_string: a QueryString object
         :param depth: How deep in the folder structure to search for items
         :param max_items: the max number of items to return
+        :param offset: the offset relative to the first item in the item collection. Usually 0.
         :return: XML elements for the matching items
         """
         from .items import Persona, ID_ONLY
@@ -1443,6 +1449,7 @@ class FindPeople(EWSAccountService, PagingEWSMixIn):
             shape=shape,
             depth=depth,
             page_size=self.chunk_size,
+            offset=offset,
         ))
         if shape == ID_ONLY and additional_fields is None:
             for p in personas:
