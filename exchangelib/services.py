@@ -1496,7 +1496,7 @@ class FindPeople(EWSAccountService, PagingEWSMixIn):
     def _paged_call(self, payload_func, max_items, **kwargs):
         account = self.account if isinstance(self, EWSAccountService) else None
         log_prefix = 'EWS %s, account %s, service %s' % (self.protocol.service_endpoint, account, self.SERVICE_NAME)
-        item_count = 0
+        item_count = kwargs['offset']
         while True:
             log.debug('%s: Getting items at offset %s', log_prefix, item_count)
             kwargs['offset'] = item_count
@@ -1536,7 +1536,6 @@ class FindPeople(EWSAccountService, PagingEWSMixIn):
         total_items = int(message.find('{%s}TotalNumberOfPeopleInView' % MNS).text)
         first_matching = int(message.find('{%s}FirstMatchingRowIndex' % MNS).text)
         first_loaded = int(message.find('{%s}FirstLoadedRowIndex' % MNS).text)
-        # TODO: Implement paging when we know how it works for this service
         log.debug('%s: Got page with total items %s, first matching %s, first loaded %s ', self.SERVICE_NAME,
                   total_items, first_matching, first_loaded)
         return message, total_items
