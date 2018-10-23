@@ -2780,34 +2780,55 @@ class FolderTest(EWSTest):
 
     def test_counts(self):
         # Test count values on a folder
-        # TODO: Subfolder creation isn't supported yet, so we can't test that child_folder_count changes
-        self.assertGreaterEqual(self.account.inbox.total_count, 0)
-        if self.account.inbox.unread_count is not None:
-            self.assertGreaterEqual(self.account.inbox.unread_count, 0)
-        self.assertGreaterEqual(self.account.inbox.child_folder_count, 0)
+        f = Folder(parent=self.account.inbox, name=get_random_string(16)).save()
+        f.refresh()
+
+        self.assertEqual(f.total_count, 0)
+        self.assertEqual(f.unread_count, 0)
+        self.assertEqual(f.child_folder_count, 0)
         # Create some items
         items = []
         for i in range(3):
             subject = 'Test Subject %s' % i
-            item = Message(account=self.account, folder=self.account.inbox, is_read=False, subject=subject,
-                           categories=self.categories)
+            item = Message(account=self.account, folder=f, is_read=False, subject=subject, categories=self.categories)
             item.save()
             items.append(item)
-        # Refresh values
-        self.account.inbox.refresh()
-        self.assertGreaterEqual(self.account.inbox.total_count, 3)
-        self.assertGreaterEqual(self.account.inbox.unread_count, 3)
-        self.assertGreaterEqual(self.account.inbox.child_folder_count, 0)
+        # Refresh values and see that total_count and unread_count changes
+        f.refresh()
+        self.assertEqual(f.total_count, 3)
+        self.assertEqual(f.unread_count, 3)
+        self.assertEqual(f.child_folder_count, 0)
         for i in items:
             i.is_read = True
             i.save()
         # Refresh values and see that unread_count changes
-        self.account.inbox.refresh()
-        self.assertGreaterEqual(self.account.inbox.total_count, 3)
-        if self.account.inbox.unread_count is not None:
-            self.assertGreaterEqual(self.account.inbox.unread_count, 0)
-        self.assertGreaterEqual(self.account.inbox.child_folder_count, 0)
+        f.refresh()
+        self.assertEqual(f.total_count, 3)
+        self.assertEqual(f.unread_count, 0)
+        self.assertEqual(f.child_folder_count, 0)
         self.bulk_delete(items)
+        # Refresh values and see that total_count changes
+        f.refresh()
+        self.assertEqual(f.total_count, 0)
+        self.assertEqual(f.unread_count, 0)
+        self.assertEqual(f.child_folder_count, 0)
+        # Create some subfolders
+        subfolders = []
+        for i in range(3):
+            subfolders.append(Folder(parent=f, name=get_random_string(16)).save())
+        # Refresh values and see that child_folder_count changes
+        f.refresh()
+        self.assertEqual(f.total_count, 0)
+        self.assertEqual(f.unread_count, 0)
+        self.assertEqual(f.child_folder_count, 3)
+        for sub_f in subfolders:
+            sub_f.delete()
+        # Refresh values and see that child_folder_count changes
+        f.refresh()
+        self.assertEqual(f.total_count, 0)
+        self.assertEqual(f.unread_count, 0)
+        self.assertEqual(f.child_folder_count, 0)
+        f.delete()
 
     def test_refresh(self):
         # Test that we can refresh folders
