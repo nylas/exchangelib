@@ -62,7 +62,9 @@ class BaseProtocol(object):
         self.credentials = credentials
         self.service_endpoint = service_endpoint
         self.auth_type = auth_type
+        self._session_pool_size = self.SESSION_POOLSIZE
         self._session_pool = None  # Consumers need to fill the session pool themselves
+        self._session_pool_lock = None
 
     def __del__(self):
         # pylint: disable=bare-except
@@ -89,6 +91,24 @@ class BaseProtocol(object):
             pool_maxsize=cls.CONNECTIONS_PER_SESSION,
             max_retries=0,
         )
+
+    def decrease_poolsize(self):
+        """Decreases the session pool size in response to error messages from the server requesting to rate-limit
+        requests. We decrease by one session per call.
+        """
+        # Take a single session from the pool and discard it. We need to protect this with a lock while we are changing
+        # the pool size variable, to avoid race conditions. We must keep at least one session in the pool.
+        if self._session_pool_size <= 1:
+            log.debug('Session pool size cannot be decreased further')
+            return
+        with self._session_pool_lock:
+            if self._session_pool_size <= 1:
+                log.debug('Session pool size was decreased in another thread')
+                return
+            log.warning('Lowering session pool size from %s to %s', self._session_pool_size,
+                        self._session_pool_size - 1)
+            self.get_session().close()
+            self._session_pool_size -= 1
 
     def get_session(self):
         _timeout = 60  # Rate-limit messages about session starvation
@@ -227,6 +247,7 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
         # Try to behave nicely with the Exchange server. We want to keep the connection open between requests.
         # We also want to re-use sessions, to avoid the NTLM auth handshake on every request.
         self._session_pool = self._create_session_pool()
+        self._session_pool_lock = Lock()
 
         if version:
             isinstance(version, Version)
@@ -242,8 +263,8 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
 
     def _create_session_pool(self):
         # Create a pool to reuse sessions containing connections to the server
-        session_pool = LifoQueue(maxsize=self.SESSION_POOLSIZE)
-        for _ in range(self.SESSION_POOLSIZE):
+        session_pool = LifoQueue(maxsize=self._session_pool_size)
+        for _ in range(self._session_pool_size):
             session_pool.put(self.create_session(), block=False)
         return session_pool
 
@@ -253,7 +274,7 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
         # larger than the connection pool so we have time to process data without idling the connection.
         # Create the pool as the last thing here, since we may fail in the version or auth type guessing, which would
         # leave open threads around to be garbage collected.
-        thread_poolsize = 4 * self.SESSION_POOLSIZE
+        thread_poolsize = 4 * self._session_pool_size
         return ThreadPool(processes=thread_poolsize)
 
     def get_timezones(self, timezones=None, return_full_timezone_data=False):
@@ -367,12 +388,14 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
             # thread_pool is a cached property and may not exist
             pass
         del state['_session_pool']
+        del state['_session_pool_lock']
         return state
 
     def __setstate__(self, state):
         # Restore the session pool. The thread pool is a property and will recreate itself
         self.__dict__.update(state)
         self._session_pool = self._create_session_pool()
+        self._session_pool_lock = Lock()
 
     def __str__(self):
         return '''\

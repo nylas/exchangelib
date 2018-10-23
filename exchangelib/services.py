@@ -88,6 +88,8 @@ class EWSService(object):
                 return self._get_elements_in_response(response=response)
             except ErrorServerBusy as e:
                 log.debug('Got ErrorServerBusy (back off %s seconds)', e.back_off)
+                # ErrorServerBusy is very often a symptom of sending too many requests. Scale back if possible.
+                self.protocol.decrease_poolsize()
                 if self.protocol.credentials.fail_fast:
                     raise
                 self.protocol.credentials.back_off(e.back_off)
@@ -115,13 +117,10 @@ class EWSService(object):
                     ErrorNoRespondingCASInDestinationSite,
                     ErrorQuotaExceeded,
                     ErrorTimeoutExpired,
-                    ErrorTooManyObjectsOpened,
                     RateLimitError,
                     UnauthorizedError,
             ):
-                # These are known and understood, and don't require a backtrace
-                # TODO: ErrorTooManyObjectsOpened means there are too many connections to the database. We should be
-                # able to act on this by lowering the self.protocol connection pool size.
+                # These are known and understood, and don't require a backtrace.
                 raise
             except Exception:
                 # This may run from a thread pool, which obfuscates the stack trace. Print trace immediately.
@@ -171,6 +170,11 @@ class EWSService(object):
                 # The guessed server version is wrong for this account. Try the next version
                 log.debug('API version %s was invalid for account %s', api_version, account)
                 continue
+            except ErrorTooManyObjectsOpened as e:
+                # ErrorTooManyObjectsOpened means there are too many connections to the Exchange database. This is very
+                # often a symptom of sending too many requests. Re-raise as an ErrorServerBusy with a default delay.
+                back_off = 300
+                raise ErrorServerBusy(msg='Reraised from %s(%s)' % (e.__class__.__name__, e), back_off=back_off)
             except ResponseMessageError as rme:
                 # We got an error message from Exchange, but we still want to get any new version info from the response
                 try:
@@ -365,6 +369,8 @@ class PagingEWSMixIn(EWSService):
                 response = self._get_response_xml(payload=payload)
             except ErrorServerBusy as e:
                 log.debug('Got ErrorServerBusy (back off %s seconds)', e.back_off)
+                # ErrorServerBusy is very often a symptom of sending too many requests. Scale back if possible.
+                self.protocol.decrease_poolsize()
                 if self.protocol.credentials.fail_fast:
                     raise
                 self.protocol.credentials.back_off(e.back_off)
@@ -1492,6 +1498,8 @@ class FindPeople(EWSAccountService, PagingEWSMixIn):
                 response = self._get_response_xml(payload=payload)
             except ErrorServerBusy as e:
                 log.debug('Got ErrorServerBusy (back off %s seconds)', e.back_off)
+                # ErrorServerBusy is very often a symptom of sending too many requests. Scale back if possible.
+                self.protocol.decrease_poolsize()
                 if self.protocol.credentials.fail_fast:
                     raise
                 self.protocol.credentials.back_off(e.back_off)
