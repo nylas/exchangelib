@@ -100,14 +100,6 @@ class Account(object):
             raise ValueError("Expected 'protocol' to be a Protocol, got %s" % self.protocol)
         log.debug('Added account: %s', self)
 
-    @property
-    def folders(self):
-        warnings.warn('The Account.folders mapping is deprecated. Use Account.root.walk() instead')
-        folders_map = defaultdict(list)
-        for f in self.root.walk():
-            folders_map[f.__class__].append(f)
-        return folders_map
-
     @threaded_cached_property
     def admin_audit_logs(self):
         return self.root.get_default_folder(AdminAuditLogs)
