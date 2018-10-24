@@ -270,7 +270,7 @@ class Occurrence(EWSElement):
     def from_xml(cls, elem, account):
         item_id, changekey = cls.id_from_xml(elem)
         kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.supported_fields()}
-        elem.clear()
+        cls._clear(elem)
         return cls(id=item_id, changekey=changekey, **kwargs)
 
 

@@ -161,7 +161,7 @@ class FileAttachment(Attachment):
             self._content = b''
         else:
             self._content = base64.b64decode(val.text)
-        elem.clear()
+        self._clear(elem)
         return self._content
 
     @content.setter
@@ -174,7 +174,7 @@ class FileAttachment(Attachment):
     def from_xml(cls, elem, account):
         kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.FIELDS}
         kwargs['content'] = kwargs.pop('_content')
-        elem.clear()
+        cls._clear(elem)
         return cls(**kwargs)
 
     def to_xml(self, version):
@@ -233,5 +233,5 @@ class ItemAttachment(Attachment):
     def from_xml(cls, elem, account):
         kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.FIELDS}
         kwargs['item'] = kwargs.pop('_item')
-        elem.clear()
+        cls._clear(elem)
         return cls(**kwargs)

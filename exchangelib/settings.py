@@ -65,7 +65,7 @@ class OofSettings(EWSElement):
             for attr in ('start', 'end'):
                 f = cls.get_field_by_fieldname(attr)
                 kwargs[attr] = f.from_xml(elem=duration, account=account)
-        elem.clear()
+        cls._clear(elem)
         return cls(**kwargs)
 
     def to_xml(self, version):

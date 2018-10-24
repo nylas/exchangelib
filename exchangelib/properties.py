@@ -112,10 +112,18 @@ class EWSElement(object):
             val = getattr(self, f.name)
             setattr(self, f.name, f.clean(val, version=version))
 
+    @staticmethod
+    def _clear(elem):
+        # Clears an XML element to reduce memory consumption
+        elem.clear()
+        for ancestor in elem.xpath('ancestor-or-self::*'):
+            while ancestor.getprevious() is not None:
+                del ancestor.getparent()[0]
+
     @classmethod
     def from_xml(cls, elem, account):
         kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.FIELDS}
-        elem.clear()
+        cls._clear(elem)
         return cls(**kwargs)
 
     def to_xml(self, version):
@@ -699,7 +707,7 @@ class FreeBusyView(EWSElement):
                 kwargs[f.name] = f.from_xml(elem=elem.find('{%s}WorkingHours' % TNS), account=account)
                 continue
             kwargs[f.name] = f.from_xml(elem=elem, account=account)
-        elem.clear()
+        cls._clear(elem)
         return cls(**kwargs)
 
 
@@ -733,7 +741,7 @@ class Room(Mailbox):
             mailbox_type=get_xml_attr(id_elem, '{%s}MailboxType' % TNS),
             item_id=ItemId.from_xml(elem=item_id_elem, account=account) if item_id_elem else None,
         )
-        elem.clear()
+        cls._clear(elem)
         return cls(**kwargs)
 
 

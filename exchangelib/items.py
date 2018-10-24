@@ -471,7 +471,7 @@ class Item(RegisterMixIn):
     def from_xml(cls, elem, account):
         item_id, changekey = cls.id_from_xml(elem=elem)
         kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.supported_fields()}
-        elem.clear()
+        cls._clear(elem)
         return cls(account=account, id=item_id, changekey=changekey, **kwargs)
 
     def __eq__(self, other):

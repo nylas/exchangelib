@@ -775,7 +775,7 @@ class Folder(RegisterMixIn, SearchableMixIn):
             # Some folders are returned with an empty 'DisplayName' element. Assign a default name to them.
             # TODO: Only do this if we actually requested the 'name' field.
             kwargs['name'] = cls.DISTINGUISHED_FOLDER_ID
-        elem.clear()
+        cls._clear(elem)
         folder_cls = cls
         if cls == Folder:
             # We were called on the generic Folder class. Try to find a more specific class to return objects as.
@@ -1567,7 +1567,7 @@ class RootOfHierarchy(Folder):
             # Some folders are returned with an empty 'DisplayName' element. Assign a default name to them.
             # TODO: Only do this if we actually requested the 'name' field.
             kwargs['name'] = cls.DISTINGUISHED_FOLDER_ID
-        elem.clear()
+        cls._clear(elem)
         return cls(account=account, id=fld_id, changekey=changekey, **kwargs)
 
     @classmethod
