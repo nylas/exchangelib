@@ -33,7 +33,7 @@ except ImportError:
     pass
 
 DEFAULT_ENCODING = 'utf-8'
-DEFAULT_HEADERS = {'Content-Type': 'text/xml; charset=%s' % DEFAULT_ENCODING, 'Accept-Encoding': 'compress, gzip'}
+DEFAULT_HEADERS = {'Content-Type': 'text/xml; charset=%s' % DEFAULT_ENCODING, 'Accept-Encoding': 'gzip, deflate'}
 
 
 def extra_headers(account):
