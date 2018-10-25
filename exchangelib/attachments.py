@@ -1,8 +1,11 @@
 from __future__ import unicode_literals
 
 import base64
+from io import BytesIO, StringIO
 import logging
 import mimetypes
+
+from base64io import Base64IO
 
 from .fields import BooleanField, TextField, IntegerField, URIField, DateTimeField, EWSElementField, Base64Field, \
     ItemField, IdField
@@ -11,6 +14,38 @@ from .services import GetAttachment, CreateAttachment, DeleteAttachment
 from .util import TNS
 
 log = logging.getLogger(__name__)
+
+
+class StringBase64IO(Base64IO):
+    def read(self, b=-1):
+        # Override upstream read() method to support a StringIO input stream. This is a workaround for
+        # https://github.com/aws/base64io-python/issues/21
+        if b is None or b < 0:
+            b = -1
+            _bytes_to_read = -1
+        elif b == 0:
+            _bytes_to_read = 0
+        else:
+            # Calculate number of encoded bytes that must be read to get b raw bytes.
+            _bytes_to_read = int((b - len(self.__read_buffer)) * 4 / 3)
+            _bytes_to_read += 4 - _bytes_to_read % 4
+
+        # Read encoded bytes from wrapped stream.
+        data = self.__wrapped.read(_bytes_to_read)
+
+        results = BytesIO()
+        # First, load any stashed bytes
+        results.write(self.__read_buffer)
+        # Decode encoded bytes.
+        results.write(base64.b64decode(data))
+
+        results.seek(0)
+        output_data = results.read(b)
+        # Stash any extra bytes for the next run.
+        self.__read_buffer = results.read()
+
+        return output_data
+
 
 
 class AttachmentId(EWSElement):
@@ -126,26 +161,31 @@ class FileAttachment(Attachment):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa580492(v=exchg.150).aspx
     """
-    # TODO: This class is most likely inefficient for large data. Investigate methods to reduce copying
     ELEMENT_NAME = 'FileAttachment'
     FIELDS = Attachment.FIELDS + [
         BooleanField('is_contact_photo', field_uri='IsContactPhoto'),
         Base64Field('_content', field_uri='Content'),
     ]
 
-    __slots__ = Attachment.__slots__ + ('is_contact_photo', '_content')
+    __slots__ = Attachment.__slots__ + ('is_contact_photo', '_content', '_fp')
 
     def __init__(self, **kwargs):
         kwargs['_content'] = kwargs.pop('content', None)
         super(FileAttachment, self).__init__(**kwargs)
+        self._fp = None
 
     @property
-    def content(self):
-        if self.attachment_id is None:
-            return self._content
-        if self._content is not None:
-            return self._content
-        # We have an ID to the data but still haven't called GetAttachment to get the actual data. Do that now.
+    def fp(self):
+        # Return a file-like object for the content. This avoids creating multiple in-memory copies of the content.
+        if self._fp is None:
+            self._init_fp()
+        return self._fp
+
+    def _init_fp(self):
+        # Create a file-like object for the attachment content.
+        #
+        # TODO: We try hard to reduce memory consumption, but the XML parser still stores a copy of the base64-encoded
+        # attachment content in an Element object. Even the lxml streaming parser will do this.
         if not self.parent_item or not self.parent_item.account:
             raise ValueError('%s must have an account' % self.__class__.__name__)
         elems = list(GetAttachment(account=self.parent_item.account).call(
@@ -158,14 +198,28 @@ class FileAttachment(Attachment):
         # Don't use get_xml_attr() here because we want to handle empty file content as '', not None
         val = elem.find('{%s}Content' % TNS)
         if val is None or val.text is None:
-            self._content = b''
+            self._fp = Base64IO(BytesIO(b''))
         else:
-            self._content = base64.b64decode(val.text)
+            self._fp = Base64IO(StringIO(val.text))
+        # Discard contents of this element and its subtree to save memory
         self._clear(elem)
+
+    @property
+    def content(self):
+        # Returns the attachment content. Stores a local copy of the content in case you want to upload the attachment
+        # again later.
+        if self.attachment_id is None:
+            return self._content
+        if self._content is not None:
+            return self._content
+        # We have an ID to the data but still haven't called GetAttachment to get the actual data. Do that now.
+        with self.fp as fp:
+            self._content = fp.read()
         return self._content
 
     @content.setter
     def content(self, value):
+        # Replaces the attachment content
         if not isinstance(value, bytes):
             raise ValueError("'value' %r must be a bytes object" % value)
         self._content = value
@@ -180,6 +234,17 @@ class FileAttachment(Attachment):
     def to_xml(self, version):
         self.content = self.content  # Make sure content is available, to avoid ErrorRequiredPropertyMissing
         return super(FileAttachment, self).to_xml(version=version)
+
+    def __getstate__(self):
+        # The fp does not need to be pickled
+        state = self.__dict__.copy()
+        del state['_fp']
+        return state
+
+    def __setstate__(self, state):
+        # Restore the fp
+        self.__dict__.update(state)
+        self._fp = None
 
 
 class ItemAttachment(Attachment):
