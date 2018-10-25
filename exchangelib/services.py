@@ -158,7 +158,7 @@ class EWSService(object):
             )
             self.protocol.release_session(session)
             try:
-                soap_response_payload = to_xml(r.content)
+                soap_response_payload = to_xml(r.iter_content())
             except ParseError as e:
                 raise SOAPError('Bad SOAP response: %s' % e)
             try:

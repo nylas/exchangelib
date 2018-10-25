@@ -242,12 +242,40 @@ class ForgivingParser(GlobalParserTLS):
 _forgiving_parser = ForgivingParser()
 
 
+class BytesGeneratorIO(io.BytesIO):
+    # A BytesIO that can produce bytes from a streaming HTTP request. Expects r.iter_content() as input
+    def __init__(self, bytes_generator):
+        self._bytes_generator = bytes_generator
+        self._tell = 0
+        super(BytesGeneratorIO, self).__init__()
+
+    def getvalue(self, *args, **kwargs):
+        res = b''.join(self._bytes_generator)
+        self._tell += len(res)
+        return res
+
+    def tell(self, *args, **kwargs):
+        return self._tell
+
+    def read(self, size=-1):
+        if size is None or size <= -1:
+            res = b''.join(self._bytes_generator)
+        else:
+            res = b''.join(next(self._bytes_generator) for _ in range(size))
+        self._tell += len(res)
+        return res
+
+
 def to_xml(bytes_content):
-    # Converts bytes to an XML tree
-    stream = io.BytesIO(bytes_content)
+    # Converts bytes or a generator of bytes to an XML tree
     # Exchange servers may spit out the weirdest XML. lxml is pretty good at recovering from errors
+    if isinstance(bytes_content, bytes):
+        stream = io.BytesIO(bytes_content)
+    else:
+        stream = BytesGeneratorIO(bytes_content)
     forgiving_parser = _forgiving_parser.getDefaultParser()
     try:
+        # TODO: investigate returning an iterating parser here instead, to avoid memory overhead.
         return parse(stream, parser=forgiving_parser)
     except AssertionError as e:
         raise ParseError(e.args[0], '<not from file>', -1, 0)
