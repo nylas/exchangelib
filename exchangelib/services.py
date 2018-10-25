@@ -59,6 +59,8 @@ class EWSService(object):
     WARNINGS_TO_CATCH_IN_RESPONSE = ErrorBatchProcessingStopped
     # Define the warnings we want to ignore, to let response processing proceed
     WARNINGS_TO_IGNORE_IN_RESPONSE = ()
+    # Controls whether the HTTP request should be streaming or fetch everything at once
+    streaming = False
 
     def __init__(self, protocol, chunk_size=None):
         self.chunk_size = chunk_size or CHUNK_SIZE  # The number of items to send in a single request
@@ -151,7 +153,9 @@ class EWSService(object):
                 url=self.protocol.service_endpoint,
                 headers=extra_headers(account=account),
                 data=wrap(content=payload, version=api_version, account=account),
-                allow_redirects=False)
+                allow_redirects=False,
+                stream=self.streaming,
+            )
             self.protocol.release_session(session)
             try:
                 soap_response_payload = to_xml(r.content)
@@ -376,13 +380,12 @@ class PagingEWSMixIn(EWSService):
                 self.protocol.credentials.back_off(e.back_off)
                 # We'll warn about this if we actually need to sleep
                 continue
-            if len(response) != expected_message_count:
-                raise MalformedResponseError(
-                    "Expected %s items in 'response', got %s (%s)" % (
-                        expected_message_count, len(response), response)
-                )
             # Collect a tuple of (rootfolder, next_offset) tuples
             parsed_pages = [self._get_page(message) for message in response]
+            if len(parsed_pages) != expected_message_count:
+                raise MalformedResponseError(
+                    "Expected %s items in 'response', got %s" % (expected_message_count, len(parsed_pages))
+                )
             for (rootfolder, next_offset), paging_info in zip(parsed_pages, paging_infos):
                 paging_info['next_offset'] = next_offset
                 if rootfolder is not None:
@@ -1512,10 +1515,12 @@ class FindPeople(EWSAccountService, PagingEWSMixIn):
                 self.protocol.credentials.back_off(e.back_off)
                 # We'll warn about this if we actually need to sleep
                 continue
-            if len(response) != 1:
+            # Collect a tuple of (rootfolder, total_items) tuples
+            parsed_pages = [self._get_page(message) for message in response]
+            if len(parsed_pages) != 1:
                 # We can only query one folder, so there should only be one element in response
-                raise MalformedResponseError("Expected single item in 'response', got %s" % response)
-            rootfolder, total_items = self._get_page(response[0])
+                raise MalformedResponseError("Expected single item in 'response', got %s" % len(parsed_pages))
+            rootfolder, total_items = parsed_pages[0]
             if rootfolder is not None:
                 container = rootfolder.find(self.element_container_name)
                 if container is None:
@@ -1643,6 +1648,7 @@ class GetAttachment(EWSAccountService):
     """
     SERVICE_NAME = 'GetAttachment'
     element_container_name = '{%s}Attachments' % MNS
+    streaming = True
 
     def call(self, items, include_mime_content):
         return self._get_elements(payload=self.get_payload(
@@ -1855,10 +1861,11 @@ class GetUserOofSettings(BaseUserOofSettings):
     def _get_elements_in_response(self, response):
         # This service only returns one result, but 'response' is a list
         from .settings import OofSettings
+        response = list(response)
         if len(response) != 1:
             raise ValueError("Expected 'response' length 1, got %s" % response)
-        response = response[0]
-        container_or_exc = self._get_element_container(message=response, name=self.element_container_name)
+        msg = response[0]
+        container_or_exc = self._get_element_container(message=msg, name=self.element_container_name)
         if isinstance(container_or_exc, (bool, Exception)):
             # pylint: disable=raising-bad-type
             raise container_or_exc

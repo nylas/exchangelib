@@ -428,7 +428,7 @@ except ImportError:
     pass
 
 
-def post_ratelimited(protocol, session, url, headers, data, allow_redirects=False):
+def post_ratelimited(protocol, session, url, headers, data, allow_redirects=False, stream=False):
     """
     There are two error-handling policies implemented here: a fail-fast policy intended for stand-alone scripts which
     fails on all responses except HTTP 200. The other policy is intended for long-running tasks that need to respect
@@ -471,6 +471,7 @@ Auth type: %(auth)s
 URL: %(url)s
 HTTP adapter: %(adapter)s
 Allow redirects: %(allow_redirects)s
+Streaming: %(stream)s
 Response time: %(response_time)s
 Status code: %(status_code)s
 Request headers: %(request_headers)s
@@ -488,6 +489,7 @@ Response data: %(xml_response)s
         url=url,
         adapter=session.get_adapter(url),
         allow_redirects=allow_redirects,
+        stream=stream,
         response_time=None,
         status_code=None,
         request_headers=headers,
@@ -504,7 +506,8 @@ Response data: %(xml_response)s
             # Always create a dummy response for logging purposes, in case we fail in the following
             r = DummyResponse(url=url, headers={}, request_headers=headers)
             try:
-                r = session.post(url=url, headers=headers, data=data, allow_redirects=False, timeout=protocol.TIMEOUT)
+                r = session.post(url=url, headers=headers, data=data, allow_redirects=False, timeout=protocol.TIMEOUT,
+                                 stream=stream)
             except CONNECTION_ERRORS as e:
                 log.debug('Session %s thread %s: connection error POST\'ing to %s', session.session_id, thread_id, url)
                 r = DummyResponse(url=url, headers={'TimeoutException': e}, request_headers=headers)
@@ -518,7 +521,7 @@ Response data: %(xml_response)s
                     status_code=r.status_code,
                     request_headers=r.request.headers,
                     response_headers=r.headers,
-                    xml_response=r.content,
+                    xml_response='[STREAMING]' if stream else r.content,
                 )
             log.debug(log_msg, log_vals)
             if _may_retry_on_error(r, protocol, wait):
@@ -530,6 +533,8 @@ Response data: %(xml_response)s
                 session = protocol.renew_session(session)
                 continue
             if r.status_code in (301, 302):
+                if stream:
+                    r.close()
                 url, redirects = _redirect_or_fail(r, redirects, allow_redirects)
                 continue
             break
@@ -547,7 +552,11 @@ Response data: %(xml_response)s
         log.debug('Got status code %s but trying to parse content anyway', r.status_code)
     elif r.status_code != 200:
         protocol.retire_session(session)
-        _raise_response_errors(r, protocol, log_msg, log_vals)  # Always raises an exception
+        try:
+            _raise_response_errors(r, protocol, log_msg, log_vals)  # Always raises an exception
+        finally:
+            if stream:
+                r.close()
     log.debug('Session %s thread %s: Useful response from %s', session.session_id, thread_id, url)
     return r, session
 
