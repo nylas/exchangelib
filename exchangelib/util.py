@@ -1,5 +1,6 @@
 from __future__ import unicode_literals
 
+from codecs import BOM_UTF8
 import datetime
 from decimal import Decimal
 import io
@@ -10,7 +11,7 @@ import socket
 import time
 
 # Import _etree via defusedxml instead of directly from lxml.etree, to silence overly strict linters
-from defusedxml.lxml import parse, fromstring, tostring, GlobalParserTLS, RestrictedElement, _etree
+from defusedxml.lxml import parse, tostring, GlobalParserTLS, RestrictedElement, _etree
 from future.backports.misc import get_ident
 from future.moves.urllib.parse import urlparse
 from future.utils import PY2
@@ -32,11 +33,9 @@ class ParseError(_etree.ParseError):
     # Wrap lxml ParseError in our own class
     pass
 
+
 # Regex of UTF-8 control characters that are illegal in XML 1.0 (and XML 1.1)
 _ILLEGAL_XML_CHARS_RE = re.compile('[\x00-\x08\x0b\x0c\x0e-\x1F\uD800-\uDFFF\uFFFE\uFFFF]')
-# UTF-8 byte order mark which may precede the XML from an Exchange server
-BOM = b'\xef\xbb\xbf'
-BOM_LEN = len(BOM)
 
 # XML namespaces
 SOAPNS = 'http://schemas.xmlsoap.org/soap/envelope/'
@@ -243,41 +242,42 @@ class ForgivingParser(GlobalParserTLS):
 _forgiving_parser = ForgivingParser()
 
 
-def to_xml(text):
+def to_xml(bytes_content):
+    # Converts bytes to an XML tree
+    stream = io.BytesIO(bytes_content)
+    # Exchange servers may spit out the weirdest XML. lxml is pretty good at recovering from errors
+    forgiving_parser = _forgiving_parser.getDefaultParser()
     try:
-        return fromstring(text[BOM_LEN:] if text[:BOM_LEN] == BOM else text)
-    except _etree.ParseError:
-        # Exchange servers may spit out the weirdest XML. lxml is pretty good at recovering from errors
-        log.warning('Fallback to lxml processing of faulty XML')
-        forgiving_parser = _forgiving_parser.getDefaultParser()
-        no_bom_text = text[BOM_LEN:] if text[:BOM_LEN] == BOM else text
+        return parse(stream, parser=forgiving_parser)
+    except AssertionError as e:
+        raise ParseError(e.args[0], '<not from file>', -1, 0)
+    except _etree.ParseError as e:
+        if hasattr(e, 'position'):
+            e.lineno, e.offset = e.position
+        if not e.lineno:
+            raise ParseError(text_type(e), '<not from file>', e.lineno, e.offset)
         try:
-            return parse(io.BytesIO(no_bom_text), parser=forgiving_parser)
-        except AssertionError as e:
-            raise ParseError(e.args[0], '<not from file>', -1, 0)
-        except _etree.ParseError as e:
-            if hasattr(e, 'position'):
-                e.lineno, e.offset = e.position
-            if not e.lineno:
-                raise ParseError(text_type(e), '<not from file>', e.lineno, e.offset)
-            try:
-                offending_line = no_bom_text.splitlines()[e.lineno - 1]
-            except IndexError:
-                raise ParseError(text_type(e), '<not from file>', e.lineno, e.offset)
-            else:
-                offending_excerpt = offending_line[max(0, e.offset - 20):e.offset + 20]
-                msg = '%s\nOffending text: [...]%s[...]' % (text_type(e), offending_excerpt)
-                raise ParseError(msg, e.lineno, e.offset)
-        except TypeError:
-            raise ParseError('This is not XML: %s' % text, '<not from file>', -1, 0)
+            stream.seek(0)
+            offending_line = stream.read().splitlines()[e.lineno - 1]
+        except IndexError:
+            raise ParseError(text_type(e), '<not from file>', e.lineno, e.offset)
+        else:
+            offending_excerpt = offending_line[max(0, e.offset - 20):e.offset + 20]
+            msg = '%s\nOffending text: [...]%s[...]' % (text_type(e), offending_excerpt)
+            raise ParseError(msg, e.lineno, e.offset)
+    except TypeError:
+        stream.seek(0)
+        raise ParseError('This is not XML: %r' % stream.read(), '<not from file>', -1, 0)
 
 
 def is_xml(text):
     """
     Helper function. Lightweight test if response is an XML doc
     """
-    if text[:BOM_LEN] == BOM:
-        return text[BOM_LEN:BOM_LEN + 5] == b'<?xml'
+    # BOM_UTF8 is an UTF-8 byte order mark which may precede the XML from an Exchange server
+    bom_len = len(BOM_UTF8)
+    if text[:bom_len] == BOM_UTF8:
+        return text[bom_len:bom_len + 5] == b'<?xml'
     return text[:5] == b'<?xml'
 
 
@@ -314,7 +314,7 @@ class PrettyXmlHandler(logging.StreamHandler):
                     continue
                 if not isinstance(value, bytes):
                     continue
-                if not is_xml(value[:10]):
+                if not is_xml(value):
                     continue
                 try:
                     if PY2:
