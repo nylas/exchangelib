@@ -116,9 +116,8 @@ class EWSElement(object):
     def _clear(elem):
         # Clears an XML element to reduce memory consumption
         elem.clear()
-        for ancestor in elem.xpath('ancestor-or-self::*'):
-            while ancestor.getprevious() is not None:
-                del ancestor.getparent()[0]
+        while elem.getprevious() is not None:
+            del elem.getparent()[0]
 
     @classmethod
     def from_xml(cls, elem, account):
