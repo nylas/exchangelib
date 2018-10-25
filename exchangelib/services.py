@@ -201,7 +201,7 @@ class EWSService(object):
             log.debug('Found new API version (%s -> %s)', hint.api_version, api_version)
         else:
             log.debug('Adding missing build number %s', api_version)
-        new_version = Version.from_response(requested_api_version=api_version, response=response.content)
+        new_version = Version.from_response(requested_api_version=api_version, bytes_content=response.content)
         if isinstance(self, EWSAccountService):
             self.account.version = new_version
         else:

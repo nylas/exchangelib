@@ -607,10 +607,10 @@ def _raise_response_errors(response, protocol, log_msg, log_vals):
             # Remove unnecessary text
             cas_error = cas_error.split(':', 1)[1].strip()
         raise CASError(cas_error=cas_error, response=response)
-    if response.status_code == 500 and ('The specified server version is invalid' in response.text or
-                                        'ErrorInvalidSchemaVersionForMailboxVersion' in response.text):
+    if response.status_code == 500 and (b'The specified server version is invalid' in response.content or
+                                        b'ErrorInvalidSchemaVersionForMailboxVersion' in response.content):
         raise ErrorInvalidSchemaVersionForMailboxVersion('Invalid server version')
-    if 'The referenced account is currently locked out' in response.text:
+    if b'The referenced account is currently locked out' in response.content:
         raise TransportError('The service account is currently locked out')
     if response.status_code == 401 and protocol.credentials.fail_fast:
         # This is a login failure

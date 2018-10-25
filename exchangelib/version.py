@@ -223,14 +223,15 @@ class Version(object):
         log.debug('Request headers: %s', r.request.headers)
         log.debug('Response code: %s', r.status_code)
         log.debug('Response headers: %s', r.headers)
+        log.debug('Response data: %s', r.content[:1000])
         if r.status_code != 200:
-            raise TransportError('Unexpected HTTP status %s when getting %s (%s)' % (r.status_code, types_url, r.text))
+            raise TransportError('Unexpected HTTP %s when getting %s (%r)' % (r.status_code, types_url, r.content))
         if not is_xml(r.content):
             raise TransportError('Unexpected result when getting %s. Maybe this is not an EWS server?%s' % (
                 types_url,
-                '\n\n%s[...]' % r.text[:200] if len(r.text) > 200 else '\n\n%s' % r.text if r.text else '',
+                '\n\n%r[...]' % r.content[:200] if len(r.content) > 200 else '\n\n%r' % r.content if r.content else '',
             ))
-        return to_xml(r.content).get('version')
+        return to_xml(r.content).getroot().get('version')
 
     @classmethod
     def _guess_version_from_service(cls, protocol, hint=None):
@@ -254,21 +255,21 @@ class Version(object):
         return re.match(r'V[0-9]{1,4}_.*', version)
 
     @classmethod
-    def from_response(cls, requested_api_version, response):
+    def from_response(cls, requested_api_version, bytes_content):
         try:
-            header = to_xml(response).find('{%s}Header' % SOAPNS)
+            header = to_xml(bytes_content).find('{%s}Header' % SOAPNS)
             if header is None:
-                raise TransportError('No header in XML response (%s)' % response)
+                raise TransportError('No header in XML response (%r)' % bytes_content)
         except ParseError:
-            raise TransportError('Unknown XML response (%s)' % response)
+            raise TransportError('Unknown XML response (%r)' % bytes_content)
 
         info = header.find('{%s}ServerVersionInfo' % TNS)
         if info is None:
-            raise TransportError('No ServerVersionInfo in response: %s' % response)
+            raise TransportError('No ServerVersionInfo in response: %r' % bytes_content)
         try:
             build = Build.from_xml(elem=info)
         except ValueError:
-            raise TransportError('Bad ServerVersionInfo in response: %s' % response)
+            raise TransportError('Bad ServerVersionInfo in response: %r' % bytes_content)
         # Not all Exchange servers send the Version element
         api_version_from_server = info.get('Version') or build.api_version()
         if api_version_from_server != requested_api_version:

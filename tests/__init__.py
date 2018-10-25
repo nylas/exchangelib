@@ -146,7 +146,7 @@ class VersionTest(unittest.TestCase):
         # Test fallback to suggested api_version value when there is a version mismatch and response version is fishy
         version = Version.from_response(
             'Exchange2007',
-            '''\
+            b'''\
 <?xml version="1.0" ?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
 <s:Header>
@@ -163,7 +163,7 @@ class VersionTest(unittest.TestCase):
         # Test that override the suggested version if the response version is not fishy
         version = Version.from_response(
             'Exchange2013',
-            '''\
+            b'''\
 <?xml version="1.0" ?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
 <s:Header>
@@ -179,7 +179,7 @@ class VersionTest(unittest.TestCase):
         # present in the response
         version = Version.from_response(
             'Exchange2013',
-            '''\
+            b'''\
 <?xml version="1.0" ?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
 <s:Header>
@@ -195,7 +195,7 @@ class VersionTest(unittest.TestCase):
         # there was no suggested version.
         version = Version.from_response(
             None,
-            '''\
+            b'''\
 <?xml version="1.0" ?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
 <s:Header>
@@ -211,12 +211,12 @@ class VersionTest(unittest.TestCase):
         with self.assertRaises(TransportError):
             Version.from_response(
                 'Exchange2013',
-                'XXX'
+                b'XXX'
             )
         with self.assertRaises(TransportError):
             Version.from_response(
                 'Exchange2013',
-                '''\
+                b'''\
 <?xml version="1.0" ?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
 </s:Envelope>'''
@@ -224,7 +224,7 @@ class VersionTest(unittest.TestCase):
         with self.assertRaises(TransportError):
             Version.from_response(
                 'Exchange2013',
-                '''\
+                b'''\
 <?xml version="1.0" ?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
 <s:Header>
@@ -234,7 +234,7 @@ class VersionTest(unittest.TestCase):
         with self.assertRaises(TransportError):
             Version.from_response(
                 'Exchange2013',
-                '''\
+                b'''\
 <?xml version="1.0" ?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
 <s:Header>
@@ -1944,7 +1944,7 @@ class CommonTest(EWSTest):
         # Test the straight, HTTP 200 path
         session.post = mock_post(url, 200, {}, 'foo')
         r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
-        self.assertEqual(r.text, 'foo')
+        self.assertEqual(r.content, b'foo')
 
         # Test exceptions raises by the POST request
         for err_cls in CONNECTION_ERRORS:
@@ -1998,7 +1998,7 @@ class CommonTest(EWSTest):
         # Allow XML data in a non-HTTP 200 response
         session.post = mock_post(url, 500, {}, '<?xml version="1.0" ?><foo></foo>')
         r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
-        self.assertEqual(r.text, '<?xml version="1.0" ?><foo></foo>')
+        self.assertEqual(r.content, b'<?xml version="1.0" ?><foo></foo>')
 
         # Bad status_code and bad text
         session.post = mock_post(url, 999, {})

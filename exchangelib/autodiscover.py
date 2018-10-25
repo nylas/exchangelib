@@ -387,8 +387,8 @@ def _get_response(protocol, email):
         )
     if not is_xml(r.content):
         # This is normal - e.g. a greedy webserver serving custom HTTP 404's as 200 OK
-        log.debug('URL %s: This is not XML: %s', protocol.service_endpoint, r.text[:1000])
-        raise AutoDiscoverFailed('URL %s: This is not XML: %s' % (protocol.service_endpoint, r.text[:1000]))
+        log.debug('URL %s: This is not XML: %r', protocol.service_endpoint, r.content[:1000])
+        raise AutoDiscoverFailed('URL %s: This is not XML: %r' % (protocol.service_endpoint, r.content[:1000]))
     return r
 
 
@@ -406,11 +406,11 @@ def _raise_response_errors(elem):
         raise_from(AutoDiscoverFailed('Unknown autodiscover response: %s' % xml_to_str(elem)), None)
 
 
-def _parse_response(response):
+def _parse_response(bytes_content):
     # We could return lots more interesting things here
-    if not is_xml(response):
-        raise AutoDiscoverFailed('Unknown autodiscover response: %s' % response)
-    autodiscover = to_xml(response)
+    if not is_xml(bytes_content):
+        raise AutoDiscoverFailed('Unknown autodiscover response: %s' % bytes_content)
+    autodiscover = to_xml(bytes_content)
     resp = autodiscover.find('{%s}Response' % RESPONSE_NS)
     if resp is None:
         _raise_response_errors(autodiscover)
