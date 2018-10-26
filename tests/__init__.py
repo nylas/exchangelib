@@ -101,6 +101,14 @@ def mock_session_exception(exc_cls):
     return raise_exc
 
 
+class MockResponse(object):
+    def __init__(self, c):
+        self.c = c
+
+    def iter_content(self):
+        return iter(self.c)
+
+
 class BuildTest(unittest.TestCase):
     def test_magic(self):
         with self.assertRaises(ValueError):
@@ -1543,7 +1551,7 @@ class CommonTest(EWSTest):
   </s:Body>
 </s:Envelope>'''
         with self.assertRaises(ErrorServerBusy) as cm:
-            ws._get_elements_in_response(response=ws._get_soap_payload(soap_response=to_xml(xml)))
+            ws._get_elements_in_response(response=ws._get_soap_payload(response=MockResponse(xml)))
         self.assertEqual(cm.exception.back_off, 297.749)
 
     def test_get_timezones(self):
@@ -1615,7 +1623,7 @@ class CommonTest(EWSTest):
         </m:GetRoomListsResponse>
     </s:Body>
 </s:Envelope>'''
-        res = ws._get_elements_in_response(response=ws._get_soap_payload(soap_response=to_xml(xml)))
+        res = ws._get_elements_in_response(response=ws._get_soap_payload(response=MockResponse(xml)))
         self.assertSetEqual(
             {RoomList.from_xml(elem=elem, account=None).email_address for elem in res},
             {'roomlist1@example.com', 'roomlist2@example.com'}
@@ -1670,7 +1678,7 @@ class CommonTest(EWSTest):
         </m:GetRoomsResponse>
     </s:Body>
 </s:Envelope>'''
-        res = ws._get_elements_in_response(response=ws._get_soap_payload(soap_response=to_xml(xml)))
+        res = ws._get_elements_in_response(response=ws._get_soap_payload(response=MockResponse(xml)))
         self.assertSetEqual(
             {Room.from_xml(elem=elem, account=None).email_address for elem in res},
             {'room1@example.com', 'room2@example.com'}
@@ -1749,7 +1757,7 @@ class CommonTest(EWSTest):
     </m:ResolveNamesResponse>
   </s:Body>
 </s:Envelope>'''
-        res = ws._get_elements_in_response(response=ws._get_soap_payload(soap_response=to_xml(xml)))
+        res = ws._get_elements_in_response(response=ws._get_soap_payload(response=MockResponse(xml)))
         self.assertSetEqual(
             {Mailbox.from_xml(elem=elem.find(Mailbox.response_tag()), account=None).email_address for elem in res},
             {'anne@example.com', 'john@example.com'}
@@ -2054,19 +2062,19 @@ class CommonTest(EWSTest):
   </soap:Body>
 </soap:Envelope>"""
         with self.assertRaises(SOAPError) as e:
-            ResolveNames._get_soap_payload(to_xml(soap_xml.format(
+            ResolveNames._get_soap_payload(response=MockResponse(soap_xml.format(
                 faultcode='YYY', faultstring='AAA', responsecode='XXX', message='ZZZ'
             ).encode('utf-8')))
         self.assertIn('AAA', e.exception.args[0])
         self.assertIn('YYY', e.exception.args[0])
         self.assertIn('ZZZ', e.exception.args[0])
         with self.assertRaises(ErrorNonExistentMailbox) as e:
-            ResolveNames._get_soap_payload(to_xml(soap_xml.format(
+            ResolveNames._get_soap_payload(response=MockResponse(soap_xml.format(
                 faultcode='ErrorNonExistentMailbox', faultstring='AAA', responsecode='XXX', message='ZZZ'
             ).encode('utf-8')))
         self.assertIn('AAA', e.exception.args[0])
         with self.assertRaises(ErrorNonExistentMailbox) as e:
-            ResolveNames._get_soap_payload(to_xml(soap_xml.format(
+            ResolveNames._get_soap_payload(response=MockResponse(soap_xml.format(
                 faultcode='XXX', faultstring='AAA', responsecode='ErrorNonExistentMailbox', message='YYY'
             ).encode('utf-8')))
         self.assertIn('YYY', e.exception.args[0])
@@ -2082,7 +2090,7 @@ class CommonTest(EWSTest):
   </soap:Body>
 </soap:Envelope>"""
         with self.assertRaises(TransportError):
-            ResolveNames._get_soap_payload(to_xml(soap_xml))
+            ResolveNames._get_soap_payload(response=MockResponse(soap_xml))
 
         # Test bad XML (no fault)
         soap_xml = b"""\
@@ -2098,7 +2106,7 @@ class CommonTest(EWSTest):
   </soap:Body>
 </soap:Envelope>"""
         with self.assertRaises(TransportError):
-            ResolveNames._get_soap_payload(to_xml(soap_xml))
+            ResolveNames._get_soap_payload(response=MockResponse(soap_xml))
 
     def test_element_container(self):
         svc = ResolveNames(self.account.protocol)
@@ -2115,7 +2123,7 @@ class CommonTest(EWSTest):
     </m:ResolveNamesResponse>
   </soap:Body>
 </soap:Envelope>"""
-        resp = svc._get_soap_payload(to_xml(soap_xml))
+        resp = svc._get_soap_payload(response=MockResponse(soap_xml))
         with self.assertRaises(TransportError) as e:
             # Missing ResolutionSet elements
             list(svc._get_elements_in_response(response=resp))

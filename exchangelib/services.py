@@ -158,11 +158,9 @@ class EWSService(object):
             )
             self.protocol.release_session(session)
             try:
-                soap_response_payload = to_xml(r.iter_content())
+                res = self._get_soap_payload(response=r)
             except ParseError as e:
                 raise SOAPError('Bad SOAP response: %s' % e)
-            try:
-                res = self._get_soap_payload(soap_response=soap_response_payload)
             except ErrorInvalidServerVersion:
                 # The guessed server version is wrong. Try the next version
                 log.debug('API version %s was invalid', api_version)
@@ -212,22 +210,35 @@ class EWSService(object):
             self.protocol.version = new_version
 
     @classmethod
-    def _get_soap_payload(cls, soap_response):
-        body = soap_response.find('{%s}Body' % SOAPNS)
+    def _response_tag(cls):
+        return '{%s}%sResponse' % (MNS, cls.SERVICE_NAME)
+
+    @staticmethod
+    def _response_messages_tag():
+        return '{%s}ResponseMessages' % MNS
+
+    @classmethod
+    def _response_message_tag(cls):
+        return '{%s}%sResponseMessage' % (MNS, cls.SERVICE_NAME)
+
+    @classmethod
+    def _get_soap_payload(cls, response):
+        root = to_xml(response.iter_content())
+        body = root.find('{%s}Body' % SOAPNS)
         if body is None:
             raise MalformedResponseError('No Body element in SOAP response')
-        response = body.find('{%s}%sResponse' % (MNS, cls.SERVICE_NAME))
+        response = body.find(cls._response_tag())
         if response is None:
             fault = body.find('{%s}Fault' % SOAPNS)
             if fault is None:
                 raise SOAPError('Unknown SOAP response: %s' % xml_to_str(body))
             cls._raise_soap_errors(fault=fault)  # Will throw SOAPError or custom EWS error
-        response_messages = response.find('{%s}ResponseMessages' % MNS)
+        response_messages = response.find(cls._response_messages_tag())
         if response_messages is None:
             # Result isn't delivered in a list of FooResponseMessages, but directly in the FooResponse. Consumers expect
             # a list, so return a list
             return [response]
-        return response_messages.findall('{%s}%sResponseMessage' % (MNS, cls.SERVICE_NAME))
+        return response_messages.findall(cls._response_message_tag())
 
     @classmethod
     def _raise_soap_errors(cls, fault):
@@ -1572,17 +1583,8 @@ class GetPersona(EWSService):
         return payload
 
     @classmethod
-    def _get_soap_payload(cls, soap_response):
-        body = soap_response.find('{%s}Body' % SOAPNS)
-        if body is None:
-            raise MalformedResponseError('No Body element in SOAP response')
-        response = body.find('{%s}%sResponseMessage' % (MNS, cls.SERVICE_NAME))
-        if response is None:
-            fault = body.find('{%s}Fault' % SOAPNS)
-            if fault is None:
-                raise SOAPError('Unknown SOAP response: %s' % xml_to_str(body))
-            cls._raise_soap_errors(fault=fault)  # Will throw SOAPError or custom EWS error
-        return [response]
+    def _response_tag(cls):
+        return '{%s}%sResponseMessage' % (MNS, cls.SERVICE_NAME)
 
 
 class ResolveNames(EWSService):
@@ -1923,19 +1925,13 @@ class GetUserAvailability(EWSService):
         set_xml_value(payload, free_busy_view_options, version=self.protocol.version)
         return payload
 
+    @staticmethod
+    def _response_messages_tag():
+        return '{%s}FreeBusyResponseArray' % MNS
+
     @classmethod
-    def _get_soap_payload(cls, soap_response):
-        body = soap_response.find('{%s}Body' % SOAPNS)
-        if body is None:
-            raise MalformedResponseError('No Body element in SOAP response')
-        response = body.find('{%s}%sResponse' % (MNS, cls.SERVICE_NAME))
-        if response is None:
-            fault = body.find('{%s}Fault' % SOAPNS)
-            if fault is None:
-                raise SOAPError('Unknown SOAP response: %s' % xml_to_str(body))
-            cls._raise_soap_errors(fault=fault)  # Will throw SOAPError or custom EWS error
-        response_messages = response.find('{%s}FreeBusyResponseArray' % MNS)
-        return response_messages.findall('{%s}FreeBusyResponse' % MNS)
+    def _response_message_tag(cls):
+        return '{%s}FreeBusyResponse' % MNS
 
     def _get_elements_in_response(self, response):
         for msg in response:
