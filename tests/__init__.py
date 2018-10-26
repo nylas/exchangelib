@@ -106,7 +106,7 @@ class MockResponse(object):
         self.c = c
 
     def iter_content(self):
-        return iter(self.c)
+        return self.c
 
 
 class BuildTest(unittest.TestCase):
