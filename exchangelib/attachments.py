@@ -198,9 +198,9 @@ class FileAttachment(Attachment):
         # Don't use get_xml_attr() here because we want to handle empty file content as '', not None
         val = elem.find('{%s}Content' % TNS)
         if val is None or val.text is None:
-            self._fp = Base64IO(BytesIO(b''))
+            self._fp = StringBase64IO(BytesIO(b''))
         else:
-            self._fp = Base64IO(StringIO(val.text))
+            self._fp = StringBase64IO(StringIO(val.text))
         # Discard contents of this element and its subtree to save memory
         self._clear(elem)
 
