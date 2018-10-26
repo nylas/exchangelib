@@ -5,6 +5,7 @@ from io import BytesIO, StringIO
 import logging
 import mimetypes
 
+from future.utils import PY2
 from base64io import Base64IO
 
 from .fields import BooleanField, TextField, IntegerField, URIField, DateTimeField, EWSElementField, Base64Field, \
@@ -18,7 +19,7 @@ log = logging.getLogger(__name__)
 
 class StringBase64IO(Base64IO):
     def __init__(self, wrapped):
-        super().__init__(wrapped)
+        super(StringBase64IO, self).__init__(wrapped)
         self.__wrapped = wrapped
         self.__read_buffer = b""
         self.__write_buffer = b""
@@ -205,7 +206,7 @@ class FileAttachment(Attachment):
         if val is None or val.text is None:
             self._fp = StringBase64IO(BytesIO(b''))
         else:
-            self._fp = StringBase64IO(StringIO(val.text))
+            self._fp = StringBase64IO(BytesIO(val.text) if PY2 else StringIO(val.text))
         # Discard contents of this element and its subtree to save memory
         self._clear(elem)
 
