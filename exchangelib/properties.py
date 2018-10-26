@@ -489,8 +489,8 @@ class TimeZoneTransition(EWSElement):
     __slots__ = ('bias', 'time', 'occurrence', 'iso_month', 'weekday')
 
     @classmethod
-    def from_xml(cls, *args, **kwargs):
-        res = super(TimeZoneTransition, cls).from_xml(*args, **kwargs)
+    def from_xml(cls, elem, account):
+        res = super(TimeZoneTransition, cls).from_xml(elem, account)
         # Some parts of EWS use '5' to mean 'last occurrence in month', others use '-1'. Let's settle on '5' because
         # only '5' is accepted in requests.
         if res.occurrence == -1:

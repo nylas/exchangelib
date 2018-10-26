@@ -1,10 +1,8 @@
 # coding=utf-8
 from __future__ import unicode_literals
 
-from collections import defaultdict
 from locale import getlocale
 from logging import getLogger
-import warnings
 
 from cached_property import threaded_cached_property
 from future.utils import python_2_unicode_compatible

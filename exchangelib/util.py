@@ -249,12 +249,12 @@ class BytesGeneratorIO(io.BytesIO):
         self._tell = 0
         super(BytesGeneratorIO, self).__init__()
 
-    def getvalue(self, *args, **kwargs):
+    def getvalue(self):
         res = b''.join(self._bytes_generator)
         self._tell += len(res)
         return res
 
-    def tell(self, *args, **kwargs):
+    def tell(self):
         return self._tell
 
     def read(self, size=-1):

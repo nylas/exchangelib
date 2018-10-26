@@ -10,7 +10,7 @@ import logging
 from six import string_types
 
 from .errors import ErrorInvalidServerVersion
-from .ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, NaiveDateTimeNotAllowed, UnknownTimeZone, UTC
+from .ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, NaiveDateTimeNotAllowed, UnknownTimeZone
 from .util import create_element, get_xml_attrs, set_xml_value, value_to_xml_text, is_iterable, TNS
 from .version import Build, EXCHANGE_2013
 
