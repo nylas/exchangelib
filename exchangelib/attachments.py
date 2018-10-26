@@ -17,6 +17,12 @@ log = logging.getLogger(__name__)
 
 
 class StringBase64IO(Base64IO):
+    def __init__(self, wrapped):
+        super().__init__(wrapped)
+        self.__wrapped = wrapped
+        self.__read_buffer = b""
+        self.__write_buffer = b""
+
     def read(self, b=-1):
         # Override upstream read() method to support a StringIO input stream. This is a workaround for
         # https://github.com/aws/base64io-python/issues/21
@@ -45,7 +51,6 @@ class StringBase64IO(Base64IO):
         self.__read_buffer = results.read()
 
         return output_data
-
 
 
 class AttachmentId(EWSElement):
