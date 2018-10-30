@@ -522,7 +522,7 @@ class Folder(RegisterMixIn, SearchableMixIn):
         try:
             return cls.ITEM_MODEL_MAP[tag]
         except KeyError:
-            raise ValueError('Item type %s was unexpected in a %s folder' % (cls.__name__, cls.__name__))
+            raise ValueError('Item type %s was unexpected in a %s folder' % (tag, cls.__name__))
 
     def allowed_fields(self):
         # Return non-ID fields of all item classes allowed in this folder type
