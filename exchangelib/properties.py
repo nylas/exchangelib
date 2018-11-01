@@ -128,7 +128,8 @@ class EWSElement(object):
         # Add attributes
         for f in self.attribute_fields():
             if f.is_read_only:
-                continue
+                print('field {} is read_only in Element {}'.format(f, self.ELEMENT_NAME))
+                # continue
             value = getattr(self, f.name)
             if value is None or (f.is_list and not value):
                 continue
