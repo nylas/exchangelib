@@ -136,8 +136,8 @@ class EWSElement(object):
 
         # Add elements and values
         for f in self.supported_fields(version=version):
-            if f.is_read_only:
-                continue
+            # Exchangelib previously skipped read_only fields but Nylas likes to keep them
+            # to surface fields like `is_cancelled` and `organizer` in event raw data
             value = getattr(self, f.name)
             if value is None or (f.is_list and not value):
                 continue
