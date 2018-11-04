@@ -1614,9 +1614,11 @@ class ResolveNames(EWSService):
             if isinstance(elem, Exception):
                 raise elem
             if return_full_contact_data:
+                mailbox_elem = elem.find(Mailbox.response_tag())
+                contact_elem = elem.find(Contact.response_tag())
                 yield (
-                    Mailbox.from_xml(elem=elem.find(Mailbox.response_tag()), account=None),
-                    Contact.from_xml(elem=elem.find(Contact.response_tag()), account=None),
+                    Mailbox.from_xml(elem=mailbox_elem, account=None) if mailbox_elem else None,
+                    Contact.from_xml(elem=contact_elem, account=None) if contact_elem else None,
                 )
             else:
                 yield Mailbox.from_xml(elem=elem.find(Mailbox.response_tag()), account=None)
