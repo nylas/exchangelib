@@ -37,7 +37,7 @@ setup(
     long_description=read('README.md'),
     long_description_content_type='text/markdown',
     license='BSD',
-    keywords='ews exchange autodiscover outlook o365 office365',
+    keywords='ews exchange autodiscover microsoft outlook exchange-web-services o365 office365',
     install_requires=['requests>=2.7', 'requests_ntlm>=0.2.0', 'dnspython>=1.14.0', 'pytz', 'lxml>3.0',
                       'cached_property', 'future', 'six', 'tzlocal', 'python-dateutil', 'pygments', 'defusedxml',
                       'isodate', 'base64io'],
