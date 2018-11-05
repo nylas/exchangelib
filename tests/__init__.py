@@ -5733,6 +5733,7 @@ class MessagesTest(BaseItemTest):
     TEST_FOLDER = 'inbox'
     FOLDER_CLASS = Inbox
     ITEM_CLASS = Message
+    INCOMING_MESSAGE_TIMEOUT = 120
 
     def test_send(self):
         # Test that we can send (only) Message items
@@ -5797,24 +5798,28 @@ class MessagesTest(BaseItemTest):
         item = self.get_test_item()
         item.folder = None
         item.send()  # get_test_item() sets the to_recipients to the test account
-        for _ in range(60):
+        t1 = time.perf_counter()
+        while True:
+            t2 = time.perf_counter()
+            self.assertLess(t2 - t1, self.INCOMING_MESSAGE_TIMEOUT,
+                            'Gave up waiting for the sent item to show up in the inbox')
             try:
                 sent_item = self.account.inbox.get(subject=item.subject)
                 break
             except DoesNotExist:
-                time.sleep(1)
-        else:
-            assert False, 'Gave up waiting for the sent item to show up in the inbox'
+                time.sleep(5)
         new_subject = ('Re: %s' % sent_item.subject)[:255]
         sent_item.reply(subject=new_subject, body='Hello reply', to_recipients=[item.author])
-        for _ in range(60):
+        t1 = time.perf_counter()
+        while True:
+            t2 = time.perf_counter()
+            self.assertLess(t2 - t1, self.INCOMING_MESSAGE_TIMEOUT,
+                            'Gave up waiting for the sent item to show up in the inbox')
             try:
                 reply = self.account.inbox.get(subject=new_subject)
                 break
             except DoesNotExist:
-                time.sleep(1)
-        else:
-            assert False, 'Gave up waiting for the reply to show up in the inbox'
+                time.sleep(5)
         self.account.bulk_delete([sent_item, reply])
 
     def test_reply_all(self):
@@ -5822,24 +5827,28 @@ class MessagesTest(BaseItemTest):
         item = self.get_test_item(folder=None)
         item.folder = None
         item.send()
-        for _ in range(60):
+        t1 = time.perf_counter()
+        while True:
+            t2 = time.perf_counter()
+            self.assertLess(t2 - t1, self.INCOMING_MESSAGE_TIMEOUT,
+                            'Gave up waiting for the sent item to show up in the inbox')
             try:
                 sent_item = self.account.inbox.get(subject=item.subject)
                 break
             except DoesNotExist:
-                time.sleep(1)
-        else:
-            assert False, 'Gave up waiting for the sent item to show up in the inbox'
+                time.sleep(5)
         new_subject = ('Re: %s' % sent_item.subject)[:255]
         sent_item.reply_all(subject=new_subject, body='Hello reply')
-        for _ in range(60):
+        t1 = time.perf_counter()
+        while True:
+            t2 = time.perf_counter()
+            self.assertLess(t2 - t1, self.INCOMING_MESSAGE_TIMEOUT,
+                            'Gave up waiting for the sent item to show up in the inbox')
             try:
                 reply = self.account.inbox.get(subject=new_subject)
                 break
             except DoesNotExist:
-                time.sleep(1)
-        else:
-            assert False, 'Gave up waiting for the reply to show up in the inbox'
+                time.sleep(5)
         self.account.bulk_delete([sent_item, reply])
 
     def test_forward(self):
@@ -5847,24 +5856,28 @@ class MessagesTest(BaseItemTest):
         item = self.get_test_item(folder=None)
         item.folder = None
         item.send()
-        for _ in range(60):
+        t1 = time.perf_counter()
+        while True:
+            t2 = time.perf_counter()
+            self.assertLess(t2 - t1, self.INCOMING_MESSAGE_TIMEOUT,
+                            'Gave up waiting for the sent item to show up in the inbox')
             try:
                 sent_item = self.account.inbox.get(subject=item.subject)
                 break
             except DoesNotExist:
-                time.sleep(1)
-        else:
-            assert False, 'Gave up waiting for the sent item to show up in the inbox'
+                time.sleep(5)
         new_subject = ('Re: %s' % sent_item.subject)[:255]
         sent_item.forward(subject=new_subject, body='Hello reply', to_recipients=[item.author])
-        for _ in range(60):
+        t1 = time.perf_counter()
+        while True:
+            t2 = time.perf_counter()
+            self.assertLess(t2 - t1, self.INCOMING_MESSAGE_TIMEOUT,
+                            'Gave up waiting for the sent item to show up in the inbox')
             try:
                 reply = self.account.inbox.get(subject=new_subject)
                 break
             except DoesNotExist:
-                time.sleep(1)
-        else:
-            assert False, 'Gave up waiting for the reply to show up in the inbox'
+                time.sleep(5)
         reply2 = sent_item.create_forward(subject=new_subject, body='Hello reply', to_recipients=[item.author])
         reply2 = reply2.save(self.account.drafts)
         self.assertIsInstance(reply2, Message)
