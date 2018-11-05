@@ -1617,8 +1617,8 @@ class ResolveNames(EWSService):
                 mailbox_elem = elem.find(Mailbox.response_tag())
                 contact_elem = elem.find(Contact.response_tag())
                 yield (
-                    Mailbox.from_xml(elem=mailbox_elem, account=None) if mailbox_elem else None,
-                    Contact.from_xml(elem=contact_elem, account=None) if contact_elem else None,
+                    None if mailbox_elem is None else Mailbox.from_xml(elem=mailbox_elem, account=None),
+                    None if contact_elem is None else Contact.from_xml(elem=contact_elem, account=None),
                 )
             else:
                 yield Mailbox.from_xml(elem=elem.find(Mailbox.response_tag()), account=None)
