@@ -5798,9 +5798,9 @@ class MessagesTest(BaseItemTest):
         item = self.get_test_item()
         item.folder = None
         item.send()  # get_test_item() sets the to_recipients to the test account
-        t1 = time.perf_counter()
+        t1 = time.time()
         while True:
-            t2 = time.perf_counter()
+            t2 = time.time()
             self.assertLess(t2 - t1, self.INCOMING_MESSAGE_TIMEOUT,
                             'Gave up waiting for the sent item to show up in the inbox')
             try:
@@ -5810,9 +5810,9 @@ class MessagesTest(BaseItemTest):
                 time.sleep(5)
         new_subject = ('Re: %s' % sent_item.subject)[:255]
         sent_item.reply(subject=new_subject, body='Hello reply', to_recipients=[item.author])
-        t1 = time.perf_counter()
+        t1 = time.time()
         while True:
-            t2 = time.perf_counter()
+            t2 = time.time()
             self.assertLess(t2 - t1, self.INCOMING_MESSAGE_TIMEOUT,
                             'Gave up waiting for the sent item to show up in the inbox')
             try:
@@ -5827,9 +5827,9 @@ class MessagesTest(BaseItemTest):
         item = self.get_test_item(folder=None)
         item.folder = None
         item.send()
-        t1 = time.perf_counter()
+        t1 = time.time()
         while True:
-            t2 = time.perf_counter()
+            t2 = time.time()
             self.assertLess(t2 - t1, self.INCOMING_MESSAGE_TIMEOUT,
                             'Gave up waiting for the sent item to show up in the inbox')
             try:
@@ -5839,9 +5839,9 @@ class MessagesTest(BaseItemTest):
                 time.sleep(5)
         new_subject = ('Re: %s' % sent_item.subject)[:255]
         sent_item.reply_all(subject=new_subject, body='Hello reply')
-        t1 = time.perf_counter()
+        t1 = time.time()
         while True:
-            t2 = time.perf_counter()
+            t2 = time.time()
             self.assertLess(t2 - t1, self.INCOMING_MESSAGE_TIMEOUT,
                             'Gave up waiting for the sent item to show up in the inbox')
             try:
@@ -5856,9 +5856,9 @@ class MessagesTest(BaseItemTest):
         item = self.get_test_item(folder=None)
         item.folder = None
         item.send()
-        t1 = time.perf_counter()
+        t1 = time.time()
         while True:
-            t2 = time.perf_counter()
+            t2 = time.time()
             self.assertLess(t2 - t1, self.INCOMING_MESSAGE_TIMEOUT,
                             'Gave up waiting for the sent item to show up in the inbox')
             try:
@@ -5868,9 +5868,9 @@ class MessagesTest(BaseItemTest):
                 time.sleep(5)
         new_subject = ('Re: %s' % sent_item.subject)[:255]
         sent_item.forward(subject=new_subject, body='Hello reply', to_recipients=[item.author])
-        t1 = time.perf_counter()
+        t1 = time.time()
         while True:
-            t2 = time.perf_counter()
+            t2 = time.time()
             self.assertLess(t2 - t1, self.INCOMING_MESSAGE_TIMEOUT,
                             'Gave up waiting for the sent item to show up in the inbox')
             try:
