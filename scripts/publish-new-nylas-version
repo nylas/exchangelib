@@ -1,0 +1,50 @@
+#!/usr/bin/env python
+# a simple script to release a new version of our internal exchangelib fork.
+from __future__ import print_function
+from __future__ import division
+from __future__ import absolute_import
+
+import os
+import sys
+import argparse
+from exchangelib import __version__ as exchangelib_version
+
+
+def ask(message):
+    # type: (str) -> bool
+    # shamelessly stolen from: https://stackoverflow.com/a/3042378
+
+    # raw_input returns the empty string for "enter"
+    yes = {'yes', 'y', 'ye', 'yay', ''}
+    no = {'no', 'n', 'nay'}
+
+    while True:
+        sys.stdout.write(message + ' ')
+        choice = raw_input().lower()
+        if choice in yes:
+            return True
+        elif choice in no:
+            return False
+        else:
+            print("Please respond with 'yes' or 'no'")
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('nylas_internal_version', help='Internal version number of our Exchangelib fork')
+    args = parser.parse_args()
+    git_tag = 'v{}-{}'.format(exchangelib_version, args.nylas_internal_version)
+
+    create_tag = ask('Going to create and push a git tag with version `{}` (y/n)'.format(git_tag))
+    if not create_tag:
+        print('Bailing out.')
+        sys.exit(-1)
+
+    print('Creating git tag')
+    os.system('git tag {}'.format(git_tag))
+
+    print('Pushing tag')
+    os.system('git push origin --tags')
+
+if __name__ == '__main__':
+    main()
