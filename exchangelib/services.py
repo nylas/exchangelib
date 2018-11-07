@@ -226,7 +226,7 @@ class EWSService(object):
                 req_id += 1
                 local_req_id = req_id
                 soap_payload = wrap(content=payload, version=api_version, account=account)
-                self._write_xml('request', local_req_id, soap_payload)
+                self._write_xml('streaming-request', local_req_id, soap_payload)
                 r, session = post_ratelimited(
                     protocol=self.protocol,
                     session=session,
@@ -243,7 +243,7 @@ class EWSService(object):
                         break
                     for r in result:
                         if r.text is not None:
-                            self._write_xml('response', local_req_id, r.text)
+                            self._write_xml('streaming-response', local_req_id, r.text)
                     got_envelopes = True
                     yield result
             finally:
@@ -264,6 +264,11 @@ class EWSService(object):
             stdout.write(u'REQUEST {} >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> {}\n'.format(req_id, now))
         elif ftype == 'response':
             stdout.write(u'RESPONSE {} <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< {}\n'.format(req_id, now))
+        elif ftype == 'streaming-request':
+            stdout.write(u'STREAMING REQUEST {} <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< {}\n'.format(req_id, now))
+        elif ftype == 'streaming-response':
+            stdout.write(u'STREAMING RESPONSE {} <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< {}\n'.format(req_id, now))
+
         stdout.write(PrettyXmlHandler.prettify_xml(xml_str) + b'\n')
 
     def _parse_envelopes(self, response):
