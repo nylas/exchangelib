@@ -32,7 +32,7 @@ from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, 
     ErrorItemSave, ErrorInvalidIdMalformed, ErrorMessageSizeExceeded, UnauthorizedError, \
     ErrorCannotDeleteTaskOccurrence, ErrorMimeContentConversionFailed, ErrorRecurrenceHasNoOccurrence, \
     ErrorNameResolutionMultipleResults, ErrorNameResolutionNoResults, ErrorNoPublicFolderReplicaAvailable, \
-    ErrorInvalidOperation, MalformedResponseError
+    ErrorInvalidOperation, MalformedResponseError, ErrorExceededConnectionCount, SessionPoolMinSizeReached
 from .ewsdatetime import EWSDateTime, NaiveDateTimeNotAllowed
 from .transport import wrap, extra_headers
 from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, \
@@ -91,7 +91,10 @@ class EWSService(object):
             except ErrorServerBusy as e:
                 log.debug('Got ErrorServerBusy (back off %s seconds)', e.back_off)
                 # ErrorServerBusy is very often a symptom of sending too many requests. Scale back if possible.
-                self.protocol.decrease_poolsize()
+                try:
+                    self.protocol.decrease_poolsize()
+                except SessionPoolMinSizeReached:
+                    pass
                 if self.protocol.credentials.fail_fast:
                     raise
                 self.protocol.credentials.back_off(e.back_off)
@@ -104,6 +107,7 @@ class EWSService(object):
                     ErrorCannotDeleteObject,
                     ErrorConnectionFailed,
                     ErrorCreateItemAccessDenied,
+                    ErrorExceededConnectionCount,
                     ErrorFolderNotFound,
                     ErrorImpersonateUserDenied,
                     ErrorImpersonationFailed,
@@ -172,9 +176,28 @@ class EWSService(object):
                 # The guessed server version is wrong for this account. Try the next version
                 log.debug('API version %s was invalid for account %s', api_version, account)
                 continue
-            except ErrorTooManyObjectsOpened as e:
+            except ErrorExceededConnectionCount as e:
+                # ErrorExceededConnectionCount indicates that the connecting user has too many open TCP connections to
+                # the server. Decrease our session pool size.
+                try:
+                    self.protocol.decrease_poolsize()
+                    continue
+                except SessionPoolMinSizeReached:
+                    # We're already as low as we can go. Let the user handle this.
+                    raise e
+            except (ErrorTooManyObjectsOpened, ErrorTimeoutExpired) as e:
                 # ErrorTooManyObjectsOpened means there are too many connections to the Exchange database. This is very
-                # often a symptom of sending too many requests. Re-raise as an ErrorServerBusy with a default delay.
+                # often a symptom of sending too many requests.
+                #
+                # ErrorTimeoutExpired can be caused by a busy server, or by overly large requests. Start by lowering the
+                # session count. This is done by downstream code.
+                if isinstance(e, ErrorTimeoutExpired) and self.protocol.session_pool_size <= 1:
+                    # We're already as low as we can go, so downstream cannot limit the session count to put less load
+                    # on the server. We don't have a way of lowering the page size of requests from
+                    # this part of the code yet. Let the user handle this.
+                    raise e
+
+                # Re-raise as an ErrorServerBusy with a default delay
                 back_off = 300
                 raise ErrorServerBusy(msg='Reraised from %s(%s)' % (e.__class__.__name__, e), back_off=back_off)
             except ResponseMessageError as rme:
@@ -385,7 +408,10 @@ class PagingEWSMixIn(EWSService):
             except ErrorServerBusy as e:
                 log.debug('Got ErrorServerBusy (back off %s seconds)', e.back_off)
                 # ErrorServerBusy is very often a symptom of sending too many requests. Scale back if possible.
-                self.protocol.decrease_poolsize()
+                try:
+                    self.protocol.decrease_poolsize()
+                except SessionPoolMinSizeReached:
+                    pass
                 if self.protocol.credentials.fail_fast:
                     raise
                 self.protocol.credentials.back_off(e.back_off)
@@ -1520,7 +1546,10 @@ class FindPeople(EWSAccountService, PagingEWSMixIn):
             except ErrorServerBusy as e:
                 log.debug('Got ErrorServerBusy (back off %s seconds)', e.back_off)
                 # ErrorServerBusy is very often a symptom of sending too many requests. Scale back if possible.
-                self.protocol.decrease_poolsize()
+                try:
+                    self.protocol.decrease_poolsize()
+                except SessionPoolMinSizeReached:
+                    pass
                 if self.protocol.credentials.fail_fast:
                     raise
                 self.protocol.credentials.back_off(e.back_off)

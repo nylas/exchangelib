@@ -19,7 +19,7 @@ from future.utils import with_metaclass, python_2_unicode_compatible
 from future.moves.queue import LifoQueue, Empty, Full
 
 from .credentials import Credentials
-from .errors import TransportError
+from .errors import TransportError, SessionPoolMinSizeReached
 from .properties import FreeBusyViewOptions, MailboxData, TimeWindow, TimeZone
 from .services import GetServerTimeZones, GetRoomLists, GetRooms, ResolveNames, GetUserAvailability, \
     GetSearchableMailboxes
@@ -92,6 +92,10 @@ class BaseProtocol(object):
             max_retries=0,
         )
 
+    @property
+    def session_pool_size(self):
+        return self._session_pool_size
+
     def decrease_poolsize(self):
         """Decreases the session pool size in response to error messages from the server requesting to rate-limit
         requests. We decrease by one session per call.
@@ -99,8 +103,7 @@ class BaseProtocol(object):
         # Take a single session from the pool and discard it. We need to protect this with a lock while we are changing
         # the pool size variable, to avoid race conditions. We must keep at least one session in the pool.
         if self._session_pool_size <= 1:
-            log.debug('Session pool size cannot be decreased further')
-            return
+            raise SessionPoolMinSizeReached('Session pool size cannot be decreased further')
         with self._session_pool_lock:
             if self._session_pool_size <= 1:
                 log.debug('Session pool size was decreased in another thread')

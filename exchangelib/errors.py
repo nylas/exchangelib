@@ -115,6 +115,10 @@ class NonExistentTimeError(EWSError):
     pass
 
 
+class SessionPoolMinSizeReached(EWSError):
+    pass
+
+
 class ResponseMessageError(TransportError):
     pass
 
