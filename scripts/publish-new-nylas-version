@@ -44,17 +44,19 @@ def main():
 
     print('Creating git tag')
     res = os.system('git tag {}'.format(git_tag))
+    return_code = os.WEXITSTATUS(res)
 
-    if os.WEXITSTATUS(res) != 0:
+    if return_code != 0:
         print('Error creating git tag! Bailing out.')
-        sys.exit(-1)
+        sys.exit(return_code)
 
     print('Pushing tag')
     res = os.system('git push origin --tags')
+    return_code = os.WEXITSTATUS(res)
 
-    if os.WEXITSTATUS(res) != 0:
+    if return_code != 0:
         print('Error pushing git tag to origin! Bailing out.')
-        sys.exit(-1)
+        sys.exit(return_code)
 
     sys.exit(0)
 
