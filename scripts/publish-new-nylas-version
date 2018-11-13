@@ -31,20 +31,31 @@ def ask(message):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('nylas_internal_version', help='Internal version number of our Exchangelib fork')
+    parser.add_argument('nylas_internal_version',
+                        help='Internal version number of our Exchangelib fork')
     args = parser.parse_args()
     git_tag = 'v{}-{}'.format(exchangelib_version, args.nylas_internal_version)
 
-    create_tag = ask('Going to create and push a git tag with version `{}` (y/n)'.format(git_tag))
+    create_tag = ask('Going to create and push a git tag '
+                     'with version `{}` (Y/n)'.format(git_tag))
     if not create_tag:
         print('Bailing out.')
         sys.exit(-1)
 
     print('Creating git tag')
-    os.system('git tag {}'.format(git_tag))
+    res = os.system('git tag {}'.format(git_tag))
+
+    if os.WEXITSTATUS(res) != 0:
+        print('Error creating git tag! Bailing out.')
+        sys.exit(-1)
 
     print('Pushing tag')
-    os.system('git push origin --tags')
+    res = os.system('git push origin --tags')
+
+    if os.WEXITSTATUS(res) != 0:
+        print('Error pushing git tag to origin! Bailing out.')
+        sys.exit(-1)
+
 
 if __name__ == '__main__':
     main()
