@@ -439,7 +439,7 @@ items_iter = account.fetch(ids=calendar_ids)
 items_iter = account.fetch(ids=calendar_ids, only_fields=['start', 'subject'])
 
 # Bulk update items. Each item must be accompanied by a list of attributes to update
-updated_ids = account.bulk_create(items=[(i, ('start', 'subject')) for i in calendar_items])
+updated_ids = account.bulk_update(items=[(i, ('start', 'subject')) for i in calendar_items])
 
 # Move many items to a new folder
 new_ids = account.bulk_move(ids=calendar_ids, to_folder=account.other_calendar)
@@ -682,7 +682,7 @@ for item in account.inbox.all().order_by('-datetime_received')[:5]:
 
 ### Searching contacts
 
-Fetching personas from a contact folderis supported using the same
+Fetching personas from a contact folder is supported using the same
 syntax as folders. Just start your query with `.people()`:
 
 ```python
