@@ -634,6 +634,9 @@ list_gmail_contact = [x for x in account.contacts.filter(Q(email_addresses__cont
 
 # all email addresses at gmail 
 list_gmail_email = [x.email_addresses[0].email for x in account.contacts.filter(Q(email_addresses__contains=gmail))]
+
+# all emails
+list_all_emails = [x.email_addresses[0].email for x in account.contacts.all() if not isinstance(x, exchangelib.DistributionList) and len(x.email_addresses)>0]
 ```
 
 ### Extended properties
