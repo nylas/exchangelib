@@ -125,10 +125,12 @@ class EWSElement(object):
         # Call create_element() without args, to not fill up the cache with unique attribute values.
         elem = create_element(self.request_tag())
 
+        # Exchangelib previously skipped read_only fields while looping through both the
+        # attribute_fields and supported_fields below, but Nylas likes to keep them to surface fields like
+        # `is_cancelled`, `organizer`, and `item_id` in event raw_data.
+
         # Add attributes
         for f in self.attribute_fields():
-            if f.is_read_only:
-                continue
             value = getattr(self, f.name)
             if value is None or (f.is_list and not value):
                 continue
@@ -136,8 +138,6 @@ class EWSElement(object):
 
         # Add elements and values
         for f in self.supported_fields(version=version):
-            # Exchangelib previously skipped read_only fields but Nylas likes to keep them
-            # to surface fields like `is_cancelled` and `organizer` in event raw data
             value = getattr(self, f.name)
             if value is None or (f.is_list and not value):
                 continue
