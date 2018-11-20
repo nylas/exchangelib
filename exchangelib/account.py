@@ -567,9 +567,13 @@ class Account(object):
         # need the item IDs immediately afterwards. iterator() will only do the bare minimum.
         if only_fields is None:
             # We didn't restrict list of field paths. Get all fields from the server, including extended properties.
-            additional_fields = {FieldPath(field=f) for f in validation_folder.allowed_fields()}
+            additional_fields = {
+                FieldPath(field=f) for f in validation_folder.allowed_item_fields(version=self.version)
+            }
         else:
-            additional_fields = validation_folder.validate_fields(fields=only_fields)
+            for field in only_fields:
+                validation_folder.validate_item_field(field=field)
+            additional_fields = validation_folder.normalize_fields(fields=only_fields)
         # Always use IdOnly here, because AllProperties doesn't actually get *all* properties
         for i in self._consume_item_service(service_cls=GetItem, items=ids, chunk_size=chunk_size, kwargs=dict(
                 additional_fields=additional_fields,

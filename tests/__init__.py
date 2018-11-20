@@ -59,7 +59,7 @@ from exchangelib.indexed_properties import EmailAddress, PhysicalAddress, PhoneN
     SingleFieldIndexedElement, MultiFieldIndexedElement
 from exchangelib.items import Item, CalendarItem, Message, Contact, Task, DistributionList, Persona
 from exchangelib.properties import Attendee, Mailbox, RoomList, MessageHeader, Room, ItemId, Member, EWSElement, Body, \
-    HTMLBody, TimeZone, FreeBusyView, PersonaId, UID
+    HTMLBody, TimeZone, FreeBusyView, PersonaId, UID, InvalidField, InvalidFieldForVersion
 from exchangelib.protocol import BaseProtocol, Protocol, NoVerifyHTTPAdapter
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.recurrence import Recurrence, AbsoluteYearlyPattern, RelativeYearlyPattern, AbsoluteMonthlyPattern, \
@@ -552,20 +552,28 @@ class PropertiesTest(unittest.TestCase):
         with self.assertRaises(AttributeError):
             Mailbox(foo='XXX')
 
-    def test_add_field_with_no_field_cache(self):
-        try:
-            delattr(Item, '_fields_map')
-        except AttributeError:
-            pass
+    def test_invalid_field(self):
+        test_field = Item.get_field_by_fieldname(fieldname='text_body')
+        self.assertIsInstance(test_field, TextField)
+        self.assertEqual(test_field.name, 'text_body')
+
+        with self.assertRaises(InvalidField):
+            Item.get_field_by_fieldname(fieldname='xxx')
+
+        Item.validate_field(field=test_field, version=None)
+        with self.assertRaises(InvalidFieldForVersion) as e:
+            Item.validate_field(field=test_field, version=Version(build=EXCHANGE_2010))
+        self.assertEqual(
+            e.exception.args[0],
+            "Field 'text_body' is not supported on server version Build=14.0.0.0, API=Exchange2010, Fullname=Microsoft "
+            "Exchange Server 2010 (supported from: 15.0.0.0, deprecated from: None)"
+        )
+
+    def test_add_field(self):
         field = TextField('foo', field_uri='bar')
-        Item.add_field(field, 1)
-        self.assertFalse(hasattr(Item, '_fields_map'))
+        Item.add_field(field, insert_after='subject')
         self.assertEqual(Item.get_field_by_fieldname('foo'), field)
-        self.assertTrue(hasattr(Item, '_fields_map'))
         Item.remove_field(field)
-        self.assertFalse(hasattr(Item, '_fields_map'))
-        Item.add_field(field, 1)
-        Item.remove_field(field)  # When _fields_map does not exist
 
     def test_itemid_equality(self):
         self.assertEqual(ItemId('X', 'Y'), ItemId('X', 'Y'))

@@ -10,6 +10,7 @@ from future.utils import python_2_unicode_compatible
 
 from .items import CalendarItem, ID_ONLY
 from .fields import FieldPath, FieldOrder
+from .properties import InvalidField
 from .restriction import Q
 from .services import CHUNK_SIZE
 from .version import EXCHANGE_2010
@@ -124,9 +125,9 @@ class QuerySet(SearchableMixIn):
         for folder in self.folder_collection:
             try:
                 return FieldPath.from_string(field_path=field_path, folder=folder)
-            except ValueError:
+            except InvalidField:
                 pass
-        raise ValueError("Unknown fieldname '%s' on folders '%s'" % (field_path, self.folder_collection.folders))
+        raise InvalidField("Unknown field path %r on folders %s" % (field_path, self.folder_collection.folders))
 
     def _get_field_order(self, field_path):
         from .items import Persona
@@ -138,9 +139,9 @@ class QuerySet(SearchableMixIn):
         for folder in self.folder_collection:
             try:
                 return FieldOrder.from_string(field_path=field_path, folder=folder)
-            except ValueError:
+            except InvalidField:
                 pass
-        raise ValueError("Unknown fieldname '%s' on folders '%s'" % (field_path, self.folder_collection.folders))
+        raise InvalidField("Unknown field path %r on folders %s" % (field_path, self.folder_collection.folders))
 
     @property
     def _item_id_field(self):
@@ -191,12 +192,11 @@ class QuerySet(SearchableMixIn):
                 ) if not f.is_complex}
                 complex_fields_requested = False
             else:
-                additional_fields = {FieldPath(field=f) for f in self.folder_collection.allowed_fields()}
+                additional_fields = {FieldPath(field=f) for f in self.folder_collection.allowed_item_fields()}
                 complex_fields_requested = True
         else:
             additional_fields = self._additional_fields()
-            complex_fields_requested = \
-                bool(set(f.field for f in additional_fields) & self.folder_collection.complex_fields())
+            complex_fields_requested = any(f.field.is_complex for f in additional_fields)
 
         # EWS can do server-side sorting on multiple fields. A caveat is that server-side sorting is not supported
         # for calendar views. In this case, we do all the sorting client-side.

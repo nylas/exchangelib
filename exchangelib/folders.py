@@ -13,11 +13,11 @@ from six import text_type, string_types
 from .errors import ErrorAccessDenied, ErrorFolderNotFound, ErrorCannotEmptyFolder, ErrorCannotDeleteObject, \
     ErrorNoPublicFolderReplicaAvailable, ErrorInvalidOperation, ErrorDeleteDistinguishedFolder, ErrorItemNotFound
 from .fields import IntegerField, TextField, DateTimeField, FieldPath, EffectiveRightsField, MailboxField, IdField, \
-    EWSElementField
+    EWSElementField, Field
 from .items import Item, CalendarItem, Contact, Message, Task, MeetingRequest, MeetingResponse, MeetingCancellation, \
     DistributionList, RegisterMixIn, Persona, ITEM_CLASSES, ITEM_TRAVERSAL_CHOICES, SHAPE_CHOICES, ID_ONLY, \
     DELETE_TYPE_CHOICES, HARD_DELETE
-from .properties import ItemId, Mailbox, EWSElement, ParentFolderId
+from .properties import ItemId, Mailbox, EWSElement, ParentFolderId, InvalidField
 from .queryset import QuerySet, SearchableMixIn
 from .restriction import Restriction, Q
 from .services import FindFolder, GetFolder, FindItem, CreateFolder, UpdateFolder, DeleteFolder, EmptyFolder, FindPeople
@@ -160,19 +160,27 @@ class FolderCollection(SearchableMixIn):
         qs.calendar_view = CalendarView(start=start, end=end, max_items=max_items)
         return qs
 
-    def allowed_fields(self):
+    def allowed_item_fields(self):
         # Return non-ID fields of all item classes allowed in this folder type
         fields = set()
         for item_model in self.supported_item_models:
-            fields.update(set(item_model.supported_fields(version=self.account.version if self.account else None)))
+            fields.update(set(item_model.supported_fields(version=self.account.version)))
         return fields
-
-    def complex_fields(self):
-        return {f for f in self.allowed_fields() if f.is_complex}
 
     @property
     def supported_item_models(self):
         return tuple(item_model for folder in self.folders for item_model in folder.supported_item_models)
+
+    def validate_item_field(self, field):
+        # For each field, check if the field is valid for any of the item models supported by this folder
+        for item_model in self.supported_item_models:
+            try:
+                item_model.validate_field(field=field, version=self.account.version)
+                break
+            except InvalidField:
+                continue
+        else:
+            raise InvalidField("%r is not a valid field on %s" % (field, self.supported_item_models))
 
     def find_items(self, q, shape=ID_ONLY, depth=SHALLOW, additional_fields=None, order_fields=None,
                    calendar_view=None, page_size=None, max_items=None, offset=0):
@@ -201,9 +209,9 @@ class FolderCollection(SearchableMixIn):
             return
         if additional_fields:
             for f in additional_fields:
-                if f.field not in self.allowed_fields():
-                    raise ValueError("'%s' is not a valid field on %s" % (f.field.name, self.supported_item_models))
-                if f.field in self.complex_fields():
+                self.validate_item_field(field=f)
+            for f in additional_fields:
+                if f.field.is_complex:
                     raise ValueError("find_items() does not support field '%s'. Use fetch() instead" % f.field.name)
         if calendar_view is not None and not isinstance(calendar_view, CalendarView):
             raise ValueError("'calendar_view' %s must be a CalendarView instance" % calendar_view)
@@ -524,38 +532,52 @@ class Folder(RegisterMixIn, SearchableMixIn):
         except KeyError:
             raise ValueError('Item type %s was unexpected in a %s folder' % (tag, cls.__name__))
 
-    def allowed_fields(self):
+    @classmethod
+    def allowed_item_fields(cls, version):
         # Return non-ID fields of all item classes allowed in this folder type
         fields = set()
-        version = self.root.account.version if self.root and self.root.account else None
-        for item_model in self.supported_item_models:
+        for item_model in cls.supported_item_models:
             fields.update(
                 set(item_model.supported_fields(version=version))
             )
         return fields
 
-    def complex_fields(self):
-        return {f for f in self.allowed_fields() if f.is_complex}
+    def validate_item_field(self, field):
+        # Takes a fieldname, Field or FieldPath object pointing to an item field, and checks that it is valid
+        # for the item types supported by this folder.
+        if field == 'item_id':
+            warnings.warn("The 'item_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
+            field = 'id'
+        version = self.root.account.version if self.root and self.root.account else None
+        # For each field, check if the field is valid for any of the item models supported by this folder
+        for item_model in self.supported_item_models:
+            try:
+                item_model.validate_field(field=field, version=version)
+                break
+            except InvalidField:
+                continue
+        else:
+            raise InvalidField("%r is not a valid field on %s" % (field, self.supported_item_models))
 
-    def validate_fields(self, fields):
-        # Takes a list of fieldnames or FieldPath objects meant for fetching, and checks that they are valid for this
-        # folder. Turns them into FieldPath objects and adds internal timezone fields if necessary.
+    def normalize_fields(self, fields):
+        # Takes a list of fieldnames, Field or FieldPath objects pointing to item fields. Turns them into FieldPath
+        # objects and adds internal timezone fields if necessary. Assume fields are already validated.
         from .version import EXCHANGE_2010
-        allowed_fields = self.allowed_fields()
         fields = list(fields)
         has_start, has_end = False, False
         for i, field_path in enumerate(fields):
             if field_path == 'item_id':
                 warnings.warn("The 'item_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
                 field_path = 'id'
-            # Allow both FieldPath instances and string field paths as input
+            # Allow both Field and FieldPath instances and string field paths as input
             if isinstance(field_path, string_types):
                 field_path = FieldPath.from_string(field_path=field_path, folder=self)
                 fields[i] = field_path
+            elif isinstance(field_path, Field):
+                field_path = FieldPath(field=field_path)
+                fields[i] = field_path
             if not isinstance(field_path, FieldPath):
                 raise ValueError("Field %r must be a string or FieldPath object" % field_path)
-            if field_path.field not in allowed_fields:
-                raise ValueError("%r is not a valid field on %s" % (field_path.field, self.supported_item_models))
             if field_path.field.name == 'start':
                 has_start = True
             elif field_path.field.name == 'end':
@@ -579,9 +601,9 @@ class Folder(RegisterMixIn, SearchableMixIn):
         for item_model in cls.supported_item_models:
             try:
                 return item_model.get_field_by_fieldname(fieldname)
-            except ValueError:
+            except InvalidField:
                 pass
-        raise ValueError("Unknown fieldname '%s' on class '%s'" % (fieldname, cls.__name__))
+        raise InvalidField("%r is not a valid field name on %s" % (fieldname, cls.supported_item_models))
 
     def get(self, *args, **kwargs):
         return FolderCollection(account=self.root.account, folders=[self]).get(*args, **kwargs)
@@ -625,10 +647,8 @@ class Folder(RegisterMixIn, SearchableMixIn):
         if depth not in ITEM_TRAVERSAL_CHOICES:
             raise ValueError("'depth' %s must be one of %s" % (depth, ITEM_TRAVERSAL_CHOICES))
         if additional_fields:
-            allowed_fields = Persona.supported_fields(version=self.root.account.version)
             for f in additional_fields:
-                if f.field not in allowed_fields:
-                    raise ValueError("'%s' is not a valid field on %s" % (f.field.name, Persona))
+                Persona.validate_field(field=f, version=self.root.account.version)
                 if f.field.is_complex:
                     raise ValueError("find_people() does not support field '%s'" % f.field.name)
 
@@ -1672,7 +1692,7 @@ class Root(RootOfHierarchy):
         if candidates:
             if len(candidates) > 1:
                 raise ValueError(
-                    'Multiple possible default %s folders: %s'% (folder_cls, [text_type(f.name) for f in candidates])
+                    'Multiple possible default %s folders: %s' % (folder_cls, [text_type(f.name) for f in candidates])
                 )
             if candidates[0].is_distinguished:
                 log.debug('Found cached distinguished %s folder', folder_cls)

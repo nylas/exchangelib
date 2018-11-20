@@ -205,6 +205,12 @@ class FieldPath(object):
     def __eq__(self, other):
         return hash(self) == hash(other)
 
+    def __str__(self):
+        return self.path
+
+    def __repr__(self):
+        return self.__class__.__name__ + repr((self.field, self.label, self.subfield))
+
     def __hash__(self):
         return hash((self.field, self.label, self.subfield))
 

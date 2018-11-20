@@ -5,6 +5,7 @@ import logging
 from future.utils import python_2_unicode_compatible
 from six import string_types
 
+from .properties import InvalidField
 from .util import create_element, xml_to_str, value_to_xml_text, is_iterable
 from .version import EXCHANGE_2010
 
@@ -331,19 +332,13 @@ class Q(object):
                 'Value %r for filter on field path "%s" must be a single value' % (self.value, self.field_path)
             )
 
-    def _validate_field_path(self, field_path, folder, applies_to):
+    def _validate_field_path(self, field_path, folder, applies_to, version):
         from .indexed_properties import MultiFieldIndexedElement
         if applies_to == Restriction.FOLDERS:
-            if field_path.field not in folder.supported_fields():
-                raise ValueError(
-                    "'%s' is not a valid field when filtering subfolders of %s" % (field_path.field.name, folder)
-                )
+            # This is a restriction on Folder fields
+            folder.validate_field(field=field_path.field, version=version)
         else:
-            if field_path.field not in folder.allowed_fields():
-                raise ValueError(
-                    "'%s' is not a valid field when filtering on %s"
-                    % (field_path.field.name, folder.__class__.__name__)
-                )
+            folder.validate_item_field(field=field_path.field)
         if not field_path.field.is_searchable:
             raise ValueError("EWS does not support filtering on field '%s'" % field_path.field.name)
         if field_path.subfield and not field_path.subfield.is_searchable:
@@ -351,23 +346,23 @@ class Q(object):
         if issubclass(field_path.field.value_cls, MultiFieldIndexedElement) and not field_path.subfield:
             raise ValueError("Field path '%s' must contain a subfield" % self.field_path)
 
-    def _get_field_path(self, folders, applies_to):
+    def _get_field_path(self, folders, applies_to, version):
         # Convert the string field path to a real FieldPath object. The path is validated using the given folders.
         from .fields import FieldPath
         for folder in folders:
             try:
                 if applies_to == Restriction.FOLDERS:
+                    # This is a restriction on Folder fields
                     field = folder.get_field_by_fieldname(fieldname=self.field_path)
                     field_path = FieldPath(field=field)
                 else:
                     field_path = FieldPath.from_string(field_path=self.field_path, folder=folder)
-                self._validate_field_path(field_path=field_path, folder=folder, applies_to=applies_to)
-                break
-            except ValueError as e:
-                print('ERROR:', applies_to, e)
+            except ValueError:
                 continue
+            self._validate_field_path(field_path=field_path, folder=folder, applies_to=applies_to, version=version)
+            break
         else:
-            raise ValueError("Unknown fieldname '%s' on folders '%s'" % (self.field_path, folders))
+            raise InvalidField("Unknown field path %r on folders %s" % (self.field_path, folders))
         return field_path
 
     def _get_clean_value(self, field_path, version):
@@ -392,7 +387,7 @@ class Q(object):
             return None
         if self.is_leaf():
             elem = self._op_to_xml(self.op)
-            field_path = self._get_field_path(folders, applies_to=applies_to)
+            field_path = self._get_field_path(folders, applies_to=applies_to, version=version)
             clean_value = self._get_clean_value(field_path=field_path, version=version)
             if issubclass(field_path.field.value_cls, ExtendedProperty) and field_path.field.value_cls.is_binary_type():
                 # We need to base64-encode binary data

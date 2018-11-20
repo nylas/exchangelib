@@ -6,17 +6,26 @@ import codecs
 import datetime
 import logging
 import struct
+from threading import Lock
 
 from future.utils import PY2
-from six import text_type
+from six import text_type, string_types
 
 from .fields import SubField, TextField, EmailAddressField, ChoiceField, DateTimeField, EWSElementField, MailboxField, \
     Choice, BooleanField, IdField, ExtendedPropertyField, IntegerField, TimeField, EnumField, CharField, EmailField, \
-    EWSElementListField, EnumListField, FreeBusyStatusField, WEEKDAY_NAMES
+    EWSElementListField, EnumListField, FreeBusyStatusField, WEEKDAY_NAMES, FieldPath, Field
 from .util import get_xml_attr, create_element, set_xml_value, value_to_xml_text, MNS, TNS
 from .version import EXCHANGE_2013
 
 log = logging.getLogger(__name__)
+
+
+class InvalidField(ValueError):
+    pass
+
+
+class InvalidFieldForVersion(ValueError):
+    pass
 
 
 class Body(text_type):
@@ -91,6 +100,8 @@ class EWSElement(object):
     ELEMENT_NAME = None
     FIELDS = []
     NAMESPACE = TNS  # Either TNS or MNS
+
+    _fields_lock = Lock()
 
     __slots__ = tuple()
 
@@ -180,30 +191,42 @@ class EWSElement(object):
 
     @classmethod
     def get_field_by_fieldname(cls, fieldname):
-        if not hasattr(cls, '_fields_map'):
-            cls._fields_map = {f.name: f for f in cls.FIELDS}
-        try:
-            return cls._fields_map[fieldname]
-        except KeyError:
-            raise ValueError("'%s' is not a valid field on '%s'" % (fieldname, cls.__name__))
+        for f in cls.FIELDS:
+            if f.name == fieldname:
+                return f
+        else:
+            raise InvalidField("'%s' is not a valid field name on '%s'" % (fieldname, cls.__name__))
 
     @classmethod
-    def add_field(cls, field, idx):
+    def validate_field(cls, field, version):
+        # Takes a list of fieldnames, Field or FieldPath objects pointing to item fields, and checks that they are valid
+        # for the given version.
+        # Allow both Field and FieldPath instances and string field paths as input
+        if isinstance(field, string_types):
+            field = cls.get_field_by_fieldname(fieldname=field)
+        elif isinstance(field, FieldPath):
+            field = field.field
+        if not isinstance(field, Field):
+            raise ValueError("Field %r must be a string, Field or FieldPath object" % field)
+        cls.get_field_by_fieldname(fieldname=field.name)  # Will raise if field name is invalid
+        if not field.supports_version(version):
+            # The field exists but is not valid for this version
+            raise InvalidFieldForVersion(
+                "Field '%s' is not supported on server version %s (supported from: %s, deprecated from: %s)"
+                % (field.name, version, field.supported_from, field.deprecated_from))
+
+    @classmethod
+    def add_field(cls, field, insert_after):
         # Insert a new field at the preferred place in the tuple and invalidate the fieldname cache
-        cls.FIELDS.insert(idx, field)
-        try:
-            delattr(cls, '_fields_map')
-        except AttributeError:
-            pass
+        with cls._fields_lock:
+            idx = tuple(f.name for f in cls.FIELDS).index(insert_after) + 1
+            cls.FIELDS.insert(idx, field)
 
     @classmethod
     def remove_field(cls, field):
         # Remove the given field and invalidate the fieldname cache
-        cls.FIELDS.remove(field)
-        try:
-            delattr(cls, '_fields_map')
-        except AttributeError:
-            pass
+        with cls._fields_lock:
+            cls.FIELDS.remove(field)
 
     def __eq__(self, other):
         return hash(self) == hash(other)

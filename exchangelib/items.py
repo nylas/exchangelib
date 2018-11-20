@@ -15,7 +15,7 @@ from .fields import BooleanField, IntegerField, DecimalField, Base64Field, TextF
     EffectiveRightsField, TimeZoneField, CultureField, IdField, CharField, TextListField, EnumAsIntField, \
     EmailAddressField, FreeBusyStatusField, ReferenceItemIdField, AssociatedCalendarItemIdField
 from .properties import EWSElement, ItemId, ConversationId, ParentFolderId, Attendee, ReferenceItemId, \
-    AssociatedCalendarItemId, PersonaId
+    AssociatedCalendarItemId, PersonaId, InvalidField
 from .recurrence import FirstOccurrence, LastOccurrence, Occurrence, DeletedOccurrence
 from .util import is_iterable
 from .version import EXCHANGE_2007_SP1, EXCHANGE_2010, EXCHANGE_2013
@@ -97,7 +97,7 @@ class RegisterMixIn(EWSElement):
             raise ValueError('Class %s is missing INSERT_AFTER_FIELD value' % cls)
         try:
             cls.get_field_by_fieldname(attr_name)
-        except ValueError:
+        except InvalidField:
             pass
         else:
             raise ValueError("'%s' is already registered" % attr_name)
@@ -109,9 +109,8 @@ class RegisterMixIn(EWSElement):
         #   https://msdn.microsoft.com/en-us/library/office/aa580790(v=exchg.150).aspx
         #
         # Find the correct index for the new extended property, and insert.
-        idx = tuple(f.name for f in cls.FIELDS).index(cls.INSERT_AFTER_FIELD) + 1
         field = ExtendedPropertyField(attr_name, value_cls=attr_cls)
-        cls.add_field(field, idx=idx)
+        cls.add_field(field, insert_after=cls.INSERT_AFTER_FIELD)
 
     @classmethod
     def deregister(cls, attr_name):
@@ -120,7 +119,7 @@ class RegisterMixIn(EWSElement):
         """
         try:
             field = cls.get_field_by_fieldname(attr_name)
-        except ValueError:
+        except InvalidField:
             raise ValueError("'%s' is not registered" % attr_name)
         if not isinstance(field, ExtendedPropertyField):
             raise ValueError("'%s' is not registered as an ExtendedProperty" % attr_name)
