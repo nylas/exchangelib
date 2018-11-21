@@ -194,8 +194,7 @@ class EWSElement(object):
         for f in cls.FIELDS:
             if f.name == fieldname:
                 return f
-        else:
-            raise InvalidField("'%s' is not a valid field name on '%s'" % (fieldname, cls.__name__))
+        raise InvalidField("'%s' is not a valid field name on '%s'" % (fieldname, cls.__name__))
 
     @classmethod
     def validate_field(cls, field, version):
