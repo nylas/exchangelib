@@ -36,7 +36,8 @@ from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, 
 from .ewsdatetime import EWSDateTime, NaiveDateTimeNotAllowed
 from .transport import wrap, extra_headers
 from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, \
-    xml_to_str, set_xml_value, peek, xml_text_to_value, SOAPNS, TNS, MNS, ENS, ParseError
+    xml_to_str, set_xml_value, peek, xml_text_to_value, SOAPNS, TNS, MNS, ENS, ParseError, StreamingBase64Parser, \
+    StreamingContentHandler
 from .version import EXCHANGE_2010, EXCHANGE_2010_SP2, EXCHANGE_2013, EXCHANGE_2013_SP1
 
 log = logging.getLogger(__name__)
@@ -135,7 +136,7 @@ class EWSService(object):
                             account, traceback.format_exc(20))
                 raise
 
-    def _get_response_xml(self, payload):
+    def _get_response_xml(self, payload, **parse_opts):
         # Takes an XML tree and returns SOAP payload as an XML tree
         # Microsoft really doesn't want to make our lives easy. The server may report one version in our initial version
         # guessing tango, but then the server may decide that any arbitrary legacy backend server may actually process
@@ -161,8 +162,11 @@ class EWSService(object):
                 stream=self.streaming,
             )
             self.protocol.release_session(session)
+            if self.streaming:
+                # Let 'requests' decode raw data automatically
+                r.raw.decode_content = True
             try:
-                res = self._get_soap_payload(response=r)
+                res = self._get_soap_payload(response=r, **parse_opts)
             except ParseError as e:
                 raise SOAPError('Bad SOAP response: %s' % e)
             except ErrorInvalidServerVersion:
@@ -245,7 +249,7 @@ class EWSService(object):
         return '{%s}%sResponseMessage' % (MNS, cls.SERVICE_NAME)
 
     @classmethod
-    def _get_soap_payload(cls, response):
+    def _get_soap_payload(cls, response, **parse_opts):
         root = to_xml(response.iter_content())
         body = root.find('{%s}Body' % SOAPNS)
         if body is None:
@@ -1706,6 +1710,25 @@ class GetAttachment(EWSAccountService):
             raise ValueError('"items" must not be empty')
         payload.append(attachment_ids)
         return payload
+
+    @classmethod
+    def _get_soap_payload(cls, response,  **parse_opts):
+        if not parse_opts.get('stream_file_content', False):
+            return super(GetAttachment, cls)._get_soap_payload(response=response)
+
+        from .attachments import FileAttachment
+        element_name = FileAttachment.get_field_by_fieldname('_content').field_uri
+        parser = StreamingBase64Parser()
+        parser.setContentHandler(StreamingContentHandler(parser=parser, ns=TNS, element_name=element_name))
+        # TODO: If the returned XML does not contain a Content element, we should assemble a fake response using the
+        # buffered content and call:
+        #     cls._get_soap_payload(response=fake_response)
+        # to throw any SOAP errors.
+        return parser.parse(response.raw)
+
+    def stream_file_content(self, attachment_id):
+        payload = self.get_payload(items=[attachment_id], include_mime_content=False)
+        return self._get_response_xml(payload=payload, stream_file_content=True)
 
 
 class CreateAttachment(EWSAccountService):

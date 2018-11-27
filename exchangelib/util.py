@@ -1,5 +1,6 @@
 from __future__ import unicode_literals
 
+from base64 import b64decode
 from codecs import BOM_UTF8
 import datetime
 from decimal import Decimal
@@ -9,6 +10,8 @@ import logging
 import re
 import socket
 import time
+import xml.sax.expatreader
+import xml.sax.handler
 
 # Import _etree via defusedxml instead of directly from lxml.etree, to silence overly strict linters
 from defusedxml.lxml import parse, tostring, GlobalParserTLS, RestrictedElement, _etree
@@ -48,8 +51,8 @@ ns_translation = {
     't': TNS,
     'm': MNS,
 }
-for k, v in ns_translation.items():
-    _etree.register_namespace(k, v)
+for item in ns_translation.items():
+    _etree.register_namespace(*item)
 
 
 def is_iterable(value, generators_allowed=False):
@@ -230,6 +233,76 @@ def add_xml_child(tree, name, value):
     # We're calling add_xml_child many places where we don't have the version handy. Don't pass EWSElement or list of
     # EWSElement to this function!
     tree.append(set_xml_value(elem=create_element(name), value=value, version=None))
+
+
+class StreamingContentHandler(xml.sax.handler.ContentHandler):
+    """A SAX content handler that returns a character data for a single element back to the parser. The parser must have
+    a 'buffer' attribute we can append data to.
+    """
+    def __init__(self, parser, ns, element_name):
+        super(StreamingContentHandler, self).__init__()
+        self._parser = parser
+        self._ns = ns
+        self._element_name = element_name
+        self._parsing = False
+
+    def startElementNS(self, name, *args):
+        if name == (self._ns, self._element_name):
+            # we can element element data next
+            self._parsing = True
+
+    def endElementNS(self, name, *args):
+        if name == (self._ns, self._element_name):
+            # all content data received
+            self._parsing = False
+
+    def characters(self, data):
+        if not self._parsing:
+            return
+        self._parser.buffer.append(data)
+
+
+class StreamingBase64Parser(xml.sax.expatreader.ExpatParser):
+    """A SAX parser that returns a generator of base64-decoded character content"""
+    def __init__(self, *args, **kwargs):
+        super(StreamingBase64Parser, self).__init__(*args, **kwargs)
+        self.buffer = None
+        self._namespaces = True
+
+    def parse(self, source):
+        # Like upstream but yields the return value of self.feed()
+        source = xml.sax.expatreader.saxutils.prepare_input_source(source)
+        self.prepareParser(source)
+        file = source.getCharacterStream()
+        if file is None:
+            file = source.getByteStream()
+        self.buffer = []
+        buffer = file.read(self._bufsize)
+        while buffer:
+            for data in self.feed(buffer):
+                yield data
+            buffer = file.read(self._bufsize)
+        self.buffer = None
+        self.close()
+
+    def feed(self, *args, **kwargs):
+        # Like upstream, but yields the current content of the character buffer
+        super().feed(*args, **kwargs)
+        return self._decode_buffer()
+
+    def _decode_buffer(self):
+        remainder = ''
+        for data in self.buffer:
+            available = len(remainder) + len(data)
+            overflow = available % 4
+            if remainder:
+                data = (remainder + data)
+                remainder = ''
+            if overflow:
+                remainder, data = data[-overflow:], data[:-overflow]
+            if data:
+                yield b64decode(data)
+        self.buffer = [remainder] if remainder else []
 
 
 class ForgivingParser(GlobalParserTLS):

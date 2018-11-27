@@ -1,57 +1,15 @@
 from __future__ import unicode_literals
 
-import base64
-from io import BytesIO, StringIO
+from io import BytesIO
 import logging
 import mimetypes
-
-from future.utils import PY2
-from base64io import Base64IO
 
 from .fields import BooleanField, TextField, IntegerField, URIField, DateTimeField, EWSElementField, Base64Field, \
     ItemField, IdField
 from .properties import RootItemId, EWSElement
 from .services import GetAttachment, CreateAttachment, DeleteAttachment
-from .util import TNS
 
 log = logging.getLogger(__name__)
-
-
-class StringBase64IO(Base64IO):
-    def __init__(self, wrapped):
-        super(StringBase64IO, self).__init__(wrapped)
-        self.__wrapped = wrapped
-        self.__read_buffer = b""
-        self.__write_buffer = b""
-
-    def read(self, b=-1):
-        # Override upstream read() method to support a StringIO input stream. This is a workaround for
-        # https://github.com/aws/base64io-python/issues/21
-        if b is None or b < 0:
-            b = -1
-            _bytes_to_read = -1
-        elif b == 0:
-            _bytes_to_read = 0
-        else:
-            # Calculate number of encoded bytes that must be read to get b raw bytes.
-            _bytes_to_read = int((b - len(self.__read_buffer)) * 4 / 3)
-            _bytes_to_read += 4 - _bytes_to_read % 4
-
-        # Read encoded bytes from wrapped stream.
-        data = self.__wrapped.read(_bytes_to_read)
-
-        results = BytesIO()
-        # First, load any stashed bytes
-        results.write(self.__read_buffer)
-        # Decode encoded bytes.
-        results.write(base64.b64decode(data))
-
-        results.seek(0)
-        output_data = results.read(b)
-        # Stash any extra bytes for the next run.
-        self.__read_buffer = results.read()
-
-        return output_data
 
 
 class AttachmentId(EWSElement):
@@ -188,27 +146,11 @@ class FileAttachment(Attachment):
         return self._fp
 
     def _init_fp(self):
-        # Create a file-like object for the attachment content.
-        #
-        # TODO: We try hard to reduce memory consumption, but the XML parser still stores a copy of the base64-encoded
-        # attachment content in an Element object. Even the lxml streaming parser will do this.
+        # Create a file-like object for the attachment content. We try hard to reduce memory consumption so we never
+        # store the full attachment content in-memory.
         if not self.parent_item or not self.parent_item.account:
             raise ValueError('%s must have an account' % self.__class__.__name__)
-        elems = list(GetAttachment(account=self.parent_item.account).call(
-            items=[self.attachment_id], include_mime_content=False))
-        if len(elems) != 1:
-            raise ValueError('Expected single item, got %s' % elems)
-        elem = elems[0]
-        if isinstance(elem, Exception):
-            raise elem
-        # Don't use get_xml_attr() here because we want to handle empty file content as '', not None
-        val = elem.find('{%s}Content' % TNS)
-        if val is None or val.text is None:
-            self._fp = StringBase64IO(BytesIO(b''))
-        else:
-            self._fp = StringBase64IO(BytesIO(val.text) if PY2 else StringIO(val.text))
-        # Discard contents of this element and its subtree to save memory
-        self._clear(elem)
+        self._fp = FileAttachmentIO(attachment=self)
 
     @property
     def content(self):
@@ -306,3 +248,22 @@ class ItemAttachment(Attachment):
         kwargs['item'] = kwargs.pop('_item')
         cls._clear(elem)
         return cls(**kwargs)
+
+
+class FileAttachmentIO(BytesIO):
+    def __init__(self, *args, **kwargs):
+        self._attachment = kwargs.pop('attachment')
+        super(FileAttachmentIO, self).__init__(*args, **kwargs)
+
+    def __enter__(self):
+        self._stream = GetAttachment(account=self._attachment.parent_item.account).stream_file_content(
+            attachment_id=self._attachment.attachment_id
+        )
+
+    def __exit__(self, *args, **kwargs):
+        self._stream = None
+
+    def read(self, size=-1):
+        if size < 0:
+            return b''.join(self._stream)
+        return b''.join(next(self._stream) for _ in range(size))
