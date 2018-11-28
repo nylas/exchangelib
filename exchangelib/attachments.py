@@ -259,11 +259,29 @@ class FileAttachmentIO(BytesIO):
         self._stream = GetAttachment(account=self._attachment.parent_item.account).stream_file_content(
             attachment_id=self._attachment.attachment_id
         )
+        self._overflow = b''
+        return self
 
     def __exit__(self, *args, **kwargs):
         self._stream = None
+        self._overflow = None
 
     def read(self, size=-1):
         if size < 0:
+            # Return everything
             return b''.join(self._stream)
-        return b''.join(next(self._stream) for _ in range(size))
+        # Return only 'size' bytes
+        buffer = [self._overflow]
+        read_size = len(self._overflow)
+        while True:
+            if read_size >= size:
+                break
+            try:
+                next_chunk = next(self._stream)
+                buffer.append(next_chunk)
+                read_size += len(next_chunk)
+            except StopIteration:
+                break
+        res = b''.join(buffer)
+        self._overflow = res[size:]
+        return res[:size]
