@@ -37,6 +37,12 @@ class ParseError(_etree.ParseError):
     pass
 
 
+class ElementNotFound(Exception):
+    def __init__(self, msg, data):
+        super(ElementNotFound, self).__init__(msg)
+        self.data = data
+
+
 # Regex of UTF-8 control characters that are illegal in XML 1.0 (and XML 1.1)
 _ILLEGAL_XML_CHARS_RE = re.compile('[\x00-\x08\x0b\x0c\x0e-\x1F\uD800-\uDFFF\uFFFE\uFFFF]')
 
@@ -248,12 +254,13 @@ class StreamingContentHandler(xml.sax.handler.ContentHandler):
 
     def startElementNS(self, name, *args):
         if name == (self._ns, self._element_name):
-            # we can element element data next
+            # we can expect element data next
             self._parsing = True
+            self._parser.element_found = True
 
     def endElementNS(self, name, *args):
         if name == (self._ns, self._element_name):
-            # all content data received
+            # all element data received
             self._parsing = False
 
     def characters(self, data):
@@ -266,24 +273,31 @@ class StreamingBase64Parser(xml.sax.expatreader.ExpatParser):
     """A SAX parser that returns a generator of base64-decoded character content"""
     def __init__(self, *args, **kwargs):
         super(StreamingBase64Parser, self).__init__(*args, **kwargs)
-        self.buffer = None
         self._namespaces = True
+        self.buffer = None
+        self.element_found = None
 
-    def parse(self, source):
+    def parse(self, response):
+        source = response.raw
         # Like upstream but yields the return value of self.feed()
         source = xml.sax.expatreader.saxutils.prepare_input_source(source)
         self.prepareParser(source)
-        file = source.getCharacterStream()
-        if file is None:
-            file = source.getByteStream()
+        file = source.getByteStream()
         self.buffer = []
+        self.element_found = False
         buffer = file.read(self._bufsize)
+        collected_data = []
         while buffer:
+            if not self.element_found:
+                collected_data += buffer
             for data in self.feed(buffer):
                 yield data
             buffer = file.read(self._bufsize)
         self.buffer = None
+        response.close()
         self.close()
+        if not self.element_found:
+            raise ElementNotFound('The element to be streamed from was not found', data=collected_data)
 
     def feed(self, *args, **kwargs):
         # Like upstream, but yields the current content of the character buffer
