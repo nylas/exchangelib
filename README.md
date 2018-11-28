@@ -799,6 +799,18 @@ for item in my_folder.all():
             if isinstance(attachment.item, Message):
                 print(attachment.item.subject, attachment.item.body)
 
+# Streaming downloads of file attachment is supported. This reduces memory consumption since we
+# never store the full content of the file in-memory:
+for attachment in item.attachments:
+    if isinstance(attachment, FileAttachment):
+        local_path = os.path.join('/tmp', attachment.name)
+        with open(local_path, 'wb') as f, attachment.fp as fp:
+            buffer = fp.read(1024)
+            while buffer:
+                f.write(buffer)
+                buffer = fp.read(1024)
+        print('Saved attachment to', local_path)
+
 # Create a new item with an attachment
 item = Message(...)
 binary_file_content = 'Hello from unicode æøå'.encode('utf-8')  # Or read from file, BytesIO etc.

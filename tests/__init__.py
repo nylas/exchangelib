@@ -5269,6 +5269,28 @@ class BaseItemTest(EWSTest):
         self.assertEqual(fresh_attachments[0].name, 'my_file_2.txt')
         self.assertEqual(fresh_attachments[0].content, binary_file_content)
 
+    def test_streaming_file_attachments(self):
+        item = self.get_test_item(folder=self.test_folder)
+        large_binary_file_content = get_random_string(2**10).encode('utf-8')
+        large_att = FileAttachment(name='my_large_file.txt', content=large_binary_file_content)
+        item.attach(large_att)
+        item.save()
+
+        # Test streaming file content
+        fresh_item = list(self.account.fetch(ids=[item]))[0]
+        with fresh_item.attachments[0].fp as fp:
+            self.assertEqual(fp.read(), large_binary_file_content)
+
+        # Test partial reads of streaming file content
+        fresh_item = list(self.account.fetch(ids=[item]))[0]
+        with fresh_item.attachments[0].fp as fp:
+            chunked_reads = []
+            buffer = fp.read(7)
+            while buffer:
+                chunked_reads.append(buffer)
+                buffer = fp.read(7)
+            self.assertListEqual(chunked_reads, list(chunkify(large_binary_file_content, 7)))
+
     def test_empty_file_attachment(self):
         item = self.get_test_item(folder=self.test_folder)
         att1 = FileAttachment(name='empty_file.txt', content=b'')

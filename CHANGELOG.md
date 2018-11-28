@@ -7,6 +7,9 @@ HEAD
     ErrorTooManyObjectsOpened errors from the server.
 -   Unusual slicing and indexing (e.g. `inbox.all()[9000]` and `inbox.all()[9000:9001]`)
     is now efficient.
+-   Downloading large attachments is now more memory-efficient. We can now stream the file
+    content without ever storing the full file content in memory, using the new
+    `Attachment.fp` context manager.
 
 1.12.0
 ------

@@ -278,10 +278,10 @@ class FileAttachmentIO(BytesIO):
                 break
             try:
                 next_chunk = next(self._stream)
-                buffer.append(next_chunk)
-                read_size += len(next_chunk)
             except StopIteration:
                 break
+            buffer.append(next_chunk)
+            read_size += len(next_chunk)
         res = b''.join(buffer)
         self._overflow = res[size:]
         return res[:size]
