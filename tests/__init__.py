@@ -1356,7 +1356,7 @@ class EWSTest(unittest.TestCase):
 
     def setUp(self):
         # Create a random category for each test to avoid crosstalk
-        self.categories = [get_random_string(length=10, spaces=False, special=False)]
+        self.categories = [get_random_string(length=16, spaces=False, special=False)]
         self.maxDiff = None
 
     def wipe_test_account(self):
