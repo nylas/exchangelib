@@ -11,11 +11,8 @@ from six import text_type
 
 @python_2_unicode_compatible
 class EWSError(Exception):
+    """Global error type within this module.
     """
-    Global error type within this module.
-
-    """
-
     def __init__(self, value):
         super(EWSError, self).__init__(value)
         self.value = value

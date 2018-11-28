@@ -348,7 +348,6 @@ def to_xml(bytes_content):
         stream = BytesGeneratorIO(bytes_content)
     forgiving_parser = _forgiving_parser.getDefaultParser()
     try:
-        # TODO: investigate returning an iterating parser here instead, to avoid memory overhead.
         return parse(stream, parser=forgiving_parser)
     except AssertionError as e:
         raise ParseError(e.args[0], '<not from file>', -1, 0)

@@ -227,7 +227,7 @@ class FolderCollection(SearchableMixIn):
             restriction = Restriction(q, folders=self.folders, applies_to=Restriction.ITEMS)
             query_string = None
         log.debug(
-            'Finding %s items un folders %s (shape: %s, depth: %s, additional_fields: %s, restriction: %s)',
+            'Finding %s items in folders %s (shape: %s, depth: %s, additional_fields: %s, restriction: %s)',
             self.folders,
             self.account,
             shape,
