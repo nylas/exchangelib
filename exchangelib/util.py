@@ -246,7 +246,7 @@ class StreamingContentHandler(xml.sax.handler.ContentHandler):
     a 'buffer' attribute we can append data to.
     """
     def __init__(self, parser, ns, element_name):
-        super(StreamingContentHandler, self).__init__()
+        xml.sax.handler.ContentHandler.__init__(self)
         self._parser = parser
         self._ns = ns
         self._element_name = element_name
@@ -272,7 +272,7 @@ class StreamingContentHandler(xml.sax.handler.ContentHandler):
 class StreamingBase64Parser(xml.sax.expatreader.ExpatParser):
     """A SAX parser that returns a generator of base64-decoded character content"""
     def __init__(self, *args, **kwargs):
-        super(StreamingBase64Parser, self).__init__(*args, **kwargs)
+        xml.sax.expatreader.ExpatParser.__init__(self, *args, **kwargs)
         self._namespaces = True
         self.buffer = None
         self.element_found = None
@@ -301,7 +301,7 @@ class StreamingBase64Parser(xml.sax.expatreader.ExpatParser):
 
     def feed(self, *args, **kwargs):
         # Like upstream, but yields the current content of the character buffer
-        super().feed(*args, **kwargs)
+        xml.sax.expatreader.ExpatParser.feed(self, *args, **kwargs)
         return self._decode_buffer()
 
     def _decode_buffer(self):
