@@ -5842,7 +5842,7 @@ class MessagesTest(BaseItemTest):
         sent_item = self.get_incoming_message(item.subject)
         new_subject = ('Re: %s' % sent_item.subject)[:255]
         sent_item.reply(subject=new_subject, body='Hello reply', to_recipients=[item.author])
-        reply = self.get_incoming_message(item.subject)
+        reply = self.get_incoming_message(new_subject)
         self.account.bulk_delete([sent_item, reply])
 
     def test_reply_all(self):
@@ -5853,7 +5853,7 @@ class MessagesTest(BaseItemTest):
         sent_item = self.get_incoming_message(item.subject)
         new_subject = ('Re: %s' % sent_item.subject)[:255]
         sent_item.reply_all(subject=new_subject, body='Hello reply')
-        reply = self.get_incoming_message(item.subject)
+        reply = self.get_incoming_message(new_subject)
         self.account.bulk_delete([sent_item, reply])
 
     def test_forward(self):
@@ -5864,7 +5864,7 @@ class MessagesTest(BaseItemTest):
         sent_item = self.get_incoming_message(item.subject)
         new_subject = ('Re: %s' % sent_item.subject)[:255]
         sent_item.forward(subject=new_subject, body='Hello reply', to_recipients=[item.author])
-        reply = self.get_incoming_message(item.subject)
+        reply = self.get_incoming_message(new_subject)
         reply2 = sent_item.create_forward(subject=new_subject, body='Hello reply', to_recipients=[item.author])
         reply2 = reply2.save(self.account.drafts)
         self.assertIsInstance(reply2, Message)
