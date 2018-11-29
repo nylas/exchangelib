@@ -1076,7 +1076,7 @@ class IndexedField(FieldURIField):
 
     @classmethod
     def response_tag(cls):
-        return '{%s}%s' % (self.namespace, cls.PARENT_ELEMENT_NAME)
+        return '{%s}%s' % (cls.namespace, cls.PARENT_ELEMENT_NAME)
 
     def __hash__(self):
         return hash(self.field_uri)
