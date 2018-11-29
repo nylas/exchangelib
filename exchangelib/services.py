@@ -161,10 +161,12 @@ class EWSService(object):
                 allow_redirects=False,
                 stream=self.streaming,
             )
-            self.protocol.release_session(session)
             if self.streaming:
                 # Let 'requests' decode raw data automatically
                 r.raw.decode_content = True
+            else:
+                # If we're streaming, we want to wait to release the session until we have consumed the stream.
+                self.protocol.release_session(session)
             try:
                 res = self._get_soap_payload(response=r, **parse_opts)
             except ParseError as e:
@@ -213,6 +215,11 @@ class EWSService(object):
                 raise rme
             else:
                 self._update_api_version(hint=hint, api_version=api_version, response=r)
+            finally:
+                if self.streaming:
+                    # TODO: We shouldn't release the session yet if we still haven't fully consumed the stream. It seems
+                    # a Session can handle multiple unfinished streaming requests, though.
+                    self.protocol.release_session(session)
             return res
         if account:
             raise ErrorInvalidSchemaVersionForMailboxVersion('Tried versions %s but all were invalid for account %s' %
@@ -1726,6 +1733,7 @@ class GetAttachment(EWSAccountService):
         return parser.parse(response)
 
     def stream_file_content(self, attachment_id):
+        # The streaming XML parser can only stream content of one attachment
         payload = self.get_payload(items=[attachment_id], include_mime_content=False)
         return self._get_response_xml(payload=payload, stream_file_content=True)
 
