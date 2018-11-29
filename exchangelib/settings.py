@@ -24,7 +24,6 @@ class ReplyField(TextField):
 
 
 class OofSettings(EWSElement):
-    NAMESPACE = TNS
     ELEMENT_NAME = 'OofSettings'
     REQUEST_ELEMENT_NAME = 'UserOofSettings'
 

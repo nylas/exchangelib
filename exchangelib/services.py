@@ -1717,9 +1717,10 @@ class GetAttachment(EWSAccountService):
             return super(GetAttachment, cls)._get_soap_payload(response=response)
 
         from .attachments import FileAttachment
-        element_name = FileAttachment.get_field_by_fieldname('_content').field_uri
         parser = StreamingBase64Parser()
-        parser.setContentHandler(StreamingContentHandler(parser=parser, ns=TNS, element_name=element_name))
+        field = FileAttachment.get_field_by_fieldname('_content')
+        handler = StreamingContentHandler(parser=parser, ns=field.namespace, element_name=field.field_uri)
+        parser.setContentHandler(handler)
         # TODO: When the returned XML does not contain a Content element, we must catch ElementNotFound and parse the
         # collected data to have errors parsed and raised
         return parser.parse(response)

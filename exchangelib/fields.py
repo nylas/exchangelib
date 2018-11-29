@@ -335,6 +335,8 @@ class Field(object):
 
 
 class FieldURIField(Field):
+    namespace = TNS
+
     def __init__(self, *args, **kwargs):
         self.field_uri = kwargs.pop('field_uri', None)
         super(FieldURIField, self).__init__(*args, **kwargs)
@@ -373,7 +375,7 @@ class FieldURIField(Field):
     def response_tag(self):
         if not self.field_uri_postfix:
             raise ValueError("'field_uri_postfix' value is missing")
-        return '{%s}%s' % (TNS, self.field_uri_postfix)
+        return '{%s}%s' % (self.namespace, self.field_uri_postfix)
 
     def __hash__(self):
         return hash(self.field_uri)
@@ -988,6 +990,8 @@ class LabelField(ChoiceField):
 
 
 class SubField(Field):
+    namespace = TNS
+
     # A field to hold the value on an SingleFieldIndexedElement
     value_cls = string_types[0]
 
@@ -1041,7 +1045,7 @@ class NamedSubField(SubField):
         return 't:%s' % self.field_uri
 
     def response_tag(self):
-        return '{%s}%s' % (TNS, self.field_uri)
+        return '{%s}%s' % (self.namespace, self.field_uri)
 
 
 class IndexedField(FieldURIField):
@@ -1072,7 +1076,7 @@ class IndexedField(FieldURIField):
 
     @classmethod
     def response_tag(cls):
-        return '{%s}%s' % (TNS, cls.PARENT_ELEMENT_NAME)
+        return '{%s}%s' % (self.namespace, cls.PARENT_ELEMENT_NAME)
 
     def __hash__(self):
         return hash(self.field_uri)
