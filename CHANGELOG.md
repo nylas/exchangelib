@@ -3,6 +3,10 @@ Change Log
 
 HEAD
 ----
+
+
+1.12.1
+------
 -   Lower the session pool size automatically in response to ErrorServerBusy and
     ErrorTooManyObjectsOpened errors from the server.
 -   Unusual slicing and indexing (e.g. `inbox.all()[9000]` and `inbox.all()[9000:9001]`)
