@@ -117,7 +117,7 @@ class EWSElement(object):
         elem.clear()
         return cls(**kwargs)
 
-    def to_xml(self, version):
+    def to_xml(self, version, exclude_read_only_fields=True):
         self.clean(version=version)
         # WARNING: The order of addition of XML elements is VERY important. Exchange expects XML elements in a
         # specific, non-documented order and will fail with meaningless errors if the order is wrong.
@@ -125,12 +125,14 @@ class EWSElement(object):
         # Call create_element() without args, to not fill up the cache with unique attribute values.
         elem = create_element(self.request_tag())
 
-        # Exchangelib previously skipped read_only fields while looping through both the
-        # attribute_fields and supported_fields below, but Nylas likes to keep them to surface fields like
-        # `is_cancelled`, `organizer`, and `item_id` in event raw_data.
+        # Exchangelib skips read_only fields while looping through both the attribute_fields and supported_fields
+        # by default. Nylas likes to keep them to surface fields like `is_cancelled`, `organizer`, and `item_id`
+        # in event raw_data. That's the purpose of the `exclude_read_only_fields` parameter.
 
         # Add attributes
         for f in self.attribute_fields():
+            if f.is_read_only and exclude_read_only_fields is True:
+                continue
             value = getattr(self, f.name)
             if value is None or (f.is_list and not value):
                 continue
@@ -138,6 +140,8 @@ class EWSElement(object):
 
         # Add elements and values
         for f in self.supported_fields(version=version):
+            if f.is_read_only and exclude_read_only_fields is True:
+                continue
             value = getattr(self, f.name)
             if value is None or (f.is_list and not value):
                 continue
