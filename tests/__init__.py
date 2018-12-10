@@ -364,7 +364,7 @@ class EWSDateTimeTest(unittest.TestCase):
         tz = EWSTimeZone.timezone('GMT')
         self.assertIsInstance(tz, EWSTimeZone)
         self.assertEqual(tz.zone, 'GMT')
-        self.assertEqual(tz.ms_id, 'GMT Standard Time')
+        self.assertEqual(tz.ms_id, 'UTC')
 
         # Test mapper contents. Latest map from unicode.org has 394 entries
         self.assertGreater(len(EWSTimeZone.PYTZ_TO_MS_MAP), 300)
@@ -1586,7 +1586,7 @@ class CommonTest(EWSTest):
             self.assertIsInstance(view_info, FreeBusyView)
             self.assertIsInstance(view_info.working_hours_timezone, TimeZone)
             ms_id = view_info.working_hours_timezone.to_server_timezone(server_timezones, start.year)
-            self.assertIn(ms_id, CLDR_TO_MS_TIMEZONE_MAP.values())
+            self.assertIn(ms_id, {t[0] for t in CLDR_TO_MS_TIMEZONE_MAP.values()})
 
     def test_get_roomlists(self):
         # The test server is not guaranteed to have any room lists which makes this test less useful

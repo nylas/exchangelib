@@ -493,6 +493,7 @@ CLDR_TO_MS_TIMEZONE_MAP = {
 #
 PYTZ_TO_MS_TIMEZONE_MAP = dict(CLDR_TO_MS_TIMEZONE_MAP, **{
     'Asia/Kolkata': ('India Standard Time', 'noterritory'),
+    'GMT': ('UTC', 'noterritory'),
     'UTC': ('UTC', 'noterritory'),
 })
 
