@@ -737,14 +737,16 @@ class Message(Item):
             raise ValueError('%s must have an account' % self.__class__.__name__)
         if not self.id:
             raise ValueError('%s must have an ID' % self.__class__.__name__)
-        if not to_recipients and not self.author:
-            raise ValueError("'to_recipients' must be set when message has no 'author'")
+        if to_recipients is None:
+            if not self.author:
+                raise ValueError("'to_recipients' must be set when message has no 'author'")
+            to_recipients = [self.author]
         return ReplyToItem(
             account=self.account,
             reference_item_id=ReferenceItemId(id=self.id, changekey=self.changekey),
             subject=subject,
             new_body=body,
-            to_recipients=to_recipients or [self.author],
+            to_recipients=to_recipients,
             cc_recipients=cc_recipients,
             bcc_recipients=bcc_recipients,
         )
@@ -763,12 +765,15 @@ class Message(Item):
             raise ValueError('%s must have an account' % self.__class__.__name__)
         if not self.id:
             raise ValueError('%s must have an ID' % self.__class__.__name__)
+        to_recipients = list(self.to_recipients) if self.to_recipients else []
+        if self.author:
+            to_recipients.append(self.author)
         return ReplyAllToItem(
             account=self.account,
             reference_item_id=ReferenceItemId(id=self.id, changekey=self.changekey),
             subject=subject,
             new_body=body,
-            to_recipients=self.to_recipients or [self.author],
+            to_recipients=to_recipients,
             cc_recipients=self.cc_recipients,
             bcc_recipients=self.bcc_recipients,
         )
