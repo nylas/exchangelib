@@ -125,6 +125,15 @@ class BaseProtocol(object):
 
     def create_session(self):
         session = requests.sessions.Session()
+        session.verify = False
+
+        # This was copy/pasted from our (Nylas's) EAS code, but it's possible
+        # that it's no longer necessary. I'm not really sure what the current
+        # state is from the linked pull request. Copy/pasted comment:
+        # Prevents environment variables from overriding session.verify setting
+        # See https://github.com/kennethreitz/requests/pull/3506
+        s.trust_env = False
+
         # Add some extra info
         session.session_id = sum(map(ord, str(os.urandom(100))))  # Used for debugging messages in services
         session.protocol = self
@@ -139,6 +148,15 @@ class BaseProtocol(object):
     @classmethod
     def raw_session(cls):
         s = requests.sessions.Session()
+        s.verify = False
+
+        # This was copy/pasted from our (Nylas's) EAS code, but it's possible
+        # that it's no longer necessary. I'm not really sure what the current
+        # state is from the linked pull request. Copy/pasted comment:
+        # Prevents environment variables from overriding session.verify setting
+        # See https://github.com/kennethreitz/requests/pull/3506
+        s.trust_env = False
+
         s.mount('http://', adapter=cls.get_adapter())
         s.mount('https://', adapter=cls.get_adapter())
         return s

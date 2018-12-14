@@ -514,7 +514,8 @@ Response data: %(xml_response)s
                                  data=data,
                                  allow_redirects=False,
                                  timeout=(timeout or protocol.TIMEOUT),
-                                 stream=stream)
+                                 stream=stream,
+                                 verify=False)
             except CONNECTION_ERRORS as e:
                 log.debug('Session %s thread %s: connection error POST\'ing to %s', session.session_id, thread_id, url)
                 r = DummyResponse(url=url, headers={'TimeoutException': e}, request_headers=headers)
