@@ -638,6 +638,8 @@ already accepted then you can also process these by removing the entry
 from the calendar.
 
 ```python
+from exchangelib.items import MeetingRequest, MeetingCancellation, SEND_TO_ALL_AND_SAVE_COPY
+
 # create a meeting request and send it out
 calendar_item = CalendarItem(
     account=account,
