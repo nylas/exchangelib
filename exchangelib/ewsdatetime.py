@@ -150,12 +150,36 @@ class EWSDateTime(datetime.datetime):
         return cls.from_datetime(aware_dt.astimezone(UTC))
 
     @classmethod
+    def fromtimestamp(cls, t, tz=None):
+        # We want to return EWSDateTime objects
+        dt = super(EWSDateTime, cls).fromtimestamp(t, tz=tz)
+        if isinstance(dt, cls):
+            return dt
+        return cls.from_datetime(dt)
+
+    @classmethod
+    def utcfromtimestamp(cls, t):
+        # We want to return EWSDateTime objects
+        dt = super(EWSDateTime, cls).utcfromtimestamp(t)
+        if isinstance(dt, cls):
+            return dt
+        return cls.from_datetime(dt)
+
+    @classmethod
     def now(cls, tz=None):
         # We want to return EWSDateTime objects
         t = super(EWSDateTime, cls).now(tz=tz)
         if isinstance(t, cls):
             return t
-        return cls.from_datetime(t)  # We want to return EWSDateTime objects
+        return cls.from_datetime(t)
+
+    @classmethod
+    def utcnow(cls):
+        # We want to return EWSDateTime objects
+        t = super(EWSDateTime, cls).utcnow()
+        if isinstance(t, cls):
+            return t
+        return cls.from_datetime(t)
 
     def date(self):
         # We want to return EWSDate objects
