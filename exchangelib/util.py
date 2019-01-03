@@ -252,21 +252,21 @@ class StreamingContentHandler(xml.sax.handler.ContentHandler):
         self._element_name = element_name
         self._parsing = False
 
-    def startElementNS(self, name, *args):
+    def startElementNS(self, name, qname, attrs):
         if name == (self._ns, self._element_name):
             # we can expect element data next
             self._parsing = True
             self._parser.element_found = True
 
-    def endElementNS(self, name, *args):
+    def endElementNS(self, name, qname):
         if name == (self._ns, self._element_name):
             # all element data received
             self._parsing = False
 
-    def characters(self, data):
+    def characters(self, content):
         if not self._parsing:
             return
-        self._parser.buffer.append(data)
+        self._parser.buffer.append(content)
 
 
 class StreamingBase64Parser(xml.sax.expatreader.ExpatParser):
@@ -277,12 +277,12 @@ class StreamingBase64Parser(xml.sax.expatreader.ExpatParser):
         self.buffer = None
         self.element_found = None
 
-    def parse(self, response):
-        source = response.raw
+    def parse(self, source):
+        raw_source = source.raw
         # Like upstream but yields the return value of self.feed()
-        source = xml.sax.expatreader.saxutils.prepare_input_source(source)
-        self.prepareParser(source)
-        file = source.getByteStream()
+        raw_source = xml.sax.expatreader.saxutils.prepare_input_source(raw_source)
+        self.prepareParser(raw_source)
+        file = raw_source.getByteStream()
         self.buffer = []
         self.element_found = False
         buffer = file.read(self._bufsize)
@@ -294,14 +294,14 @@ class StreamingBase64Parser(xml.sax.expatreader.ExpatParser):
                 yield data
             buffer = file.read(self._bufsize)
         self.buffer = None
-        response.close()
+        source.close()
         self.close()
         if not self.element_found:
             raise ElementNotFound('The element to be streamed from was not found', data=collected_data)
 
-    def feed(self, *args, **kwargs):
+    def feed(self, data, isFinal=0):
         # Like upstream, but yields the current content of the character buffer
-        xml.sax.expatreader.ExpatParser.feed(self, *args, **kwargs)
+        xml.sax.expatreader.ExpatParser.feed(self, data=data, isFinal=isFinal)
         return self._decode_buffer()
 
     def _decode_buffer(self):
