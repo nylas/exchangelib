@@ -292,6 +292,7 @@ CLDR_TO_MS_TIMEZONE_MAP = {
     'Asia/Pontianak': ('SE Asia Standard Time', 'ID'),
     'Asia/Pyongyang': ('North Korea Standard Time', '001'),
     'Asia/Qatar': ('Arab Standard Time', 'QA'),
+    'Asia/Qostanay': ('Central Asia Standard Time', 'KZ'),
     'Asia/Qyzylorda': ('Central Asia Standard Time', 'KZ'),
     'Asia/Rangoon': ('Myanmar Standard Time', '001'),
     'Asia/Riyadh': ('Arab Standard Time', '001'),
