@@ -5,6 +5,7 @@ import requests
 from .util import to_xml
 
 CLDR_WINZONE_URL = 'http://unicode.org/repos/cldr/trunk/common/supplemental/windowsZones.xml'
+DEFAULT_TERRITORY = '001'
 
 
 def generate_map(timeout=10):
@@ -15,8 +16,10 @@ def generate_map(timeout=10):
     tz_map = {}
     for e in to_xml(r.content).find('windowsZones').find('mapTimezones').findall('mapZone'):
         for location in e.get('type').split(' '):
-            if e.get('territory') == '001' or location not in tz_map:
-                tz_map[location] = (e.get('other'), e.get('territory'))
+            if e.get('territory') == DEFAULT_TERRITORY or location not in tz_map:
+                # Prefer default territory. This is so MS_TIMEZONE_TO_PYTZ_MAP maps from MS timezone ID back to the
+                # "preferred" region/location timezone name.
+                tz_map[location] = e.get('other'), e.get('territory')
     return tz_map
 
 
@@ -492,13 +495,19 @@ CLDR_TO_MS_TIMEZONE_MAP = {
 #
 #    sorted(set(pytz.all_timezones) - set(CLDR_TO_MS_TIMEZONE_MAP))
 #
-PYTZ_TO_MS_TIMEZONE_MAP = dict(CLDR_TO_MS_TIMEZONE_MAP, **{
-    'Asia/Kolkata': ('India Standard Time', 'noterritory'),
-    'GMT': ('UTC', 'noterritory'),
-    'UTC': ('UTC', 'noterritory'),
-})
+PYTZ_TO_MS_TIMEZONE_MAP = dict(
+    CLDR_TO_MS_TIMEZONE_MAP,
+    **{
+        'Asia/Kolkata': ('India Standard Time', 'noterritory'),
+        'GMT': ('UTC', 'noterritory'),
+        'UTC': ('UTC', 'noterritory'),
+    }
+)
 
 # Reverse map from Microsoft timezone ID to pytz timezone name. Non-CLDR timezone ID's can be added here.
-MS_TIMEZONE_TO_PYTZ_MAP = dict(dict((v[0], k) for k, v in PYTZ_TO_MS_TIMEZONE_MAP.items() if v[1] == '001'), **{
-    'tzone://Microsoft/Utc': 'UTC',
-})
+MS_TIMEZONE_TO_PYTZ_MAP = dict(
+    {v[0]: k for k, v in PYTZ_TO_MS_TIMEZONE_MAP.items() if v[1] == DEFAULT_TERRITORY},
+    **{
+        'tzone://Microsoft/Utc': 'UTC',
+    }
+)
