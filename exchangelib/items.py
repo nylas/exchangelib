@@ -1341,5 +1341,5 @@ class Persona(EWSElement):
         return super(Persona, self).__hash__()
 
 
-ITEM_CLASSES = (CalendarItem, Contact, DistributionList, Message, PostItem, Task, MeetingRequest, MeetingResponse,
+ITEM_CLASSES = (Item, CalendarItem, Contact, DistributionList, Message, PostItem, Task, MeetingRequest, MeetingResponse,
                 MeetingCancellation)
