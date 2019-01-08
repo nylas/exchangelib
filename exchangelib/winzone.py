@@ -25,6 +25,8 @@ def generate_map(timeout=10):
 
 # This map is generated irregularly from generate_map(). Do not edit manually - make corrections to
 # PYTZ_TO_MS_TIMEZONE_MAP instead. We provide this map to avoid hammering the CLDR_WINZONE_URL.
+#
+# This list was generated from CLDR_WINZONE_URL version 2018i.
 CLDR_TO_MS_TIMEZONE_MAP = {
     'Africa/Abidjan': ('Greenwich Standard Time', 'CI'),
     'Africa/Accra': ('Greenwich Standard Time', 'GH'),
@@ -170,7 +172,7 @@ CLDR_TO_MS_TIMEZONE_MAP = {
     'America/Mendoza': ('Argentina Standard Time', 'AR'),
     'America/Menominee': ('Central Standard Time', 'US'),
     'America/Merida': ('Central Standard Time (Mexico)', 'MX'),
-    'America/Metlakatla': ('Alaskan Standard Time', 'US'),
+    'America/Metlakatla': ('Pacific Standard Time', 'US'),
     'America/Mexico_City': ('Central Standard Time (Mexico)', '001'),
     'America/Miquelon': ('Saint Pierre Standard Time', '001'),
     'America/Moncton': ('Atlantic Standard Time', 'CA'),
@@ -296,7 +298,7 @@ CLDR_TO_MS_TIMEZONE_MAP = {
     'Asia/Pyongyang': ('North Korea Standard Time', '001'),
     'Asia/Qatar': ('Arab Standard Time', 'QA'),
     'Asia/Qostanay': ('Central Asia Standard Time', 'KZ'),
-    'Asia/Qyzylorda': ('Central Asia Standard Time', 'KZ'),
+    'Asia/Qyzylorda': ('West Asia Standard Time', 'KZ'),
     'Asia/Rangoon': ('Myanmar Standard Time', '001'),
     'Asia/Riyadh': ('Arab Standard Time', '001'),
     'Asia/Saigon': ('SE Asia Standard Time', 'VN'),
