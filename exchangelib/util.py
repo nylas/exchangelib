@@ -297,7 +297,7 @@ class StreamingBase64Parser(xml.sax.expatreader.ExpatParser):
         source.close()
         self.close()
         if not self.element_found:
-            raise ElementNotFound('The element to be streamed from was not found', data=collected_data)
+            raise ElementNotFound('The element to be streamed from was not found', data=bytes(collected_data))
 
     def feed(self, data, isFinal=0):
         # Like upstream, but yields the current content of the character buffer
