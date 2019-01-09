@@ -470,13 +470,16 @@ class DummyRequest(object):
 
 
 class DummyResponse(object):
-    def __init__(self, url, headers, request_headers):
+    def __init__(self, url, headers, request_headers, content=b''):
         self.status_code = 503
         self.url = url
         self.headers = headers
-        self.text = ''
-        self.content = b''
+        self.content = content
+        self.text = content.decode('utf-8', errors='ignore')
         self.request = DummyRequest(headers=request_headers)
+
+    def iter_content(self):
+        return self.content
 
 
 def get_domain(email):

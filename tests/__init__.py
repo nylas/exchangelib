@@ -31,7 +31,7 @@ from yaml import safe_load
 
 from exchangelib import close_connections
 from exchangelib.account import Account, SAVE_ONLY, SEND_ONLY, SEND_AND_SAVE_COPY
-from exchangelib.attachments import FileAttachment, ItemAttachment
+from exchangelib.attachments import FileAttachment, ItemAttachment, AttachmentId
 from exchangelib.autodiscover import AutodiscoverProtocol, discover
 import exchangelib.autodiscover
 from exchangelib.configuration import Configuration
@@ -43,7 +43,8 @@ from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalid
     ErrorFolderNotFound, ErrorInvalidRequest, SOAPError, ErrorInvalidServerVersion, NaiveDateTimeNotAllowed, \
     AmbiguousTimeError, NonExistentTimeError, ErrorUnsupportedPathForQuery, ErrorInvalidPropertyForOperation, \
     ErrorInvalidValueForProperty, ErrorPropertyUpdate, ErrorDeleteDistinguishedFolder, \
-    ErrorNoPublicFolderReplicaAvailable, ErrorServerBusy, ErrorInvalidPropertySet, ErrorObjectTypeChanged
+    ErrorNoPublicFolderReplicaAvailable, ErrorServerBusy, ErrorInvalidPropertySet, ErrorObjectTypeChanged, \
+    ErrorInvalidIdMalformed
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.extended_properties import ExtendedProperty, ExternId
 from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextField, EmailAddressField, URIField, \
@@ -5301,6 +5302,28 @@ class BaseItemTest(EWSTest):
                 chunked_reads.append(buffer)
                 buffer = fp.read(7)
             self.assertListEqual(chunked_reads, list(chunkify(large_binary_file_content, 7)))
+
+    def test_streaming_file_attachment_error(self):
+        # Test that we can parse XML error responses in streaming mode.
+
+        # Try to stram an attachment with malformed ID
+        att = FileAttachment(
+            parent_item=self.get_test_item(folder=self.test_folder),
+            attachment_id=AttachmentId(id='AAMk='),
+            name='dummy.txt',
+            content=b'',
+        )
+        with self.assertRaises(ErrorInvalidIdMalformed):
+            with att.fp as fp:
+                fp.read()
+
+        # Try to stream a non-existent attachment
+        att.attachment_id.id=\
+            'AAMkADQyYzZmYmUxLTJiYjItNDg2Ny1iMzNjLTIzYWE1NDgxNmZhNABGAAAAAADUebQDarW2Q7G2Ji8hKofPBwAl9iKCsfCfS' \
+            'a9cmjh+JCrCAAPJcuhjAABioKiOUTCQRI6Q5sRzi0pJAAHnDV3CAAABEgAQAN0zlxDrzlxAteU+kt84qOM='
+        with self.assertRaises(ErrorItemNotFound):
+            with att.fp as fp:
+                fp.read()
 
     def test_empty_file_attachment(self):
         item = self.get_test_item(folder=self.test_folder)

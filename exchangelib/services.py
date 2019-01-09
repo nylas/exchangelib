@@ -37,7 +37,7 @@ from .ewsdatetime import EWSDateTime, NaiveDateTimeNotAllowed
 from .transport import wrap, extra_headers
 from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, \
     xml_to_str, set_xml_value, peek, xml_text_to_value, SOAPNS, TNS, MNS, ENS, ParseError, StreamingBase64Parser, \
-    StreamingContentHandler
+    StreamingContentHandler, DummyResponse, ElementNotFound
 from .version import EXCHANGE_2010, EXCHANGE_2010_SP2, EXCHANGE_2013, EXCHANGE_2013_SP1
 
 log = logging.getLogger(__name__)
@@ -1728,14 +1728,25 @@ class GetAttachment(EWSAccountService):
         field = FileAttachment.get_field_by_fieldname('_content')
         handler = StreamingContentHandler(parser=parser, ns=field.namespace, element_name=field.field_uri)
         parser.setContentHandler(handler)
-        # TODO: When the returned XML does not contain a Content element, we must catch ElementNotFound and parse the
-        # collected data to have errors parsed and raised
         return parser.parse(response)
 
     def stream_file_content(self, attachment_id):
         # The streaming XML parser can only stream content of one attachment
         payload = self.get_payload(items=[attachment_id], include_mime_content=False)
-        return self._get_response_xml(payload=payload, stream_file_content=True)
+        try:
+            for chunk in self._get_response_xml(payload=payload, stream_file_content=True):
+                yield chunk
+        except ElementNotFound as enf:
+            # When the returned XML does not contain a Content element, ElementNotFound is thrown by parser.parse().
+            # Let the non-streaming SOAP parser parse the response and hook into the normal exception handling.
+            # Wrap in DummyResponse because _get_soap_payload() expects an iter_content() method.
+            response = DummyResponse(url=None, headers=None, request_headers=None, content=enf.data)
+            res = super(GetAttachment, self)._get_soap_payload(response=response)
+            for e in self._get_elements_in_response(response=res):
+                if isinstance(e, Exception):
+                    raise e
+            # The returned content did not contain any EWS exceptions. Give up and re-raise the original exception.
+            raise enf
 
 
 class CreateAttachment(EWSAccountService):
