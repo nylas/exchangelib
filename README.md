@@ -278,8 +278,16 @@ f.save()
 
 f.name = 'My New Subfolder'
 f.save()
-
 f.delete()
+
+# Delete all items in a folder
+f.empty()
+# Also delete all subfolders in the folder
+f.empty(delete_sub_folders=True)
+# Recursively delete all items in a folder, and all subfolders and their content. This is
+# like `empty(delete_sub_folders=True)` but attempts to protect distinguished folders from
+# being deleted. Use with caution!
+f.wipe()
 ```
 
 ### Dates, datetimes and timezones
