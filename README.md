@@ -14,8 +14,7 @@ calendar, mailbox, task, contact and distribution list items.
 [![image](https://secure.travis-ci.org/ecederstrand/exchangelib.png)](http://travis-ci.org/ecederstrand/exchangelib)
 [![image](https://coveralls.io/repos/github/ecederstrand/exchangelib/badge.svg?branch=master)](https://coveralls.io/github/ecederstrand/exchangelib?branch=master)
 
-Teaser
-------
+## Teaser
 
 Here's a short example of how `exchangelib` works. Let's print the first
 100 inbox messages in reverse order:
@@ -82,15 +81,11 @@ For other operating systems, please consult the documentation for the Python pac
 fails to install.
 
 
-### Setup and connecting
+## Setup and connecting
 
 ```python
-from datetime import datetime, timedelta
-import pytz
 from exchangelib import DELEGATE, IMPERSONATION, Account, Credentials, ServiceAccount, \
-    EWSDateTime, EWSTimeZone, Configuration, NTLM, GSSAPI, CalendarItem, Message, \
-    Mailbox, Attendee, Q, ExtendedProperty, FileAttachment, ItemAttachment, \
-    HTMLBody, Build, Version, FolderCollection
+    Configuration, NTLM, GSSAPI, Build, Version
 
 # Specify your credentials. Username is usually in WINDOMAIN\username format, where WINDOMAIN is
 # the name of the Windows Domain your username is connected to, but some servers also
@@ -159,16 +154,26 @@ ews_url = account.protocol.service_endpoint
 ews_auth_type = account.protocol.auth_type
 primary_smtp_address = account.primary_smtp_address
 
-# 5 minutes later, fetch the cached values and create the account without autodiscovering:
+# You can now create the Account without autodiscovering, using the cached values:
 config = Configuration(service_endpoint=ews_url, credentials=credentials, auth_type=ews_auth_type)
 account = Account(
     primary_smtp_address=primary_smtp_address, 
     config=config, autodiscover=False, 
     access_type=DELEGATE,
 )
+
+# Autodiscover can take a lot of time, specially the part that figures out the autodiscover 
+# server to contact for a specific email domain. For this reason, we will create a persistent, 
+# per-user, on-disk cache containing a map of previous, successful domain -> autodiscover server
+# lookups. This cache is shared between processes and is not deleted when your program exits.
+
+# A cache entry for a domain is removed automatically if autodiscovery fails for an email in that
+# domain. It's possible to clear the entire cache completely if you want:
+from exchangelib.autodiscover import _autodiscover_cache
+_autodiscover_cache.clear()
 ```
 
-### Proxies and custom TLS validation
+## Proxies and custom TLS validation
 
 If you need proxy support or custom TLS validation, you can supply a
 custom 'requests' transport adapter class, as described in
@@ -188,7 +193,6 @@ class RootCAAdapter(requests.adapters.HTTPAdapter):
         cert_file = {
             'example.com': '/path/to/example.com.crt',
             'mail.internal': '/path/to/mail.internal.crt',
-            ...
         }[urlparse(url).hostname]
         super(RootCAAdapter, self).cert_verify(conn=conn, url=url, verify=cert_file, cert=cert)
 
@@ -199,6 +203,9 @@ BaseProtocol.HTTP_ADAPTER_CLS = RootCAAdapter
 Here's an example of adding proxy support:
 
 ```python
+import requests.adapters
+from exchangelib.protocol import BaseProtocol
+
 class ProxyAdapter(requests.adapters.HTTPAdapter):
     def send(self, *args, **kwargs):
         kwargs['proxies'] = {
@@ -215,13 +222,13 @@ BaseProtocol.HTTP_ADAPTER_CLS = ProxyAdapter
 errors. Use at own risk.
 
 ```python
-from exchangelib.protocol import NoVerifyHTTPAdapter
+from exchangelib.protocol import BaseProtocol, NoVerifyHTTPAdapter
 
 # Tell exchangelib to use this adapter class instead of the default
 BaseProtocol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
 ```
 
-### Folders
+## Folders
 All wellknown folders are available as properties on the account, e.g. as `account.root`, `account.calendar`,
 `account.trash`, `account.inbox`, `account.outbox`, `account.sent`, `account.junk`, `account.tasks` and
 `account.contacts`.
@@ -233,10 +240,14 @@ All wellknown folders are available as properties on the account, e.g. as `accou
 # The folder structure is cached after first access to a folder hierarchy. This means that external
 # changes to the folder structure will not show up until you clear the cache. Here's how to clear
 # the cache of each of the currently supported folder hierarchies:
-account.root.refresh()
-account.public_folders_root.refresh()
-account.archive_root.refresh()
+from exchangelib import Account, Folder
 
+a = Account(...)
+a.root.refresh()
+a.public_folders_root.refresh()
+a.archive_root.refresh()
+
+some_folder = a.root / 'Some Folder'
 some_folder.parent
 some_folder.parent.parent.parent
 some_folder.root  # Returns the root of the folder structure, at any level. Same as Account.root
@@ -254,7 +265,7 @@ some_folder / 'sub_folder' / 'even_deeper' / 'leaf'  # Works like pathlib.Path
 some_folder // 'sub_folder' // 'even_deeper' // 'leaf'
 some_folder.parts  # returns some_folder and all its parents, as Folder instances
 # tree() returns a string representation of the tree structure at the given level
-print(root.tree())
+print(a.root.tree())
 '''
 root
 ├── inbox
@@ -266,14 +277,14 @@ root
 '''
 
 # Folders have some useful counters:
-account.inbox.total_count
-account.inbox.child_folder_count
-account.inbox.unread_count
+a.inbox.total_count
+a.inbox.child_folder_count
+a.inbox.unread_count
 # Update the counters
-account.inbox.refresh()
+a.inbox.refresh()
 
 # Folders can be created, updated and deleted:
-f = Folder(parent=self.account.inbox, name='My New Folder')
+f = Folder(parent=a.inbox, name='My New Folder')
 f.save()
 
 f.name = 'My New Subfolder'
@@ -290,13 +301,17 @@ f.empty(delete_sub_folders=True)
 f.wipe()
 ```
 
-### Dates, datetimes and timezones
+## Dates, datetimes and timezones
 
 EWS has some special requirements on datetimes and timezones. You need
 to use the special `EWSDate`, `EWSDateTime` and `EWSTimeZone` classes
 when working with dates.
 
 ```python
+from datetime import datetime, timedelta
+import pytz
+from exchangelib import EWSTimeZone, EWSDateTime, EWSDate
+
 # EWSTimeZone works just like pytz.timezone()
 tz = EWSTimeZone.timezone('Europe/Copenhagen')
 # You can also get the local timezone defined in your operating system
@@ -332,15 +347,18 @@ py_dt = pytz_tz.localize(datetime(2017, 12, 11, 10, 9, 8))
 ews_now = EWSDateTime.from_datetime(py_dt)
 ```
 
-### Creating, updating, deleting, sending and moving
+## Creating, updating, deleting, sending and moving
 
 ```python
 # Here's an example of creating a calendar item in the user's standard calendar.  If you want to
 # access a non-standard calendar, choose a different one from account.folders[Calendar].
 #
 # You can create, update and delete single items:
+from exchangelib import Account, CalendarItem, Message, Mailbox, FileAttachment, HTMLBody
 from exchangelib.items import SEND_ONLY_TO_ALL, SEND_ONLY_TO_CHANGED
-item = CalendarItem(folder=account.calendar, subject='foo')
+
+a = Account(...)
+item = CalendarItem(folder=a.calendar, subject='foo')
 item.save()  # This gives the item an 'id' and a 'changekey' value
 item.save(send_meeting_invitations=SEND_ONLY_TO_ALL)  # Send a meeting invitation to attendees
 # Update a field. All fields have a corresponding Python type that must be used.
@@ -356,8 +374,8 @@ item.delete()  # Hard deletinon
 item.delete(send_meeting_cancellations=SEND_ONLY_TO_ALL)  # Send cancellations to all attendees
 item.soft_delete()  # Delete, but keep a copy in the recoverable items folder
 item.move_to_trash()  # Move to the trash folder
-item.move(account.trash)  # Also moves the item to the trash folder
-item.copy(account.trash)  # Creates a copy of the item to the trash folder
+item.move(a.trash)  # Also moves the item to the trash folder
+item.copy(a.trash)  # Creates a copy of the item to the trash folder
 
 # You can also send emails. If you don't want a local copy:
 m = Message(
@@ -408,7 +426,7 @@ forward_draft = m.create_forward(
     to_recipients=['carl@example.com', 'denice@example.com']
 ).save(a.drafts) # gives you back the item
 forward_draft.reply_to = 'eric@example.com'
-forward_draft.attach(FileAttachment(distinguishes.txt', content='hello world'.encode('utf-8')))
+forward_draft.attach(FileAttachment(name='my_file.txt', content='hello world'.encode('utf-8')))
 forward_draft.send() # now our forward has an extra reply_to field and an extra attachment.
 
 # EWS distinguishes between plain text and HTML body contents. If you want to send HTML body
@@ -416,10 +434,13 @@ forward_draft.send() # now our forward has an extra reply_to field and an extra 
 item.body = HTMLBody('<html><body>Hello happy <blink>OWA user!</blink></body></html>')
 ```
 
-### Bulk operations
+## Bulk operations
 
 ```python
 # Build a list of calendar items
+from exchangelib import Account, CalendarItem, EWSDateTime, EWSTimeZone, Attendee, Mailbox
+
+a = Account(...)
 tz = EWSTimeZone.timezone('Europe/Copenhagen')
 year, month, day = 2016, 3, 20
 calendar_items = []
@@ -438,31 +459,32 @@ for hour in range(7, 17):
     ))
 
 # Create all items at once
-return_ids = account.bulk_create(folder=account.calendar, items=calendar_items)
+return_ids = a.bulk_create(folder=a.calendar, items=calendar_items)
 
 # Bulk fetch, when you have a list of item IDs and want the full objects. Returns a generator.
 calendar_ids = [(i.id, i.changekey) for i in calendar_items]
-items_iter = account.fetch(ids=calendar_ids)
+items_iter = a.fetch(ids=calendar_ids)
 # If you only want some fields, use the 'only_fields' attribute
-items_iter = account.fetch(ids=calendar_ids, only_fields=['start', 'subject'])
+items_iter = a.fetch(ids=calendar_ids, only_fields=['start', 'subject'])
 
 # Bulk update items. Each item must be accompanied by a list of attributes to update
-updated_ids = account.bulk_update(items=[(i, ('start', 'subject')) for i in calendar_items])
+updated_ids = a.bulk_update(items=[(i, ('start', 'subject')) for i in calendar_items])
 
 # Move many items to a new folder
-new_ids = account.bulk_move(ids=calendar_ids, to_folder=account.other_calendar)
+new_ids = a.bulk_move(ids=calendar_ids, to_folder=a.other_calendar)
 
 # Send draft messages in bulk
-new_ids = account.bulk_send(ids=message_ids, save_copy=False)
+message_ids = a.drafts.all().only('id', 'changekey')
+new_ids = a.bulk_send(ids=message_ids, save_copy=False)
 
 # Delete in bulk
-delete_results = account.bulk_delete(ids=calendar_ids)
+delete_results = a.bulk_delete(ids=calendar_ids)
 
 # Bulk delete items found as a queryset
-account.inbox.filter(subject__startswith='Invoice').delete()
+a.inbox.filter(subject__startswith='Invoice').delete()
 ```
 
-### Searching
+## Searching
 
 Searching is modeled after the Django QuerySet API, and a large part of
 the API is supported. Like in Django, the QuerySet is lazy and doesn't
@@ -475,73 +497,77 @@ iterated the first time.
 Here are some examples of using the API:
 
 ```python
-# Let's get the calendar items we just created.
-all_items = my_folder.all()  # Get everything
-all_items_without_caching = my_folder.all().iterator()  # Get everything, but don't cache
+from datetime import timedelta
+from exchangelib import Account, EWSDateTime, FolderCollection, Q
+
+a = Account(...)
+all_items = a.inbox.all()  # Get everything
+all_items_without_caching = a.inbox.all().iterator()  # Get everything, but don't cache
 # Chain multiple modifiers ro refine the query
-filtered_items = my_folder.filter(subject__contains='foo').exclude(categories__icontains='bar')
-status_report = my_folder.all().delete()  # Delete the items returned by the QuerySet
-items_for_2017 = my_calendar.filter(start__range=(
-    tz.localize(EWSDateTime(2017, 1, 1)),
-    tz.localize(EWSDateTime(2018, 1, 1))
-))  # Filter by a date range
+filtered_items = a.inbox.filter(subject__contains='foo').exclude(categories__icontains='bar')
+status_report = a.inbox.all().delete()  # Delete the items returned by the QuerySet
+start = a.default_timezone.localize(EWSDateTime(2017, 1, 1))
+end = a.default_timezone.localize(EWSDateTime(2018, 1, 1))
+items_for_2017 = a.calendar.filter(start__range=(start, end))  # Filter by a date range
 
 # Same as filter() but throws an error if exactly one item isn't returned
-item = my_folder.get(subject='unique_string')
+item = a.inbox.get(subject='unique_string')
 
 # If you only have the ID and possibly the changekey of an item, you can get the full item:
-item = my_folder.get(id='AAMkADQy=')
-item = my_folder.get(id='AAMkADQy=', changekey='FwAAABYA')
+item = a.inbox.get(id='AAMkADQy=')
+item = a.inbox.get(id='AAMkADQy=', changekey='FwAAABYA')
 
 # You can sort by a single or multiple fields. Prefix a field with '-' to reverse the sorting. 
-# Sorting is efficient since it is done server-side.
-ordered_items = my_folder.all().order_by('subject')
-reverse_ordered_items = my_folder.all().order_by('-subject')
+# Sorting is efficient since it is done server-side, except when a calendar view sorting on 
+# multiple fields.
+ordered_items = a.inbox.all().order_by('subject')
+reverse_ordered_items = a.inbox.all().order_by('-subject')
  # Indexed properties can be ordered on their individual components
-sorted_by_home_street = my_contacts.all().order_by('physical_addresses__Home__street')
-dont_do_this = my_huge_folder.all().order_by('subject', 'categories')[:10]  # This is efficient
+sorted_by_home_street = a.contacts.all().order_by('physical_addresses__Home__street')
+# Beware that sorting is done client-side here
+a.calendar.view(start=start, end=end).order_by('subject', 'categories')
 
 # Counting and exists
-n = my_folder.all().count()  # Efficient counting
-folder_is_empty = not my_folder.all().exists()  # Efficient tasting
+n = a.inbox.all().count()  # Efficient counting
+folder_is_empty = not a.inbox.all().exists()  # Efficient tasting
 
 # Restricting returned attributes
-sparse_items = my_folder.all().only('subject', 'start')
+sparse_items = a.inbox.all().only('subject', 'start')
 # Dig deeper on indexed properties
-sparse_items = my_contacts.all().only('phone_numbers')
-sparse_items = my_contacts.all().only('phone_numbers__CarPhone')
-sparse_items = my_contacts.all().only('physical_addresses__Home__street')
+sparse_items = a.contacts.all().only('phone_numbers')
+sparse_items = a.contacts.all().only('phone_numbers__CarPhone')
+sparse_items = a.contacts.all().only('physical_addresses__Home__street')
 
 # Return values as dicts, not objects
-ids_as_dict = my_folder.all().values('id', 'changekey')
+ids_as_dict = a.inbox.all().values('id', 'changekey')
 # Return values as nested lists
-values_as_list = my_folder.all().values_list('subject', 'body')
+values_as_list = a.inbox.all().values_list('subject', 'body')
 # Return values as a flat list
-all_subjects = my_folder.all().values_list('physical_addresses__Home__street', flat=True)
+all_subjects = a.inbox.all().values_list('physical_addresses__Home__street', flat=True)
 
 # A QuerySet can be indexed and sliced like a normal Python list. Slicing and indexing of the
 # QuerySet is efficient because it only fetches the necessary items to perform the slicing.
 # Slicing from the end is also efficient, but then you might as well reverse the sorting.
-first_ten = my_folder.all().order_by('-subject')[:10]  # Efficient. We only fetch 10 items
-last_ten = my_folder.all().order_by('-subject')[:-10]  # Efficient, but convoluted
-next_ten = my_folder.all().order_by('-subject')[10:20]  # Efficient. We only fetch 10 items
-single_item = my_folder.all().order_by('-subject')[34298]  # Efficient. We only fetch 1 item
-single_item = my_folder.all().order_by('-subject')[3420:3430]  # Efficient. We only fetch 10 items
-random_emails = my_folder.all().order_by('-subject')[::3]  # This is just stupid, but works
+first_ten = a.inbox.all().order_by('-subject')[:10]  # Efficient. We only fetch 10 items
+last_ten = a.inbox.all().order_by('-subject')[:-10]  # Efficient, but convoluted
+next_ten = a.inbox.all().order_by('-subject')[10:20]  # Efficient. We only fetch 10 items
+single_item = a.inbox.all().order_by('-subject')[34298]  # Efficient. We only fetch 1 item
+single_item = a.inbox.all().order_by('-subject')[3420:3430]  # Efficient. We only fetch 10 items
+random_emails = a.inbox.all().order_by('-subject')[::3]  # This is just stupid, but works
 
 # The syntax for filter() is modeled after Django QuerySet filters. The following filter lookup 
 # types are supported. Some lookups only work with string attributes. Range and less/greater 
 # operators only work for date or numerical attributes. Some attributes are not searchable at all 
 # via EWS:
-qs = account.calendar.all()
+qs = a.calendar.all()
 qs.filter(subject='foo')  # Returns items where subject is exactly 'foo'. Case-sensitive
-qs.filter(start__range=(dt1, dt2))  # Returns items within range
+qs.filter(start__range=(start, end))  # Returns items within range
 qs.filter(subject__in=('foo', 'bar'))  # Return items where subject is either 'foo' or 'bar'
 qs.filter(subject__not='foo')  # Returns items where subject is not 'foo'
-qs.filter(start__gt=dt)  # Returns items starting after 'dt'
-qs.filter(start__gte=dt)  # Returns items starting on or after 'dt'
-qs.filter(start__lt=dt)  # Returns items starting before 'dt'
-qs.filter(start__lte=dt)  # Returns items starting on or before 'dt'
+qs.filter(start__gt=start)  # Returns items starting after 'dt'
+qs.filter(start__gte=start)  # Returns items starting on or after 'dt'
+qs.filter(start__lt=start)  # Returns items starting before 'dt'
+qs.filter(start__lte=start)  # Returns items starting on or before 'dt'
 qs.filter(subject__exact='foo')  # Same as filter(subject='foo')
 qs.filter(subject__iexact='foo')  #  Returns items where subject is 'foo', 'FOO' or 'Foo'
 qs.filter(subject__contains='foo')  # Returns items where subject contains 'foo'
@@ -562,17 +588,17 @@ qs.filter(categories__exists=False)
 #
 # Read more about the QueryString syntax here:
 # https://msdn.microsoft.com/en-us/library/ee693615.aspx
-items = my_folder.filter('subject:XXX')
+items = a.inbox.filter('subject:XXX')
 
 # filter() also supports Q objects that are modeled after Django Q objects, for building complex
 # boolean logic search expressions.
 q = (Q(subject__iexact='foo') | Q(subject__contains='bar')) & ~Q(subject__startswith='baz')
-items = my_folder.filter(q)
+items = a.inbox.filter(q)
 
 # In this example, we filter by categories so we only get the items created by us.
-items = account.calendar.filter(
-    start__lt=tz.localize(EWSDateTime(year, month, day + 1)),
-    end__gt=tz.localize(EWSDateTime(year, month, day)),
+items = a.calendar.filter(
+    start__lt=a.default_timezone.localize(EWSDateTime(2019, 1, 1)),
+    end__gt=a.default_timezone.localize(EWSDateTime(2019, 1, 31)),
     categories__contains=['foo', 'bar'],
 )
 for item in items:
@@ -580,9 +606,9 @@ for item in items:
 
 # By default, EWS returns only the master recurring item. If you want recurring calendar
 # items to be expanded, use calendar.view(start=..., end=...) instead.
-items = account.calendar.view(
-    start=tz.localize(EWSDateTime(year, month, day)),
-    end=tz.localize(EWSDateTime(year, month, day)) + timedelta(days=1),
+items = a.calendar.view(
+    start=a.default_timezone.localize(EWSDateTime(2019, 1, 31)),
+    end=a.default_timezone.localize(EWSDateTime(2019, 1, 31)) + timedelta(days=1),
 )
 for item in items:
     print(item.start, item.end, item.subject, item.body, item.location)
@@ -590,21 +616,21 @@ for item in items:
 # You can combine view() with other modifiers. For example, to check for conflicts before 
 # adding a meeting from 8:00 to 10:00:
 has_conflicts = a.calendar.view(
-    start=a.default_timezone.localize(EWSDateTime(year, month, day, 8)),
-    end=a.default_timezone.localize(EWSDateTime(year, month, day, 10)),
+    start=a.default_timezone.localize(EWSDateTime(2019, 1, 31, 8)),
+    end=a.default_timezone.localize(EWSDateTime(2019, 1, 31, 10)),
     max_items=1
 ).exists()
 
 # The filtering syntax also works on collections of folders, so you can search multiple folders in 
 # a single request.
-my_folder.children.filter(subject='foo')
-my_folder.walk().filter(subject='foo')
-my_folder.glob('foo*').filter(subject='foo')
+a.inbox.children.filter(subject='foo')
+a.inbox.walk().filter(subject='foo')
+a.inbox.glob('foo*').filter(subject='foo')
 # Or select the folders individually
-FolderCollection(account=account, folders=[account.inbox, account.calendar]).filter(subject='foo')
+FolderCollection(account=a, folders=[a.inbox, a.calendar]).filter(subject='foo')
 ```
 
-### Paging
+## Paging
 
 Paging EWS services, e.g. FindItem and, have a default page size of 100. You can
 change this value globally if you want:
@@ -619,6 +645,9 @@ value. For example, if you want to retrieve and save emails with large attachmen
 you can change this value on a per-queryset basis:
 
 ```python
+from exchangelib import Account
+
+a = Account(...)
 qs = a.inbox.all().only('mime_content')
 qs.page_size = 5
 for msg in qs.iterator():
@@ -631,10 +660,14 @@ argument that you can use to set a non-default page size when fetching, creating
 or deleting items.
 
 ```python
-return_ids = account.bulk_create(folder=account.inbox, items=huge_items, chunk_size=5)
+from exchangelib import Account, Message
+
+a = Account(...)
+huge_list_of_items = [Message(...) for i in range(10000)]
+return_ids = a.bulk_create(folder=a.inbox, items=huge_list_of_items, chunk_size=5)
 ```
 
-### Meetings
+## Meetings
 
 The `CalendarItem` class allows you send out requests for meetings that
 you initiate or to cancel meetings that you already set out before. It
@@ -646,14 +679,17 @@ already accepted then you can also process these by removing the entry
 from the calendar.
 
 ```python
+from exchangelib import Account, CalendarItem, EWSDateTime
 from exchangelib.items import MeetingRequest, MeetingCancellation, SEND_TO_ALL_AND_SAVE_COPY
 
+a = Account(...)
+
 # create a meeting request and send it out
-calendar_item = CalendarItem(
-    account=account,
-    folder=account.calendar,
-    start=tz.localize(EWSDateTime(year, month, day, hour, minute)),
-    end=tz.localize(EWSDateTime(year, month, day, hour, minute)),
+item = CalendarItem(
+    account=a,
+    folder=a.calendar,
+    start=a.default_timezone.localize(EWSDateTime(2019, 1, 31, 8, 15)),
+    end=a.default_timezone.localize(EWSDateTime(2019, 1, 31, 8, 45)),
     subject="Subject of Meeting",
     body="Please come to my meeting",
     required_attendees=['anne@example.com', 'bob@example.com']
@@ -661,13 +697,13 @@ calendar_item = CalendarItem(
 item.save(send_meeting_invitations=SEND_TO_ALL_AND_SAVE_COPY)
 
 # cancel a meeting that was sent out using the CalendarItem class
-for calendar_item in account.calendar.all().order_by('-datetime_received')[:5]:
+for calendar_item in a.calendar.all().order_by('-datetime_received')[:5]:
     # only the organizer of a meeting can cancel it
-    if calendar_item.organizer.email_address == account.primary_smtp_address:
+    if calendar_item.organizer.email_address == a.primary_smtp_address:
         calendar_item.cancel()
 
 # processing an incoming MeetingRequest
-for item in account.inbox.all().order_by('-datetime_received')[:5]:
+for item in a.inbox.all().order_by('-datetime_received')[:5]:
     if isinstance(item, MeetingRequest):
         item.accept(body="Sure, I'll come")
         # Or:
@@ -677,26 +713,31 @@ for item in account.inbox.all().order_by('-datetime_received')[:5]:
 
 # meeting requests can also be handled from the calendar - e.g. decline the meeting that was 
 # received last.
-for calendar_item in account.calendar.all().order_by('-datetime_received')[:1]:
+for calendar_item in a.calendar.all().order_by('-datetime_received')[:1]:
     calendar_item.decline()
 
 # processing an incoming MeetingCancellation (also delete from calendar)
-for item in account.inbox.all().order_by('-datetime_received')[:5]:
-    if isinstance(ews_item, MeetingCancellation):
+for item in a.inbox.all().order_by('-datetime_received')[:5]:
+    if isinstance(item, MeetingCancellation):
         if item.associated_calendar_item_id:
-            calendar_item = account.inbox.get(id=item.associated_calendar_item_id.id,
-                                              changekey=item.associated_calendar_item_id.changekey)
+            calendar_item = a.inbox.get(
+                id=item.associated_calendar_item_id.id,
+                changekey=item.associated_calendar_item_id.changekey
+            )
             calendar_item.delete()
         item.move_to_trash()
 ```
 
-### Searching contacts
+## Searching contacts
 
 Fetching personas from a contact folder is supported using the same
 syntax as folders. Just start your query with `.people()`:
 
 ```python
 # Navigate to a contact folder and start the search
+from exchangelib import Account
+
+a = Account(...)
 folder = a.root / 'AllContacts'
 for p in folder.people():
     print(p)
@@ -704,7 +745,7 @@ for p in folder.people().only('display_name').filter(display_name='john').order_
     print(p)
 ```
 
-### Extended properties
+## Extended properties
 
 Extended properties makes it possible to attach custom key-value pairs
 to items and folders on the Exchange server. There are multiple online
@@ -717,6 +758,10 @@ possibilities provided by EWS.
 ```python
 # If folder items have extended properties, you need to register them before you can access them. 
 # Create a subclass of ExtendedProperty and define a set of matching setup values:
+from exchangelib import Account, ExtendedProperty, CalendarItem, Folder, Message
+
+a = Account(...)
+
 class LunchMenu(ExtendedProperty):
     property_set_id = '12345678-1234-1234-1234-123456781234'
     property_name = 'Catering from the cafeteria'
@@ -727,7 +772,7 @@ CalendarItem.register('lunch_menu', LunchMenu)
 # Now your property is available as the attribute 'lunch_menu', just like any other attribute
 item = CalendarItem(..., lunch_menu='Foie gras et consommé de légumes')
 item.save()
-for i in account.calendar.all():
+for i in a.calendar.all():
     print(i.lunch_menu)
 # If you change your mind, jsut remove the property again
 CalendarItem.deregister('lunch_menu')
@@ -766,7 +811,7 @@ class FolderSize(ExtendedProperty):
     property_type = 'Integer'
 
 Folder.register('size', FolderSize)
-print(my_folder.size)
+print(a.inbox.size)
 
 # In general, here's how to work with any MAPI property as listed in e.g.
 # https://msdn.microsoft.com/EN-US/library/office/cc815517.aspx. Let's take `PidLidTaskDueDate` as
@@ -791,14 +836,18 @@ class FlagDue(ExtendedProperty):
 Message.register('flag_due', FlagDue)
 ```
 
-### Attachments
+## Attachments
 
 ```python
 # It's possible to create, delete and get attachments connected to any item type:
 # Process attachments on existing items. FileAttachments have a 'content' attribute
 # containing the binary content of the file, and ItemAttachments have an 'item' attribute
 # containing the item. The item can be a Message, CalendarItem, Task etc.
-for item in my_folder.all():
+import os.path
+from exchangelib import Account, FileAttachment, ItemAttachment, Message, CalendarItem, HTMLBody
+
+a = Account
+for item in a.inbox.all():
     for attachment in item.attachments:
         if isinstance(attachment, FileAttachment):
             local_path = os.path.join('/tmp', attachment.name)
@@ -811,15 +860,16 @@ for item in my_folder.all():
 
 # Streaming downloads of file attachment is supported. This reduces memory consumption since we
 # never store the full content of the file in-memory:
-for attachment in item.attachments:
-    if isinstance(attachment, FileAttachment):
-        local_path = os.path.join('/tmp', attachment.name)
-        with open(local_path, 'wb') as f, attachment.fp as fp:
-            buffer = fp.read(1024)
-            while buffer:
-                f.write(buffer)
+for item in a.inbox.all():
+    for attachment in item.attachments:
+        if isinstance(attachment, FileAttachment):
+            local_path = os.path.join('/tmp', attachment.name)
+            with open(local_path, 'wb') as f, attachment.fp as fp:
                 buffer = fp.read(1024)
-        print('Saved attachment to', local_path)
+                while buffer:
+                    f.write(buffer)
+                    buffer = fp.read(1024)
+            print('Saved attachment to', local_path)
 
 # Create a new item with an attachment
 item = Message(...)
@@ -839,6 +889,7 @@ item.attach(my_other_file)
 item.detach(my_file)
 
 # If you want to embed an image in the item body, you can link to the file in the HTML
+message = Message(...)
 logo_filename = 'logo.png'
 with open(logo_filename, 'rb') as f:
     my_logo = FileAttachment(name=logo_filename, content=f.read(), is_inline=True, content_id=logo_filename)
@@ -852,7 +903,7 @@ message.body = HTMLBody('<html><body>Hello logo: <img src="cid:%s"></body></html
 # (items that have an item_id) will update the changekey of the item.
 ```
 
-### Recurring calendar items
+## Recurring calendar items
 
 There is full read-write support for creating recurring calendar items.
 You can create daily, weekly, monthly and yearly recurrences (the latter
@@ -862,13 +913,18 @@ Here's an example of creating 7 occurrences on Mondays and Wednesdays of
 every third week, starting September 1, 2017:
 
 ```python
-from exchangelib.recurrence import Recurrence, WeeklyPattern, MONDAY, WEDNESDAY
+from datetime import timedelta
+from exchangelib import Account, CalendarItem, EWSDateTime
+from exchangelib.fields import MONDAY, WEDNESDAY
+from exchangelib.recurrence import Recurrence, WeeklyPattern
 
-start = tz.localize(EWSDateTime(2017, 9, 1, 11))
+a = Account(...)
+start = a.default_timezone.localize(EWSDateTime(2017, 9, 1, 11))
+end = start + timedelta(hours=2)
 item = CalendarItem(
     folder=a.calendar,
     start=start,
-    end=start + timedelta(hours=2),
+    end=end,
     subject='Hello Recurrence',
     recurrence=Recurrence(
         pattern=WeeklyPattern(interval=3, weekdays=[MONDAY, WEDNESDAY]),
@@ -896,21 +952,21 @@ for i in a.calendar.view(start=start, end=start + timedelta(days=4*3*7)):
 # delete or modify an occurrence, you must use 'view()' to fetch the occurrence and modify or 
 # delete it:
 for occurrence in a.calendar.view(start=start, end=start + timedelta(days=4*3*7)):
-    # Delete or update random occurrences. This will affect  'modified_occurrences' and 
+    # Delete or update random occurrences. This will affect 'modified_occurrences' and 
     # 'deleted_occurrences' of the master item.
-    if i.start.milliseconds % 2:
+    if occurrence.start.milliseconds % 2:
         # We receive timestamps as UTC but want to write them back as local timezone
-        occurrence.start = occurrence.start.astimezone(tz)
-        occurrence.start += datetime.timedelta(minutes=30)
-        occurrence.end = occurrence.end.astimezone(tz)
-        occurrence.end += datetime.timedelta(minutes=30)
+        occurrence.start = occurrence.start.astimezone(a.default_timezone)
+        occurrence.start += timedelta(minutes=30)
+        occurrence.end = occurrence.end.astimezone(a.default_timezone)
+        occurrence.end += timedelta(minutes=30)
         occurrence.subject = 'My new subject'
         occurrence.save()
     else:
-        item.delete()
+        occurrence.delete()
 ```
 
-### Message timestamp fields
+## Message timestamp fields
 
 Each `Message` item has four timestamp fields:
 
@@ -925,12 +981,16 @@ instances.
 
 The `datetime_sent` value may be earlier than `datetime_created`.
 
-### Out of Facility
+## Out of Facility
 
 You can get and set OOF messages using the `Account.oof_settings`
 property:
 
 ```python
+from exchangelib import Account, OofSettings, EWSDateTime
+
+a = Account(...)
+
 # Get the current OOF settings
 a.oof_settings
 # Change the OOF settings to something else
@@ -939,8 +999,8 @@ a.oof_settings = OofSettings(
     external_audience='Known',
     internal_reply="I'm in the pub. See ya guys!",
     external_reply="I'm having a business dinner in town",
-    start=tz.localize(EWSDateTime(2017, 11, 1, 11)),
-    end=tz.localize(EWSDateTime(2017, 12, 1, 11)),
+    start=a.default_timezone.localize(EWSDateTime(2017, 11, 1, 11)),
+    end=a.default_timezone.localize(EWSDateTime(2017, 12, 1, 11)),
 )
 # Disable OOF messages
 a.oof_settings = OofSettings(
@@ -950,19 +1010,27 @@ a.oof_settings = OofSettings(
 )
 ```
 
-### Export and upload
+## Export and upload
 
 Exchange supports backup and restore of folder contents using special
 export and upload services. They are available on the `Account` model:
 
 ```python
+from exchangelib import Account
+
+a = Account(...)
+items = a.inbox.all().only('id', 'changekey')
 data = a.export(items)  # Pass a list of Item instances or (item_id, changekey) tuples
-a.upload((a.inbox, d) for d in data))  # Restore the items. Expects a list of (folder, data) tuples
+a.upload((a.inbox, d) for d in data)  # Restore the items. Expects a list of (folder, data) tuples
 ```
 
-### Non-account methods
+## Non-account methods
 
 ```python
+from exchangelib import Account
+
+a = Account(...)
+
 # Get timezone information from the server
 a.protocol.get_timezones()
 
@@ -970,7 +1038,8 @@ a.protocol.get_timezones()
 a.protocol.get_roomlists()
 
 # Get rooms belonging to a specific room list
-a.protocol.get_rooms(some_roomlist)
+for rl in a.protocol.get_roomlists():
+    a.protocol.get_rooms(rl)
 
 # Get account information for a list of names or email addresses
 for mailbox in a.protocol.resolve_names(['ann@example.com', 'bart@example.com']):
@@ -990,8 +1059,12 @@ information, including a list of calendar events in the user's calendar, and
 the working hours and timezone of the user.
 
 ```python
-start = tz.localize(EWSDateTime.now())
-end = start + datetime.timedelta(hours=6)
+from datetime import timedelta
+from exchangelib import Account, EWSDateTime
+
+a = Account(...)
+start = a.default_timezone.localize(EWSDateTime.now())
+end = start + timedelta(hours=6)
 accounts = [(a, 'Organizer', False)]
 for busy_info in a.protocol.get_free_busy_info(accounts=accounts, start=start, end=end):
     print(busy_info)
@@ -1003,11 +1076,15 @@ known to be in the same timezone.
 
 ```python
 # Get all server timezones. We need that to convert 'working_hours_timezone'
+from datetime import timedelta
+from exchangelib import Account, EWSDateTime, EWSTimeZone
+
+a = Account(...)
 timezones = list(a.protocol.get_timezones(return_full_timezone_data=True))
 
 # Get availability information for a list of accounts
-start = tz.localize(EWSDateTime.now())
-end = start + datetime.timedelta(hours=6)
+start = a.default_timezone.localize(EWSDateTime.now())
+end = start + timedelta(hours=6)
 # get_free_busy_info() expects a list of (account, attendee_type, exclude_conflicts) tuples
 accounts = [(a, 'Organizer', False)]
 for busy_info in a.protocol.get_free_busy_info(accounts=accounts, start=start, end=end):
@@ -1020,7 +1097,7 @@ for busy_info in a.protocol.get_free_busy_info(accounts=accounts, start=start, e
 ```
 
 
-### Troubleshooting
+## Troubleshooting
 
 If you are having trouble using this library, the first thing to try is
 to enable debug logging. This will output a huge amount of information
@@ -1045,7 +1122,7 @@ from exchangelib import CalendarItem
 print(CalendarItem.__doc__)
 ```
 
-### Notes
+# Notes
 
 Almost all item fields are supported. The remaining ones are tracked in
 <https://github.com/ecederstrand/exchangelib/issues/203>.
