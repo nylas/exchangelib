@@ -4,7 +4,7 @@ Release notes:
 * Bump version in exchangelib/__init__.py
 * Bump version in CHANGELOG.md
 * Commit and push changes
-* Build package: rm dist/* && python setup.py sdist bdist_wheel
+* Build package: rm -rf dist/* && python setup.py sdist bdist_wheel
 * Push to PyPI: twine upload dist/*
 * Create release on GitHub
 """
