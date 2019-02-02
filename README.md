@@ -514,8 +514,8 @@ items_for_2017 = a.calendar.filter(start__range=(start, end))  # Filter by a dat
 item = a.inbox.get(subject='unique_string')
 
 # If you only have the ID and possibly the changekey of an item, you can get the full item:
-item = a.inbox.get(id='AAMkADQy=')
-item = a.inbox.get(id='AAMkADQy=', changekey='FwAAABYA')
+a.inbox.get(id='AAMkADQy=')
+a.inbox.get(id='AAMkADQy=', changekey='FwAAABYA')
 
 # You can sort by a single or multiple fields. Prefix a field with '-' to reverse the sorting. 
 # Sorting is efficient since it is done server-side, except when a calendar view sorting on 
@@ -552,7 +552,7 @@ first_ten = a.inbox.all().order_by('-subject')[:10]  # Efficient. We only fetch 
 last_ten = a.inbox.all().order_by('-subject')[:-10]  # Efficient, but convoluted
 next_ten = a.inbox.all().order_by('-subject')[10:20]  # Efficient. We only fetch 10 items
 single_item = a.inbox.all().order_by('-subject')[34298]  # Efficient. We only fetch 1 item
-single_item = a.inbox.all().order_by('-subject')[3420:3430]  # Efficient. We only fetch 10 items
+ten_items = a.inbox.all().order_by('-subject')[3420:3430]  # Efficient. We only fetch 10 items
 random_emails = a.inbox.all().order_by('-subject')[::3]  # This is just stupid, but works
 
 # The syntax for filter() is modeled after Django QuerySet filters. The following filter lookup 
@@ -588,21 +588,19 @@ qs.filter(categories__exists=False)
 #
 # Read more about the QueryString syntax here:
 # https://msdn.microsoft.com/en-us/library/ee693615.aspx
-items = a.inbox.filter('subject:XXX')
+a.inbox.filter('subject:XXX')
 
 # filter() also supports Q objects that are modeled after Django Q objects, for building complex
 # boolean logic search expressions.
 q = (Q(subject__iexact='foo') | Q(subject__contains='bar')) & ~Q(subject__startswith='baz')
-items = a.inbox.filter(q)
+a.inbox.filter(q)
 
 # In this example, we filter by categories so we only get the items created by us.
-items = a.calendar.filter(
+a.calendar.filter(
     start__lt=a.default_timezone.localize(EWSDateTime(2019, 1, 1)),
     end__gt=a.default_timezone.localize(EWSDateTime(2019, 1, 31)),
     categories__contains=['foo', 'bar'],
 )
-for item in items:
-    print(item.start, item.end, item.subject, item.body, item.location)
 
 # By default, EWS returns only the master recurring item. If you want recurring calendar
 # items to be expanded, use calendar.view(start=..., end=...) instead.
