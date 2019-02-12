@@ -304,6 +304,12 @@ class EWSTimeZone(object):
             return res.replace(tzinfo=self.from_pytz(res.tzinfo))
         return res
 
+    def fromutc(self, dt):
+        t = super(EWSTimeZone, self).fromutc(dt)
+        if isinstance(t, EWSDateTime):
+            return t
+        return EWSDateTime.from_datetime(t)  # We want to return EWSDateTime objects
+
 
 UTC = EWSTimeZone.timezone('UTC')
 UTC_NOW = lambda: EWSDateTime.now(tz=UTC)
