@@ -395,6 +395,12 @@ class Mailbox(EWSElement):
         return hash(self.email_address.lower())
 
 
+class DLMailbox(Mailbox):
+    # Like Mailbox, but creates elements in the 'messages' namespace when sending requests
+    NAMESPACE = MNS
+    __slots__ = Mailbox.__slots__
+
+
 class AvailabilityMailbox(EWSElement):
     # Like Mailbox, but with slightly different attributes
     #

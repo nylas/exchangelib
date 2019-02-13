@@ -1027,7 +1027,7 @@ a.upload((a.inbox, d) for d in data)  # Restore the items. Expects a list of (fo
 ## Non-account methods
 
 ```python
-from exchangelib import Account
+from exchangelib import Account, DLMailbox
 
 a = Account(...)
 
@@ -1048,6 +1048,9 @@ for mailbox, contact in a.protocol.resolve_names(['anne', 'bart'], return_full_c
     print(mailbox.email_address, contact.display_name)
 
 # Get all mailboxes on a distribution list
+for mailbox in a.protocol.expand_dl(DLMailbox(email_address='distro@example.com', mailbox_type='PublicDL'):
+    print(mailbox.email_address)
+# Or just pass a string containing the SMTP address
 for mailbox in a.protocol.expand_dl('distro@example.com'):
     print(mailbox.email_address)
 

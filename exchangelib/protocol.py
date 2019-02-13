@@ -17,6 +17,7 @@ import requests.adapters
 import requests.sessions
 from future.utils import with_metaclass, python_2_unicode_compatible
 from future.moves.queue import LifoQueue, Empty, Full
+from six import string_types
 
 from .credentials import Credentials
 from .errors import TransportError, SessionPoolMinSizeReached
@@ -372,9 +373,12 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
     def expand_dl(self, distribution_list):
         """ Expand distribution list into it's members
 
-        :param distribution_list: SMTP address of the distribution list to expand
+        :param distribution_list: SMTP address of the distribution list to expand, or a DLMailbox representing the list
         :return: List of Mailbox items that are members of the distribution list
         """
+        from .properties import DLMailbox
+        if isinstance(distribution_list, string_types):
+            distribution_list = DLMailbox(email_address=distribution_list, mailbox_type='PublicDL')
         return list(ExpandDL(protocol=self).call(distribution_list=distribution_list))
 
     def get_searchable_mailboxes(self, search_filter=None, expand_group_membership=False):

@@ -60,7 +60,7 @@ from exchangelib.indexed_properties import EmailAddress, PhysicalAddress, PhoneN
     SingleFieldIndexedElement, MultiFieldIndexedElement
 from exchangelib.items import Item, CalendarItem, Message, Contact, Task, DistributionList, Persona
 from exchangelib.properties import Attendee, Mailbox, RoomList, MessageHeader, Room, ItemId, Member, EWSElement, Body, \
-    HTMLBody, TimeZone, FreeBusyView, PersonaId, UID, InvalidField, InvalidFieldForVersion
+    HTMLBody, TimeZone, FreeBusyView, PersonaId, UID, InvalidField, InvalidFieldForVersion, DLMailbox
 from exchangelib.protocol import BaseProtocol, Protocol, NoVerifyHTTPAdapter
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.recurrence import Recurrence, AbsoluteYearlyPattern, RelativeYearlyPattern, AbsoluteMonthlyPattern, \
@@ -1786,6 +1786,10 @@ class CommonTest(EWSTest):
     def test_expanddl(self):
         with self.assertRaises(ErrorNameResolutionNoResults):
             self.account.protocol.expand_dl('non_existent_distro@example.com')
+        with self.assertRaises(ErrorNameResolutionNoResults):
+            self.account.protocol.expand_dl(
+                DLMailbox(email_address='non_existent_distro@example.com', mailbox_type='PublicDL')
+            )
 
     def test_oof_settings(self):
         oof = OofSettings(

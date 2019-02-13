@@ -1705,9 +1705,7 @@ class ExpandDL(EWSService):
 
     def get_payload(self, distribution_list):
         payload = create_element('m:%s' % self.SERVICE_NAME)
-        dl_mailbox = create_element('m:Mailbox')
-        add_xml_child(dl_mailbox, 't:EmailAddress', distribution_list)
-        payload.append(dl_mailbox)
+        set_xml_value(payload, distribution_list, version=self.protocol.version)
         return payload
 
 
