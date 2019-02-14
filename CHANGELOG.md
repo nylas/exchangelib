@@ -5,6 +5,11 @@ HEAD
 ----
 
 
+1.12.2
+------
+-   Add `Protocol.expand_dl()` to get members of a distribution list.
+
+
 1.12.1
 ------
 -   Lower the session pool size automatically in response to ErrorServerBusy and
