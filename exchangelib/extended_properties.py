@@ -264,3 +264,10 @@ class ExternId(ExtendedProperty):
     property_type = 'String'
 
     __slots__ = ExtendedProperty.__slots__
+
+
+############# Nylas Extended Porperties ##############
+class Flag(ExtendedProperty):
+	property_tag = 0x1090
+	property_type = 'Integer'
+
