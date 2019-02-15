@@ -264,3 +264,13 @@ class ExternId(ExtendedProperty):
     property_type = 'String'
 
     __slots__ = ExtendedProperty.__slots__
+
+
+############# Nylas Extended Porperties ##############
+
+# When used, this flag property returns 0 for Not Flagged messages, 1 for Flagged messages and 2 for Completed messages.
+# See: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/flagstatus for a description of each status.
+class Flag(ExtendedProperty):
+	property_tag = 0x1090
+	property_type = 'Integer'
+
