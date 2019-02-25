@@ -2245,10 +2245,11 @@ class AccountTest(EWSTest):
     def test_pickle(self):
         # Test that we can pickle various objects
         item = Message(folder=self.account.inbox, subject='XXX', categories=self.categories).save()
-        pickle.dumps(item)
+        attachment = FileAttachment(name='pickle_me.txt', content=b'')
         try:
             for o in (
                 item,
+                attachment,
                 self.account.protocol,
                 self.account.root,
                 self.account.inbox,

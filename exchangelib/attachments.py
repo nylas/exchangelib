@@ -185,13 +185,14 @@ class FileAttachment(Attachment):
 
     def __getstate__(self):
         # The fp does not need to be pickled
-        state = self.__dict__.copy()
+        state = {k: getattr(self, k) for k in self.__slots__}
         del state['_fp']
         return state
 
     def __setstate__(self, state):
         # Restore the fp
-        self.__dict__.update(state)
+        for k in self.__slots__:
+            setattr(self, k, state.get(k))
         self._fp = None
 
 
