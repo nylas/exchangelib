@@ -2794,6 +2794,8 @@ class FolderTest(EWSTest):
                 self.assertEqual(f.folder_class, 'IPF')
             elif isinstance(f, ConversationSettings):
                 self.assertEqual(f.folder_class, 'IPF.Configuration')
+            elif isinstance(f, Files):
+                self.assertEqual(f.folder_class, 'IPF.Files')
             elif isinstance(f, Friends):
                 self.assertEqual(f.folder_class, 'IPF.Note')
             elif isinstance(f, RSSFeeds):
@@ -2806,8 +2808,14 @@ class FolderTest(EWSTest):
                 self.assertEqual(f.folder_class, 'IPF.Journal')
             elif isinstance(f, Notes):
                 self.assertEqual(f.folder_class, 'IPF.StickyNote')
+            elif isinstance(f, DefaultFoldersChangeHistory):
+                self.assertEqual(f.folder_class, 'IPM.DefaultFolderHistoryItem')
+            elif isinstance(f, PassThroughSearchResults):
+                self.assertEqual(f.folder_class, 'IPF.StoreItem.PassThroughSearchResults')
+            elif isinstance(f, SmsAndChatsSync):
+                self.assertEqual(f.folder_class, 'IPF.SmsAndChatsSync')
             else:
-                self.assertEqual(f.folder_class, None, (f.name, f.__class__.__name__, f.folder_class))
+                self.assertIn(f.folder_class, (None, 'IPF'), (f.name, f.__class__.__name__, f.folder_class))
                 self.assertIsInstance(f, Folder)
 
     def test_counts(self):
