@@ -251,14 +251,23 @@ class EWSElement(object):
                 for k, v in state.items():
                     setattr(self, k, v)
 
+    def _field_vals(self):
+        field_vals = []  # Keep sorting
+        for f in self.FIELDS:
+            val = getattr(self, f.name)
+            if isinstance(f, EnumField) and isinstance(val, int):
+                val = f.as_string(val)
+            field_vals.append((f.name, val))
+        return field_vals
+
     def __str__(self):
         return self.__class__.__name__ + '(%s)' % ', '.join(
-            '%s=%s' % (f.name, repr(getattr(self, f.name))) for f in self.FIELDS if getattr(self, f.name) is not None
+            '%s=%r' % (name, val) for name, val in self._field_vals() if val is not None
         )
 
     def __repr__(self):
         return self.__class__.__name__ + '(%s)' % ', '.join(
-            '%s=%s' % (f.name, repr(getattr(self, f.name))) for f in self.FIELDS
+            '%s=%r' % (name, val) for name, val in self._field_vals()
         )
 
 

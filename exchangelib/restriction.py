@@ -278,7 +278,7 @@ class Q(object):
         if self.query_string:
             return self.query_string
         if self.is_leaf():
-            expr = '%s %s %s' % (self.field_path, self.op, repr(self.value))
+            expr = '%s %s %r' % (self.field_path, self.op, self.value)
         else:
             # Sort children by field name so we get stable output (for easier testing). Children should never be empty.
             expr = (' %s ' % (self.AND if self.conn_type == self.NOT else self.conn_type)).join(
@@ -474,8 +474,8 @@ class Q(object):
     def __repr__(self):
         if self.is_leaf():
             if self.query_string:
-                return self.__class__.__name__ + '(%s)' % repr(self.query_string)
-            return self.__class__.__name__ + '(%s %s %s)' % (self.field_path, self.op, repr(self.value))
+                return self.__class__.__name__ + '(%r)' % self.query_string
+            return self.__class__.__name__ + '(%s %s %r)' % (self.field_path, self.op, self.value)
         sorted_children = tuple(sorted(self.children, key=lambda i: i.field_path or ''))
         if self.conn_type == self.NOT or len(self.children) > 1:
             return self.__class__.__name__ + repr((self.conn_type,) + sorted_children)
