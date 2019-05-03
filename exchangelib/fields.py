@@ -471,6 +471,14 @@ class EnumField(IntegerField):
                 value = self.enum.index(value) + 1
         return super(EnumField, self).clean(value, version=version)
 
+    def as_string(self, value):
+        # Converts an integer in the enum to its equivalent string
+        if isinstance(value, string_types):
+            return value
+        if self.is_list:
+            return [self.enum[v - 1] for v in sorted(value)]
+        return self.enum[value - 1]
+
     def from_xml(self, elem, account):
         val = self._get_val_from_elem(elem)
         if val is not None:
@@ -486,8 +494,8 @@ class EnumField(IntegerField):
     def to_xml(self, value, version):
         field_elem = create_element(self.request_tag())
         if self.is_list:
-            return set_xml_value(field_elem, ' '.join(self.enum[v - 1] for v in sorted(value)), version=version)
-        return set_xml_value(field_elem, self.enum[value - 1], version=version)
+            return set_xml_value(field_elem, ' '.join(self.as_string(value)), version=version)
+        return set_xml_value(field_elem, self.as_string(value), version=version)
 
 
 class EnumListField(EnumField):
