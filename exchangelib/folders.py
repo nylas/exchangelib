@@ -786,14 +786,15 @@ class Folder(RegisterMixIn, SearchableMixIn):
 
     @classmethod
     def from_xml(cls, elem, root):
-        # fld_type = re.sub('{.*}', '', elem.tag)
         fld_id_elem = elem.find(FolderId.response_tag())
         fld_id = fld_id_elem.get(FolderId.ID_ATTR)
         changekey = fld_id_elem.get(FolderId.CHANGEKEY_ATTR)
+        # Check for 'DisplayName' element before collecting kwargs because because that clears the elements
+        has_name_elem = elem.find(cls.get_field_by_fieldname('name').response_tag()) is not None
         kwargs = {f.name: f.from_xml(elem=elem, account=root.account) for f in cls.supported_fields()}
-        if not kwargs['name']:
-            # Some folders are returned with an empty 'DisplayName' element. Assign a default name to them.
-            # TODO: Only do this if we actually requested the 'name' field.
+        if has_name_elem and not kwargs['name']:
+            # When we request the 'DisplayName' property, some folders may still be returned with an empty value.
+            # Assign a default name to these folders.
             kwargs['name'] = cls.DISTINGUISHED_FOLDER_ID
         cls._clear(elem)
         folder_cls = cls
@@ -1582,10 +1583,12 @@ class RootOfHierarchy(Folder):
         fld_id_elem = elem.find(FolderId.response_tag())
         fld_id = fld_id_elem.get(FolderId.ID_ATTR)
         changekey = fld_id_elem.get(FolderId.CHANGEKEY_ATTR)
+        # Check for 'DisplayName' element before collecting kwargs because because that clears the elements
+        has_name_elem = elem.find(cls.get_field_by_fieldname('name').response_tag()) is not None
         kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.supported_fields()}
-        if not kwargs['name']:
-            # Some folders are returned with an empty 'DisplayName' element. Assign a default name to them.
-            # TODO: Only do this if we actually requested the 'name' field.
+        if has_name_elem and not kwargs['name']:
+            # When we request the 'DisplayName' property, some folders may still be returned with an empty value.
+            # Assign a default name to these folders.
             kwargs['name'] = cls.DISTINGUISHED_FOLDER_ID
         cls._clear(elem)
         return cls(account=account, id=fld_id, changekey=changekey, **kwargs)
