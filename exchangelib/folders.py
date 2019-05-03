@@ -1293,13 +1293,13 @@ class AllItems(NonDeleteableFolderMixin, Folder):
 
 class CalendarLogging(NonDeleteableFolderMixin, Folder):
     LOCALIZED_NAMES = {
-        None: ('Calendar Logging',),
+        None: (u'Calendar Logging',),
     }
 
 
 class CommonViews(NonDeleteableFolderMixin, Folder):
     LOCALIZED_NAMES = {
-        None: ('Common Views',),
+        None: (u'Common Views',),
     }
 
 
@@ -1310,15 +1310,30 @@ class ConversationSettings(NonDeleteableFolderMixin, Folder):
     }
 
 
+class DefaultFoldersChangeHistory(NonDeleteableFolderMixin, Folder):
+    CONTAINER_CLASS = 'IPM.DefaultFolderHistoryItem'
+    LOCALIZED_NAMES = {
+        None: (u'DefaultFoldersChangeHistory',),
+    }
+
+
 class DeferredAction(NonDeleteableFolderMixin, Folder):
     LOCALIZED_NAMES = {
-        None: ('Deferred Action',),
+        None: (u'Deferred Action',),
     }
 
 
 class ExchangeSyncData(NonDeleteableFolderMixin, Folder):
     LOCALIZED_NAMES = {
         None: (u'ExchangeSyncData',),
+    }
+
+
+class Files(NonDeleteableFolderMixin, Folder):
+    CONTAINER_CLASS = 'IPF.Files'
+
+    LOCALIZED_NAMES = {
+        'da_DK': (u'Filer',),
     }
 
 
@@ -1371,6 +1386,13 @@ class ParkedMessages(NonDeleteableFolderMixin, Folder):
     }
 
 
+class PassThroughSearchResults(NonDeleteableFolderMixin, Folder):
+    CONTAINER_CLASS = 'IPF.StoreItem.PassThroughSearchResults'
+    LOCALIZED_NAMES = {
+        None: (u'Pass-Through Search Results',),
+    }
+
+
 class Reminders(NonDeleteableFolderMixin, Folder):
     CONTAINER_CLASS = 'Outlook.Reminder'
     LOCALIZED_NAMES = {
@@ -1401,6 +1423,13 @@ class Sharing(NonDeleteableFolderMixin, Folder):
 class Shortcuts(NonDeleteableFolderMixin, Folder):
     LOCALIZED_NAMES = {
         None: (u'Shortcuts',),
+    }
+
+
+class SmsAndChatsSync(NonDeleteableFolderMixin, Folder):
+    CONTAINER_CLASS = 'IPF.SmsAndChatsSync'
+    LOCALIZED_NAMES = {
+        None: (u'SmsAndChatsSync',),
     }
 
 
@@ -1766,20 +1795,24 @@ NON_DELETEABLE_FOLDERS = [
     CalendarLogging,
     CommonViews,
     ConversationSettings,
+    DefaultFoldersChangeHistory,
     DeferredAction,
     ExchangeSyncData,
     FreebusyData,
+    Files,
     Friends,
     GALContacts,
     Location,
     MailboxAssociations,
     MyContactsExtended,
     ParkedMessages,
+    PassThroughSearchResults,
     Reminders,
     RSSFeeds,
     Schedule,
     Sharing,
     Shortcuts,
+    SmsAndChatsSync,
     SpoolerQueue,
     System,
     TemporarySaves,
