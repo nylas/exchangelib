@@ -80,6 +80,116 @@ class CalendarView(EWSElement):
             raise ValueError("'start' must be before 'end'")
 
 
+class FolderQuerySet(object):
+    """A QuerySet-like class for finding subfolders of a folder collection
+    """
+    def __init__(self, folder_collection):
+        if not isinstance(folder_collection, FolderCollection):
+            raise ValueError("'folder_collection' %r must be a FolderCollection instance" % folder_collection)
+        self.folder_collection = folder_collection
+        self._only_fields = None
+        self._depth = None
+        self._q = None
+
+    def only(self, *args):
+        all_fields = self.folder_collection.get_folder_fields(is_complex=None)
+        only_fields = []
+        for arg in args:
+            for field_path in all_fields:
+                if field_path.field.name == arg:
+                    only_fields.append(field_path)
+                    break
+            else:
+                raise InvalidField("Unknown field %r on folders %s" % (arg, self.folder_collection.folders))
+        self.only_fields = only_fields
+        return self
+
+    def depth(self, depth):
+        if depth not in FOLDER_TRAVERSAL_CHOICES:
+            raise ValueError("'depth' %s must be one of %s" % (depth, FOLDER_TRAVERSAL_CHOICES))
+        self._depth = depth
+        return self
+
+    def get(self, *args, **kwargs):
+        if args or kwargs:
+            folders = list(self.filter(*args, **kwargs))
+        else:
+            folders = list(self.all())
+        if not folders:
+            raise ErrorFolderNotFound('Could not find a child folder matching the query')
+        if len(folders) != 1:
+            raise ValueError('Expected result length 1, but got %s' % folders)
+        f = folders[0]
+        if isinstance(f, Exception):
+            raise f
+        return f
+
+    def all(self):
+        return self
+
+    def filter(self, *args, **kwargs):
+        q = Q(*args, **kwargs)
+        self._q = q if self._q is None else self._q & q
+        return self
+
+    def __iter__(self):
+        return self._query()
+
+    def _query(self):
+        if self._only_fields is None:
+            non_complex_fields = self.folder_collection.get_folder_fields(is_complex=False)
+            complex_fields = self.folder_collection.get_folder_fields(is_complex=True)
+        else:
+            non_complex_fields = set(f.field for f in self._only_fields if not f.field.is_complex)
+            complex_fields = set(f.field for f in self._only_fields if f.field.is_complex)
+
+        # First, fetch all non-complex fields using FindFolder. We do this because some folders do not support
+        # GetFolder but we still want to get as much information as possible.
+        folders = self.folder_collection.find_folders(
+            q=self._q, depth=self._depth, additional_fields=non_complex_fields
+        )
+        if not complex_fields:
+            for f in folders:
+                yield f
+            return
+
+        # Fetch all properties for the found folders
+        resolveable_folders = []
+        for f in folders:
+            if isinstance(f, System):
+                log.debug('GetFolder not allowed on System folder. Non-complex fields must be fetched with FindFolder')
+                yield f
+            else:
+                resolveable_folders.append(f)
+
+        # Get the complex fields using GetFolder, for the folders that support it, and add the extra field values
+        complex_folders = FolderCollection(
+            account=self.folder_collection.account, folders=resolveable_folders
+        ).get_folders(additional_fields=complex_fields)
+        for f, complex_f in zip(resolveable_folders, complex_folders):
+            if isinstance(f, Exception):
+                yield f
+                continue
+            if isinstance(complex_f, Exception):
+                yield complex_f
+                continue
+            # Add the extra field values to the folders we fetched with find_folders()
+            if f.__class__ != complex_f.__class__:
+                raise ValueError('Type mismatch: %s vs %s' % (f, complex_f))
+            for complex_field in complex_fields:
+                field_name = complex_field.field.name
+                setattr(f, field_name, getattr(complex_f, field_name))
+            yield f
+
+
+class SingleFolderQuerySet(FolderQuerySet):
+    """A helper class with simpler argument types
+    """
+    def __init__(self, account, folder):
+        folder_collection = FolderCollection(account=account, folders=[folder])
+        super(SingleFolderQuerySet, self).__init__(folder_collection=folder_collection)
+
+
 class FolderCollection(SearchableMixIn):
     def __init__(self, account, folders):
         """ Implements a search API on a collection of folders
@@ -256,20 +366,39 @@ class FolderCollection(SearchableMixIn):
                 else:
                     yield Folder.item_model_from_tag(i.tag).from_xml(elem=i, account=self.account)
 
-    def _get_folder_fields(self):
+    def get_folder_fields(self, is_complex=None):
         additional_fields = set()
         for folder in self.folders:
             if isinstance(folder, Folder):
                 additional_fields.update(
                     FieldPath(field=f) for f in folder.supported_fields(version=self.account.version)
+                    if is_complex is None or f.is_complex is is_complex
                 )
             else:
                 additional_fields.update(
                     FieldPath(field=f) for f in Folder.supported_fields(version=self.account.version)
+                    if is_complex is None or f.is_complex is is_complex
                 )
         return additional_fields
 
-    def find_folders(self, q=None, shape=ID_ONLY, depth=DEEP, page_size=None, max_items=None, offset=0):
+    def resolve(self):
+        # Looks up the folders or folder IDs in the collection and returns full Folder instances with all fields set.
+        resolveable_folders = []
+        for f in self.folders:
+            if isinstance(f, System):
+                log.debug('GetFolder not allowed on System folder. Non-complex fields must be fetched with FindFolder')
+                yield f
+            else:
+                resolveable_folders.append(f)
+        # Fetch all properties for the remaining folders of folder IDs
+        additional_fields = self.get_folder_fields(is_complex=None)
+        for f in self.__class__(account=self.account, folders=resolveable_folders).get_folders(
+                additional_fields=additional_fields
+        ):
+            yield f
+
+    def find_folders(self, q=None, shape=ID_ONLY, depth=DEEP, additional_fields=None, page_size=None, max_items=None,
+                     offset=0):
         # 'depth' controls whether to return direct children or recurse into sub-folders
         if not self.account:
             raise ValueError('Folder must have an account')
@@ -283,27 +412,52 @@ class FolderCollection(SearchableMixIn):
             raise ValueError("'depth' %s must be one of %s" % (depth, FOLDER_TRAVERSAL_CHOICES))
         if not self.folders:
             log.debug('Folder list is empty')
-            return []
-        additional_fields = self._get_folder_fields()
-        return FindFolder(account=self.account, folders=self.folders, chunk_size=page_size).call(
+            return
+        if additional_fields is None:
+            # Default to all non-complex properties
+            additional_fields = self.get_folder_fields(is_complex=False)
+        else:
+            for f in additional_fields:
+                if f.field.is_complex:
+                    raise ValueError("find_folders() does not support field '%s'. Use get_folders()." % f.field.name)
+
+        # To properly identify folders, we always want the 'name' and 'folder_class' fields
+        additional_fields.update((
+            FieldPath(field=Folder.get_field_by_fieldname('folder_class')),
+            FieldPath(field=Folder.get_field_by_fieldname('name')),
+        ))
+
+        for f in FindFolder(account=self.account, folders=self.folders, chunk_size=page_size).call(
                 additional_fields=additional_fields,
                 restriction=restriction,
                 shape=shape,
                 depth=depth,
                 max_items=max_items,
                 offset=offset,
-        )
+        ):
+            yield f
 
-    def get_folders(self):
+    def get_folders(self, additional_fields=None):
+        # Expand folders with their full set of properties
         if not self.folders:
             log.debug('Folder list is empty')
-            return []
-        additional_fields = self._get_folder_fields()
-        return GetFolder(account=self.account).call(
+            return
+        if additional_fields is None:
+            # Default to all complex properties
+            additional_fields = self.get_folder_fields(is_complex=True)
+
+        # To properly identify folders, we always want the 'name' and 'folder_class' fields
+        additional_fields.update((
+            FieldPath(field=Folder.get_field_by_fieldname('folder_class')),
+            FieldPath(field=Folder.get_field_by_fieldname('name')),
+        ))
+
+        for f in GetFolder(account=self.account).call(
                 folders=self.folders,
                 additional_fields=additional_fields,
                 shape=ID_ONLY,
-        )
+        ):
+            yield f
 
 
 @python_2_unicode_compatible
@@ -327,8 +481,8 @@ class Folder(RegisterMixIn, SearchableMixIn):
         IdField('changekey', field_uri=FolderId.CHANGEKEY_ATTR),
         EWSElementField('parent_folder_id', field_uri='folder:ParentFolderId', value_cls=ParentFolderId,
                         is_read_only=True),
-        TextField('folder_class', field_uri='folder:FolderClass', is_required_after_save=True),
-        TextField('name', field_uri='folder:DisplayName'),
+        CharField('folder_class', field_uri='folder:FolderClass', is_required_after_save=True),
+        CharField('name', field_uri='folder:DisplayName'),
         IntegerField('total_count', field_uri='folder:TotalCount', is_read_only=True),
         IntegerField('child_folder_count', field_uri='folder:ChildFolderCount', is_read_only=True),
         IntegerField('unread_count', field_uri='folder:UnreadCount', is_read_only=True),
@@ -852,39 +1006,37 @@ class Folder(RegisterMixIn, SearchableMixIn):
         return tuple(f for f in cls.FIELDS if f.name not in ('id', 'changekey') and f.supports_version(version))
 
     @classmethod
-    def get_distinguished(cls, root):
-        """Gets the distinguished folder for this folder class"""
-        if not cls.DISTINGUISHED_FOLDER_ID:
-            raise ValueError('Class %s must have a DISTINGUISHED_FOLDER_ID value' % cls)
-        folders = list(FolderCollection(
-            account=root.account,
-            folders=[cls(root=root, name=cls.DISTINGUISHED_FOLDER_ID, is_distinguished=True)]
-        ).get_folders()
-        )
+    def resolve(cls, account, folder):
+        # Resolve a single folder
+        folders = list(FolderCollection(account=account, folders=[folder]).resolve())
         if not folders:
-            raise ErrorFolderNotFound('Could not find distinguished folder %s' % cls.DISTINGUISHED_FOLDER_ID)
+            raise ErrorFolderNotFound('Could not find folder %r' % folder)
         if len(folders) != 1:
             raise ValueError('Expected result length 1, but got %s' % folders)
-        folder = folders[0]
-        if isinstance(folder, Exception):
-            raise folder
-        if folder.__class__ != cls:
-            raise ValueError("Expected 'folder' %r to be a %s instance" % (folder, cls))
-        return folder
+        f = folders[0]
+        if isinstance(f, Exception):
+            raise f
+        if f.__class__ != cls:
+            raise ValueError("Expected folder %r to be a %s instance" % (f, cls))
+        return f
+
+    @classmethod
+    def get_distinguished(cls, root):
+        """Gets the distinguished folder for this folder class"""
+        try:
+            return cls.resolve(
+                account=root.account,
+                folder=cls(root=root, name=cls.DISTINGUISHED_FOLDER_ID, is_distinguished=True)
+            )
+        except ErrorFolderNotFound:
+            raise ErrorFolderNotFound('Could not find distinguished folder %r' % cls.DISTINGUISHED_FOLDER_ID)
 
     def refresh(self):
         if not self.root:
             raise ValueError('%s must have a root' % self.__class__.__name__)
         if not self.id:
             raise ValueError('%s must have an ID' % self.__class__.__name__)
-        folders = list(FolderCollection(account=self.root.account, folders=[self]).get_folders())
-        if not folders:
-            raise ErrorFolderNotFound('Folder %s disappeared' % self)
-        if len(folders) != 1:
-            raise ValueError('Expected result length 1, but got %s' % folders)
-        fresh_folder = folders[0]
-        if isinstance(fresh_folder, Exception):
-            raise fresh_folder
+        fresh_folder = self.resolve(account=self.root.account, folder=self)
         if self.id != fresh_folder.id:
             raise ValueError('ID mismatch')
         # Apparently, the changekey may get updated
@@ -902,11 +1054,10 @@ class Folder(RegisterMixIn, SearchableMixIn):
             return self
 
         # Assume an exact match on the folder name in a shallow search will only return at most one folder
-        for f in FolderCollection(account=self.root.account, folders=[self]).find_folders(
-                q=Q(name=other), depth=SHALLOW
-        ):
-            return f
-        raise ErrorFolderNotFound("No subfolder with name '%s'" % other)
+        try:
+            return SingleFolderQuerySet(account=self.root.account, folder=self).depth(SHALLOW).get(name=other)
+        except ErrorFolderNotFound:
+            raise ErrorFolderNotFound("No subfolder with name '%s'" % other)
 
     def __truediv__(self, other):
         # Support the some_folder / 'child_folder' / 'child_of_child_folder' navigation syntax
@@ -1444,6 +1595,9 @@ class System(NonDeleteableFolderMixin, Folder):
         None: (u'System',),
     }
 
+    def refresh(self):
+        raise ErrorAccessDenied('System folder does not support GetFolder')
+
 
 class TemporarySaves(NonDeleteableFolderMixin, Folder):
     LOCALIZED_NAMES = {
@@ -1520,21 +1674,13 @@ class RootOfHierarchy(Folder):
         """Gets the distinguished folder for this folder class"""
         if not cls.DISTINGUISHED_FOLDER_ID:
             raise ValueError('Class %s must have a DISTINGUISHED_FOLDER_ID value' % cls)
-        folders = list(FolderCollection(
-            account=account,
-            folders=[cls(account=account, name=cls.DISTINGUISHED_FOLDER_ID, is_distinguished=True)]
-        ).get_folders()
-        )
-        if not folders:
+        try:
+            return cls.resolve(
+                account=account,
+                folder=cls(account=account, name=cls.DISTINGUISHED_FOLDER_ID, is_distinguished=True)
+            )
+        except ErrorFolderNotFound:
             raise ErrorFolderNotFound('Could not find distinguished folder %s' % cls.DISTINGUISHED_FOLDER_ID)
-        if len(folders) != 1:
-            raise ValueError('Expected result length 1, but got %s' % folders)
-        folder = folders[0]
-        if isinstance(folder, Exception):
-            raise folder
-        if folder.__class__ != cls:
-            raise ValueError("Expected 'folder' %r to be a %s instance" % (folder, cls))
-        return folder
 
     def get_default_folder(self, folder_cls):
         # Returns the distinguished folder instance of type folder_cls belonging to this account. If no distinguished
@@ -1578,7 +1724,7 @@ class RootOfHierarchy(Folder):
             if cls != AdminAuditLogs and cls.supports_version(self.account.version)
         ]
         try:
-            for f in FolderCollection(account=self.account, folders=distinguished_folders).get_folders():
+            for f in FolderCollection(account=self.account, folders=distinguished_folders).resolve():
                 if isinstance(f, (ErrorFolderNotFound, ErrorNoPublicFolderReplicaAvailable)):
                     # This is just a distinguished folder the server does not have
                     continue
@@ -1593,7 +1739,7 @@ class RootOfHierarchy(Folder):
                 if isinstance(f, Exception):
                     raise f
                 folders_map[f.id] = f
-            for f in FolderCollection(account=self.account, folders=[self]).find_folders(depth=self.TRAVERSAL_DEPTH):
+            for f in SingleFolderQuerySet(account=self.account, folder=self).depth(self.TRAVERSAL_DEPTH).all():
                 if isinstance(f, Exception):
                     raise f
                 if f.id in folders_map:
@@ -1757,7 +1903,7 @@ class PublicFoldersRoot(RootOfHierarchy):
 
         children_map = {}
         try:
-            for f in FolderCollection(account=self.account, folders=[folder]).find_folders(depth=self.TRAVERSAL_DEPTH):
+            for f in SingleFolderQuerySet(account=self.account, folder=folder).depth(depth=self.TRAVERSAL_DEPTH).all():
                 if isinstance(f, Exception):
                     raise f
                 children_map[f.id] = f

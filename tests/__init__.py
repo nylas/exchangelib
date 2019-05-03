@@ -51,11 +51,13 @@ from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextFie
     ChoiceField, BodyField, DateTimeField, Base64Field, PhoneNumberField, EmailAddressesField, TimeZoneField, \
     PhysicalAddressField, ExtendedPropertyField, MailboxField, AttendeesField, AttachmentField, CharListField, \
     MailboxListField, Choice, FieldPath, EWSElementField, CultureField, DateField, EnumField, EnumListField, IdField, \
-    CharField, TextListField, MONDAY, WEDNESDAY, FEBRUARY, AUGUST, SECOND, LAST, DAY, WEEK_DAY, WEEKEND_DAY
+    CharField, TextListField, PermissionSetField, \
+    MONDAY, WEDNESDAY, FEBRUARY, AUGUST, SECOND, LAST, DAY, WEEK_DAY, WEEKEND_DAY
 from exchangelib.folders import Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Messages, Tasks, \
     Contacts, Folder, RecipientCache, GALContacts, System, AllContacts, MyContactsExtended, Reminders, Favorites, \
     AllItems, ConversationSettings, Friends, RSSFeeds, Sharing, IMContactList, QuickContacts, Journal, Notes, \
-    SyncIssues, MyContacts, ToDoSearch, FolderCollection, DistinguishedFolderId
+    SyncIssues, MyContacts, ToDoSearch, FolderCollection, DistinguishedFolderId, Root, Files, \
+    DefaultFoldersChangeHistory, PassThroughSearchResults, SmsAndChatsSync
 from exchangelib.indexed_properties import EmailAddress, PhysicalAddress, PhoneNumber, \
     SingleFieldIndexedElement, MultiFieldIndexedElement
 from exchangelib.items import Item, CalendarItem, Message, Contact, Task, DistributionList, Persona
@@ -2727,13 +2729,6 @@ class FolderTest(EWSTest):
         folders = list(FolderCollection(account=self.account, folders=[self.account.root]).find_folders())
         self.assertGreater(len(folders), 40, sorted(f.name for f in folders))
 
-        # Test that FindFolder can handle FolderId instances
-        folders = list(FolderCollection(account=self.account, folders=[DistinguishedFolderId(
-            id=Inbox.DISTINGUISHED_FOLDER_ID,
-            mailbox=Mailbox(email_address=self.account.primary_smtp_address)
-        )]).get_folders())
-        self.assertGreaterEqual(len(folders), 0, sorted(f.name for f in folders))
-
     def test_find_folders_with_restriction(self):
         # Exact match
         folders = list(FolderCollection(account=self.account, folders=[self.account.root])
@@ -2872,7 +2867,7 @@ class FolderTest(EWSTest):
         for f in self.account.root.walk():
             if isinstance(f, System):
                 # Can't refresh the 'System' folder for some reason
-                        continue
+                continue
             old_values = {}
             for field in f.FIELDS:
                 old_values[field.name] = getattr(f, field.name)
@@ -2903,7 +2898,7 @@ class FolderTest(EWSTest):
 
         folder = Folder()
         with self.assertRaises(ValueError):
-            folder.refresh()  # Must have an account
+            folder.refresh()  # Must have root folder
         folder.root = 'XXX'
         with self.assertRaises(ValueError):
             folder.refresh()  # Must have an id
