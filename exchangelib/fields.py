@@ -1214,6 +1214,15 @@ class ItemField(FieldURIField):
         return value.to_xml(version=version)
 
 
+class PermissionSetField(EWSElementField):
+    is_complex = True
+
+    def __init__(self, *args, **kwargs):
+        from .properties import PermissionSet
+        kwargs['value_cls'] = PermissionSet
+        super(PermissionSetField, self).__init__(*args, **kwargs)
+
+
 class EffectiveRightsField(EWSElementField):
     def __init__(self, *args, **kwargs):
         from .properties import EffectiveRights
