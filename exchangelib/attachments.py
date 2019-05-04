@@ -44,7 +44,7 @@ class Attachment(EWSElement):
         BooleanField('is_inline', field_uri='IsInline'),
     ]
 
-    __slots__ = tuple(f.name for f in FIELDS)
+    __slots__ = tuple(f.name for f in FIELDS) + ('parent_item',)
 
     def __init__(self, **kwargs):
         self.parent_item = kwargs.pop('parent_item', None)
@@ -129,7 +129,7 @@ class FileAttachment(Attachment):
         Base64Field('_content', field_uri='Content'),
     ]
 
-    __slots__ = tuple(f.name for f in FIELDS) + ('_fp',)
+    __slots__ = tuple(f.name for f in FIELDS) + ('parent_item', '_fp')
 
     def __init__(self, **kwargs):
         kwargs['_content'] = kwargs.pop('content', None)
@@ -204,7 +204,7 @@ class ItemAttachment(Attachment):
         ItemField('_item', field_uri='Item'),
     ]
 
-    __slots__ = tuple(f.name for f in FIELDS)
+    __slots__ = tuple(f.name for f in FIELDS) + ('parent_item',)
 
     def __init__(self, **kwargs):
         kwargs['_item'] = kwargs.pop('item', None)
