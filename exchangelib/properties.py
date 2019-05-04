@@ -280,7 +280,7 @@ class MessageHeader(EWSElement):
         SubField('value'),
     ]
 
-    __slots__ = ('name', 'value')
+    __slots__ = tuple(f.name for f in FIELDS)
 
 
 class ItemId(EWSElement):
@@ -295,7 +295,7 @@ class ItemId(EWSElement):
         IdField('changekey', field_uri=CHANGEKEY_ATTR, is_required=False),
     ]
 
-    __slots__ = ('id', 'changekey')
+    __slots__ = tuple(f.name for f in FIELDS)
 
     def __init__(self, *args, **kwargs):
         if not kwargs:
@@ -389,7 +389,7 @@ class Mailbox(EWSElement):
         EWSElementField('item_id', value_cls=ItemId, is_read_only=True),
     ]
 
-    __slots__ = ('name', 'email_address', 'routing_type', 'mailbox_type', 'item_id')
+    __slots__ = tuple(f.name for f in FIELDS)
 
     def clean(self, version=None):
         super(Mailbox, self).clean(version=version)
@@ -421,7 +421,7 @@ class AvailabilityMailbox(EWSElement):
         ChoiceField('routing_type', field_uri='RoutingType', choices={Choice('SMTP')}, default='SMTP'),
     ]
 
-    __slots__ = ('name', 'email_address', 'routing_type')
+    __slots__ = tuple(f.name for f in FIELDS)
 
     def __hash__(self):
         # Exchange may add 'name' on insert. We're satisfied if the email address matches.
@@ -440,7 +440,7 @@ class Email(AvailabilityMailbox):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa565868(v=exchg.150).aspx
     ELEMENT_NAME = 'Email'
 
-    __slots__ = ('name', 'email_address', 'routing_type')
+    __slots__ = AvailabilityMailbox.__slots__
 
     def __hash__(self):
         # Exchange may add 'name' on insert. We're satisfied if the email address matches.
@@ -458,7 +458,7 @@ class MailboxData(EWSElement):
         BooleanField('exclude_conflicts', field_uri='ExcludeConflicts'),
     ]
 
-    __slots__ = ('email', 'attendee_type', 'exclude_conflicts')
+    __slots__ = tuple(f.name for f in FIELDS)
 
     def __hash__(self):
         # Exchange may add 'name' on insert. We're satisfied if the email address matches.
@@ -473,7 +473,7 @@ class TimeWindow(EWSElement):
         DateTimeField('end', field_uri='EndTime', is_required=True),
     ]
 
-    __slots__ = ('start', 'end')
+    __slots__ = tuple(f.name for f in FIELDS)
 
 
 class FreeBusyViewOptions(EWSElement):
@@ -489,7 +489,7 @@ class FreeBusyViewOptions(EWSElement):
                     is_required=True),  # Choice('None') is also valid, but only for responses
     ]
 
-    __slots__ = ('time_window', 'merged_free_busy_interval', 'requested_view')
+    __slots__ = tuple(f.name for f in FIELDS)
 
 
 class Attendee(EWSElement):
@@ -505,7 +505,7 @@ class Attendee(EWSElement):
         DateTimeField('last_response_time', field_uri='LastResponseTime'),
     ]
 
-    __slots__ = ('mailbox', 'response_type', 'last_response_time')
+    __slots__ = tuple(f.name for f in FIELDS)
 
     def __hash__(self):
         # TODO: maybe take 'response_type' and 'last_response_time' into account?
@@ -523,7 +523,7 @@ class TimeZoneTransition(EWSElement):
         # 'Year' is not implemented yet
     ]
 
-    __slots__ = ('bias', 'time', 'occurrence', 'iso_month', 'weekday')
+    __slots__ = tuple(f.name for f in FIELDS)
 
     @classmethod
     def from_xml(cls, elem, account):
@@ -564,7 +564,7 @@ class TimeZone(EWSElement):
         EWSElementField('daylight_time', value_cls=DaylightTime),
     ]
 
-    __slots__ = ('bias', 'standard_time', 'daylight_time')
+    __slots__ = tuple(f.name for f in FIELDS)
 
     def to_server_timezone(self, timezones, for_year):
         """Returns the Microsoft timezone ID corresponding to this timezone. There may not be a match at all, and there
@@ -792,7 +792,7 @@ class Member(EWSElement):
         }, default='Normal'),
     ]
 
-    __slots__ = ('mailbox', 'status')
+    __slots__ = tuple(f.name for f in FIELDS)
 
     def __hash__(self):
         # TODO: maybe take 'status' into account?
@@ -810,6 +810,8 @@ class UserId(EWSElement):
         EnumField('distinguished_user', field_uri='DistinguishedUser', enum=('Default', 'Anonymous')),
         CharField('external_user_identity', field_uri='ExternalUserIdentity'),
     ]
+
+    __slots__ = tuple(f.name for f in FIELDS)
 
 
 class Permission(EWSElement):

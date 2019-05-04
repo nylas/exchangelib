@@ -26,7 +26,7 @@ class AttachmentId(EWSElement):
         IdField('root_changekey', field_uri=ROOT_CHANGEKEY_ATTR),
     ]
 
-    __slots__ = ('id', 'root_id', 'root_changekey')
+    __slots__ = tuple(f.name for f in FIELDS)
 
 
 class Attachment(EWSElement):
@@ -44,8 +44,7 @@ class Attachment(EWSElement):
         BooleanField('is_inline', field_uri='IsInline'),
     ]
 
-    __slots__ = ('parent_item', 'attachment_id', 'name', 'content_type', 'content_id', 'content_location', 'size',
-                 'last_modified_time', 'is_inline')
+    __slots__ = tuple(f.name for f in FIELDS)
 
     def __init__(self, **kwargs):
         self.parent_item = kwargs.pop('parent_item', None)
@@ -130,7 +129,7 @@ class FileAttachment(Attachment):
         Base64Field('_content', field_uri='Content'),
     ]
 
-    __slots__ = Attachment.__slots__ + ('is_contact_photo', '_content', '_fp')
+    __slots__ = tuple(f.name for f in FIELDS) + ('_fp',)
 
     def __init__(self, **kwargs):
         kwargs['_content'] = kwargs.pop('content', None)
@@ -205,7 +204,7 @@ class ItemAttachment(Attachment):
         ItemField('_item', field_uri='Item'),
     ]
 
-    __slots__ = Attachment.__slots__ + ('_item',)
+    __slots__ = tuple(f.name for f in FIELDS)
 
     def __init__(self, **kwargs):
         kwargs['_item'] = kwargs.pop('item', None)

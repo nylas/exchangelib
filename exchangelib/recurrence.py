@@ -64,7 +64,8 @@ class AbsoluteYearlyPattern(Pattern):
         # value, the last day in the month is assumed
         IntegerField('day_of_month', field_uri='t:DayOfMonth', min=1, max=31, is_required=True),
     ]
-    __slots__ = ('month', 'day_of_month')
+
+    __slots__ = tuple(f.name for f in FIELDS)
 
     def __str__(self):
         return 'Occurs on day %s of %s' % (self.day_of_month, _month_to_str(self.month))
@@ -85,7 +86,8 @@ class RelativeYearlyPattern(Pattern):
         # The month of the year, from 1 - 12
         EnumField('month', field_uri='t:Month', enum=MONTHS, is_required=True),
     ]
-    __slots__ = ('weekdays', 'week_number', 'month')
+
+    __slots__ = tuple(f.name for f in FIELDS)
 
     def __str__(self):
         return 'Occurs on weekdays %s in the %s week of %s' % (
@@ -106,7 +108,8 @@ class AbsoluteMonthlyPattern(Pattern):
         # value, the last day in the month is assumed
         IntegerField('day_of_month', field_uri='t:DayOfMonth', min=1, max=31, is_required=True),
     ]
-    __slots__ = ('interval', 'day_of_month')
+
+    __slots__ = tuple(f.name for f in FIELDS)
 
     def __str__(self):
         return 'Occurs on day %s of every %s month(s)' % (self.day_of_month, self.interval)
@@ -127,7 +130,8 @@ class RelativeMonthlyPattern(Pattern):
         # months that have only 4 weeks.
         EnumField('week_number', field_uri='t:DayOfWeekIndex', enum=WEEK_NUMBERS, is_required=True),
     ]
-    __slots__ = ('interval', 'week_number', 'weekdays')
+
+    __slots__ = tuple(f.name for f in FIELDS)
 
     def __str__(self):
         return 'Occurs on weekdays %s in the %s week of every %s month(s)' % (
@@ -149,7 +153,8 @@ class WeeklyPattern(Pattern):
         # The first day of the week. Defaults to Monday
         EnumField('first_day_of_week', field_uri='t:FirstDayOfWeek', enum=WEEKDAYS, default=1, is_required=True),
     ]
-    __slots__ = ('interval', 'weekdays', 'first_day_of_week')
+
+    __slots__ = tuple(f.name for f in FIELDS)
 
     def __str__(self):
         if isinstance(self.weekdays, string_types):
@@ -171,7 +176,8 @@ class DailyPattern(Pattern):
         # Interval, in days, in range 1 -> 999
         IntegerField('interval', field_uri='t:Interval', min=1, max=999, is_required=True),
     ]
-    __slots__ = ('interval',)
+
+    __slots__ = tuple(f.name for f in FIELDS)
 
     def __str__(self):
         return 'Occurs every %s day(s)' % self.interval
@@ -189,7 +195,8 @@ class NoEndPattern(Boundary):
         # Start date, as EWSDate
         DateField('start', field_uri='t:StartDate', is_required=True),
     ]
-    __slots__ = ('start',)
+
+    __slots__ = tuple(f.name for f in FIELDS)
 
 
 class EndDatePattern(Boundary):
@@ -202,7 +209,8 @@ class EndDatePattern(Boundary):
         # End date, as EWSDate
         DateField('end', field_uri='t:EndDate', is_required=True),
     ]
-    __slots__ = ('start', 'end')
+
+    __slots__ = tuple(f.name for f in FIELDS)
 
 
 class NumberedPattern(Boundary):
@@ -215,7 +223,8 @@ class NumberedPattern(Boundary):
         # The number of occurrences in this pattern, in range 1 -> 999
         IntegerField('number', field_uri='t:NumberOfOccurrences', min=1, max=999, is_required=True),
     ]
-    __slots__ = ('start', 'number',)
+
+    __slots__ = tuple(f.name for f in FIELDS)
 
 
 class Occurrence(EWSElement):
@@ -234,7 +243,8 @@ class Occurrence(EWSElement):
         # The original start time of the item, as EWSDateTime
         DateTimeField('original_start', field_uri='t:OriginalStart'),
     ]
-    __slots__ = ('id', 'changekey', 'start', 'end', 'original_start')
+
+    __slots__ = tuple(f.name for f in FIELDS)
 
     def __init__(self, **kwargs):
         if 'item_id' in kwargs:
@@ -299,7 +309,8 @@ class DeletedOccurrence(EWSElement):
         # The modified start time of the item, as EWSDateTime
         DateTimeField('start', field_uri='t:Start'),
     ]
-    __slots__ = ('start',)
+
+    __slots__ = tuple(f.name for f in FIELDS)
 
 
 PATTERN_CLASSES = AbsoluteYearlyPattern, RelativeYearlyPattern, AbsoluteMonthlyPattern, RelativeMonthlyPattern, \
@@ -316,7 +327,7 @@ class Recurrence(EWSElement):
         EWSElementField('boundary', value_cls=Boundary),
     ]
 
-    __slots__ = ('pattern', 'boundary')
+    __slots__ = tuple(f.name for f in FIELDS)
 
     def __init__(self, **kwargs):
         # Allow specifying a start, end and/or number as a shortcut to creating a boundary

@@ -50,7 +50,7 @@ class DistinguishedFolderId(ItemId):
         MailboxField('mailbox'),
     ]
 
-    __slots__ = ItemId.__slots__ + ('mailbox',)
+    __slots__ = tuple(f.name for f in FIELDS)
 
     def clean(self, version=None):
         super(DistinguishedFolderId, self).clean(version=version)
@@ -72,7 +72,7 @@ class CalendarView(EWSElement):
         IntegerField('max_items', field_uri='MaxEntriesReturned', min=1, is_attribute=True),
     ]
 
-    __slots__ = ('start', 'end', 'max_items')
+    __slots__ = tuple(f.name for f in FIELDS)
 
     def clean(self, version=None):
         super(CalendarView, self).clean(version=version)
