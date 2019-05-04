@@ -13,7 +13,7 @@ from six import text_type, string_types
 
 from .fields import SubField, TextField, EmailAddressField, ChoiceField, DateTimeField, EWSElementField, MailboxField, \
     Choice, BooleanField, IdField, ExtendedPropertyField, IntegerField, TimeField, EnumField, CharField, EmailField, \
-    EWSElementListField, EnumListField, FreeBusyStatusField, CharListField, WEEKDAY_NAMES, FieldPath, Field
+    EWSElementListField, EnumListField, FreeBusyStatusField, UnknownEntriesField, WEEKDAY_NAMES, FieldPath, Field
 from .util import get_xml_attr, create_element, set_xml_value, value_to_xml_text, MNS, TNS
 from .version import EXCHANGE_2013
 
@@ -807,7 +807,9 @@ class UserId(EWSElement):
         CharField('sid', field_uri='SID'),
         EmailAddressField('primary_smtp_address', field_uri='PrimarySmtpAddress'),
         CharField('display_name', field_uri='DisplayName'),
-        EnumField('distinguished_user', field_uri='DistinguishedUser', enum=('Default', 'Anonymous')),
+        ChoiceField('distinguished_user', field_uri='DistinguishedUser', choices={
+            Choice('Default'), Choice('Anonymous')
+        }),
         CharField('external_user_identity', field_uri='ExternalUserIdentity'),
     ]
 
@@ -820,30 +822,66 @@ class Permission(EWSElement):
 
     PERMISSION_ENUM = {Choice('None'), Choice('Owned'), Choice('All')}
     FIELDS = [
-        BooleanField('can_create_items', field_uri='CanCreateItems'),
-        BooleanField('can_create_subfolders', field_uri='CanCreateSubfolders'),
-        BooleanField('is_folder_owner', field_uri='IsFolderOwner'),
-        BooleanField('is_folder_visible', field_uri='IsFolderVisible'),
-        BooleanField('is_folder_contact', field_uri='IsFolderContact'),
-        ChoiceField('edit_items', field_uri='EditItems', choices=PERMISSION_ENUM),
-        ChoiceField('delete_items', field_uri='DeleteItems', choices=PERMISSION_ENUM),
+        BooleanField('can_create_items', field_uri='CanCreateItems', default=False),
+        BooleanField('can_create_subfolders', field_uri='CanCreateSubfolders', default=False),
+        BooleanField('is_folder_owner', field_uri='IsFolderOwner', default=False),
+        BooleanField('is_folder_visible', field_uri='IsFolderVisible', default=False),
+        BooleanField('is_folder_contact', field_uri='IsFolderContact', default=False),
+        ChoiceField('edit_items', field_uri='EditItems', choices=PERMISSION_ENUM, default='None'),
+        ChoiceField('delete_items', field_uri='DeleteItems', choices=PERMISSION_ENUM, default='None'),
         ChoiceField('permission_level', field_uri='PermissionLevel', choices={
             Choice('None'), Choice('Owner'), Choice('PublishingEditor'), Choice('Editor'), Choice('PublishingAuthor'),
             Choice('Author'), Choice('NoneditingAuthor'), Choice('Reviewer'), Choice('Contributor'), Choice('Custom')
-        }),
-        ChoiceField('read_items', field_uri='ReadItems', choices={Choice('None'), Choice('FullDetails')}),
-        EWSElementField('user_id', field_uri='UserId', value_cls=UserId)
+        }, default='None'),
+        ChoiceField('read_items', field_uri='ReadItems', choices={
+            Choice('None'), Choice('FullDetails')
+        }, default='None'),
+        EWSElementField('user_id', field_uri='UserId', value_cls=UserId, is_required=True)
     ]
+
+    __slots__ = tuple(f.name for f in FIELDS)
+
+
+class CalendarPermission(EWSElement):
+    # MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/calendarpermission
+    ELEMENT_NAME = 'Permission'
+
+    PERMISSION_ENUM = {Choice('None'), Choice('Owned'), Choice('All')}
+    FIELDS = [
+        ChoiceField('calendar_permission_level', field_uri='CalendarPermissionLevel', choices={
+            Choice('None'), Choice('Owner'), Choice('PublishingEditor'), Choice('Editor'), Choice('PublishingAuthor'),
+            Choice('Author'), Choice('NoneditingAuthor'), Choice('Reviewer'), Choice('Contributor'),
+            Choice('FreeBusyTimeOnly'), Choice('FreeBusyTimeAndSubjectAndLocation'), Choice('Custom')
+        }, default='None'),
+        BooleanField('can_create_items', field_uri='CanCreateItems', default=False),
+        BooleanField('can_create_subfolders', field_uri='CanCreateSubfolders', default=False),
+        BooleanField('is_folder_owner', field_uri='IsFolderOwner', default=False),
+        BooleanField('is_folder_visible', field_uri='IsFolderVisible', default=False),
+        BooleanField('is_folder_contact', field_uri='IsFolderContact', default=False),
+        ChoiceField('edit_items', field_uri='EditItems', choices=PERMISSION_ENUM, default='None'),
+        ChoiceField('delete_items', field_uri='DeleteItems', choices=PERMISSION_ENUM, default='None'),
+        ChoiceField('read_items', field_uri='ReadItems', choices={
+            Choice('None'), Choice('FullDetails')
+        }, default='None'),
+        EWSElementField('user_id', field_uri='UserId', value_cls=UserId, is_required=True)
+    ]
+
+    __slots__ = tuple(f.name for f in FIELDS)
 
 
 class PermissionSet(EWSElement):
     # MSDN:
     # https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/permissionset-permissionsettype
+    # and
+    # https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/permissionset-calendarpermissionsettype
+
+    # For simplicity, we implement the two distinct but equally names elements as one class.
     ELEMENT_NAME = 'PermissionSet'
 
     FIELDS = [
         EWSElementListField('permissions', field_uri='Permissions', value_cls=Permission),
-        CharListField('unknown_entries', field_uri='UnknownEntries'),
+        EWSElementListField('calendar_permissions', field_uri='CalendarPermissions', value_cls=CalendarPermission),
+        UnknownEntriesField('unknown_entries', field_uri='UnknownEntries'),
     ]
 
     __slots__ = tuple(f.name for f in FIELDS)

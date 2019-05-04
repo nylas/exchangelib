@@ -1217,6 +1217,11 @@ class ItemField(FieldURIField):
         return value.to_xml(version=version)
 
 
+class UnknownEntriesField(CharListField):
+    def list_elem_tag(self):
+        return '{%s}UnknownEntry' % self.namespace
+
+
 class PermissionSetField(EWSElementField):
     is_complex = True
 
