@@ -5,6 +5,12 @@ HEAD
 ----
 
 
+1.12.3
+------
+-   Add support for reading and writing `PermissionSet` field on folders.
+-   Add support for Exchange 2019 build IDs.
+
+
 1.12.2
 ------
 -   Add `Protocol.expand_dl()` to get members of a distribution list.
