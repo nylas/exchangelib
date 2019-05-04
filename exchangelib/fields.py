@@ -689,10 +689,13 @@ class IdField(CharField):
 class CharListField(CharField):
     is_list = True
 
+    def list_elem_tag(self):
+        return '{%s}String' % self.namespace
+
     def from_xml(self, elem, account):
         iter_elem = elem.find(self.response_tag())
         if iter_elem is not None:
-            return get_xml_attrs(iter_elem, '{%s}String' % TNS)
+            return get_xml_attrs(iter_elem, self.list_elem_tag())
         return self.default
 
 
