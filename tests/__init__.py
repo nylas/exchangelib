@@ -5513,6 +5513,21 @@ class BaseItemTest(EWSTest):
         item.attach(attachment3)
         item.detach(attachment3)
 
+    def test_both_attachment_types(self):
+        item = self.get_test_item(folder=self.test_folder)
+        attached_item = self.get_test_item(folder=self.test_folder).save()
+        item_attachment = ItemAttachment(name='item_attachment', item=attached_item)
+        file_attachment = FileAttachment(name='file_attachment', content=b'file_attachment')
+        item.attach(item_attachment)
+        item.attach(file_attachment)
+        item.save()
+
+        fresh_item = list(self.account.fetch(ids=[item]))[0]
+        self.assertSetEqual(
+            {a.name for a in fresh_item.attachments},
+            {'item_attachment', 'file_attachment'}
+        )
+
     def test_recursive_attachments(self):
         # Test that we can handle an item which has an attached item, which has an attached item...
         item = self.get_test_item(folder=self.test_folder)
