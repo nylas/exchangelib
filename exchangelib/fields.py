@@ -982,7 +982,7 @@ class AttachmentField(EWSElementListField):
         # Look for both FileAttachment and ItemAttachment
         if iter_elem is not None:
             attachments = []
-            for att_type in (FileAttachment, ItemAttachment):
+            for att_type in (ItemAttachment, FileAttachment):
                 attachments.extend(
                     [att_type.from_xml(elem=e, account=account) for e in iter_elem.findall(att_type.response_tag())]
                 )
