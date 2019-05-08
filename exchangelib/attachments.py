@@ -111,7 +111,8 @@ class Attachment(EWSElement):
     def __hash__(self):
         if self.attachment_id:
             return hash(self.attachment_id)
-        return hash(tuple(getattr(self, f) for f in self.__slots__[1:]))
+        # Be careful to avoid recursion on the back-reference to the parent item
+        return hash(tuple(getattr(self, f) for f in self.__slots__ if f != 'parent_item'))
 
     def __repr__(self):
         return self.__class__.__name__ + '(%s)' % ', '.join(
