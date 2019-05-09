@@ -203,9 +203,8 @@ class EWSService(object):
                     # this part of the code yet. Let the user handle this.
                     raise e
 
-                # Re-raise as an ErrorServerBusy with a default delay
-                back_off = 300
-                raise ErrorServerBusy(msg='Reraised from %s(%s)' % (e.__class__.__name__, e), back_off=back_off)
+                # Re-raise as an ErrorServerBusy with a default delay of 5 minutes
+                raise ErrorServerBusy(msg='Reraised from %s(%s)' % (e.__class__.__name__, e), back_off=300)
             except ResponseMessageError as rme:
                 # We got an error message from Exchange, but we still want to get any new version info from the response
                 try:
@@ -1545,15 +1544,13 @@ class FindPeople(EWSAccountService, PagingEWSMixIn):
         return findpeople
 
     def _paged_call(self, payload_func, max_items, **kwargs):
-        account = self.account if isinstance(self, EWSAccountService) else None
-        log_prefix = 'EWS %s, account %s, service %s' % (self.protocol.service_endpoint, account, self.SERVICE_NAME)
         item_count = kwargs['offset']
         while True:
-            log.debug('%s: Getting items at offset %s', log_prefix, item_count)
+            log.debug('EWS %s, account %s, service %s: Getting items at offset %s',
+                      self.protocol.service_endpoint, self.account, self.SERVICE_NAME, item_count)
             kwargs['offset'] = item_count
-            payload = payload_func(**kwargs)
             try:
-                response = self._get_response_xml(payload=payload)
+                response = self._get_response_xml(payload=payload_func(**kwargs))
             except ErrorServerBusy as e:
                 log.debug('Got ErrorServerBusy (back off %s seconds)', e.back_off)
                 # ErrorServerBusy is very often a symptom of sending too many requests. Scale back if possible.
@@ -1742,7 +1739,7 @@ class GetAttachment(EWSAccountService):
         return payload
 
     @classmethod
-    def _get_soap_payload(cls, response,  **parse_opts):
+    def _get_soap_payload(cls, response, **parse_opts):
         if not parse_opts.get('stream_file_content', False):
             return super(GetAttachment, cls)._get_soap_payload(response=response)
 

@@ -320,7 +320,6 @@ class FolderCollection(SearchableMixIn):
         if additional_fields:
             for f in additional_fields:
                 self.validate_item_field(field=f)
-            for f in additional_fields:
                 if f.field.is_complex:
                     raise ValueError("find_items() does not support field '%s'. Use fetch() instead" % f.field.name)
         if calendar_view is not None and not isinstance(calendar_view, CalendarView):
@@ -968,7 +967,8 @@ class Folder(RegisterMixIn, SearchableMixIn):
             # Instead, search for a folder class using the localized name. If none are found, fall back to getting the
             # folder class by the "FolderClass" value.
             #
-            # The returned XML may contain neither folder class nor name. In that case, we default
+            # The returned XML may contain neither folder class nor name. In that case, we default to the generic
+            # Folder class.
             if kwargs['name']:
                 try:
                     # TODO: fld_class.LOCALIZED_NAMES is most definitely neither complete nor authoritative
