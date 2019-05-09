@@ -3,7 +3,13 @@ Change Log
 
 HEAD
 ----
+
+
+1.12.4
+------
 - Fix bug that left out parts of the folder hierarchy when traversing `account.root`.
+- Fix bug that did not properly find all attachments if an item has a mix of item
+  and file attachments.
 
 
 1.12.3
