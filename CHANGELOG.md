@@ -3,6 +3,7 @@ Change Log
 
 HEAD
 ----
+- Fix bug that left out parts of the folder hierarchy when traversing `account.root`.
 
 
 1.12.3
