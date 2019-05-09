@@ -1446,6 +1446,13 @@ class AllItems(NonDeleteableFolderMixin, Folder):
     }
 
 
+class Audits(NonDeleteableFolderMixin, Folder):
+    LOCALIZED_NAMES = {
+        None: (u'Audits',),
+    }
+    get_folder_allowed = False
+
+
 class CalendarLogging(NonDeleteableFolderMixin, Folder):
     LOCALIZED_NAMES = {
         None: (u'Calendar Logging',),
@@ -1940,6 +1947,7 @@ class ArchiveRoot(RootOfHierarchy):
 NON_DELETEABLE_FOLDERS = [
     AllContacts,
     AllItems,
+    Audits,
     CalendarLogging,
     CommonViews,
     ConversationSettings,
