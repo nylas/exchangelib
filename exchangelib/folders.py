@@ -156,8 +156,8 @@ class FolderQuerySet(object):
         # Fetch all properties for the found folders
         resolveable_folders = []
         for f in folders:
-            if isinstance(f, System):
-                log.debug('GetFolder not allowed on System folder. Non-complex fields must be fetched with FindFolder')
+            if not f.get_folder_allowed:
+                log.debug('GetFolder not allowed on folder %s. Non-complex fields must be fetched with FindFolder', f)
                 yield f
             else:
                 resolveable_folders.append(f)
@@ -384,8 +384,8 @@ class FolderCollection(SearchableMixIn):
         # Looks up the folders or folder IDs in the collection and returns full Folder instances with all fields set.
         resolveable_folders = []
         for f in self.folders:
-            if isinstance(f, System):
-                log.debug('GetFolder not allowed on System folder. Non-complex fields must be fetched with FindFolder')
+            if not f.get_folder_allowed:
+                log.debug('GetFolder not allowed on folder %s. Non-complex fields must be fetched with FindFolder', f)
                 yield f
             else:
                 resolveable_folders.append(f)
@@ -473,6 +473,8 @@ class Folder(RegisterMixIn, SearchableMixIn):
     # Marks the version from which a distinguished folder was introduced. A possibly authoritative source is:
     # https://github.com/OfficeDev/ews-managed-api/blob/master/Enumerations/WellKnownFolderName.cs
     supported_from = None
+    # Whether this folder type is allowed with the GetFolder service
+    get_folder_allowed = True
     LOCALIZED_NAMES = dict()  # A map of (str)locale: (tuple)localized_folder_names
     ITEM_MODEL_MAP = {cls.response_tag(): cls for cls in ITEM_CLASSES}
     FIELDS = [
@@ -1257,6 +1259,7 @@ class WellknownFolder(Folder):
 class AdminAuditLogs(WellknownFolder):
     DISTINGUISHED_FOLDER_ID = 'adminauditlogs'
     supported_from = EXCHANGE_2013
+    get_folder_allowed = False
 
 
 class ArchiveDeletedItems(WellknownFolder):
@@ -1595,9 +1598,7 @@ class System(NonDeleteableFolderMixin, Folder):
     LOCALIZED_NAMES = {
         None: (u'System',),
     }
-
-    def refresh(self):
-        raise ErrorAccessDenied('System folder does not support GetFolder')
+    get_folder_allowed = False
 
 
 class TemporarySaves(NonDeleteableFolderMixin, Folder):
