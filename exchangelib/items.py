@@ -1149,7 +1149,7 @@ class MeetingResponse(BaseMeetingItem):
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa564337(v=exchg.150).aspx
     """
     ELEMENT_NAME = 'MeetingResponse'
-    FIELDS = Message.FIELDS
+    FIELDS = Message.FIELDS.copy()
 
 
 class MeetingCancellation(BaseMeetingItem):
