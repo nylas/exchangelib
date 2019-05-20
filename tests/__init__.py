@@ -5,6 +5,7 @@ from decimal import Decimal
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import glob
+from inspect import isclass
 from itertools import chain
 import io
 from keyword import kwlist
@@ -519,6 +520,19 @@ class EWSDateTimeTest(unittest.TestCase):
 
 
 class PropertiesTest(unittest.TestCase):
+    def test_unique_field_names(self):
+        from exchangelib import attachments, properties, items, folders, indexed_properties, recurrence, settings
+        for module in (attachments, properties, items, folders, indexed_properties, recurrence, settings):
+            for cls in module.__dict__.values():
+                if not isclass(cls) or not issubclass(cls, EWSElement):
+                    continue
+                # Assert that all FIELDS names are unique on the model
+                field_names = set()
+                for f in cls.FIELDS:
+                    self.assertNotIn(f.name, field_names,
+                                     'Field name %r is not unique on model %r' % (f.name, cls.__name__))
+                    field_names.add(f.name)
+
     def test_uid(self):
         # Test translation of calendar UIDs. See #453
         self.assertEqual(

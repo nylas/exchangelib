@@ -1149,10 +1149,7 @@ class MeetingResponse(BaseMeetingItem):
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa564337(v=exchg.150).aspx
     """
     ELEMENT_NAME = 'MeetingResponse'
-    FIELDS = Message.FIELDS + [
-        MailboxField('received_by', field_uri='message:ReceivedBy', is_read_only=True),
-        MailboxField('received_representing', field_uri='message:ReceivedRepresenting', is_read_only=True),
-    ]
+    FIELDS = Message.FIELDS
 
 
 class MeetingCancellation(BaseMeetingItem):

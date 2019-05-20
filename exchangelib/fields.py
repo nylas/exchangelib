@@ -898,7 +898,12 @@ class BaseEmailField(EWSElementField):
         if sub_elem is not None:
             if self.field_uri is not None:
                 # We want the nested Mailbox, not the wrapper element
-                return self.value_cls.from_xml(elem=sub_elem.find(self.value_cls.response_tag()), account=account)
+                nested_elem = sub_elem.find(self.value_cls.response_tag())
+                if nested_elem is None:
+                    raise ValueError(
+                        'Expected XML element %r missing on field %r' % (self.value_cls.response_tag(), self.name)
+                    )
+                return self.value_cls.from_xml(elem=nested_elem, account=account)
             return self.value_cls.from_xml(elem=sub_elem, account=account)
         return self.default
 
