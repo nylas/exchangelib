@@ -1422,6 +1422,10 @@ class ToDoSearch(WellknownFolder):
 
 class VoiceMail(WellknownFolder):
     DISTINGUISHED_FOLDER_ID = 'voicemail'
+    CONTAINER_CLASS = 'IPF.Note.Microsoft.Voicemail'
+    LOCALIZED_NAMES = {
+        None: (u'Voice Mail',),
+    }
 
 
 class NonDeleteableFolderMixin:
@@ -1522,6 +1526,13 @@ class GALContacts(NonDeleteableFolderMixin, Contacts):
     }
 
 
+class GraphAnalytics(NonDeleteableFolderMixin, Folder):
+    CONTAINER_CLASS = 'IPF.StoreItem.GraphAnalytics'
+    LOCALIZED_NAMES = {
+        None: (u'GraphAnalytics',),
+    }
+
+
 class Location(NonDeleteableFolderMixin, Folder):
     LOCALIZED_NAMES = {
         None: (u'Location',),
@@ -1555,6 +1566,13 @@ class PassThroughSearchResults(NonDeleteableFolderMixin, Folder):
     }
 
 
+class PdpProfileV2Secured(NonDeleteableFolderMixin, Folder):
+    CONTAINER_CLASS = 'IPF.StoreItem.PdpProfileSecured'
+    LOCALIZED_NAMES = {
+        None: (u'PdpProfileV2Secured',),
+    }
+
+
 class Reminders(NonDeleteableFolderMixin, Folder):
     CONTAINER_CLASS = 'Outlook.Reminder'
     LOCALIZED_NAMES = {
@@ -1585,6 +1603,13 @@ class Sharing(NonDeleteableFolderMixin, Folder):
 class Shortcuts(NonDeleteableFolderMixin, Folder):
     LOCALIZED_NAMES = {
         None: (u'Shortcuts',),
+    }
+
+
+class Signal(NonDeleteableFolderMixin, Folder):
+    CONTAINER_CLASS = 'IPF.StoreItem.Signal'
+    LOCALIZED_NAMES = {
+        None: (u'Signal',),
     }
 
 
@@ -1959,16 +1984,19 @@ NON_DELETEABLE_FOLDERS = [
     Files,
     Friends,
     GALContacts,
+    GraphAnalytics,
     Location,
     MailboxAssociations,
     MyContactsExtended,
     ParkedMessages,
     PassThroughSearchResults,
+    PdpProfileV2Secured,
     Reminders,
     RSSFeeds,
     Schedule,
     Sharing,
     Shortcuts,
+    Signal,
     SmsAndChatsSync,
     SpoolerQueue,
     System,

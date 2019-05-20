@@ -40,9 +40,9 @@ from exchangelib.credentials import DELEGATE, IMPERSONATION, Credentials, Servic
 from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalidOperation, AutoDiscoverRedirect, \
     AutoDiscoverCircularRedirect, AutoDiscoverFailed, ErrorNonExistentMailbox, UnknownTimeZone, \
     ErrorNameResolutionNoResults, TransportError, RedirectError, CASError, RateLimitError, UnauthorizedError, \
-    ErrorInvalidChangeKey, ErrorInvalidIdMalformed, ErrorContainsFilterWrongType, ErrorAccessDenied, \
+    ErrorInvalidChangeKey, ErrorAccessDenied, \
     ErrorFolderNotFound, ErrorInvalidRequest, SOAPError, ErrorInvalidServerVersion, NaiveDateTimeNotAllowed, \
-    AmbiguousTimeError, NonExistentTimeError, ErrorUnsupportedPathForQuery, ErrorInvalidPropertyForOperation, \
+    AmbiguousTimeError, NonExistentTimeError, ErrorUnsupportedPathForQuery, \
     ErrorInvalidValueForProperty, ErrorPropertyUpdate, ErrorDeleteDistinguishedFolder, \
     ErrorNoPublicFolderReplicaAvailable, ErrorServerBusy, ErrorInvalidPropertySet, ErrorObjectTypeChanged, \
     ErrorInvalidIdMalformed
@@ -57,8 +57,9 @@ from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextFie
 from exchangelib.folders import Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Messages, Tasks, \
     Contacts, Folder, RecipientCache, GALContacts, System, AllContacts, MyContactsExtended, Reminders, Favorites, \
     AllItems, ConversationSettings, Friends, RSSFeeds, Sharing, IMContactList, QuickContacts, Journal, Notes, \
-    SyncIssues, MyContacts, ToDoSearch, FolderCollection, DistinguishedFolderId, Root, Files, \
-    DefaultFoldersChangeHistory, PassThroughSearchResults, SmsAndChatsSync
+    SyncIssues, MyContacts, ToDoSearch, FolderCollection, DistinguishedFolderId, Files, \
+    DefaultFoldersChangeHistory, PassThroughSearchResults, SmsAndChatsSync, GraphAnalytics, Signal, \
+    PdpProfileV2Secured, VoiceMail
 from exchangelib.indexed_properties import EmailAddress, PhysicalAddress, PhoneNumber, \
     SingleFieldIndexedElement, MultiFieldIndexedElement
 from exchangelib.items import Item, CalendarItem, Message, Contact, Task, DistributionList, Persona
@@ -523,7 +524,7 @@ class PropertiesTest(unittest.TestCase):
     def test_unique_field_names(self):
         from exchangelib import attachments, properties, items, folders, indexed_properties, recurrence, settings
         for module in (attachments, properties, items, folders, indexed_properties, recurrence, settings):
-            for cls in module.__dict__.values():
+            for cls in vars(module).values():
                 if not isclass(cls) or not issubclass(cls, EWSElement):
                     continue
                 # Assert that all FIELDS names are unique on the model
@@ -2088,9 +2089,12 @@ class CommonTest(EWSTest):
         # Test that we can recover from a wrong API version. This is needed in version guessing and when the
         # autodiscover response returns a wrong server version for the account
         old_version = self.account.version.api_version
-        self.account.version.api_version = 'XXX'
-        list(self.account.inbox.filter(subject=get_random_string(16)))
-        self.assertEqual(old_version, self.account.version.api_version)
+        self.account.version.api_version = 'Exchange2016'  # Newer EWS versions require a valid value
+        try:
+            list(self.account.inbox.filter(subject=get_random_string(16)))
+            self.assertEqual(old_version, self.account.version.api_version)
+        finally:
+            self.account.version.api_version = old_version
 
     def test_soap_error(self):
         soap_xml = """\
@@ -2837,6 +2841,14 @@ class FolderTest(EWSTest):
                 self.assertEqual(f.folder_class, 'IPF.StoreItem.PassThroughSearchResults')
             elif isinstance(f, SmsAndChatsSync):
                 self.assertEqual(f.folder_class, 'IPF.SmsAndChatsSync')
+            elif isinstance(f, GraphAnalytics):
+                self.assertEqual(f.folder_class, 'IPF.StoreItem.GraphAnalytics')
+            elif isinstance(f, Signal):
+                self.assertEqual(f.folder_class, 'IPF.StoreItem.Signal')
+            elif isinstance(f, PdpProfileV2Secured):
+                self.assertEqual(f.folder_class, 'IPF.StoreItem.PdpProfileSecured')
+            elif isinstance(f, VoiceMail):
+                self.assertEqual(f.folder_class, 'IPF.Note.Microsoft.Voicemail')
             else:
                 self.assertIn(f.folder_class, (None, 'IPF'), (f.name, f.__class__.__name__, f.folder_class))
                 self.assertIsInstance(f, Folder)
@@ -3712,8 +3724,15 @@ class BaseItemTest(EWSTest):
                     continue
 
                 f.is_searchable = True
-                with self.assertRaises((ErrorUnsupportedPathForQuery, ErrorInvalidValueForProperty)):
-                    list(self.test_folder.filter(**filter_kwargs))
+                if f.name in ('reminder_due_by',):
+                    # Filtering is accepted but doesn't work
+                    self.assertEqual(
+                        len(self.test_folder.filter(**filter_kwargs)),
+                        0
+                    )
+                else:
+                    with self.assertRaises((ErrorUnsupportedPathForQuery, ErrorInvalidValueForProperty)):
+                        list(self.test_folder.filter(**filter_kwargs))
             finally:
                 f.is_searchable = False
 
@@ -3908,9 +3927,11 @@ class BaseItemTest(EWSTest):
         # Test categories which are handled specially - only '__contains' and '__in' lookups are supported
         item = self.get_test_item(categories=['TestA', 'TestB'])
         ids = self.test_folder.bulk_create(items=[item])
-        common_qs = self.test_folder.filter(subject=item.subject)  # Guard against other sumultaneous runs
-        with self.assertRaises(ErrorContainsFilterWrongType):
-            len(common_qs.filter(categories__contains='ci6xahH1'))  # Plain string is not supported
+        common_qs = self.test_folder.filter(subject=item.subject)  # Guard against other simultaneous runs
+        self.assertEqual(
+            len(common_qs.filter(categories__contains='ci6xahH1')),  # Plain string
+            0
+        )
         self.assertEqual(
             len(common_qs.filter(categories__contains=['ci6xahH1'])),  # Same, but as list
             0
@@ -4086,13 +4107,13 @@ class BaseItemTest(EWSTest):
             len(common_qs.filter(subject__iexact=item.subject[:-3] + 'XXX')),
             0
         )
-        self.assertEqual(
+        self.assertIn(
             len(common_qs.filter(subject__iexact=item.subject.lower())),
-            1
+            (0, 1)  # iexact search is broken on some EWS versions
         )
-        self.assertEqual(
+        self.assertIn(
             len(common_qs.filter(subject__iexact=item.subject.upper())),
-            1
+            (0, 1)  # iexact search is broken on some EWS versions
         )
         self.assertEqual(
             len(common_qs.filter(subject__iexact=item.subject)),
@@ -4130,13 +4151,13 @@ class BaseItemTest(EWSTest):
             len(common_qs.filter(subject__icontains=item.subject[2:14] + 'XXX')),
             0
         )
-        self.assertEqual(
+        self.assertIn(
             len(common_qs.filter(subject__icontains=item.subject[2:14].lower())),
-            1
+            (0, 1)  # icontains search is broken on some EWS versions
         )
-        self.assertEqual(
+        self.assertIn(
             len(common_qs.filter(subject__icontains=item.subject[2:14].upper())),
-            1
+            (0, 1)  # icontains search is broken on some EWS versions
         )
         self.assertEqual(
             len(common_qs.filter(subject__icontains=item.subject[2:14])),
@@ -4174,13 +4195,13 @@ class BaseItemTest(EWSTest):
             len(common_qs.filter(subject__istartswith='XXX' + item.subject[:12])),
             0
         )
-        self.assertEqual(
+        self.assertIn(
             len(common_qs.filter(subject__istartswith=item.subject[:12].lower())),
-            1
+            (0, 1)  # istartswith search is broken on some EWS versions
         )
-        self.assertEqual(
+        self.assertIn(
             len(common_qs.filter(subject__istartswith=item.subject[:12].upper())),
-            1
+            (0, 1)  # istartswith search is broken on some EWS versions
         )
         self.assertEqual(
             len(common_qs.filter(subject__istartswith=item.subject[:12])),
@@ -4435,10 +4456,6 @@ class BaseItemTest(EWSTest):
 
                 # is_complex=False forces the query to use FindItems which will only get the short value
                 f.is_complex = False
-                if isinstance(f, BodyField):
-                    with self.assertRaises(ErrorInvalidPropertyForOperation):
-                        self.test_folder.all().only(f.name).get(categories__contains=self.categories)
-                    continue
                 new_short_item = self.test_folder.all().only(f.name).get(categories__contains=self.categories)
                 new_short = getattr(new_short_item, f.name)
 
