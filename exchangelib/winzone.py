@@ -4,7 +4,7 @@ import requests
 
 from .util import to_xml
 
-CLDR_WINZONE_URL = 'http://unicode.org/repos/cldr/trunk/common/supplemental/windowsZones.xml'
+CLDR_WINZONE_URL = 'https://raw.githubusercontent.com/unicode-org/cldr/master/common/supplemental/windowsZones.xml'
 DEFAULT_TERRITORY = '001'
 
 
