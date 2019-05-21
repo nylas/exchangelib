@@ -108,7 +108,7 @@ class ServiceAccount(Credentials):
             if self._back_off_until is None:
                 return None
             if self._back_off_until < datetime.datetime.now():
-                self._back_off_until = None  # The backoff value has expired. Reset
+                self._back_off_until = None  # The back off value has expired. Reset
                 return None
             return self._back_off_until
 
@@ -118,7 +118,8 @@ class ServiceAccount(Credentials):
             self._back_off_until = value
 
     def back_off(self, seconds):
-        seconds = seconds or 60  # Back off 60 seconds if we didn't get an explicit suggested value
+        if seconds is None:
+            seconds = 60  # Back off 60 seconds if we didn't get an explicit suggested value
         value = datetime.datetime.now() + datetime.timedelta(seconds=seconds)
         with self._back_off_lock:
             self._back_off_until = value

@@ -10,6 +10,7 @@ from itertools import chain
 import io
 from keyword import kwlist
 import logging
+import math
 import os
 import pickle
 import random
@@ -344,6 +345,44 @@ class CredentialsTest(unittest.TestCase):
         self.assertEqual(Credentials('a', 'b').type, Credentials.UPN)
         self.assertEqual(Credentials('a@example.com', 'b').type, Credentials.EMAIL)
         self.assertEqual(Credentials('a\\n', 'b').type, Credentials.DOMAIN)
+
+    def test_credentials_back_off(self):
+        # Test Credentials that does not support back-off logic
+        c = Credentials('a', 'b')
+        self.assertIsNone(c.back_off_until)
+        with self.assertRaises(NotImplementedError):
+            c.back_off_until = 1
+
+    def test_service_account_back_off(self):
+        # Test back-off logic in ServiceAccount
+        sa = ServiceAccount('a', 'b')
+
+        # Initially, the value is None
+        self.assertIsNone(sa.back_off_until)
+
+        # Test a non-expired back off value
+        in_a_while = datetime.datetime.now() + datetime.timedelta(seconds=10)
+        sa.back_off_until = in_a_while
+        self.assertEqual(sa.back_off_until, in_a_while)
+
+        # Test an expired back off value
+        sa.back_off_until = datetime.datetime.now()
+        time.sleep(0.001)
+        self.assertIsNone(sa.back_off_until)
+
+        # Test the back_off() helper
+        sa.back_off(10)
+        # This is not a precise test. Assuming fast computers, there should be less than 1 second between the two lines.
+        self.assertEqual(int(math.ceil((sa.back_off_until - datetime.datetime.now()).total_seconds())), 10)
+
+        # Test expiry
+        sa.back_off(0)
+        time.sleep(0.001)
+        self.assertIsNone(sa.back_off_until)
+
+        # Test default value
+        sa.back_off(None)
+        self.assertEqual(int(math.ceil((sa.back_off_until - datetime.datetime.now()).total_seconds())), 60)
 
 
 class EWSDateTimeTest(unittest.TestCase):
