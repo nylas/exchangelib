@@ -46,7 +46,7 @@ from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalid
     AmbiguousTimeError, NonExistentTimeError, ErrorUnsupportedPathForQuery, \
     ErrorInvalidValueForProperty, ErrorPropertyUpdate, ErrorDeleteDistinguishedFolder, \
     ErrorNoPublicFolderReplicaAvailable, ErrorServerBusy, ErrorInvalidPropertySet, ErrorObjectTypeChanged, \
-    ErrorInvalidIdMalformed
+    ErrorInvalidIdMalformed, SessionPoolMinSizeReached
 from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.extended_properties import ExtendedProperty, ExternId
 from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextField, EmailAddressField, URIField, \
@@ -327,6 +327,20 @@ class ProtocolTest(unittest.TestCase):
         protocol.release_session(session)
         protocol.close()
         self.assertEqual(len({p.raddr[0] for p in proc.connections() if p.raddr[0] in ip_addresses}), 0)
+
+    def test_decrease_poolsize(self):
+        protocol = Protocol(service_endpoint='https://example.com/Foo.asmx', credentials=Credentials('A', 'B'),
+                            auth_type=NTLM, version=Version(Build(15, 1)))
+        self.assertEqual(protocol._session_pool.qsize(), Protocol.SESSION_POOLSIZE)
+        protocol.decrease_poolsize()
+        self.assertEqual(protocol._session_pool.qsize(), 3)
+        protocol.decrease_poolsize()
+        self.assertEqual(protocol._session_pool.qsize(), 2)
+        protocol.decrease_poolsize()
+        self.assertEqual(protocol._session_pool.qsize(), 1)
+        with self.assertRaises(SessionPoolMinSizeReached):
+            protocol.decrease_poolsize()
+        self.assertEqual(protocol._session_pool.qsize(), 1)
 
 
 class CredentialsTest(unittest.TestCase):
