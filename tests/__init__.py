@@ -3217,6 +3217,10 @@ class FolderTest(EWSTest):
                 folder_qs.only('name').get(name=f2.name).child_folder_count,
                 None
             )
+            with self.assertRaises(DoesNotExist):
+                folder_qs.get(name=get_random_string(16))
+            with self.assertRaises(MultipleObjectsReturned):
+                folder_qs.get()
         finally:
             f0.wipe()
             f0.delete()

@@ -19,7 +19,7 @@ from .items import Item, CalendarItem, Contact, Message, Task, MeetingRequest, M
     DistributionList, RegisterMixIn, Persona, ITEM_CLASSES, ITEM_TRAVERSAL_CHOICES, SHAPE_CHOICES, ID_ONLY, \
     DELETE_TYPE_CHOICES, HARD_DELETE
 from .properties import ItemId, Mailbox, EWSElement, ParentFolderId, InvalidField
-from .queryset import QuerySet, SearchableMixIn
+from .queryset import QuerySet, SearchableMixIn, DoesNotExist, MultipleObjectsReturned
 from .restriction import Restriction, Q
 from .services import FindFolder, GetFolder, FindItem, CreateFolder, UpdateFolder, DeleteFolder, EmptyFolder, FindPeople
 from .util import TNS, MNS
@@ -137,9 +137,9 @@ class FolderQuerySet(object):
         else:
             folders = list(self.all())
         if not folders:
-            raise ErrorFolderNotFound('Could not find a child folder matching the query')
+            raise DoesNotExist('Could not find a child folder matching the query')
         if len(folders) != 1:
-            raise ValueError('Expected result length 1, but got %s' % folders)
+            raise MultipleObjectsReturned('Expected result length 1, but got %s' % folders)
         f = folders[0]
         if isinstance(f, Exception):
             raise f
@@ -1092,7 +1092,7 @@ class Folder(RegisterMixIn, SearchableMixIn):
         # Assume an exact match on the folder name in a shallow search will only return at most one folder
         try:
             return SingleFolderQuerySet(account=self.root.account, folder=self).depth(SHALLOW).get(name=other)
-        except ErrorFolderNotFound:
+        except DoesNotExist:
             raise ErrorFolderNotFound("No subfolder with name '%s'" % other)
 
     def __truediv__(self, other):
