@@ -1,6 +1,7 @@
 # coding=utf-8
 from __future__ import unicode_literals
 
+from copy import deepcopy
 from fnmatch import fnmatch
 import logging
 from operator import attrgetter
@@ -87,11 +88,25 @@ class FolderQuerySet(object):
         if not isinstance(folder_collection, FolderCollection):
             raise ValueError("'folder_collection' %r must be a FolderCollection instance" % folder_collection)
         self.folder_collection = folder_collection
-        self._only_fields = None
-        self._depth = None
-        self._q = None
+        self.only_fields = None
+        self.traversal_depth = None
+        self.q = None
+
+    def _copy_cls(self):
+        return self.__class__(folder_collection=self.folder_collection)
+
+    def copy(self):
+        """Chaining operations must make a copy of self before making any modifications
+        """
+        new_qs = self._copy_cls()
+        new_qs.only_fields = self.only_fields
+        new_qs.traversal_depth = self.traversal_depth
+        new_qs.q = None if self.q is None else deepcopy(self.q)
+        return new_qs
 
     def only(self, *args):
+        """Restrict the fields returned. 'name' and 'folder_class' are always returned.
+        """
         all_fields = self.folder_collection.get_folder_fields(is_complex=None)
         only_fields = []
         for arg in args:
@@ -101,16 +116,22 @@ class FolderQuerySet(object):
                     break
             else:
                 raise InvalidField("Unknown field %r on folders %s" % (arg, self.folder_collection.folders))
-        self.only_fields = only_fields
-        return self
+        new_qs = self.copy()
+        new_qs.only_fields = only_fields
+        return new_qs
 
     def depth(self, depth):
+        """Specify the search depth (SHALLOW or DEEP)
+        """
         if depth not in FOLDER_TRAVERSAL_CHOICES:
             raise ValueError("'depth' %s must be one of %s" % (depth, FOLDER_TRAVERSAL_CHOICES))
-        self._depth = depth
-        return self
+        new_qs = self.copy()
+        new_qs.traversal_depth = depth
+        return new_qs
 
     def get(self, *args, **kwargs):
+        """Return the single folder matching the specified filter
+        """
         if args or kwargs:
             folders = list(self.filter(*args, **kwargs))
         else:
@@ -125,28 +146,36 @@ class FolderQuerySet(object):
         return f
 
     def all(self):
-        return self
+        """Return all child folders at the depth specified
+        """
+        new_qs = self.copy()
+        return new_qs
 
     def filter(self, *args, **kwargs):
+        """Add restrictions to the folder search
+        """
+        new_qs = self.copy()
         q = Q(*args, **kwargs)
-        self._q = q if self._q is None else self._q & q
-        return self
+        new_qs.q = q if new_qs.q is None else new_qs.q & q
+        return new_qs
 
     def __iter__(self):
         return self._query()
 
     def _query(self):
-        if self._only_fields is None:
+        if self.traversal_depth is None:
+            self.traversal_depth = DEEP
+        if self.only_fields is None:
             non_complex_fields = self.folder_collection.get_folder_fields(is_complex=False)
             complex_fields = self.folder_collection.get_folder_fields(is_complex=True)
         else:
-            non_complex_fields = set(f.field for f in self._only_fields if not f.field.is_complex)
-            complex_fields = set(f.field for f in self._only_fields if f.field.is_complex)
+            non_complex_fields = set(f for f in self.only_fields if not f.field.is_complex)
+            complex_fields = set(f for f in self.only_fields if f.field.is_complex)
 
         # First, fetch all non-complex fields using FindFolder. We do this because some folders do not support
         # GetFolder but we still want to get as much information as possible.
         folders = self.folder_collection.find_folders(
-            q=self._q, depth=self._depth, additional_fields=non_complex_fields
+            q=self.q, depth=self.traversal_depth, additional_fields=non_complex_fields
         )
         if not complex_fields:
             for f in folders:
@@ -189,8 +218,14 @@ class SingleFolderQuerySet(FolderQuerySet):
         folder_collection = FolderCollection(account=account, folders=[folder])
         super(SingleFolderQuerySet, self).__init__(folder_collection=folder_collection)
 
+    def _copy_cls(self):
+        return self.__class__(account=self.folder_collection.account, folder=self.folder_collection.folders[0])
+
 
 class FolderCollection(SearchableMixIn):
+    # These fields are required in a FindFolder or GetFolder call to properly identify folder types
+    REQUIRED_FOLDER_FIELDS = ('name', 'folder_class')
+
     def __init__(self, account, folders):
         """ Implements a search API on a collection of folders
 
@@ -420,11 +455,10 @@ class FolderCollection(SearchableMixIn):
                 if f.field.is_complex:
                     raise ValueError("find_folders() does not support field '%s'. Use get_folders()." % f.field.name)
 
-        # To properly identify folders, we always want the 'name' and 'folder_class' fields
-        additional_fields.update((
-            FieldPath(field=Folder.get_field_by_fieldname('folder_class')),
-            FieldPath(field=Folder.get_field_by_fieldname('name')),
-        ))
+        # Add required fields
+        additional_fields.update(
+            (FieldPath(field=Folder.get_field_by_fieldname(f)) for f in self.REQUIRED_FOLDER_FIELDS)
+        )
 
         for f in FindFolder(account=self.account, folders=self.folders, chunk_size=page_size).call(
                 additional_fields=additional_fields,
@@ -445,11 +479,10 @@ class FolderCollection(SearchableMixIn):
             # Default to all complex properties
             additional_fields = self.get_folder_fields(is_complex=True)
 
-        # To properly identify folders, we always want the 'name' and 'folder_class' fields
-        additional_fields.update((
-            FieldPath(field=Folder.get_field_by_fieldname('folder_class')),
-            FieldPath(field=Folder.get_field_by_fieldname('name')),
-        ))
+        # Add required fields
+        additional_fields.update(
+            (FieldPath(field=Folder.get_field_by_fieldname(f)) for f in self.REQUIRED_FOLDER_FIELDS)
+        )
 
         for f in GetFolder(account=self.account).call(
                 folders=self.folders,

@@ -60,7 +60,7 @@ from exchangelib.folders import Calendar, DeletedItems, Drafts, Inbox, Outbox, S
     AllItems, ConversationSettings, Friends, RSSFeeds, Sharing, IMContactList, QuickContacts, Journal, Notes, \
     SyncIssues, MyContacts, ToDoSearch, FolderCollection, DistinguishedFolderId, Files, \
     DefaultFoldersChangeHistory, PassThroughSearchResults, SmsAndChatsSync, GraphAnalytics, Signal, \
-    PdpProfileV2Secured, VoiceMail
+    PdpProfileV2Secured, VoiceMail, FolderQuerySet, SingleFolderQuerySet, SHALLOW
 from exchangelib.indexed_properties import EmailAddress, PhysicalAddress, PhoneNumber, \
     SingleFieldIndexedElement, MultiFieldIndexedElement
 from exchangelib.items import Item, CalendarItem, Message, Contact, Task, DistributionList, Persona
@@ -3154,6 +3154,82 @@ class FolderTest(EWSTest):
         f.save()
         f.delete()
 
+    def test_folder_query_set(self):
+        # Create a folder hierarchy and test a folder queryset
+        #
+        # -f0
+        #  - f1
+        #  - f2
+        #    - f21
+        #    - f22
+        f0 = Folder(parent=self.account.inbox, name=get_random_string(16)).save()
+        f1 = Folder(parent=f0, name=get_random_string(16)).save()
+        f2 = Folder(parent=f0, name=get_random_string(16)).save()
+        f21 = Folder(parent=f2, name=get_random_string(16)).save()
+        f22 = Folder(parent=f2, name=get_random_string(16)).save()
+        folder_qs = SingleFolderQuerySet(account=self.account, folder=f0)
+        try:
+            # Test all()
+            self.assertSetEqual(
+                set(f.name for f in folder_qs.all()),
+                {f.name for f in (f1, f2, f21, f22)}
+            )
+
+            # Test only()
+            self.assertSetEqual(
+                set(f.name for f in folder_qs.only('name').all()),
+                {f.name for f in (f1, f2, f21, f22)}
+            )
+            self.assertSetEqual(
+                set(f.child_folder_count for f in folder_qs.only('name').all()),
+                {None}
+            )
+            # Test depth()
+            self.assertSetEqual(
+                set(f.name for f in folder_qs.depth(SHALLOW).all()),
+                {f.name for f in (f1, f2)}
+            )
+
+            # Test filter()
+            self.assertSetEqual(
+                set(f.name for f in folder_qs.filter(name=f1.name)),
+                {f.name for f in (f1,)}
+            )
+            self.assertSetEqual(
+                set(f.name for f in folder_qs.filter(name__in=[f1.name, f2.name])),
+                {f.name for f in (f1, f2)}
+            )
+
+            # Test get()
+            self.assertEqual(
+                folder_qs.get(name=f2.name).child_folder_count,
+                2
+            )
+            self.assertEqual(
+                folder_qs.filter(name=f2.name).get().child_folder_count,
+                2
+            )
+            self.assertEqual(
+                folder_qs.only('name').get(name=f2.name).name,
+                f2.name
+            )
+            self.assertEqual(
+                folder_qs.only('name').get(name=f2.name).child_folder_count,
+                None
+            )
+        finally:
+            f0.wipe()
+            f0.delete()
+
+    def test_folder_query_set_failures(self):
+        with self.assertRaises(ValueError):
+            FolderQuerySet('XXX')
+        fld_qs = SingleFolderQuerySet(account=self.account, folder=self.account.inbox)
+        with self.assertRaises(InvalidField):
+            fld_qs.only('XXX')
+        with self.assertRaises(InvalidField):
+            list(fld_qs.filter(XXX='XXX'))
+
 
 class BaseItemTest(EWSTest):
     TEST_FOLDER = None
@@ -4265,16 +4341,16 @@ class BaseItemTest(EWSTest):
     def test_filter_with_querystring(self):
         # QueryString is only supported from Exchange 2010
         with self.assertRaises(NotImplementedError):
-            Q('subject:XXX').to_xml(self.test_folder, version=mock_version(build=EXCHANGE_2007),
+            Q('Subject:XXX').to_xml(self.test_folder, version=mock_version(build=EXCHANGE_2007),
                                     applies_to=Restriction.ITEMS)
 
         # We don't allow QueryString in combination with other restrictions
         with self.assertRaises(ValueError):
-            self.test_folder.filter('subject:XXX', foo='bar')
+            self.test_folder.filter('Subject:XXX', foo='bar')
         with self.assertRaises(ValueError):
-            self.test_folder.filter('subject:XXX').filter(foo='bar')
+            self.test_folder.filter('Subject:XXX').filter(foo='bar')
         with self.assertRaises(ValueError):
-            self.test_folder.filter(foo='bar').filter('subject:XXX')
+            self.test_folder.filter(foo='bar').filter('Subject:XXX')
 
         item = self.get_test_item()
         item.subject = get_random_string(length=8, spaces=False, special=False)
@@ -4282,7 +4358,7 @@ class BaseItemTest(EWSTest):
         # For some reason, the querystring search doesn't work instantly. We may have to wait for up to 60 seconds.
         # I'm too impatient for that, so also allow empty results. This makes the test almost worthless but I blame EWS.
         self.assertIn(
-            len(self.test_folder.filter('subject:%s' % item.subject)),
+            len(self.test_folder.filter('Subject:%s' % item.subject)),
             (0, 1)
         )
         item.delete()
