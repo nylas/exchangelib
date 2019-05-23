@@ -1768,6 +1768,21 @@ class CommonTest(EWSTest):
         start = tz.localize(EWSDateTime.now())
         end = tz.localize(EWSDateTime.now() + datetime.timedelta(hours=6))
         accounts = [(self.account, 'Organizer', False)]
+
+        with self.assertRaises(ValueError):
+            self.account.protocol.get_free_busy_info(accounts=[('XXX', 'XXX', 'XXX')], start=0, end=0)
+        with self.assertRaises(ValueError):
+            self.account.protocol.get_free_busy_info(accounts=[(self.account, 'XXX', 'XXX')], start=0, end=0)
+        with self.assertRaises(ValueError):
+            self.account.protocol.get_free_busy_info(accounts=[(self.account, 'Organizer', 'XXX')], start=0, end=0)
+        with self.assertRaises(ValueError):
+            self.account.protocol.get_free_busy_info(accounts=accounts, start=end, end=start)
+        with self.assertRaises(ValueError):
+            self.account.protocol.get_free_busy_info(accounts=accounts, start=start, end=end,
+                                                     merged_free_busy_interval='XXX')
+        with self.assertRaises(ValueError):
+            self.account.protocol.get_free_busy_info(accounts=accounts, start=start, end=end, requested_view='XXX')
+
         for view_info in self.account.protocol.get_free_busy_info(accounts=accounts, start=start, end=end):
             self.assertIsInstance(view_info, FreeBusyView)
             self.assertIsInstance(view_info.working_hours_timezone, TimeZone)
@@ -1881,6 +1896,10 @@ class CommonTest(EWSTest):
         )
 
     def test_resolvenames(self):
+        with self.assertRaises(ValueError):
+            self.account.protocol.resolve_names(names=[], search_scope='XXX')
+        with self.assertRaises(ValueError):
+            self.account.protocol.resolve_names(names=[], shape='XXX')
         self.assertGreaterEqual(
             self.account.protocol.resolve_names(names=['xxx@example.com']),
             []
@@ -1958,6 +1977,11 @@ class CommonTest(EWSTest):
             {Mailbox.from_xml(elem=elem.find(Mailbox.response_tag()), account=None).email_address for elem in res},
             {'anne@example.com', 'john@example.com'}
         )
+
+    def test_get_searchable_mailboxes(self):
+        # Insufficient privileges for the test account, so let's just test the exception
+        with self.assertRaises(ErrorAccessDenied):
+            self.account.protocol.get_searchable_mailboxes('non_existent_distro@example.com')
 
     def test_expanddl(self):
         with self.assertRaises(ErrorNameResolutionNoResults):
