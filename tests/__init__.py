@@ -80,7 +80,7 @@ from exchangelib.transport import NOAUTH, BASIC, DIGEST, NTLM, wrap, _get_auth_m
 from exchangelib.util import chunkify, peek, get_redirect_url, to_xml, BOM_UTF8, get_domain, value_to_xml_text, \
     post_ratelimited, create_element, CONNECTION_ERRORS, PrettyXmlHandler, xml_to_str, ParseError
 from exchangelib.version import Build, Version, EXCHANGE_2007, EXCHANGE_2010, EXCHANGE_2013
-from exchangelib.winzone import generate_map, CLDR_TO_MS_TIMEZONE_MAP
+from exchangelib.winzone import generate_map, CLDR_TO_MS_TIMEZONE_MAP, CLDR_WINZONE_URL
 
 if PY2:
     FileNotFoundError = IOError
@@ -284,6 +284,16 @@ class ConfigurationTest(unittest.TestCase):
             auth_type=NTLM,
             version=Version(build=Build(15, 1, 2, 3), api_version='foo'),
         )
+
+    def test_credentials_helper(self):
+        c = Configuration(
+            server='example.com',
+            has_ssl=True,
+            credentials=Credentials('foo', 'bar'),
+            auth_type=NTLM,
+            version=Version(build=Build(15, 1, 2, 3), api_version='foo'),
+        )
+        self.assertEqual(c.credentials, Credentials('foo', 'bar'))
 
 
 class ProtocolTest(unittest.TestCase):
@@ -551,6 +561,12 @@ class EWSDateTimeTest(unittest.TestCase):
             # generate_map() requires access to unicode.org, which may be unavailable. Don't fail test, since this is
             # out of our control.
             pass
+
+    @requests_mock.mock()
+    def test_generate_failure(self, m):
+        m.get(CLDR_WINZONE_URL, status_code=500)
+        with self.assertRaises(ValueError):
+            generate_map()
 
     def test_ewsdate(self):
         self.assertEqual(EWSDate(2000, 1, 1).ewsformat(), '2000-01-01')
@@ -870,6 +886,14 @@ class FieldTest(unittest.TestCase):
 </Envelope>'''
         elem = to_xml(payload).find('{%s}Item' % TNS)
         self.assertEqual(field.from_xml(elem=elem, account=account), default_value)
+
+    def test_single_field_indexed_element(self):
+        # A SingleFieldIndexedElement must have only one field defined
+        class TestField(SingleFieldIndexedElement):
+            FIELDS = [CharField('a'), CharField('b')]
+
+        with self.assertRaises(ValueError):
+            TestField.value_field()
 
 
 class ItemTest(unittest.TestCase):
@@ -2126,6 +2150,10 @@ class CommonTest(EWSTest):
         protocol.renew_session = lambda s: s  # Return the same session so it's still mocked
         with self.assertRaises(RateLimitError) as rle:
             r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
+        self.assertEqual(
+            str(rle.exception),
+            'Max timeout reached (gave up after 10 seconds. URL https://example.com returned status code 503)'
+        )
         self.assertEqual(rle.exception.url, url)
         self.assertEqual(rle.exception.status_code, 503)
         # Test something larger than the default wait, so we retry at least once
@@ -2133,6 +2161,10 @@ class CommonTest(EWSTest):
         session.post = mock_post(url, 503, {'connection': 'close'})
         with self.assertRaises(RateLimitError) as rle:
             r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
+        self.assertEqual(
+            str(rle.exception),
+            'Max timeout reached (gave up after 20 seconds. URL https://example.com returned status code 503)'
+        )
         self.assertEqual(rle.exception.url, url)
         self.assertEqual(rle.exception.status_code, 503)
         protocol.release_session(session)
