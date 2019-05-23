@@ -294,7 +294,7 @@ class Field(object):
                 raise ValueError("Field '%s' value %r must be a list" % (self.name, value))
             for v in value:
                 if not isinstance(v, self.value_cls):
-                    raise TypeError('Field %s value "%r must be of type %s' % (self.name, v, self.value_cls))
+                    raise TypeError("Field '%s' value %r must be of type %s" % (self.name, v, self.value_cls))
                 if hasattr(v, 'clean'):
                     v.clean(version=version)
         else:
@@ -413,14 +413,14 @@ class IntegerField(FieldURIField):
                 for v in value:
                     if self.min is not None and v < self.min:
                         raise ValueError(
-                            "value '%s' on field '%s' must be greater than %s" % (value, self.name, self.min))
+                            "Value %r on field '%s' must be greater than %s" % (v, self.name, self.min))
                     if self.max is not None and v > self.max:
-                        raise ValueError("value '%s' on field '%s' must be less than %s" % (value, self.name, self.max))
+                        raise ValueError("Value %r on field '%s' must be less than %s" % (v, self.name, self.max))
             else:
                 if self.min is not None and value < self.min:
-                    raise ValueError("value '%s' on field '%s' must be greater than %s" % (value, self.name, self.min))
+                    raise ValueError("Value %r on field '%s' must be greater than %s" % (value, self.name, self.min))
                 if self.max is not None and value > self.max:
-                    raise ValueError("value '%s' on field '%s' must be less than %s" % (value, self.name, self.max))
+                    raise ValueError("Value %r on field '%s' must be less than %s" % (value, self.name, self.max))
         return value
 
     def from_xml(self, elem, account):
@@ -748,7 +748,7 @@ class ChoiceField(CharField):
             value, self.name, ', '.join(self.supported_choices(version=version))))
 
     def supported_choices(self, version=None):
-        return {c.value for c in self.choices if c.supports_version(version)}
+        return list(c.value for c in self.choices if c.supports_version(version))
 
 
 FREE_BUSY_CHOICES = [Choice('Free'), Choice('Tentative'), Choice('Busy'), Choice('OOF'), Choice('NoData'),

@@ -720,75 +720,148 @@ class PropertiesTest(unittest.TestCase):
 class FieldTest(unittest.TestCase):
     def test_value_validation(self):
         field = TextField('foo', field_uri='bar', is_required=True, default=None)
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ValueError) as e:
             field.clean(None)  # Must have a default value on None input
+        self.assertEqual(str(e.exception), "'foo' is a required field with no default")
 
         field = TextField('foo', field_uri='bar', is_required=True, default='XXX')
         self.assertEqual(field.clean(None), 'XXX')
 
         field = CharListField('foo', field_uri='bar')
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ValueError) as e:
             field.clean('XXX')  # Must be a list type
+        self.assertEqual(str(e.exception), "Field 'foo' value 'XXX' must be a list")
 
         field = CharListField('foo', field_uri='bar')
-        with self.assertRaises(TypeError):
+        with self.assertRaises(TypeError) as e:
             field.clean([1, 2, 3])  # List items must be correct type
+        self.assertEqual(str(e.exception), "Field 'foo' value 1 must be of type <class 'str'>")
 
         field = CharField('foo', field_uri='bar')
-        with self.assertRaises(TypeError):
+        with self.assertRaises(TypeError) as e:
             field.clean(1)  # Value must be correct type
-        with self.assertRaises(ValueError):
+        self.assertEqual(str(e.exception), "Field 'foo' value 1 must be of type <class 'str'>")
+        with self.assertRaises(ValueError) as e:
             field.clean('X' * 256)  # Value length must be within max_length
+        self.assertEqual(
+            str(e.exception),
+            "'foo' value 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+            "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+            "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX' exceeds length 255"
+        )
 
         field = DateTimeField('foo', field_uri='bar')
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ValueError) as e:
             field.clean(EWSDateTime(2017, 1, 1))  # Datetime values must be timezone aware
+        self.assertEqual(str(e.exception), "Value '2017-01-01 00:00:00' on field 'foo' must be timezone aware")
 
-        field = ChoiceField('foo', field_uri='bar', choices={Choice('foo'), Choice('bar')})
-        with self.assertRaises(ValueError):
+        field = ChoiceField('foo', field_uri='bar', choices=[Choice('foo'), Choice('bar')])
+        with self.assertRaises(ValueError) as e:
             field.clean('XXX')  # Value must be a valid choice
+        self.assertEqual(str(e.exception), "Invalid choice 'XXX' for field 'foo'. Valid choices are: foo, bar")
 
         # A few tests on extended properties that override base methods
         field = ExtendedPropertyField('foo', value_cls=ExternId, is_required=True)
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ValueError) as e:
             field.clean(None)  # Value is required
+        self.assertEqual(str(e.exception), "'foo' is a required field")
+        with self.assertRaises(TypeError) as e:
+            field.clean(123)  # Correct type is required
+        self.assertEqual(str(e.exception), "'ExternId' value 123 must be an instance of <class 'str'>")
         self.assertEqual(field.clean('XXX'), 'XXX')  # We can clean a simple value and keep it as a simple value
         self.assertEqual(field.clean(ExternId('XXX')), ExternId('XXX'))  # We can clean an ExternId instance as well
 
+        class ExternIdArray(ExternId):
+            property_type = 'StringArray'
+
+        field = ExtendedPropertyField('foo', value_cls=ExternIdArray, is_required=True)
+        with self.assertRaises(ValueError)as e:
+            field.clean(None)  # Value is required
+        self.assertEqual(str(e.exception), "'foo' is a required field")
+        with self.assertRaises(ValueError)as e:
+            field.clean(123)  # Must be an iterable
+        self.assertEqual(str(e.exception), "'ExternIdArray' value 123 must be a list")
+        with self.assertRaises(TypeError) as e:
+            field.clean([123])  # Correct type is required
+        self.assertEqual(str(e.exception), "'ExternIdArray' value element 123 must be an instance of <class 'str'>")
+
         # Test min/max on IntegerField
         field = IntegerField('foo', field_uri='bar', min=5, max=10)
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ValueError) as e:
             field.clean(2)
-        with self.assertRaises(ValueError):
+        self.assertEqual(str(e.exception), "Value 2 on field 'foo' must be greater than 5")
+        with self.assertRaises(ValueError)as e:
             field.clean(12)
+        self.assertEqual(str(e.exception), "Value 12 on field 'foo' must be less than 10")
 
         # Test enum validation
         field = EnumField('foo', field_uri='bar', enum=['a', 'b', 'c'])
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ValueError)as e:
             field.clean(0)  # Enums start at 1
-        with self.assertRaises(ValueError):
+        self.assertEqual(str(e.exception), "Value 0 on field 'foo' must be greater than 1")
+        with self.assertRaises(ValueError) as e:
             field.clean(4)  # Spills over list
-        with self.assertRaises(ValueError):
+        self.assertEqual(str(e.exception), "Value 4 on field 'foo' must be less than 3")
+        with self.assertRaises(ValueError) as e:
             field.clean('d')  # Value not in enum
+        self.assertEqual(str(e.exception), "Value 'd' on field 'foo' must be one of ['a', 'b', 'c']")
 
         # Test enum list validation
         field = EnumListField('foo', field_uri='bar', enum=['a', 'b', 'c'])
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ValueError)as e:
             field.clean([])
-        with self.assertRaises(ValueError):
+        self.assertEqual(str(e.exception), "Value '[]' on field 'foo' must not be empty")
+        with self.assertRaises(ValueError) as e:
             field.clean([0])
-        with self.assertRaises(ValueError):
+        self.assertEqual(str(e.exception), "Value 0 on field 'foo' must be greater than 1")
+        with self.assertRaises(ValueError) as e:
             field.clean([1, 1])  # Values must be unique
-        with self.assertRaises(ValueError):
+        self.assertEqual(str(e.exception), "List entries '[1, 1]' on field 'foo' must be unique")
+        with self.assertRaises(ValueError) as e:
             field.clean(['d'])
+        self.assertEqual(str(e.exception), "List value 'd' on field 'foo' must be one of ['a', 'b', 'c']")
 
         # Test ExtraWeekdaysField. Normal weedays are passed as lists, extra options as strings
         field = ExtraWeekdaysField('foo', field_uri='bar')
         for val in (DAY, WEEK_DAY, WEEKEND_DAY, (MONDAY, WEDNESDAY), 3, 10, (5, 7)):
             field.clean(val)
-        for val in ('foo', ('foo', 'bar'), (3, 3), 0, 11, (1, 11)):
-            with self.assertRaises(ValueError):
-                field.clean(val)
+        with self.assertRaises(ValueError) as e:
+            field.clean('foo')
+        self.assertEqual(
+            str(e.exception),
+            "Single value 'foo' on field 'foo' must be one of ('Day', 'Weekday', 'WeekendDay')"
+        )
+        with self.assertRaises(ValueError) as e:
+            field.clean(('foo', 'bar'))
+        self.assertEqual(
+            str(e.exception),
+            "List value 'foo' on field 'foo' must be one of ('Monday', 'Tuesday', 'Wednesday', 'Thursday', "
+            "'Friday', 'Saturday', 'Sunday')"
+        )
+        with self.assertRaises(ValueError) as e:
+            field.clean((3, 3))
+        self.assertEqual(
+            str(e.exception),
+            "List entries '[3, 3]' on field 'foo' must be unique"
+        )
+        with self.assertRaises(ValueError) as e:
+            field.clean(0)
+        self.assertEqual(
+            str(e.exception),
+            "Value 0 on field 'foo' must be greater than 1"
+        )
+        with self.assertRaises(ValueError) as e:
+            field.clean(11)
+        self.assertEqual(
+            str(e.exception),
+            "Value 11 on field 'foo' must be less than 10"
+        )
+        with self.assertRaises(ValueError) as e:
+            field.clean((1, 11))
+        self.assertEqual(
+            str(e.exception),
+            "List value '11' on field 'foo' must be in range 1 -> 7"
+        )
 
     def test_garbage_input(self):
         # Test that we can survive garbage input for common field types
