@@ -978,7 +978,7 @@ class Folder(RegisterMixIn, SearchableMixIn):
         raise NotImplementedError('Use from_xml_with_root() instead')
 
     @classmethod
-    def from_xml_with_root(cls, elem,  root):
+    def from_xml_with_root(cls, elem, root):
         # If no root is specified, assume the main root hierarchy
         fld_id_elem = elem.find(FolderId.response_tag())
         fld_id = fld_id_elem.get(FolderId.ID_ATTR)

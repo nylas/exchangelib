@@ -735,7 +735,10 @@ class FieldTest(unittest.TestCase):
         field = CharListField('foo', field_uri='bar')
         with self.assertRaises(TypeError) as e:
             field.clean([1, 2, 3])  # List items must be correct type
-        self.assertEqual(str(e.exception), "Field 'foo' value 1 must be of type <class 'str'>")
+        if PY2:
+            self.assertEqual(str(e.exception), "Field 'foo' value 1 must be of type <class 'basestring'>")
+        else:
+            self.assertEqual(str(e.exception), "Field 'foo' value 1 must be of type <class 'str'>")
 
         field = CharField('foo', field_uri='bar')
         with self.assertRaises(TypeError) as e:
