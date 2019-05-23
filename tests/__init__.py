@@ -3559,203 +3559,11 @@ class BaseItemTest(EWSTest):
         item_kwargs['categories'] = categories or self.categories
         return self.ITEM_CLASS(folder=folder or self.test_folder, **item_kwargs)
 
-    def test_field_names(self):
-        # Test that fieldnames don't clash with Python keywords
-        for f in self.ITEM_CLASS.FIELDS:
-            self.assertNotIn(f.name, kwlist)
 
-    def test_magic(self):
-        item = self.get_test_item()
-        self.assertIn('subject=', str(item))
-        self.assertIn(item.__class__.__name__, repr(item))
-
-    def test_validation(self):
-        item = self.get_test_item()
-        item.clean()
-        for f in self.ITEM_CLASS.FIELDS:
-            # Test field max_length
-            if isinstance(f, CharField) and f.max_length:
-                with self.assertRaises(ValueError):
-                    setattr(item, f.name, 'a' * (f.max_length + 1))
-                    item.clean()
-                    setattr(item, f.name, 'a')
-
-    def test_empty_args(self):
-        # We allow empty sequences for these methods
-        self.assertEqual(self.test_folder.bulk_create(items=[]), [])
-        self.assertEqual(list(self.account.fetch(ids=[])), [])
-        self.assertEqual(self.account.bulk_create(folder=self.test_folder, items=[]), [])
-        self.assertEqual(self.account.bulk_update(items=[]), [])
-        self.assertEqual(self.account.bulk_delete(ids=[]), [])
-        self.assertEqual(self.account.bulk_send(ids=[]), [])
-        self.assertEqual(self.account.bulk_copy(ids=[], to_folder=self.account.trash), [])
-        self.assertEqual(self.account.bulk_move(ids=[], to_folder=self.account.trash), [])
-        self.assertEqual(self.account.upload(data=[]), [])
-        self.assertEqual(self.account.export(items=[]), [])
-
-    def test_qs_args(self):
-        # We allow querysets for these methods
-        qs = self.test_folder.none()
-        self.assertEqual(list(self.account.fetch(ids=qs)), [])
-        with self.assertRaises(ValueError):
-            # bulk_update() does not allow queryset input
-            self.assertEqual(self.account.bulk_update(items=qs), [])
-        self.assertEqual(self.account.bulk_delete(ids=qs), [])
-        self.assertEqual(self.account.bulk_send(ids=qs), [])
-        self.assertEqual(self.account.bulk_copy(ids=qs, to_folder=self.account.trash), [])
-        self.assertEqual(self.account.bulk_move(ids=qs, to_folder=self.account.trash), [])
-        with self.assertRaises(ValueError):
-            # upload() does not allow queryset input
-            self.assertEqual(self.account.upload(data=qs), [])
-        self.assertEqual(self.account.export(items=qs), [])
-
-    def test_no_kwargs(self):
-        self.assertEqual(self.test_folder.bulk_create([]), [])
-        self.assertEqual(list(self.account.fetch([])), [])
-        self.assertEqual(self.account.bulk_create(self.test_folder, []), [])
-        self.assertEqual(self.account.bulk_update([]), [])
-        self.assertEqual(self.account.bulk_delete([]), [])
-        self.assertEqual(self.account.bulk_send([]), [])
-        self.assertEqual(self.account.bulk_copy([], to_folder=self.account.trash), [])
-        self.assertEqual(self.account.bulk_move([], to_folder=self.account.trash), [])
-        self.assertEqual(self.account.upload([]), [])
-        self.assertEqual(self.account.export([]), [])
-
-    def test_invalid_bulk_args(self):
-        # Test bulk_create
-        with self.assertRaises(ValueError):
-            # Folder must belong to account
-            self.account.bulk_create(folder=Folder(root=None), items=[])
-        with self.assertRaises(AttributeError):
-            # Must have folder on save
-            self.account.bulk_create(folder=None, items=[], message_disposition=SAVE_ONLY)
-        # Test that we can send_and_save with a default folder
-        self.account.bulk_create(folder=None, items=[], message_disposition=SEND_AND_SAVE_COPY)
-        with self.assertRaises(AttributeError):
-            # Must not have folder on send-only
-            self.account.bulk_create(folder=self.test_folder, items=[], message_disposition=SEND_ONLY)
-
-        # Test bulk_update
-        with self.assertRaises(ValueError):
-            # Cannot update in send-only mode
-            self.account.bulk_update(items=[], message_disposition=SEND_ONLY)
-
-    def test_invalid_direct_args(self):
-        with self.assertRaises(ValueError):
-            item = self.get_test_item()
-            item.account = None
-            item.save()  # Must have account on save
-        with self.assertRaises(ValueError):
-            item = self.get_test_item()
-            item.id = 'XXX'  # Fake a saved item
-            item.account = None
-            item.save()  # Must have account on update
-        with self.assertRaises(ValueError):
-            item = self.get_test_item()
-            item.save(update_fields=['foo', 'bar'])  # update_fields is only valid on update
-
-        if self.ITEM_CLASS == Message:
-            with self.assertRaises(ValueError):
-                item = self.get_test_item()
-                item.account = None
-                item.send()  # Must have account on send
-            with self.assertRaises(ErrorItemNotFound):
-                item = self.get_test_item()
-                item.save()
-                item_id, changekey = item.id, item.changekey
-                item.delete()
-                item.id, item.changekey = item_id, changekey
-                item.send()  # Item disappeared
-            with self.assertRaises(AttributeError):
-                item = self.get_test_item()
-                item.send(copy_to_folder=self.account.trash, save_copy=False)  # Inconsistent args
-
-        with self.assertRaises(ValueError):
-            item = self.get_test_item()
-            item.account = None
-            item.refresh()  # Must have account on refresh
-        with self.assertRaises(ValueError):
-            item = self.get_test_item()
-            item.refresh()  # Refresh an item that has not been saved
-        with self.assertRaises(ErrorItemNotFound):
-            item = self.get_test_item()
-            item.save()
-            item_id, changekey = item.id, item.changekey
-            item.delete()
-            item.id, item.changekey = item_id, changekey
-            item.refresh()  # Refresh an item that doesn't exist
-
-        with self.assertRaises(ValueError):
-            item = self.get_test_item()
-            item.account = None
-            item.copy(to_folder=self.test_folder)  # Must have an account on copy
-        with self.assertRaises(ValueError):
-            item = self.get_test_item()
-            item.copy(to_folder=self.test_folder)  # Must be an existing item
-        with self.assertRaises(ErrorItemNotFound):
-            item = self.get_test_item()
-            item.save()
-            item_id, changekey = item.id, item.changekey
-            item.delete()
-            item.id, item.changekey = item_id, changekey
-            item.copy(to_folder=self.test_folder)  # Item disappeared
-
-        with self.assertRaises(ValueError):
-            item = self.get_test_item()
-            item.account = None
-            item.move(to_folder=self.test_folder)  # Must have an account on move
-        with self.assertRaises(ValueError):
-            item = self.get_test_item()
-            item.move(to_folder=self.test_folder)  # Must be an existing item
-        with self.assertRaises(ErrorItemNotFound):
-            item = self.get_test_item()
-            item.save()
-            item_id, changekey = item.id, item.changekey
-            item.delete()
-            item.id, item.changekey = item_id, changekey
-            item.move(to_folder=self.test_folder)  # Item disappeared
-
-        with self.assertRaises(ValueError):
-            item = self.get_test_item()
-            item.account = None
-            item.delete()  # Must have an account
-        with self.assertRaises(ValueError):
-            item = self.get_test_item()
-            item.delete()  # Must be an existing item
-        with self.assertRaises(ErrorItemNotFound):
-            item = self.get_test_item()
-            item.save()
-            item_id, changekey = item.id, item.changekey
-            item.delete()
-            item.id, item.changekey = item_id, changekey
-            item.delete()  # Item disappeared
-
-    def test_unsupported_fields(self):
-        # Create a field that is not supported by any current versions. Test that we fail when using this field
-        class UnsupportedProp(ExtendedProperty):
-            property_set_id = 'deadcafe-beef-beef-beef-deadcafebeef'
-            property_name = 'Unsupported Property'
-            property_type = 'String'
-
-        attr_name = 'unsupported_property'
-        self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=UnsupportedProp)
-        try:
-            for f in self.ITEM_CLASS.FIELDS:
-                if f.name == attr_name:
-                    f.supported_from = Build(99, 99, 99, 99)
-
-            with self.assertRaises(ValueError):
-                self.test_folder.get(**{attr_name: 'XXX'})
-            with self.assertRaises(ValueError):
-                list(self.test_folder.filter(**{attr_name: 'XXX'}))
-            with self.assertRaises(ValueError):
-                list(self.test_folder.all().only(attr_name))
-            with self.assertRaises(ValueError):
-                list(self.test_folder.all().values(attr_name))
-            with self.assertRaises(ValueError):
-                list(self.test_folder.all().values_list(attr_name))
-        finally:
-            self.ITEM_CLASS.deregister(attr_name=attr_name)
+class ItemQuerySetTest(BaseItemTest):
+    TEST_FOLDER = 'inbox'
+    FOLDER_CLASS = Inbox
+    ITEM_CLASS = Message
 
     def test_querysets(self):
         test_items = []
@@ -3924,6 +3732,21 @@ class BaseItemTest(EWSTest):
             [True, True, True, True]
         )
 
+    def test_queryset_failure(self):
+        qs = QuerySet(
+            folder_collection=FolderCollection(account=self.account, folders=[self.test_folder])
+        ).filter(categories__contains=self.categories)
+        with self.assertRaises(ValueError):
+            qs.order_by('XXX')
+        with self.assertRaises(ValueError):
+            qs.values('XXX')
+        with self.assertRaises(ValueError):
+            qs.values_list('XXX')
+        with self.assertRaises(ValueError):
+            qs.only('XXX')
+        with self.assertRaises(ValueError):
+            qs.reverse()  # We can't reverse when we haven't defined an order yet
+
     def test_cached_queryset_corner_cases(self):
         test_items = []
         for i in range(4):
@@ -3988,6 +3811,944 @@ class BaseItemTest(EWSTest):
         self.assertEqual(item.subject, get_item.subject)
         self.assertIsNone(get_item.body)
 
+    def test_paging(self):
+        # Test that paging services work correctly. Default EWS paging size is 1000 items. Our default is 100 items.
+        items = []
+        for _ in range(11):
+            i = self.get_test_item()
+            del i.attachments[:]
+            items.append(i)
+        self.test_folder.bulk_create(items=items)
+        ids = self.test_folder.filter(categories__contains=self.categories).values_list('id', 'changekey')
+        ids.page_size = 10
+        self.bulk_delete(ids.iterator())
+
+    def test_slicing(self):
+        # Test that slicing works correctly
+        items = []
+        for i in range(4):
+            item = self.get_test_item()
+            item.subject = 'Subj %s' % i
+            del item.attachments[:]
+            items.append(item)
+        ids = self.test_folder.bulk_create(items=items)
+        qs = self.test_folder.filter(categories__contains=self.categories).only('subject').order_by('subject')
+
+        # Test positive index
+        self.assertEqual(
+            qs.copy()[0].subject,
+            'Subj 0'
+        )
+        # Test positive index
+        self.assertEqual(
+            qs.copy()[3].subject,
+            'Subj 3'
+        )
+        # Test negative index
+        self.assertEqual(
+            qs.copy()[-2].subject,
+            'Subj 2'
+        )
+        # Test positive slice
+        self.assertEqual(
+            [i.subject for i in qs.copy()[0:2]],
+            ['Subj 0', 'Subj 1']
+        )
+        # Test positive slice
+        self.assertEqual(
+            [i.subject for i in qs.copy()[2:4]],
+            ['Subj 2', 'Subj 3']
+        )
+        # Test positive open slice
+        self.assertEqual(
+            [i.subject for i in qs.copy()[:2]],
+            ['Subj 0', 'Subj 1']
+        )
+        # Test positive open slice
+        self.assertEqual(
+            [i.subject for i in qs.copy()[2:]],
+            ['Subj 2', 'Subj 3']
+        )
+        # Test negative slice
+        self.assertEqual(
+            [i.subject for i in qs.copy()[-3:-1]],
+            ['Subj 1', 'Subj 2']
+        )
+        # Test negative slice
+        self.assertEqual(
+            [i.subject for i in qs.copy()[1:-1]],
+            ['Subj 1', 'Subj 2']
+        )
+        # Test negative open slice
+        self.assertEqual(
+            [i.subject for i in qs.copy()[:-2]],
+            ['Subj 0', 'Subj 1']
+        )
+        # Test negative open slice
+        self.assertEqual(
+            [i.subject for i in qs.copy()[-2:]],
+            ['Subj 2', 'Subj 3']
+        )
+        # Test positive slice with step
+        self.assertEqual(
+            [i.subject for i in qs.copy()[0:4:2]],
+            ['Subj 0', 'Subj 2']
+        )
+        # Test negative slice with step
+        self.assertEqual(
+            [i.subject for i in qs.copy()[4:0:-2]],
+            ['Subj 3', 'Subj 1']
+        )
+        self.bulk_delete(ids)
+
+
+class ItemHelperTest(BaseItemTest):
+    TEST_FOLDER = 'inbox'
+    FOLDER_CLASS = Inbox
+    ITEM_CLASS = Message
+
+    def test_save_with_update_fields(self):
+        # Create a test item
+        insert_kwargs = self.get_random_insert_kwargs()
+        if 'is_all_day' in insert_kwargs:
+            insert_kwargs['is_all_day'] = False
+        item = self.ITEM_CLASS(account=self.account, folder=self.test_folder, **insert_kwargs)
+        with self.assertRaises(ValueError):
+            item.save(update_fields=['subject'])  # update_fields does not work on item creation
+        item.save()
+        item.subject = 'XXX'
+        item.body = 'YYY'
+        item.save(update_fields=['subject'])
+        item.refresh()
+        self.assertEqual(item.subject, 'XXX')
+        self.assertNotEqual(item.body, 'YYY')
+
+        # Test invalid 'update_fields' input
+        with self.assertRaises(ValueError) as e:
+            item.save(update_fields=['xxx'])
+        self.assertEqual(
+            e.exception.args[0],
+            "Field name(s) 'xxx' are not valid for a '%s' item" % self.ITEM_CLASS.__name__
+        )
+        with self.assertRaises(ValueError) as e:
+            item.save(update_fields='subject')
+        self.assertEqual(
+            e.exception.args[0],
+            "Field name(s) 's', 'u', 'b', 'j', 'e', 'c', 't' are not valid for a '%s' item" % self.ITEM_CLASS.__name__
+        )
+
+        self.bulk_delete([item])
+
+    def test_soft_delete(self):
+        # First, empty trash bin
+        self.account.trash.filter(categories__contains=self.categories).delete()
+        self.account.recoverable_items_deletions.filter(categories__contains=self.categories).delete()
+        item = self.get_test_item().save()
+        item_id = (item.id, item.changekey)
+        # Soft delete
+        item.soft_delete()
+        for e in self.account.fetch(ids=[item_id]):
+            # It's gone from the test folder
+            self.assertIsInstance(e, ErrorItemNotFound)
+        # Really gone, not just changed ItemId
+        self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 0)
+        self.assertEqual(len(self.account.trash.filter(categories__contains=item.categories)), 0)
+        # But we can find it in the recoverable items folder
+        self.assertEqual(len(self.account.recoverable_items_deletions.filter(categories__contains=item.categories)), 1)
+
+    def test_move_to_trash(self):
+        # First, empty trash bin
+        self.account.trash.filter(categories__contains=self.categories).delete()
+        item = self.get_test_item().save()
+        item_id = (item.id, item.changekey)
+        # Move to trash
+        item.move_to_trash()
+        for e in self.account.fetch(ids=[item_id]):
+            # Not in the test folder anymore
+            self.assertIsInstance(e, ErrorItemNotFound)
+        # Really gone, not just changed ItemId
+        self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 0)
+        # Test that the item moved to trash
+        item = self.account.trash.get(categories__contains=item.categories)
+        moved_item = list(self.account.fetch(ids=[item]))[0]
+        # The item was copied, so the ItemId has changed. Let's compare the subject instead
+        self.assertEqual(item.subject, moved_item.subject)
+
+    def test_copy(self):
+        # First, empty trash bin
+        self.account.trash.filter(categories__contains=self.categories).delete()
+        item = self.get_test_item().save()
+        # Copy to trash. We use trash because it can contain all item types.
+        copy_item_id, copy_changekey = item.copy(to_folder=self.account.trash)
+        # Test that the item still exists in the folder
+        self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 1)
+        # Test that the copied item exists in trash
+        copied_item = self.account.trash.get(categories__contains=item.categories)
+        self.assertNotEqual(item.id, copied_item.id)
+        self.assertNotEqual(item.changekey, copied_item.changekey)
+        self.assertEqual(copy_item_id, copied_item.id)
+        self.assertEqual(copy_changekey, copied_item.changekey)
+
+    def test_move(self):
+        # First, empty trash bin
+        self.account.trash.filter(categories__contains=self.categories).delete()
+        item = self.get_test_item().save()
+        item_id = (item.id, item.changekey)
+        # Move to trash. We use trash because it can contain all item types. This changes the ItemId
+        item.move(to_folder=self.account.trash)
+        for e in self.account.fetch(ids=[item_id]):
+            # original item ID no longer exists
+            self.assertIsInstance(e, ErrorItemNotFound)
+        # Test that the item moved to trash
+        self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 0)
+        moved_item = self.account.trash.get(categories__contains=item.categories)
+        self.assertEqual(item.id, moved_item.id)
+        self.assertEqual(item.changekey, moved_item.changekey)
+
+    def test_refresh(self):
+        # Test that we can refresh items, and that refresh fails if the item no longer exists on the server
+        item = self.get_test_item().save()
+        orig_subject = item.subject
+        item.subject = 'XXX'
+        item.refresh()
+        self.assertEqual(item.subject, orig_subject)
+        item.delete()
+        with self.assertRaises(ValueError):
+            # Item no longer has an ID
+            item.refresh()
+
+
+class ExtendedPropertyTest(BaseItemTest):
+    TEST_FOLDER = 'inbox'
+    FOLDER_CLASS = Inbox
+    ITEM_CLASS = Message
+
+    def test_register(self):
+        # Tests that we can register and de-register custom extended properties
+        class TestProp(ExtendedProperty):
+            property_set_id = 'deadbeaf-cafe-cafe-cafe-deadbeefcafe'
+            property_name = 'Test Property'
+            property_type = 'Integer'
+
+        attr_name = 'dead_beef'
+
+        # Before register
+        self.assertNotIn(attr_name, {f.name for f in self.ITEM_CLASS.supported_fields()})
+        with self.assertRaises(ValueError):
+            self.ITEM_CLASS.deregister(attr_name)  # Not registered yet
+        with self.assertRaises(ValueError):
+            self.ITEM_CLASS.deregister('subject')  # Not an extended property
+
+        self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=TestProp)
+        try:
+            # After register
+            self.assertEqual(TestProp.python_type(), int)
+            self.assertIn(attr_name, {f.name for f in self.ITEM_CLASS.supported_fields()})
+
+            # Test item creation, refresh, and update
+            item = self.get_test_item(folder=self.test_folder)
+            prop_val = item.dead_beef
+            self.assertTrue(isinstance(prop_val, int))
+            item.save()
+            item.refresh()
+            self.assertEqual(prop_val, item.dead_beef)
+            new_prop_val = get_random_int(0, 256)
+            item.dead_beef = new_prop_val
+            item.save()
+            item.refresh()
+            self.assertEqual(new_prop_val, item.dead_beef)
+
+            # Test deregister
+            with self.assertRaises(ValueError):
+                self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=TestProp)  # Already registered
+            with self.assertRaises(ValueError):
+                self.ITEM_CLASS.register(attr_name='XXX', attr_cls=Mailbox)  # Not an extended property
+        finally:
+            self.ITEM_CLASS.deregister(attr_name=attr_name)
+        self.assertNotIn(attr_name, {f.name for f in self.ITEM_CLASS.supported_fields()})
+
+    def test_extended_property_arraytype(self):
+        # Tests array type extended properties
+        class TestArayProp(ExtendedProperty):
+            property_set_id = 'deadcafe-beef-beef-beef-deadcafebeef'
+            property_name = 'Test Array Property'
+            property_type = 'IntegerArray'
+
+        attr_name = 'dead_beef_array'
+        self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=TestArayProp)
+        try:
+            # Test item creation, refresh, and update
+            item = self.get_test_item(folder=self.test_folder)
+            prop_val = item.dead_beef_array
+            self.assertTrue(isinstance(prop_val, list))
+            item.save()
+            item.refresh()
+            self.assertEqual(prop_val, item.dead_beef_array)
+            new_prop_val = self.random_val(self.ITEM_CLASS.get_field_by_fieldname(attr_name))
+            item.dead_beef_array = new_prop_val
+            item.save()
+            item.refresh()
+            self.assertEqual(new_prop_val, item.dead_beef_array)
+        finally:
+            self.ITEM_CLASS.deregister(attr_name=attr_name)
+
+    def test_extended_property_with_tag(self):
+        class Flag(ExtendedProperty):
+            property_tag = 0x1090
+            property_type = 'Integer'
+
+        attr_name = 'my_flag'
+        self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=Flag)
+        try:
+            # Test item creation, refresh, and update
+            item = self.get_test_item(folder=self.test_folder)
+            prop_val = item.my_flag
+            self.assertTrue(isinstance(prop_val, int))
+            item.save()
+            item.refresh()
+            self.assertEqual(prop_val, item.my_flag)
+            new_prop_val = self.random_val(self.ITEM_CLASS.get_field_by_fieldname(attr_name))
+            item.my_flag = new_prop_val
+            item.save()
+            item.refresh()
+            self.assertEqual(new_prop_val, item.my_flag)
+        finally:
+            self.ITEM_CLASS.deregister(attr_name=attr_name)
+
+    def test_extended_property_with_invalid_tag(self):
+        class InvalidProp(ExtendedProperty):
+            property_tag = '0x8000'
+            property_type = 'Integer'
+
+        with self.assertRaises(ValueError):
+            InvalidProp('Foo').clean()  # property_tag is in protected range
+
+    def test_extended_property_with_string_tag(self):
+        class Flag(ExtendedProperty):
+            property_tag = '0x1090'
+            property_type = 'Integer'
+
+        attr_name = 'my_flag'
+        self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=Flag)
+        try:
+            # Test item creation, refresh, and update
+            item = self.get_test_item(folder=self.test_folder)
+            prop_val = item.my_flag
+            self.assertTrue(isinstance(prop_val, int))
+            item.save()
+            item.refresh()
+            self.assertEqual(prop_val, item.my_flag)
+            new_prop_val = self.random_val(self.ITEM_CLASS.get_field_by_fieldname(attr_name))
+            item.my_flag = new_prop_val
+            item.save()
+            item.refresh()
+            self.assertEqual(new_prop_val, item.my_flag)
+        finally:
+            self.ITEM_CLASS.deregister(attr_name=attr_name)
+
+    def test_extended_distinguished_property(self):
+        if self.ITEM_CLASS == CalendarItem:
+            raise self.skipTest("This extendedproperty doesn't work on CalendarItems")
+
+        class MyMeeting(ExtendedProperty):
+            distinguished_property_set_id = 'Meeting'
+            property_type = 'Binary'
+            property_id = 3
+
+        attr_name = 'my_meeting'
+        self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=MyMeeting)
+        try:
+            # Test item creation, refresh, and update
+            item = self.get_test_item(folder=self.test_folder)
+            # MyMeeting is an extended prop version of the 'uid' field. We don't want 'uid' to overwrite that.
+            # overwriting each other.
+            item.uid = None
+            prop_val = item.my_meeting
+            self.assertTrue(isinstance(prop_val, bytes))
+            item.save()
+            item = list(self.account.fetch(ids=[(item.id, item.changekey)]))[0]
+            self.assertEqual(prop_val, item.my_meeting, (prop_val, item.my_meeting))
+            new_prop_val = self.random_val(self.ITEM_CLASS.get_field_by_fieldname(attr_name))
+            item.my_meeting = new_prop_val
+            # MyMeeting is an extended prop version of the 'uid' field. We don't want 'uid' to overwrite that.
+            item.uid = None
+            item.save()
+            item = list(self.account.fetch(ids=[(item.id, item.changekey)]))[0]
+            self.assertEqual(new_prop_val, item.my_meeting)
+        finally:
+            self.ITEM_CLASS.deregister(attr_name=attr_name)
+
+    def test_extended_property_binary_array(self):
+        class MyMeetingArray(ExtendedProperty):
+            property_set_id = '00062004-0000-0000-C000-000000000046'
+            property_type = 'BinaryArray'
+            property_id = 32852
+
+        attr_name = 'my_meeting_array'
+        self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=MyMeetingArray)
+
+        try:
+            # Test item creation, refresh, and update
+            item = self.get_test_item(folder=self.test_folder)
+            prop_val = item.my_meeting_array
+            self.assertTrue(isinstance(prop_val, list))
+            item.save()
+            item = list(self.account.fetch(ids=[(item.id, item.changekey)]))[0]
+            self.assertEqual(prop_val, item.my_meeting_array)
+            new_prop_val = self.random_val(self.ITEM_CLASS.get_field_by_fieldname(attr_name))
+            item.my_meeting_array = new_prop_val
+            item.save()
+            item = list(self.account.fetch(ids=[(item.id, item.changekey)]))[0]
+            self.assertEqual(new_prop_val, item.my_meeting_array)
+        finally:
+            self.ITEM_CLASS.deregister(attr_name=attr_name)
+
+    def test_extended_property_validation(self):
+        """
+        if cls.property_type not in cls.PROPERTY_TYPES:
+            raise ValueError(
+                "'property_type' value '%s' must be one of %s" % (cls.property_type, sorted(cls.PROPERTY_TYPES))
+            )
+        """
+        # Must not have property_set_id or property_tag
+        class TestProp(ExtendedProperty):
+            distinguished_property_set_id = 'XXX'
+            property_set_id = 'YYY'
+        with self.assertRaises(ValueError):
+            TestProp.validate_cls()
+
+        # Must have property_id or property_name
+        class TestProp(ExtendedProperty):
+            distinguished_property_set_id = 'XXX'
+        with self.assertRaises(ValueError):
+            TestProp.validate_cls()
+
+        # distinguished_property_set_id must have a valid value
+        class TestProp(ExtendedProperty):
+            distinguished_property_set_id = 'XXX'
+            property_id = 'YYY'
+        with self.assertRaises(ValueError):
+            TestProp.validate_cls()
+
+        # Must not have distinguished_property_set_id or property_tag
+        class TestProp(ExtendedProperty):
+            property_set_id = 'XXX'
+            property_tag = 'YYY'
+        with self.assertRaises(ValueError):
+            TestProp.validate_cls()
+
+        # Must have property_id or property_name
+        class TestProp(ExtendedProperty):
+            property_set_id = 'XXX'
+        with self.assertRaises(ValueError):
+            TestProp.validate_cls()
+
+        # property_tag is only compatible with property_type
+        class TestProp(ExtendedProperty):
+            property_tag = 'XXX'
+            property_set_id = 'YYY'
+        with self.assertRaises(ValueError):
+            TestProp.validate_cls()
+
+        # property_tag must be an integer or string that can be converted to int
+        class TestProp(ExtendedProperty):
+            property_tag = 'XXX'
+        with self.assertRaises(ValueError):
+            TestProp.validate_cls()
+
+        # property_tag must not be in the reserved range
+        class TestProp(ExtendedProperty):
+            property_tag = 0x8001
+        with self.assertRaises(ValueError):
+            TestProp.validate_cls()
+
+        # Must not have property_id or property_tag
+        class TestProp(ExtendedProperty):
+            property_name = 'XXX'
+            property_id = 'YYY'
+        with self.assertRaises(ValueError):
+            TestProp.validate_cls()
+
+        # Must have distinguished_property_set_id or property_set_id
+        class TestProp(ExtendedProperty):
+            property_name = 'XXX'
+        with self.assertRaises(ValueError):
+            TestProp.validate_cls()
+
+        # Must not have property_name or property_tag
+        class TestProp(ExtendedProperty):
+            property_id = 'XXX'
+            property_name = 'YYY'
+        with self.assertRaises(ValueError):
+            TestProp.validate_cls()  # This actually hits the check on property_name values
+
+        # Must have distinguished_property_set_id or property_set_id
+        class TestProp(ExtendedProperty):
+            property_id = 'XXX'
+        with self.assertRaises(ValueError):
+            TestProp.validate_cls()
+
+        # property_type must be a valid value
+        class TestProp(ExtendedProperty):
+            property_id = 'XXX'
+            property_set_id = 'YYY'
+            property_type = 'ZZZ'
+        with self.assertRaises(ValueError):
+            TestProp.validate_cls()
+
+
+class BulkMethodTest(BaseItemTest):
+    TEST_FOLDER = 'inbox'
+    FOLDER_CLASS = Inbox
+    ITEM_CLASS = Message
+
+    def test_fetch(self):
+        item = self.get_test_item()
+        self.test_folder.bulk_create(items=[item, item])
+        ids = self.test_folder.filter(categories__contains=item.categories)
+        items = list(self.account.fetch(ids=ids))
+        for item in items:
+            self.assertIsInstance(item, self.ITEM_CLASS)
+        self.assertEqual(len(items), 2)
+
+        items = list(self.account.fetch(ids=ids, only_fields=['subject']))
+        self.assertEqual(len(items), 2)
+
+        items = list(self.account.fetch(ids=ids, only_fields=[FieldPath.from_string('subject', self.test_folder)]))
+        self.assertEqual(len(items), 2)
+
+        self.bulk_delete(ids)
+
+    def test_empty_args(self):
+        # We allow empty sequences for these methods
+        self.assertEqual(self.test_folder.bulk_create(items=[]), [])
+        self.assertEqual(list(self.account.fetch(ids=[])), [])
+        self.assertEqual(self.account.bulk_create(folder=self.test_folder, items=[]), [])
+        self.assertEqual(self.account.bulk_update(items=[]), [])
+        self.assertEqual(self.account.bulk_delete(ids=[]), [])
+        self.assertEqual(self.account.bulk_send(ids=[]), [])
+        self.assertEqual(self.account.bulk_copy(ids=[], to_folder=self.account.trash), [])
+        self.assertEqual(self.account.bulk_move(ids=[], to_folder=self.account.trash), [])
+        self.assertEqual(self.account.upload(data=[]), [])
+        self.assertEqual(self.account.export(items=[]), [])
+
+    def test_qs_args(self):
+        # We allow querysets for these methods
+        qs = self.test_folder.none()
+        self.assertEqual(list(self.account.fetch(ids=qs)), [])
+        with self.assertRaises(ValueError):
+            # bulk_update() does not allow queryset input
+            self.assertEqual(self.account.bulk_update(items=qs), [])
+        self.assertEqual(self.account.bulk_delete(ids=qs), [])
+        self.assertEqual(self.account.bulk_send(ids=qs), [])
+        self.assertEqual(self.account.bulk_copy(ids=qs, to_folder=self.account.trash), [])
+        self.assertEqual(self.account.bulk_move(ids=qs, to_folder=self.account.trash), [])
+        with self.assertRaises(ValueError):
+            # upload() does not allow queryset input
+            self.assertEqual(self.account.upload(data=qs), [])
+        self.assertEqual(self.account.export(items=qs), [])
+
+    def test_no_kwargs(self):
+        self.assertEqual(self.test_folder.bulk_create([]), [])
+        self.assertEqual(list(self.account.fetch([])), [])
+        self.assertEqual(self.account.bulk_create(self.test_folder, []), [])
+        self.assertEqual(self.account.bulk_update([]), [])
+        self.assertEqual(self.account.bulk_delete([]), [])
+        self.assertEqual(self.account.bulk_send([]), [])
+        self.assertEqual(self.account.bulk_copy([], to_folder=self.account.trash), [])
+        self.assertEqual(self.account.bulk_move([], to_folder=self.account.trash), [])
+        self.assertEqual(self.account.upload([]), [])
+        self.assertEqual(self.account.export([]), [])
+
+    def test_invalid_bulk_args(self):
+        # Test bulk_create
+        with self.assertRaises(ValueError):
+            # Folder must belong to account
+            self.account.bulk_create(folder=Folder(root=None), items=[])
+        with self.assertRaises(AttributeError):
+            # Must have folder on save
+            self.account.bulk_create(folder=None, items=[], message_disposition=SAVE_ONLY)
+        # Test that we can send_and_save with a default folder
+        self.account.bulk_create(folder=None, items=[], message_disposition=SEND_AND_SAVE_COPY)
+        with self.assertRaises(AttributeError):
+            # Must not have folder on send-only
+            self.account.bulk_create(folder=self.test_folder, items=[], message_disposition=SEND_ONLY)
+
+        # Test bulk_update
+        with self.assertRaises(ValueError):
+            # Cannot update in send-only mode
+            self.account.bulk_update(items=[], message_disposition=SEND_ONLY)
+
+    def test_bulk_failure(self):
+        # Test that bulk_* can handle EWS errors and return the errors in order without losing non-failure results
+        items1 = [self.get_test_item().save() for _ in range(3)]
+        items1[1].changekey = 'XXX'
+        for i, res in enumerate(self.account.bulk_delete(items1)):
+            if i == 1:
+                self.assertIsInstance(res, ErrorInvalidChangeKey)
+            else:
+                self.assertEqual(res, True)
+        items2 = [self.get_test_item().save() for _ in range(3)]
+        items2[1].id = 'AAAA=='
+        for i, res in enumerate(self.account.bulk_delete(items2)):
+            if i == 1:
+                self.assertIsInstance(res, ErrorInvalidIdMalformed)
+            else:
+                self.assertEqual(res, True)
+        items3 = [self.get_test_item().save() for _ in range(3)]
+        items3[1].id = items1[0].id
+        for i, res in enumerate(self.account.fetch(items3)):
+            if i == 1:
+                self.assertIsInstance(res, ErrorItemNotFound)
+            else:
+                self.assertIsInstance(res, Item)
+
+
+class AttachmentsTest(BaseItemTest):
+    TEST_FOLDER = 'inbox'
+    FOLDER_CLASS = Inbox
+    ITEM_CLASS = Message
+
+    def test_attachment_failure(self):
+        att1 = FileAttachment(name='my_file_1.txt', content=u'Hello from unicode æøå'.encode('utf-8'))
+        att1.attachment_id = 'XXX'
+        with self.assertRaises(ValueError):
+            att1.attach()  # Cannot have an attachment ID
+        att1.attachment_id = None
+        with self.assertRaises(ValueError):
+            att1.attach()  # Must have a parent item
+        att1.parent_item = Item()
+        with self.assertRaises(ValueError):
+            att1.attach()  # Parent item must have an account
+        att1.parent_item = None
+        with self.assertRaises(ValueError):
+            att1.detach()  # Must have an attachment ID
+        att1.attachment_id = 'XXX'
+        with self.assertRaises(ValueError):
+            att1.detach()  # Must have a parent item
+        att1.parent_item = Item()
+        with self.assertRaises(ValueError):
+            att1.detach()  # Parent item must have an account
+        att1.parent_item = None
+        att1.attachment_id = None
+
+    def test_attachment_properties(self):
+        binary_file_content = u'Hello from unicode æøå'.encode('utf-8')
+        att1 = FileAttachment(name='my_file_1.txt', content=binary_file_content)
+        self.assertIn("name='my_file_1.txt'", str(att1))
+        att1.content = binary_file_content  # Test property setter
+        self.assertEqual(att1.content, binary_file_content)  # Test property getter
+        att1.attachment_id = 'xxx'
+        self.assertEqual(att1.content, binary_file_content)  # Test property getter when attachment_id is set
+        att1._content = None
+        with self.assertRaises(ValueError):
+            print(att1.content)  # Test property getter when we need to fetch the content
+
+        attached_item1 = self.get_test_item(folder=self.test_folder)
+        att2 = ItemAttachment(name='attachment1', item=attached_item1)
+        self.assertIn("name='attachment1'", str(att2))
+        att2.item = attached_item1  # Test property setter
+        self.assertEqual(att2.item, attached_item1)  # Test property getter
+        self.assertEqual(att2.item, attached_item1)  # Test property getter
+        att2.attachment_id = 'xxx'
+        self.assertEqual(att2.item, attached_item1)  # Test property getter when attachment_id is set
+        att2._item = None
+        with self.assertRaises(ValueError):
+            print(att2.item)  # Test property getter when we need to fetch the item
+
+    def test_file_attachments(self):
+        item = self.get_test_item(folder=self.test_folder)
+
+        # Test __init__(attachments=...) and attach() on new item
+        binary_file_content = u'Hello from unicode æøå'.encode('utf-8')
+        att1 = FileAttachment(name='my_file_1.txt', content=binary_file_content)
+        self.assertEqual(len(item.attachments), 0)
+        item.attach(att1)
+        self.assertEqual(len(item.attachments), 1)
+        item.save()
+        fresh_item = list(self.account.fetch(ids=[item]))[0]
+        self.assertEqual(len(fresh_item.attachments), 1)
+        fresh_attachments = sorted(fresh_item.attachments, key=lambda a: a.name)
+        self.assertEqual(fresh_attachments[0].name, 'my_file_1.txt')
+        self.assertEqual(fresh_attachments[0].content, binary_file_content)
+
+        # Test raw call to service
+        self.assertEqual(
+            list(GetAttachment(account=item.account).call(
+                items=[att1.attachment_id],
+                include_mime_content=False)
+            )[0].find('{%s}Content' % TNS).text,
+            'SGVsbG8gZnJvbSB1bmljb2RlIMOmw7jDpQ==')
+
+        # Test attach on saved object
+        att2 = FileAttachment(name='my_file_2.txt', content=binary_file_content)
+        self.assertEqual(len(item.attachments), 1)
+        item.attach(att2)
+        self.assertEqual(len(item.attachments), 2)
+        fresh_item = list(self.account.fetch(ids=[item]))[0]
+        self.assertEqual(len(fresh_item.attachments), 2)
+        fresh_attachments = sorted(fresh_item.attachments, key=lambda a: a.name)
+        self.assertEqual(fresh_attachments[0].name, 'my_file_1.txt')
+        self.assertEqual(fresh_attachments[0].content, binary_file_content)
+        self.assertEqual(fresh_attachments[1].name, 'my_file_2.txt')
+        self.assertEqual(fresh_attachments[1].content, binary_file_content)
+
+        # Test detach
+        item.detach(att1)
+        self.assertTrue(att1.attachment_id is None)
+        self.assertTrue(att1.parent_item is None)
+        fresh_item = list(self.account.fetch(ids=[item]))[0]
+        self.assertEqual(len(fresh_item.attachments), 1)
+        fresh_attachments = sorted(fresh_item.attachments, key=lambda a: a.name)
+        self.assertEqual(fresh_attachments[0].name, 'my_file_2.txt')
+        self.assertEqual(fresh_attachments[0].content, binary_file_content)
+
+    def test_streaming_file_attachments(self):
+        item = self.get_test_item(folder=self.test_folder)
+        large_binary_file_content = get_random_string(2**10).encode('utf-8')
+        large_att = FileAttachment(name='my_large_file.txt', content=large_binary_file_content)
+        item.attach(large_att)
+        item.save()
+
+        # Test streaming file content
+        fresh_item = list(self.account.fetch(ids=[item]))[0]
+        with fresh_item.attachments[0].fp as fp:
+            self.assertEqual(fp.read(), large_binary_file_content)
+
+        # Test partial reads of streaming file content
+        fresh_item = list(self.account.fetch(ids=[item]))[0]
+        with fresh_item.attachments[0].fp as fp:
+            chunked_reads = []
+            buffer = fp.read(7)
+            while buffer:
+                chunked_reads.append(buffer)
+                buffer = fp.read(7)
+            self.assertListEqual(chunked_reads, list(chunkify(large_binary_file_content, 7)))
+
+    def test_streaming_file_attachment_error(self):
+        # Test that we can parse XML error responses in streaming mode.
+
+        # Try to stram an attachment with malformed ID
+        att = FileAttachment(
+            parent_item=self.get_test_item(folder=self.test_folder),
+            attachment_id=AttachmentId(id='AAMk='),
+            name='dummy.txt',
+            content=b'',
+        )
+        with self.assertRaises(ErrorInvalidIdMalformed):
+            with att.fp as fp:
+                fp.read()
+
+        # Try to stream a non-existent attachment
+        att.attachment_id.id=\
+            'AAMkADQyYzZmYmUxLTJiYjItNDg2Ny1iMzNjLTIzYWE1NDgxNmZhNABGAAAAAADUebQDarW2Q7G2Ji8hKofPBwAl9iKCsfCfS' \
+            'a9cmjh+JCrCAAPJcuhjAABioKiOUTCQRI6Q5sRzi0pJAAHnDV3CAAABEgAQAN0zlxDrzlxAteU+kt84qOM='
+        with self.assertRaises(ErrorItemNotFound):
+            with att.fp as fp:
+                fp.read()
+
+    def test_empty_file_attachment(self):
+        item = self.get_test_item(folder=self.test_folder)
+        att1 = FileAttachment(name='empty_file.txt', content=b'')
+        item.attach(att1)
+        item.save()
+        fresh_item = list(self.account.fetch(ids=[item]))[0]
+        self.assertEqual(
+            fresh_item.attachments[0].content,
+            b''
+        )
+
+    def test_both_attachment_types(self):
+        item = self.get_test_item(folder=self.test_folder)
+        attached_item = self.get_test_item(folder=self.test_folder).save()
+        item_attachment = ItemAttachment(name='item_attachment', item=attached_item)
+        file_attachment = FileAttachment(name='file_attachment', content=b'file_attachment')
+        item.attach(item_attachment)
+        item.attach(file_attachment)
+        item.save()
+
+        fresh_item = list(self.account.fetch(ids=[item]))[0]
+        self.assertSetEqual(
+            {a.name for a in fresh_item.attachments},
+            {'item_attachment', 'file_attachment'}
+        )
+
+    def test_recursive_attachments(self):
+        # Test that we can handle an item which has an attached item, which has an attached item...
+        item = self.get_test_item(folder=self.test_folder)
+        attached_item_level_1 = self.get_test_item(folder=self.test_folder)
+        attached_item_level_2 = self.get_test_item(folder=self.test_folder)
+        attached_item_level_3 = self.get_test_item(folder=self.test_folder)
+
+        attached_item_level_3.save()
+        attachment_level_3 = ItemAttachment(name='attached_item_level_3', item=attached_item_level_3)
+        attached_item_level_2.attach(attachment_level_3)
+        attached_item_level_2.save()
+        attachment_level_2 = ItemAttachment(name='attached_item_level_2', item=attached_item_level_2)
+        attached_item_level_1.attach(attachment_level_2)
+        attached_item_level_1.save()
+        attachment_level_1 = ItemAttachment(name='attached_item_level_1', item=attached_item_level_1)
+        item.attach(attachment_level_1)
+        item.save()
+
+        self.assertEqual(
+            item.attachments[0].item.attachments[0].item.attachments[0].item.subject,
+            attached_item_level_3.subject
+        )
+
+        # Also test a fresh item
+        new_item = self.test_folder.get(id=item.id, changekey=item.changekey)
+        self.assertEqual(
+            new_item.attachments[0].item.attachments[0].item.attachments[0].item.subject,
+            attached_item_level_3.subject
+        )
+
+
+class CommonItemTest(BaseItemTest):
+    @classmethod
+    def setUpClass(cls):
+        if cls is CommonItemTest:
+            raise unittest.SkipTest("Skip CommonItemTest, it's only for inheritance")
+        super(CommonItemTest, cls).setUpClass()
+
+    def test_field_names(self):
+        # Test that fieldnames don't clash with Python keywords
+        for f in self.ITEM_CLASS.FIELDS:
+            self.assertNotIn(f.name, kwlist)
+
+    def test_magic(self):
+        item = self.get_test_item()
+        self.assertIn('subject=', str(item))
+        self.assertIn(item.__class__.__name__, repr(item))
+
+    def test_validation(self):
+        item = self.get_test_item()
+        item.clean()
+        for f in self.ITEM_CLASS.FIELDS:
+            # Test field max_length
+            if isinstance(f, CharField) and f.max_length:
+                with self.assertRaises(ValueError):
+                    setattr(item, f.name, 'a' * (f.max_length + 1))
+                    item.clean()
+                    setattr(item, f.name, 'a')
+
+    def test_invalid_direct_args(self):
+        with self.assertRaises(ValueError):
+            item = self.get_test_item()
+            item.account = None
+            item.save()  # Must have account on save
+        with self.assertRaises(ValueError):
+            item = self.get_test_item()
+            item.id = 'XXX'  # Fake a saved item
+            item.account = None
+            item.save()  # Must have account on update
+        with self.assertRaises(ValueError):
+            item = self.get_test_item()
+            item.save(update_fields=['foo', 'bar'])  # update_fields is only valid on update
+
+        if self.ITEM_CLASS == Message:
+            with self.assertRaises(ValueError):
+                item = self.get_test_item()
+                item.account = None
+                item.send()  # Must have account on send
+            with self.assertRaises(ErrorItemNotFound):
+                item = self.get_test_item()
+                item.save()
+                item_id, changekey = item.id, item.changekey
+                item.delete()
+                item.id, item.changekey = item_id, changekey
+                item.send()  # Item disappeared
+            with self.assertRaises(AttributeError):
+                item = self.get_test_item()
+                item.send(copy_to_folder=self.account.trash, save_copy=False)  # Inconsistent args
+
+        with self.assertRaises(ValueError):
+            item = self.get_test_item()
+            item.account = None
+            item.refresh()  # Must have account on refresh
+        with self.assertRaises(ValueError):
+            item = self.get_test_item()
+            item.refresh()  # Refresh an item that has not been saved
+        with self.assertRaises(ErrorItemNotFound):
+            item = self.get_test_item()
+            item.save()
+            item_id, changekey = item.id, item.changekey
+            item.delete()
+            item.id, item.changekey = item_id, changekey
+            item.refresh()  # Refresh an item that doesn't exist
+
+        with self.assertRaises(ValueError):
+            item = self.get_test_item()
+            item.account = None
+            item.copy(to_folder=self.test_folder)  # Must have an account on copy
+        with self.assertRaises(ValueError):
+            item = self.get_test_item()
+            item.copy(to_folder=self.test_folder)  # Must be an existing item
+        with self.assertRaises(ErrorItemNotFound):
+            item = self.get_test_item()
+            item.save()
+            item_id, changekey = item.id, item.changekey
+            item.delete()
+            item.id, item.changekey = item_id, changekey
+            item.copy(to_folder=self.test_folder)  # Item disappeared
+
+        with self.assertRaises(ValueError):
+            item = self.get_test_item()
+            item.account = None
+            item.move(to_folder=self.test_folder)  # Must have an account on move
+        with self.assertRaises(ValueError):
+            item = self.get_test_item()
+            item.move(to_folder=self.test_folder)  # Must be an existing item
+        with self.assertRaises(ErrorItemNotFound):
+            item = self.get_test_item()
+            item.save()
+            item_id, changekey = item.id, item.changekey
+            item.delete()
+            item.id, item.changekey = item_id, changekey
+            item.move(to_folder=self.test_folder)  # Item disappeared
+
+        with self.assertRaises(ValueError):
+            item = self.get_test_item()
+            item.account = None
+            item.delete()  # Must have an account
+        with self.assertRaises(ValueError):
+            item = self.get_test_item()
+            item.delete()  # Must be an existing item
+        with self.assertRaises(ErrorItemNotFound):
+            item = self.get_test_item()
+            item.save()
+            item_id, changekey = item.id, item.changekey
+            item.delete()
+            item.id, item.changekey = item_id, changekey
+            item.delete()  # Item disappeared
+
+    def test_unsupported_fields(self):
+        # Create a field that is not supported by any current versions. Test that we fail when using this field
+        class UnsupportedProp(ExtendedProperty):
+            property_set_id = 'deadcafe-beef-beef-beef-deadcafebeef'
+            property_name = 'Unsupported Property'
+            property_type = 'String'
+
+        attr_name = 'unsupported_property'
+        self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=UnsupportedProp)
+        try:
+            for f in self.ITEM_CLASS.FIELDS:
+                if f.name == attr_name:
+                    f.supported_from = Build(99, 99, 99, 99)
+
+            with self.assertRaises(ValueError):
+                self.test_folder.get(**{attr_name: 'XXX'})
+            with self.assertRaises(ValueError):
+                list(self.test_folder.filter(**{attr_name: 'XXX'}))
+            with self.assertRaises(ValueError):
+                list(self.test_folder.all().only(attr_name))
+            with self.assertRaises(ValueError):
+                list(self.test_folder.all().values(attr_name))
+            with self.assertRaises(ValueError):
+                list(self.test_folder.all().values_list(attr_name))
+        finally:
+            self.ITEM_CLASS.deregister(attr_name=attr_name)
+
     def test_queryset_nonsearchable_fields(self):
         for f in self.ITEM_CLASS.FIELDS:
             if f.is_searchable or isinstance(f, IdField) or not f.supports_version(self.account.version):
@@ -4023,38 +4784,6 @@ class BaseItemTest(EWSTest):
                         list(self.test_folder.filter(**filter_kwargs))
             finally:
                 f.is_searchable = False
-
-    def test_queryset_failure(self):
-        qs = QuerySet(
-            folder_collection=FolderCollection(account=self.account, folders=[self.test_folder])
-        ).filter(categories__contains=self.categories)
-        with self.assertRaises(ValueError):
-            qs.order_by('XXX')
-        with self.assertRaises(ValueError):
-            qs.values('XXX')
-        with self.assertRaises(ValueError):
-            qs.values_list('XXX')
-        with self.assertRaises(ValueError):
-            qs.only('XXX')
-        with self.assertRaises(ValueError):
-            qs.reverse()  # We can't reverse when we haven't defined an order yet
-
-    def test_order_by_failure(self):
-        # Test error handling on indexed properties with labels and subfields
-        if self.ITEM_CLASS == Contact:
-            qs = QuerySet(
-                folder_collection=FolderCollection(account=self.account, folders=[self.test_folder])
-            ).filter(categories__contains=self.categories)
-            with self.assertRaises(ValueError):
-                qs.order_by('email_addresses')  # Must have label
-            with self.assertRaises(ValueError):
-                qs.order_by('email_addresses__FOO')  # Must have a valid label
-            with self.assertRaises(ValueError):
-                qs.order_by('email_addresses__EmailAddress1__FOO')  # Must not have a subfield
-            with self.assertRaises(ValueError):
-                qs.order_by('physical_addresses__Business')  # Must have a subfield
-            with self.assertRaises(ValueError):
-                qs.order_by('physical_addresses__Business__FOO')  # Must have a valid subfield
 
     def test_order_by(self):
         # Test order_by() on normal field
@@ -4585,113 +5314,6 @@ class BaseItemTest(EWSTest):
                 self.assertEqual(len(common_qs.filter(**kw)), 1, (f.name, val, kw))
         self.bulk_delete(ids)
 
-    def test_paging(self):
-        # Test that paging services work correctly. Default EWS paging size is 1000 items. Our default is 100 items.
-        items = []
-        for _ in range(11):
-            i = self.get_test_item()
-            del i.attachments[:]
-            items.append(i)
-        self.test_folder.bulk_create(items=items)
-        ids = self.test_folder.filter(categories__contains=self.categories).values_list('id', 'changekey')
-        ids.page_size = 10
-        self.bulk_delete(ids.iterator())
-
-    def test_slicing(self):
-        # Test that slicing works correctly
-        items = []
-        for i in range(4):
-            item = self.get_test_item()
-            item.subject = 'Subj %s' % i
-            del item.attachments[:]
-            items.append(item)
-        ids = self.test_folder.bulk_create(items=items)
-        qs = self.test_folder.filter(categories__contains=self.categories).only('subject').order_by('subject')
-
-        # Test positive index
-        self.assertEqual(
-            qs.copy()[0].subject,
-            'Subj 0'
-        )
-        # Test positive index
-        self.assertEqual(
-            qs.copy()[3].subject,
-            'Subj 3'
-        )
-        # Test negative index
-        self.assertEqual(
-            qs.copy()[-2].subject,
-            'Subj 2'
-        )
-        # Test positive slice
-        self.assertEqual(
-            [i.subject for i in qs.copy()[0:2]],
-            ['Subj 0', 'Subj 1']
-        )
-        # Test positive slice
-        self.assertEqual(
-            [i.subject for i in qs.copy()[2:4]],
-            ['Subj 2', 'Subj 3']
-        )
-        # Test positive open slice
-        self.assertEqual(
-            [i.subject for i in qs.copy()[:2]],
-            ['Subj 0', 'Subj 1']
-        )
-        # Test positive open slice
-        self.assertEqual(
-            [i.subject for i in qs.copy()[2:]],
-            ['Subj 2', 'Subj 3']
-        )
-        # Test negative slice
-        self.assertEqual(
-            [i.subject for i in qs.copy()[-3:-1]],
-            ['Subj 1', 'Subj 2']
-        )
-        # Test negative slice
-        self.assertEqual(
-            [i.subject for i in qs.copy()[1:-1]],
-            ['Subj 1', 'Subj 2']
-        )
-        # Test negative open slice
-        self.assertEqual(
-            [i.subject for i in qs.copy()[:-2]],
-            ['Subj 0', 'Subj 1']
-        )
-        # Test negative open slice
-        self.assertEqual(
-            [i.subject for i in qs.copy()[-2:]],
-            ['Subj 2', 'Subj 3']
-        )
-        # Test positive slice with step
-        self.assertEqual(
-            [i.subject for i in qs.copy()[0:4:2]],
-            ['Subj 0', 'Subj 2']
-        )
-        # Test negative slice with step
-        self.assertEqual(
-            [i.subject for i in qs.copy()[4:0:-2]],
-            ['Subj 3', 'Subj 1']
-        )
-        self.bulk_delete(ids)
-
-    def test_getitems(self):
-        item = self.get_test_item()
-        self.test_folder.bulk_create(items=[item, item])
-        ids = self.test_folder.filter(categories__contains=item.categories)
-        items = list(self.account.fetch(ids=ids))
-        for item in items:
-            self.assertIsInstance(item, self.ITEM_CLASS)
-        self.assertEqual(len(items), 2)
-
-        items = list(self.account.fetch(ids=ids, only_fields=['subject']))
-        self.assertEqual(len(items), 2)
-
-        items = list(self.account.fetch(ids=ids, only_fields=[FieldPath.from_string('subject', self.test_folder)]))
-        self.assertEqual(len(items), 2)
-
-        self.bulk_delete(ids)
-
     def test_text_field_settings(self):
         # Test that the max_length and is_complex field settings are correctly set for text fields
         item = self.get_test_item().save()
@@ -4926,116 +5548,6 @@ class BaseItemTest(EWSTest):
         items = self.test_folder.filter(categories__contains=item.categories)
         self.assertEqual(len(items), 0)
 
-    def test_save_with_update_fields(self):
-        # Create a test item
-        insert_kwargs = self.get_random_insert_kwargs()
-        if 'is_all_day' in insert_kwargs:
-            insert_kwargs['is_all_day'] = False
-        item = self.ITEM_CLASS(account=self.account, folder=self.test_folder, **insert_kwargs)
-        with self.assertRaises(ValueError):
-            item.save(update_fields=['subject'])  # update_fields does not work on item creation
-        item.save()
-        item.subject = 'XXX'
-        item.body = 'YYY'
-        item.save(update_fields=['subject'])
-        item.refresh()
-        self.assertEqual(item.subject, 'XXX')
-        self.assertNotEqual(item.body, 'YYY')
-
-        # Test invalid 'update_fields' input
-        with self.assertRaises(ValueError) as e:
-            item.save(update_fields=['xxx'])
-        self.assertEqual(
-            e.exception.args[0],
-            "Field name(s) 'xxx' are not valid for a '%s' item" % self.ITEM_CLASS.__name__
-        )
-        with self.assertRaises(ValueError) as e:
-            item.save(update_fields='subject')
-        self.assertEqual(
-            e.exception.args[0],
-            "Field name(s) 's', 'u', 'b', 'j', 'e', 'c', 't' are not valid for a '%s' item" % self.ITEM_CLASS.__name__
-        )
-
-        self.bulk_delete([item])
-
-    def test_soft_delete(self):
-        # First, empty trash bin
-        self.account.trash.filter(categories__contains=self.categories).delete()
-        self.account.recoverable_items_deletions.filter(categories__contains=self.categories).delete()
-        item = self.get_test_item().save()
-        item_id = (item.id, item.changekey)
-        # Soft delete
-        item.soft_delete()
-        for e in self.account.fetch(ids=[item_id]):
-            # It's gone from the test folder
-            self.assertIsInstance(e, ErrorItemNotFound)
-        # Really gone, not just changed ItemId
-        self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 0)
-        self.assertEqual(len(self.account.trash.filter(categories__contains=item.categories)), 0)
-        # But we can find it in the recoverable items folder
-        self.assertEqual(len(self.account.recoverable_items_deletions.filter(categories__contains=item.categories)), 1)
-
-    def test_move_to_trash(self):
-        # First, empty trash bin
-        self.account.trash.filter(categories__contains=self.categories).delete()
-        item = self.get_test_item().save()
-        item_id = (item.id, item.changekey)
-        # Move to trash
-        item.move_to_trash()
-        for e in self.account.fetch(ids=[item_id]):
-            # Not in the test folder anymore
-            self.assertIsInstance(e, ErrorItemNotFound)
-        # Really gone, not just changed ItemId
-        self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 0)
-        # Test that the item moved to trash
-        item = self.account.trash.get(categories__contains=item.categories)
-        moved_item = list(self.account.fetch(ids=[item]))[0]
-        # The item was copied, so the ItemId has changed. Let's compare the subject instead
-        self.assertEqual(item.subject, moved_item.subject)
-
-    def test_copy(self):
-        # First, empty trash bin
-        self.account.trash.filter(categories__contains=self.categories).delete()
-        item = self.get_test_item().save()
-        # Copy to trash. We use trash because it can contain all item types.
-        copy_item_id, copy_changekey = item.copy(to_folder=self.account.trash)
-        # Test that the item still exists in the folder
-        self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 1)
-        # Test that the copied item exists in trash
-        copied_item = self.account.trash.get(categories__contains=item.categories)
-        self.assertNotEqual(item.id, copied_item.id)
-        self.assertNotEqual(item.changekey, copied_item.changekey)
-        self.assertEqual(copy_item_id, copied_item.id)
-        self.assertEqual(copy_changekey, copied_item.changekey)
-
-    def test_move(self):
-        # First, empty trash bin
-        self.account.trash.filter(categories__contains=self.categories).delete()
-        item = self.get_test_item().save()
-        item_id = (item.id, item.changekey)
-        # Move to trash. We use trash because it can contain all item types. This changes the ItemId
-        item.move(to_folder=self.account.trash)
-        for e in self.account.fetch(ids=[item_id]):
-            # original item ID no longer exists
-            self.assertIsInstance(e, ErrorItemNotFound)
-        # Test that the item moved to trash
-        self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 0)
-        moved_item = self.account.trash.get(categories__contains=item.categories)
-        self.assertEqual(item.id, moved_item.id)
-        self.assertEqual(item.changekey, moved_item.changekey)
-
-    def test_refresh(self):
-        # Test that we can refresh items, and that refresh fails if the item no longer exists on the server
-        item = self.get_test_item().save()
-        orig_subject = item.subject
-        item.subject = 'XXX'
-        item.refresh()
-        self.assertEqual(item.subject, orig_subject)
-        item.delete()
-        with self.assertRaises(ValueError):
-            # Item no longer has an ID
-            item.refresh()
-
     def test_item(self):
         # Test insert
         # For CalendarItem instances, the 'is_all_day' attribute affects the 'start' and 'end' values. Changing from
@@ -5254,428 +5766,6 @@ class BaseItemTest(EWSTest):
         del ids[3]  # Sending the deleted one through will cause an error
         self.bulk_delete(ids)
 
-    def test_register(self):
-        # Tests that we can register and de-register custom extended properties
-        class TestProp(ExtendedProperty):
-            property_set_id = 'deadbeaf-cafe-cafe-cafe-deadbeefcafe'
-            property_name = 'Test Property'
-            property_type = 'Integer'
-
-        attr_name = 'dead_beef'
-
-        # Before register
-        self.assertNotIn(attr_name, {f.name for f in self.ITEM_CLASS.supported_fields()})
-        with self.assertRaises(ValueError):
-            self.ITEM_CLASS.deregister(attr_name)  # Not registered yet
-        with self.assertRaises(ValueError):
-            self.ITEM_CLASS.deregister('subject')  # Not an extended property
-
-        self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=TestProp)
-        try:
-            # After register
-            self.assertEqual(TestProp.python_type(), int)
-            self.assertIn(attr_name, {f.name for f in self.ITEM_CLASS.supported_fields()})
-
-            # Test item creation, refresh, and update
-            item = self.get_test_item(folder=self.test_folder)
-            prop_val = item.dead_beef
-            self.assertTrue(isinstance(prop_val, int))
-            item.save()
-            item.refresh()
-            self.assertEqual(prop_val, item.dead_beef)
-            new_prop_val = get_random_int(0, 256)
-            item.dead_beef = new_prop_val
-            item.save()
-            item.refresh()
-            self.assertEqual(new_prop_val, item.dead_beef)
-
-            # Test deregister
-            with self.assertRaises(ValueError):
-                self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=TestProp)  # Already registered
-            with self.assertRaises(ValueError):
-                self.ITEM_CLASS.register(attr_name='XXX', attr_cls=Mailbox)  # Not an extended property
-        finally:
-            self.ITEM_CLASS.deregister(attr_name=attr_name)
-        self.assertNotIn(attr_name, {f.name for f in self.ITEM_CLASS.supported_fields()})
-
-    def test_extended_property_arraytype(self):
-        # Tests array type extended properties
-        class TestArayProp(ExtendedProperty):
-            property_set_id = 'deadcafe-beef-beef-beef-deadcafebeef'
-            property_name = 'Test Array Property'
-            property_type = 'IntegerArray'
-
-        attr_name = 'dead_beef_array'
-        self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=TestArayProp)
-        try:
-            # Test item creation, refresh, and update
-            item = self.get_test_item(folder=self.test_folder)
-            prop_val = item.dead_beef_array
-            self.assertTrue(isinstance(prop_val, list))
-            item.save()
-            item.refresh()
-            self.assertEqual(prop_val, item.dead_beef_array)
-            new_prop_val = self.random_val(self.ITEM_CLASS.get_field_by_fieldname(attr_name))
-            item.dead_beef_array = new_prop_val
-            item.save()
-            item.refresh()
-            self.assertEqual(new_prop_val, item.dead_beef_array)
-        finally:
-            self.ITEM_CLASS.deregister(attr_name=attr_name)
-
-    def test_extended_property_with_tag(self):
-        class Flag(ExtendedProperty):
-            property_tag = 0x1090
-            property_type = 'Integer'
-
-        attr_name = 'my_flag'
-        self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=Flag)
-        try:
-            # Test item creation, refresh, and update
-            item = self.get_test_item(folder=self.test_folder)
-            prop_val = item.my_flag
-            self.assertTrue(isinstance(prop_val, int))
-            item.save()
-            item.refresh()
-            self.assertEqual(prop_val, item.my_flag)
-            new_prop_val = self.random_val(self.ITEM_CLASS.get_field_by_fieldname(attr_name))
-            item.my_flag = new_prop_val
-            item.save()
-            item.refresh()
-            self.assertEqual(new_prop_val, item.my_flag)
-        finally:
-            self.ITEM_CLASS.deregister(attr_name=attr_name)
-
-    def test_extended_property_with_invalid_tag(self):
-        class InvalidProp(ExtendedProperty):
-            property_tag = '0x8000'
-            property_type = 'Integer'
-
-        with self.assertRaises(ValueError):
-            InvalidProp('Foo').clean()  # property_tag is in protected range
-
-    def test_extended_property_with_string_tag(self):
-        class Flag(ExtendedProperty):
-            property_tag = '0x1090'
-            property_type = 'Integer'
-
-        attr_name = 'my_flag'
-        self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=Flag)
-        try:
-            # Test item creation, refresh, and update
-            item = self.get_test_item(folder=self.test_folder)
-            prop_val = item.my_flag
-            self.assertTrue(isinstance(prop_val, int))
-            item.save()
-            item.refresh()
-            self.assertEqual(prop_val, item.my_flag)
-            new_prop_val = self.random_val(self.ITEM_CLASS.get_field_by_fieldname(attr_name))
-            item.my_flag = new_prop_val
-            item.save()
-            item.refresh()
-            self.assertEqual(new_prop_val, item.my_flag)
-        finally:
-            self.ITEM_CLASS.deregister(attr_name=attr_name)
-
-    def test_extended_distinguished_property(self):
-        if self.ITEM_CLASS == CalendarItem:
-            raise self.skipTest("This extendedproperty doesn't work on CalendarItems")
-
-        class MyMeeting(ExtendedProperty):
-            distinguished_property_set_id = 'Meeting'
-            property_type = 'Binary'
-            property_id = 3
-
-        attr_name = 'my_meeting'
-        self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=MyMeeting)
-        try:
-            # Test item creation, refresh, and update
-            item = self.get_test_item(folder=self.test_folder)
-            # MyMeeting is an extended prop version of the 'uid' field. We don't want 'uid' to overwrite that.
-            # overwriting each other.
-            item.uid = None
-            prop_val = item.my_meeting
-            self.assertTrue(isinstance(prop_val, bytes))
-            item.save()
-            item = list(self.account.fetch(ids=[(item.id, item.changekey)]))[0]
-            self.assertEqual(prop_val, item.my_meeting, (prop_val, item.my_meeting))
-            new_prop_val = self.random_val(self.ITEM_CLASS.get_field_by_fieldname(attr_name))
-            item.my_meeting = new_prop_val
-            # MyMeeting is an extended prop version of the 'uid' field. We don't want 'uid' to overwrite that.
-            item.uid = None
-            item.save()
-            item = list(self.account.fetch(ids=[(item.id, item.changekey)]))[0]
-            self.assertEqual(new_prop_val, item.my_meeting)
-        finally:
-            self.ITEM_CLASS.deregister(attr_name=attr_name)
-
-    def test_extended_property_binary_array(self):
-        class MyMeetingArray(ExtendedProperty):
-            property_set_id = '00062004-0000-0000-C000-000000000046'
-            property_type = 'BinaryArray'
-            property_id = 32852
-
-        attr_name = 'my_meeting_array'
-        self.ITEM_CLASS.register(attr_name=attr_name, attr_cls=MyMeetingArray)
-
-        try:
-            # Test item creation, refresh, and update
-            item = self.get_test_item(folder=self.test_folder)
-            prop_val = item.my_meeting_array
-            self.assertTrue(isinstance(prop_val, list))
-            item.save()
-            item = list(self.account.fetch(ids=[(item.id, item.changekey)]))[0]
-            self.assertEqual(prop_val, item.my_meeting_array)
-            new_prop_val = self.random_val(self.ITEM_CLASS.get_field_by_fieldname(attr_name))
-            item.my_meeting_array = new_prop_val
-            item.save()
-            item = list(self.account.fetch(ids=[(item.id, item.changekey)]))[0]
-            self.assertEqual(new_prop_val, item.my_meeting_array)
-        finally:
-            self.ITEM_CLASS.deregister(attr_name=attr_name)
-
-    def test_extended_property_validation(self):
-        """
-        if cls.property_type not in cls.PROPERTY_TYPES:
-            raise ValueError(
-                "'property_type' value '%s' must be one of %s" % (cls.property_type, sorted(cls.PROPERTY_TYPES))
-            )
-        """
-        # Must not have property_set_id or property_tag
-        class TestProp(ExtendedProperty):
-            distinguished_property_set_id = 'XXX'
-            property_set_id = 'YYY'
-        with self.assertRaises(ValueError):
-            TestProp.validate_cls()
-
-        # Must have property_id or property_name
-        class TestProp(ExtendedProperty):
-            distinguished_property_set_id = 'XXX'
-        with self.assertRaises(ValueError):
-            TestProp.validate_cls()
-
-        # distinguished_property_set_id must have a valid value
-        class TestProp(ExtendedProperty):
-            distinguished_property_set_id = 'XXX'
-            property_id = 'YYY'
-        with self.assertRaises(ValueError):
-            TestProp.validate_cls()
-
-        # Must not have distinguished_property_set_id or property_tag
-        class TestProp(ExtendedProperty):
-            property_set_id = 'XXX'
-            property_tag = 'YYY'
-        with self.assertRaises(ValueError):
-            TestProp.validate_cls()
-
-        # Must have property_id or property_name
-        class TestProp(ExtendedProperty):
-            property_set_id = 'XXX'
-        with self.assertRaises(ValueError):
-            TestProp.validate_cls()
-
-        # property_tag is only compatible with property_type
-        class TestProp(ExtendedProperty):
-            property_tag = 'XXX'
-            property_set_id = 'YYY'
-        with self.assertRaises(ValueError):
-            TestProp.validate_cls()
-
-        # property_tag must be an integer or string that can be converted to int
-        class TestProp(ExtendedProperty):
-            property_tag = 'XXX'
-        with self.assertRaises(ValueError):
-            TestProp.validate_cls()
-
-        # property_tag must not be in the reserved range
-        class TestProp(ExtendedProperty):
-            property_tag = 0x8001
-        with self.assertRaises(ValueError):
-            TestProp.validate_cls()
-
-        # Must not have property_id or property_tag
-        class TestProp(ExtendedProperty):
-            property_name = 'XXX'
-            property_id = 'YYY'
-        with self.assertRaises(ValueError):
-            TestProp.validate_cls()
-
-        # Must have distinguished_property_set_id or property_set_id
-        class TestProp(ExtendedProperty):
-            property_name = 'XXX'
-        with self.assertRaises(ValueError):
-            TestProp.validate_cls()
-
-        # Must not have property_name or property_tag
-        class TestProp(ExtendedProperty):
-            property_id = 'XXX'
-            property_name = 'YYY'
-        with self.assertRaises(ValueError):
-            TestProp.validate_cls()  # This actually hits the check on property_name values
-
-        # Must have distinguished_property_set_id or property_set_id
-        class TestProp(ExtendedProperty):
-            property_id = 'XXX'
-        with self.assertRaises(ValueError):
-            TestProp.validate_cls()
-
-        # property_type must be a valid value
-        class TestProp(ExtendedProperty):
-            property_id = 'XXX'
-            property_set_id = 'YYY'
-            property_type = 'ZZZ'
-        with self.assertRaises(ValueError):
-            TestProp.validate_cls()
-
-    def test_attachment_failure(self):
-        att1 = FileAttachment(name='my_file_1.txt', content=u'Hello from unicode æøå'.encode('utf-8'))
-        att1.attachment_id = 'XXX'
-        with self.assertRaises(ValueError):
-            att1.attach()  # Cannot have an attachment ID
-        att1.attachment_id = None
-        with self.assertRaises(ValueError):
-            att1.attach()  # Must have a parent item
-        att1.parent_item = Item()
-        with self.assertRaises(ValueError):
-            att1.attach()  # Parent item must have an account
-        att1.parent_item = None
-        with self.assertRaises(ValueError):
-            att1.detach()  # Must have an attachment ID
-        att1.attachment_id = 'XXX'
-        with self.assertRaises(ValueError):
-            att1.detach()  # Must have a parent item
-        att1.parent_item = Item()
-        with self.assertRaises(ValueError):
-            att1.detach()  # Parent item must have an account
-        att1.parent_item = None
-        att1.attachment_id = None
-
-    def test_attachment_properties(self):
-        binary_file_content = u'Hello from unicode æøå'.encode('utf-8')
-        att1 = FileAttachment(name='my_file_1.txt', content=binary_file_content)
-        self.assertIn("name='my_file_1.txt'", str(att1))
-        att1.content = binary_file_content  # Test property setter
-        self.assertEqual(att1.content, binary_file_content)  # Test property getter
-        att1.attachment_id = 'xxx'
-        self.assertEqual(att1.content, binary_file_content)  # Test property getter when attachment_id is set
-        att1._content = None
-        with self.assertRaises(ValueError):
-            print(att1.content)  # Test property getter when we need to fetch the content
-
-        attached_item1 = self.get_test_item(folder=self.test_folder)
-        att2 = ItemAttachment(name='attachment1', item=attached_item1)
-        self.assertIn("name='attachment1'", str(att2))
-        att2.item = attached_item1  # Test property setter
-        self.assertEqual(att2.item, attached_item1)  # Test property getter
-        self.assertEqual(att2.item, attached_item1)  # Test property getter
-        att2.attachment_id = 'xxx'
-        self.assertEqual(att2.item, attached_item1)  # Test property getter when attachment_id is set
-        att2._item = None
-        with self.assertRaises(ValueError):
-            print(att2.item)  # Test property getter when we need to fetch the item
-
-    def test_file_attachments(self):
-        item = self.get_test_item(folder=self.test_folder)
-
-        # Test __init__(attachments=...) and attach() on new item
-        binary_file_content = u'Hello from unicode æøå'.encode('utf-8')
-        att1 = FileAttachment(name='my_file_1.txt', content=binary_file_content)
-        self.assertEqual(len(item.attachments), 0)
-        item.attach(att1)
-        self.assertEqual(len(item.attachments), 1)
-        item.save()
-        fresh_item = list(self.account.fetch(ids=[item]))[0]
-        self.assertEqual(len(fresh_item.attachments), 1)
-        fresh_attachments = sorted(fresh_item.attachments, key=lambda a: a.name)
-        self.assertEqual(fresh_attachments[0].name, 'my_file_1.txt')
-        self.assertEqual(fresh_attachments[0].content, binary_file_content)
-
-        # Test raw call to service
-        self.assertEqual(
-            list(GetAttachment(account=item.account).call(
-                items=[att1.attachment_id],
-                include_mime_content=False)
-            )[0].find('{%s}Content' % TNS).text,
-            'SGVsbG8gZnJvbSB1bmljb2RlIMOmw7jDpQ==')
-
-        # Test attach on saved object
-        att2 = FileAttachment(name='my_file_2.txt', content=binary_file_content)
-        self.assertEqual(len(item.attachments), 1)
-        item.attach(att2)
-        self.assertEqual(len(item.attachments), 2)
-        fresh_item = list(self.account.fetch(ids=[item]))[0]
-        self.assertEqual(len(fresh_item.attachments), 2)
-        fresh_attachments = sorted(fresh_item.attachments, key=lambda a: a.name)
-        self.assertEqual(fresh_attachments[0].name, 'my_file_1.txt')
-        self.assertEqual(fresh_attachments[0].content, binary_file_content)
-        self.assertEqual(fresh_attachments[1].name, 'my_file_2.txt')
-        self.assertEqual(fresh_attachments[1].content, binary_file_content)
-
-        # Test detach
-        item.detach(att1)
-        self.assertTrue(att1.attachment_id is None)
-        self.assertTrue(att1.parent_item is None)
-        fresh_item = list(self.account.fetch(ids=[item]))[0]
-        self.assertEqual(len(fresh_item.attachments), 1)
-        fresh_attachments = sorted(fresh_item.attachments, key=lambda a: a.name)
-        self.assertEqual(fresh_attachments[0].name, 'my_file_2.txt')
-        self.assertEqual(fresh_attachments[0].content, binary_file_content)
-
-    def test_streaming_file_attachments(self):
-        item = self.get_test_item(folder=self.test_folder)
-        large_binary_file_content = get_random_string(2**10).encode('utf-8')
-        large_att = FileAttachment(name='my_large_file.txt', content=large_binary_file_content)
-        item.attach(large_att)
-        item.save()
-
-        # Test streaming file content
-        fresh_item = list(self.account.fetch(ids=[item]))[0]
-        with fresh_item.attachments[0].fp as fp:
-            self.assertEqual(fp.read(), large_binary_file_content)
-
-        # Test partial reads of streaming file content
-        fresh_item = list(self.account.fetch(ids=[item]))[0]
-        with fresh_item.attachments[0].fp as fp:
-            chunked_reads = []
-            buffer = fp.read(7)
-            while buffer:
-                chunked_reads.append(buffer)
-                buffer = fp.read(7)
-            self.assertListEqual(chunked_reads, list(chunkify(large_binary_file_content, 7)))
-
-    def test_streaming_file_attachment_error(self):
-        # Test that we can parse XML error responses in streaming mode.
-
-        # Try to stram an attachment with malformed ID
-        att = FileAttachment(
-            parent_item=self.get_test_item(folder=self.test_folder),
-            attachment_id=AttachmentId(id='AAMk='),
-            name='dummy.txt',
-            content=b'',
-        )
-        with self.assertRaises(ErrorInvalidIdMalformed):
-            with att.fp as fp:
-                fp.read()
-
-        # Try to stream a non-existent attachment
-        att.attachment_id.id=\
-            'AAMkADQyYzZmYmUxLTJiYjItNDg2Ny1iMzNjLTIzYWE1NDgxNmZhNABGAAAAAADUebQDarW2Q7G2Ji8hKofPBwAl9iKCsfCfS' \
-            'a9cmjh+JCrCAAPJcuhjAABioKiOUTCQRI6Q5sRzi0pJAAHnDV3CAAABEgAQAN0zlxDrzlxAteU+kt84qOM='
-        with self.assertRaises(ErrorItemNotFound):
-            with att.fp as fp:
-                fp.read()
-
-    def test_empty_file_attachment(self):
-        item = self.get_test_item(folder=self.test_folder)
-        att1 = FileAttachment(name='empty_file.txt', content=b'')
-        item.attach(att1)
-        item.save()
-        fresh_item = list(self.account.fetch(ids=[item]))[0]
-        self.assertEqual(
-            fresh_item.attachments[0].content,
-            b''
-        )
-
     def test_item_attachments(self):
         item = self.get_test_item(folder=self.test_folder)
         item.attachments = []
@@ -5832,77 +5922,8 @@ class BaseItemTest(EWSTest):
         item.attach(attachment3)
         item.detach(attachment3)
 
-    def test_both_attachment_types(self):
-        item = self.get_test_item(folder=self.test_folder)
-        attached_item = self.get_test_item(folder=self.test_folder).save()
-        item_attachment = ItemAttachment(name='item_attachment', item=attached_item)
-        file_attachment = FileAttachment(name='file_attachment', content=b'file_attachment')
-        item.attach(item_attachment)
-        item.attach(file_attachment)
-        item.save()
 
-        fresh_item = list(self.account.fetch(ids=[item]))[0]
-        self.assertSetEqual(
-            {a.name for a in fresh_item.attachments},
-            {'item_attachment', 'file_attachment'}
-        )
-
-    def test_recursive_attachments(self):
-        # Test that we can handle an item which has an attached item, which has an attached item...
-        item = self.get_test_item(folder=self.test_folder)
-        attached_item_level_1 = self.get_test_item(folder=self.test_folder)
-        attached_item_level_2 = self.get_test_item(folder=self.test_folder)
-        attached_item_level_3 = self.get_test_item(folder=self.test_folder)
-
-        attached_item_level_3.save()
-        attachment_level_3 = ItemAttachment(name='attached_item_level_3', item=attached_item_level_3)
-        attached_item_level_2.attach(attachment_level_3)
-        attached_item_level_2.save()
-        attachment_level_2 = ItemAttachment(name='attached_item_level_2', item=attached_item_level_2)
-        attached_item_level_1.attach(attachment_level_2)
-        attached_item_level_1.save()
-        attachment_level_1 = ItemAttachment(name='attached_item_level_1', item=attached_item_level_1)
-        item.attach(attachment_level_1)
-        item.save()
-
-        self.assertEqual(
-            item.attachments[0].item.attachments[0].item.attachments[0].item.subject,
-            attached_item_level_3.subject
-        )
-
-        # Also test a fresh item
-        new_item = self.test_folder.get(id=item.id, changekey=item.changekey)
-        self.assertEqual(
-            new_item.attachments[0].item.attachments[0].item.attachments[0].item.subject,
-            attached_item_level_3.subject
-        )
-
-    def test_bulk_failure(self):
-        # Test that bulk_* can handle EWS errors and return the errors in order without losing non-failure results
-        items1 = [self.get_test_item().save() for _ in range(3)]
-        items1[1].changekey = 'XXX'
-        for i, res in enumerate(self.account.bulk_delete(items1)):
-            if i == 1:
-                self.assertIsInstance(res, ErrorInvalidChangeKey)
-            else:
-                self.assertEqual(res, True)
-        items2 = [self.get_test_item().save() for _ in range(3)]
-        items2[1].id = 'AAAA=='
-        for i, res in enumerate(self.account.bulk_delete(items2)):
-            if i == 1:
-                self.assertIsInstance(res, ErrorInvalidIdMalformed)
-            else:
-                self.assertEqual(res, True)
-        items3 = [self.get_test_item().save() for _ in range(3)]
-        items3[1].id = items1[0].id
-        for i, res in enumerate(self.account.fetch(items3)):
-            if i == 1:
-                self.assertIsInstance(res, ErrorItemNotFound)
-            else:
-                self.assertIsInstance(res, Item)
-
-
-class CalendarTest(BaseItemTest):
+class CalendarTest(CommonItemTest):
     TEST_FOLDER = 'calendar'
     FOLDER_CLASS = Calendar
     ITEM_CLASS = CalendarItem
@@ -6147,7 +6168,7 @@ class CalendarTest(BaseItemTest):
         self.assertEqual(len(fresh_item.deleted_occurrences), 3)
 
 
-class MessagesTest(BaseItemTest):
+class MessagesTest(CommonItemTest):
     # Just test one of the Message-type folders
     TEST_FOLDER = 'inbox'
     FOLDER_CLASS = Inbox
@@ -6279,7 +6300,7 @@ class MessagesTest(BaseItemTest):
         item.delete()
 
 
-class TasksTest(BaseItemTest):
+class TasksTest(CommonItemTest):
     TEST_FOLDER = 'tasks'
     FOLDER_CLASS = Tasks
     ITEM_CLASS = Task
@@ -6295,10 +6316,26 @@ class TasksTest(BaseItemTest):
         self.assertEqual(item.percent_complete, Decimal(100))
 
 
-class ContactsTest(BaseItemTest):
+class ContactsTest(CommonItemTest):
     TEST_FOLDER = 'contacts'
     FOLDER_CLASS = Contacts
     ITEM_CLASS = Contact
+
+    def test_order_by_failure(self):
+        # Test error handling on indexed properties with labels and subfields
+        qs = QuerySet(
+            folder_collection=FolderCollection(account=self.account, folders=[self.test_folder])
+        ).filter(categories__contains=self.categories)
+        with self.assertRaises(ValueError):
+            qs.order_by('email_addresses')  # Must have label
+        with self.assertRaises(ValueError):
+            qs.order_by('email_addresses__FOO')  # Must have a valid label
+        with self.assertRaises(ValueError):
+            qs.order_by('email_addresses__EmailAddress1__FOO')  # Must not have a subfield
+        with self.assertRaises(ValueError):
+            qs.order_by('physical_addresses__Business')  # Must have a subfield
+        with self.assertRaises(ValueError):
+            qs.order_by('physical_addresses__Business__FOO')  # Must have a valid subfield
 
     def test_distribution_lists(self):
         dl = DistributionList(folder=self.test_folder, display_name=get_random_string(255), categories=self.categories)
