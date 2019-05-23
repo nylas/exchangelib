@@ -1741,7 +1741,7 @@ class GetAttachment(EWSAccountService):
     @classmethod
     def _get_soap_payload(cls, response, **parse_opts):
         if not parse_opts.get('stream_file_content', False):
-            return super(GetAttachment, cls)._get_soap_payload(response=response)
+            return super(GetAttachment, cls)._get_soap_payload(response, **parse_opts)
 
         from .attachments import FileAttachment
         parser = StreamingBase64Parser()
