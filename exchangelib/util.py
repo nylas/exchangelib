@@ -10,11 +10,12 @@ import logging
 import re
 import socket
 import time
-import xml.sax.expatreader
 import xml.sax.handler
 
 # Import _etree via defusedxml instead of directly from lxml.etree, to silence overly strict linters
 from defusedxml.lxml import parse, tostring, GlobalParserTLS, RestrictedElement, _etree
+from defusedxml.expatreader import DefusedExpatParser
+from defusedxml.sax import _InputSource
 from future.backports.misc import get_ident
 from future.moves.urllib.parse import urlparse
 from future.utils import PY2
@@ -269,10 +270,18 @@ class StreamingContentHandler(xml.sax.handler.ContentHandler):
         self._parser.buffer.append(content)
 
 
-class StreamingBase64Parser(xml.sax.expatreader.ExpatParser):
+def prepare_input_source(source):
+    # Extracted from xml.sax.expatreader.saxutils.prepare_input_source
+    f = source
+    source = _InputSource()
+    source.setByteStream(f)
+    return source
+
+
+class StreamingBase64Parser(DefusedExpatParser):
     """A SAX parser that returns a generator of base64-decoded character content"""
     def __init__(self, *args, **kwargs):
-        xml.sax.expatreader.ExpatParser.__init__(self, *args, **kwargs)
+        DefusedExpatParser.__init__(self, *args, **kwargs)
         self._namespaces = True
         self.buffer = None
         self.element_found = None
@@ -280,7 +289,7 @@ class StreamingBase64Parser(xml.sax.expatreader.ExpatParser):
     def parse(self, source):
         raw_source = source.raw
         # Like upstream but yields the return value of self.feed()
-        raw_source = xml.sax.expatreader.saxutils.prepare_input_source(raw_source)
+        raw_source = prepare_input_source(raw_source)
         self.prepareParser(raw_source)
         file = raw_source.getByteStream()
         self.buffer = []
@@ -305,7 +314,7 @@ class StreamingBase64Parser(xml.sax.expatreader.ExpatParser):
 
     def feed(self, data, isFinal=0):
         # Like upstream, but yields the current content of the character buffer
-        xml.sax.expatreader.ExpatParser.feed(self, data=data, isFinal=isFinal)
+        DefusedExpatParser.feed(self, data=data, isFinal=isFinal)
         return self._decode_buffer()
 
     def _decode_buffer(self):
