@@ -8,7 +8,7 @@ from future.utils import python_2_unicode_compatible, PY2
 from six import text_type
 
 from .errors import TransportError, ErrorInvalidSchemaVersionForMailboxVersion, ErrorInvalidServerVersion, \
-    ResponseMessageError
+    ErrorIncorrectSchemaVersion, ResponseMessageError
 from .transport import get_auth_instance
 from .util import is_xml, to_xml, TNS, SOAPNS, ParseError
 
@@ -245,7 +245,7 @@ class Version(object):
         protocol.version = Version(build=None, api_version=hint or API_VERSIONS[-1])
         try:
             list(ResolveNames(protocol=protocol).call(unresolved_entries=[protocol.credentials.username]))
-        except (ErrorInvalidSchemaVersionForMailboxVersion, ErrorInvalidServerVersion):
+        except (ErrorInvalidSchemaVersionForMailboxVersion, ErrorInvalidServerVersion, ErrorIncorrectSchemaVersion):
             raise TransportError('Unable to guess version')
         except ResponseMessageError:
             # We survived long enough to get a new version
