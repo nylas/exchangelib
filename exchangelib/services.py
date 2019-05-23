@@ -1090,7 +1090,7 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
             if isinstance(elem, Exception):
                 yield elem
                 continue
-            yield Folder.from_xml(elem=elem, root=root)
+            yield Folder.from_xml_with_root(elem=elem, root=root)
 
     def get_payload(self, additional_fields, restriction, shape, depth, page_size, offset=0):
         findfolder = create_element('m:%s' % self.SERVICE_NAME, Traversal=depth)
@@ -1150,9 +1150,9 @@ class GetFolder(EWSAccountService):
                 yield elem
                 continue
             if isinstance(folder, RootOfHierarchy):
-                f = folder.from_xml(elem=elem, account=self.account)
+                f = folder.from_xml(elem=elem, account=folder.account)
             elif isinstance(folder, Folder):
-                f = folder.from_xml(elem=elem, root=folder.root)
+                f = folder.from_xml_with_root(elem=elem, root=folder.root)
             elif isinstance(folder, DistinguishedFolderId):
                 # We don't know the root, so assume account.root.
                 for folder_cls in self.account.root.WELLKNOWN_FOLDERS:
@@ -1160,10 +1160,10 @@ class GetFolder(EWSAccountService):
                         break
                 else:
                     raise ValueError('Unknown distinguished folder ID: %s', folder.id)
-                f = folder_cls.from_xml(elem=elem, root=self.account.root)
+                f = folder_cls.from_xml_with_root(elem=elem, root=self.account.root)
             else:
                 # 'folder' is a generic FolderId instance. We don't know the root so assume account.root.
-                f = Folder.from_xml(elem=elem, root=self.account.root)
+                f = Folder.from_xml_with_root(elem=elem, root=self.account.root)
             if isinstance(folder, DistinguishedFolderId):
                 f.is_distinguished = True
             elif isinstance(folder, Folder) and folder.is_distinguished:
@@ -1213,9 +1213,9 @@ class CreateFolder(EWSAccountService):
                 yield elem
                 continue
             if isinstance(folder, RootOfHierarchy):
-                f = folder.from_xml(elem=elem, account=self.account)
+                f = folder.from_xml(elem=elem, account=folder.root.account)
             else:
-                f = folder.from_xml(elem=elem, root=folder.root)
+                f = folder.from_xml_with_root(elem=elem, root=folder.root)
             if folder.is_distinguished:
                 f.is_distinguished = True
             yield f
@@ -1255,9 +1255,9 @@ class UpdateFolder(EWSAccountService):
                 yield elem
                 continue
             if isinstance(folder, RootOfHierarchy):
-                f = folder.from_xml(elem=elem, account=self.account)
+                f = folder.from_xml(elem=elem, account=folder.root.account)
             else:
-                f = folder.from_xml(elem=elem, root=folder.root)
+                f = folder.from_xml_with_root(elem=elem, root=folder.root)
             if folder.is_distinguished:
                 f.is_distinguished = True
             yield f

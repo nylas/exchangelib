@@ -974,7 +974,12 @@ class Folder(RegisterMixIn, SearchableMixIn):
         return True
 
     @classmethod
-    def from_xml(cls, elem, root):
+    def from_xml(cls, elem, account):
+        raise NotImplementedError('Use from_xml_with_root() instead')
+
+    @classmethod
+    def from_xml_with_root(cls, elem,  root):
+        # If no root is specified, assume the main root hierarchy
         fld_id_elem = elem.find(FolderId.response_tag())
         fld_id = fld_id_elem.get(FolderId.ID_ATTR)
         changekey = fld_id_elem.get(FolderId.CHANGEKEY_ATTR)
@@ -1737,7 +1742,11 @@ class RootOfHierarchy(Folder):
                 yield f
 
     @classmethod
-    def get_distinguished(cls, account):
+    def get_distinguished(cls, root):
+        raise NotImplementedError('Use get_distinguished_root() instead')
+
+    @classmethod
+    def get_distinguished_root(cls, account):
         """Gets the distinguished folder for this folder class"""
         if not cls.DISTINGUISHED_FOLDER_ID:
             raise ValueError('Class %s must have a DISTINGUISHED_FOLDER_ID value' % cls)

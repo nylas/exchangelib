@@ -132,7 +132,7 @@ class Account(object):
 
     @threaded_cached_property
     def archive_root(self):
-        return ArchiveRoot.get_distinguished(account=self)
+        return ArchiveRoot.get_distinguished_root(account=self)
 
     @threaded_cached_property
     def calendar(self):
@@ -208,7 +208,7 @@ class Account(object):
 
     @threaded_cached_property
     def public_folders_root(self):
-        return PublicFoldersRoot.get_distinguished(account=self)
+        return PublicFoldersRoot.get_distinguished_root(account=self)
 
     @threaded_cached_property
     def quick_contacts(self):
@@ -236,7 +236,7 @@ class Account(object):
 
     @threaded_cached_property
     def root(self):
-        return Root.get_distinguished(account=self)
+        return Root.get_distinguished_root(account=self)
 
     @threaded_cached_property
     def search_folders(self):

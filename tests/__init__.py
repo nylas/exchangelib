@@ -3434,7 +3434,7 @@ class BaseItemTest(EWSTest):
                 continue
             if f.name == 'status':
                 # Start with an incomplete task
-                status = get_random_choice(f.supported_choices(version=self.account.version) - {Task.COMPLETED})
+                status = get_random_choice(set(f.supported_choices(version=self.account.version)) - {Task.COMPLETED})
                 insert_kwargs[f.name] = status
                 if status == Task.NOT_STARTED:
                     insert_kwargs['percent_complete'] = Decimal(0)
