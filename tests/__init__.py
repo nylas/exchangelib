@@ -6222,14 +6222,16 @@ class MessagesTest(CommonItemTest):
         self.assertIsNone(item.id)
         self.assertIsNone(item.changekey)
         time.sleep(5)  # Requests are supposed to be transactional, but apparently not...
-        self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 1)
+        # Also, the sent item may be followed by an automatic message with the same category
+        self.assertGreaterEqual(len(self.test_folder.filter(categories__contains=item.categories)), 1)
 
         # Test update, although it makes little sense
         item = self.get_test_item()
         item.save()
         item.send_and_save()
         time.sleep(5)  # Requests are supposed to be transactional, but apparently not...
-        self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 1)
+        # Also, the sent item may be followed by an automatic message with the same category
+        self.assertGreaterEqual(len(self.test_folder.filter(categories__contains=item.categories)), 1)
 
     def test_send_draft(self):
         item = self.get_test_item()
