@@ -2455,7 +2455,10 @@ class AccountTest(EWSTest):
         with self.assertRaises(ValueError) as e:
             # access type must be one of ACCESS_TYPES
             Account(primary_smtp_address='blah@example.com', access_type=123)
-        self.assertEqual(str(e.exception), "'access_type' 123 must be one of ('impersonation', 'delegate')")
+        if PY2:
+            self.assertEqual(str(e.exception), "'access_type' 123 must be one of (u'impersonation', u'delegate')")
+        else:
+            self.assertEqual(str(e.exception), "'access_type' 123 must be one of ('impersonation', 'delegate')")
         with self.assertRaises(ValueError) as e:
             # locale must be a string
             Account(primary_smtp_address='blah@example.com', locale=123)
