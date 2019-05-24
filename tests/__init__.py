@@ -2428,18 +2428,38 @@ class AccountTest(EWSTest):
         self.assertIn(self.account.fullname, str(self.account))
 
     def test_validation(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ValueError) as e:
             # Must have valid email address
             Account(primary_smtp_address='blah')
-        with self.assertRaises(AttributeError):
+        self.assertEqual(str(e.exception), "primary_smtp_address 'blah' is not an email address")
+        with self.assertRaises(AttributeError) as e:
             # Autodiscover requires credentials
             Account(primary_smtp_address='blah@example.com', autodiscover=True)
-        with self.assertRaises(AttributeError):
+        self.assertEqual(str(e.exception), 'autodiscover requires credentials')
+        with self.assertRaises(AttributeError) as e:
             # Autodiscover must have credentials but must not have config
             Account(primary_smtp_address='blah@example.com', credentials='FOO', config='FOO', autodiscover=True)
-        with self.assertRaises(AttributeError):
+        self.assertEqual(str(e.exception), 'config is ignored when autodiscover is active')
+        with self.assertRaises(AttributeError) as e:
             # Non-autodiscover requires a config
             Account(primary_smtp_address='blah@example.com', autodiscover=False)
+        self.assertEqual(str(e.exception), 'non-autodiscover requires a config')
+        with self.assertRaises(ValueError) as e:
+            # access type must be one of ACCESS_TYPES
+            Account(primary_smtp_address='blah@example.com', access_type=123)
+        self.assertEqual(str(e.exception), "'access_type' 123 must be one of ('impersonation', 'delegate')")
+        with self.assertRaises(ValueError) as e:
+            # locale must be a string
+            Account(primary_smtp_address='blah@example.com', locale=123)
+        self.assertEqual(str(e.exception), "Expected 'locale' to be a string, got 123")
+        with self.assertRaises(ValueError) as e:
+            # default timezone must be an EWSTimeZone
+            Account(primary_smtp_address='blah@example.com', default_timezone=123)
+        self.assertEqual(str(e.exception), "Expected 'default_timezone' to be an EWSTimeZone, got 123")
+        with self.assertRaises(ValueError) as e:
+            # config must be a Configuration
+            Account(primary_smtp_address='blah@example.com', config=123)
+        self.assertEqual(str(e.exception), "Expected 'config' to be a Configuration, got 123")
 
     def test_get_default_folder(self):
         # Test a normal folder lookup with GetFolder

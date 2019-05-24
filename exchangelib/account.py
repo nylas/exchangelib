@@ -9,6 +9,7 @@ from future.utils import python_2_unicode_compatible
 from six import string_types
 
 from .autodiscover import discover
+from .configuration import Configuration
 from .credentials import DELEGATE, IMPERSONATION, ACCESS_TYPES
 from .errors import UnknownTimeZone
 from .ewsdatetime import EWSTimeZone, UTC
@@ -26,7 +27,6 @@ from .items import Item, BulkCreateResult, HARD_DELETE, \
     SEND_MEETING_INVITATIONS_CHOICES, SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES, \
     SEND_MEETING_CANCELLATIONS_CHOICES, ID_ONLY
 from .properties import Mailbox
-from .protocol import Protocol
 from .queryset import QuerySet
 from .services import ExportItems, UploadItems, GetItem, CreateItem, UpdateItem, DeleteItem, MoveItem, SendItem, \
     CopyItem, GetUserOofSettings, SetUserOofSettings
@@ -55,9 +55,13 @@ class Account(object):
         assume values to be in the provided timezone. Defaults to the timezone of the host.
         """
         if '@' not in primary_smtp_address:
-            raise ValueError("primary_smtp_address '%s' is not an email address" % primary_smtp_address)
+            raise ValueError("primary_smtp_address %r is not an email address" % primary_smtp_address)
         self.primary_smtp_address = primary_smtp_address
         self.fullname = fullname
+        # Assume delegate access if individual credentials are provided. Else, assume service user with impersonation
+        self.access_type = access_type or (DELEGATE if credentials else IMPERSONATION)
+        if self.access_type not in ACCESS_TYPES:
+            raise ValueError("'access_type' %r must be one of %s" % (self.access_type, ACCESS_TYPES))
         try:
             self.locale = locale or getlocale()[0] or None  # get_locale() might not be able to determine the locale
         except ValueError as e:
@@ -66,11 +70,16 @@ class Account(object):
             self.locale = None
         if self.locale is not None:
             if not isinstance(self.locale, string_types):
-                raise ValueError("Expected 'locale' to be a string, got %s" % self.locale)
-        # Assume delegate access if individual credentials are provided. Else, assume service user with impersonation
-        self.access_type = access_type or (DELEGATE if credentials else IMPERSONATION)
-        if self.access_type not in ACCESS_TYPES:
-            raise ValueError("'access_type' %s must be one of %s" % (self.access_type, ACCESS_TYPES))
+                raise ValueError("Expected 'locale' to be a string, got %r" % self.locale)
+        try:
+            self.default_timezone = default_timezone or EWSTimeZone.localzone()
+        except (ValueError, UnknownTimeZone) as e:
+            # There is no translation from local timezone name to Windows timezone name, or e failed to find the
+            # local timezone.
+            log.warning('%s. Fallback to UTC', e.args[0])
+            self.default_timezone = UTC
+        if not isinstance(self.default_timezone, EWSTimeZone):
+            raise ValueError("Expected 'default_timezone' to be an EWSTimeZone, got %r" % self.default_timezone)
         if autodiscover:
             if not credentials:
                 raise AttributeError('autodiscover requires credentials')
@@ -81,21 +90,12 @@ class Account(object):
         else:
             if not config:
                 raise AttributeError('non-autodiscover requires a config')
+            if not isinstance(config, Configuration):
+                raise ValueError("Expected 'config' to be a Configuration, got %r" % config)
             self.protocol = config.protocol
-        try:
-            self.default_timezone = default_timezone or EWSTimeZone.localzone()
-        except (ValueError, UnknownTimeZone) as e:
-            # There is no translation from local timezone name to Windows timezone name, or e failed to find the
-            # local timezone.
-            log.warning('%s. Fallback to UTC', e.args[0])
-            self.default_timezone = UTC
-        if not isinstance(self.default_timezone, EWSTimeZone):
-            raise ValueError("Expected 'default_timezone' to be an EWSTimeZone, got %s" % self.default_timezone)
         # We may need to override the default server version on a per-account basis because Microsoft may report one
         # server version up-front but delegate account requests to an older backend server.
         self.version = self.protocol.version
-        if not isinstance(self.protocol, Protocol):
-            raise ValueError("Expected 'protocol' to be a Protocol, got %s" % self.protocol)
         log.debug('Added account: %s', self)
 
     @threaded_cached_property
