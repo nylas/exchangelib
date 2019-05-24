@@ -116,7 +116,20 @@ class MockResponse(object):
         return self.c
 
 
-class BuildTest(unittest.TestCase):
+class TimedTestCase(unittest.TestCase):
+    SLOW_TEST_DURATION = 5  # Log tests that are slower than this value (in seconds)
+
+    def setUp(self):
+        self.maxDiff = None
+        self.t1 = time.time()
+
+    def tearDown(self):
+        t2 = time.time() - self.t1
+        if t2 > self.SLOW_TEST_DURATION:
+            print("{:07.3f} : {}".format(t2, self.id()))
+
+
+class BuildTest(TimedTestCase):
     def test_magic(self):
         with self.assertRaises(ValueError):
             Build(7, 0)
@@ -150,7 +163,7 @@ class BuildTest(unittest.TestCase):
             Build(15, 4).api_version()
 
 
-class VersionTest(unittest.TestCase):
+class VersionTest(TimedTestCase):
     def test_default_api_version(self):
         # Test that a version gets a reasonable api_version value if we don't set one explicitly
         version = Version(build=Build(15, 1, 2, 3))
@@ -260,7 +273,7 @@ class VersionTest(unittest.TestCase):
             )
 
 
-class ConfigurationTest(unittest.TestCase):
+class ConfigurationTest(TimedTestCase):
     def test_magic(self):
         config = Configuration(
             server='example.com',
@@ -296,7 +309,7 @@ class ConfigurationTest(unittest.TestCase):
         self.assertEqual(c.credentials, Credentials('foo', 'bar'))
 
 
-class ProtocolTest(unittest.TestCase):
+class ProtocolTest(TimedTestCase):
 
     @requests_mock.mock()
     def test_session(self, m):
@@ -353,7 +366,7 @@ class ProtocolTest(unittest.TestCase):
         self.assertEqual(protocol._session_pool.qsize(), 1)
 
 
-class CredentialsTest(unittest.TestCase):
+class CredentialsTest(TimedTestCase):
     def test_hash(self):
         # Test that we can use credentials as a dict key
         self.assertEqual(hash(Credentials('a', 'b')), hash(Credentials('a', 'b')))
@@ -409,9 +422,7 @@ class CredentialsTest(unittest.TestCase):
         self.assertEqual(int(math.ceil((sa.back_off_until - datetime.datetime.now()).total_seconds())), 60)
 
 
-class EWSDateTimeTest(unittest.TestCase):
-    def setUp(self):
-        self.maxDiff = None
+class EWSDateTimeTest(TimedTestCase):
 
     def test_super_methods(self):
         tz = EWSTimeZone.timezone('Europe/Copenhagen')
@@ -589,7 +600,7 @@ class EWSDateTimeTest(unittest.TestCase):
         self.assertEqual(dt, EWSDate(2000, 1, 1))
 
 
-class PropertiesTest(unittest.TestCase):
+class PropertiesTest(TimedTestCase):
     def test_unique_field_names(self):
         from exchangelib import attachments, properties, items, folders, indexed_properties, recurrence, settings
         for module in (attachments, properties, items, folders, indexed_properties, recurrence, settings):
@@ -717,7 +728,7 @@ class PropertiesTest(unittest.TestCase):
         self.assertIsInstance(HTMLBody('{}').format('foo'), HTMLBody)
 
 
-class FieldTest(unittest.TestCase):
+class FieldTest(TimedTestCase):
     def test_value_validation(self):
         field = TextField('foo', field_uri='bar', is_required=True, default=None)
         with self.assertRaises(ValueError) as e:
@@ -995,7 +1006,7 @@ class FieldTest(unittest.TestCase):
             TestField.value_field()
 
 
-class ItemTest(unittest.TestCase):
+class ItemTest(TimedTestCase):
     def test_item_id_deprecation(self):
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
@@ -1050,7 +1061,7 @@ class ItemTest(unittest.TestCase):
         self.assertEqual(task.percent_complete, Decimal(0))
 
 
-class RecurrenceTest(unittest.TestCase):
+class RecurrenceTest(TimedTestCase):
     def test_item_id_deprecation(self):
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
@@ -1107,10 +1118,7 @@ class RecurrenceTest(unittest.TestCase):
         self.assertEqual(r.boundary, NumberedPattern(start=d_start, number=1))
 
 
-class RestrictionTest(unittest.TestCase):
-    def setUp(self):
-        self.maxDiff = None
-
+class RestrictionTest(TimedTestCase):
     def test_magic(self):
         self.assertEqual(str(Q()), 'Q()')
 
@@ -1234,7 +1242,7 @@ class RestrictionTest(unittest.TestCase):
             Q(foo=None).clean()
 
 
-class QuerySetTest(unittest.TestCase):
+class QuerySetTest(TimedTestCase):
     def test_magic(self):
         self.assertEqual(
             str(QuerySet(
@@ -1309,7 +1317,7 @@ class QuerySetTest(unittest.TestCase):
         self.assertNotEqual(qs.return_format, new_qs.return_format)
 
 
-class ServicesTest(unittest.TestCase):
+class ServicesTest(TimedTestCase):
     def test_invalid_server_version(self):
         # Test that we get a client-side error if we call a service that was only implemented in a later version
         version = mock_version(build=EXCHANGE_2007)
@@ -1322,7 +1330,7 @@ class ServicesTest(unittest.TestCase):
             GetRooms(protocol=account.protocol).call('XXX')
 
 
-class TransportTest(unittest.TestCase):
+class TransportTest(TimedTestCase):
     @requests_mock.mock()
     def test_get_auth_method_from_response(self, m):
         url = 'http://example.com/noauth'
@@ -1394,7 +1402,7 @@ class TransportTest(unittest.TestCase):
         self.assertEqual(_get_auth_method_from_response(r), DIGEST)
 
 
-class UtilTest(unittest.TestCase):
+class UtilTest(TimedTestCase):
     def test_chunkify(self):
         # Test tuple, list, set, range, map, chain and generator
         seq = [1, 2, 3, 4, 5]
@@ -1527,7 +1535,7 @@ class UtilTest(unittest.TestCase):
         )
 
 
-class EWSTest(unittest.TestCase):
+class EWSTest(TimedTestCase):
     @classmethod
     def setUpClass(cls):
         # There's no official Exchange server we can test against, and we can't really provide credentials for our
@@ -1561,9 +1569,9 @@ class EWSTest(unittest.TestCase):
                               locale='da_DK', default_timezone=tz)
 
     def setUp(self):
+        super(EWSTest, self).setUp()
         # Create a random category for each test to avoid crosstalk
         self.categories = [get_random_string(length=16, spaces=False, special=False)]
-        self.maxDiff = None
 
     def wipe_test_account(self):
         # Deletes up all deleteable items in the test account. Not run in a normal test run
@@ -3432,6 +3440,7 @@ class BaseItemTest(EWSTest):
         self.test_folder.filter(categories__contains=self.categories).delete()
         # Delete all delivery receipts
         self.test_folder.filter(subject__startswith='Delivered: Subject: ').delete()
+        super(BaseItemTest, self).tearDown()
 
     def get_random_insert_kwargs(self):
         insert_kwargs = {}
@@ -6489,11 +6498,13 @@ if __name__ == '__main__':
 
     if '-q' in sys.argv:
         sys.argv.remove('-q')
-        logging.basicConfig(level=logging.WARNING)
+        logging.basicConfig(level=logging.CRITICAL)
+        verbosity = 0
     else:
         logging.basicConfig(level=logging.DEBUG, handlers=[PrettyXmlHandler()])
+        verbosity = 1
 
-    unittest.main()
+    unittest.main(verbosity=verbosity)
 else:
     # Don't print warnings and stack traces mixed with test progress. We'll get the debug info for test failures later.
     logging.basicConfig(level=logging.CRITICAL)
