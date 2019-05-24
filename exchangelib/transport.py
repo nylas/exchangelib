@@ -8,7 +8,7 @@ import requests_ntlm
 
 from .credentials import IMPERSONATION
 from .errors import UnauthorizedError, TransportError, RedirectError, RelativeRedirect
-from .util import create_element, add_xml_child, get_redirect_url, xml_to_str, ns_translation
+from .util import create_element, add_xml_child, get_redirect_url, xml_to_str, ns_translation, CONNECTION_ERRORS
 
 log = logging.getLogger(__name__)
 
@@ -95,8 +95,11 @@ def get_autodiscover_authtype(service_endpoint, data):
     log.debug('Getting autodiscover auth type for %s', service_endpoint)
     from .autodiscover import AutodiscoverProtocol
     with AutodiscoverProtocol.raw_session() as s:
-        r = s.head(url=service_endpoint, headers=DEFAULT_HEADERS.copy(), timeout=AutodiscoverProtocol.TIMEOUT,
-                   allow_redirects=False)
+        try:
+            r = s.head(url=service_endpoint, headers=DEFAULT_HEADERS.copy(), timeout=AutodiscoverProtocol.TIMEOUT,
+                       allow_redirects=False)
+        except CONNECTION_ERRORS as e:
+            raise TransportError(str(e))
         if r.status_code in (301, 302):
             try:
                 redirect_url = get_redirect_url(r, require_relative=True)
@@ -107,8 +110,11 @@ def get_autodiscover_authtype(service_endpoint, data):
                 raise RedirectError(url=e.value)
             # Some MS servers are masters of messing up HTTP, issuing 302 to an error page with zero content.
             # Give this URL a chance with a POST request.
-        r = s.post(url=service_endpoint, headers=DEFAULT_HEADERS.copy(), data=data,
-                   timeout=AutodiscoverProtocol.TIMEOUT, allow_redirects=False)
+        try:
+            r = s.post(url=service_endpoint, headers=DEFAULT_HEADERS.copy(), data=data,
+                       timeout=AutodiscoverProtocol.TIMEOUT, allow_redirects=False)
+        except CONNECTION_ERRORS as e:
+            raise TransportError(str(e))
     return _get_auth_method_from_response(response=r)
 
 
@@ -116,8 +122,11 @@ def get_docs_authtype(docs_url):
     # Get auth type by tasting headers from the server. Don't do HEAD requests. It's too error prone.
     log.debug('Getting docs auth type for %s', docs_url)
     from .protocol import BaseProtocol
-    with BaseProtocol.raw_session() as s:
-        r = s.get(url=docs_url, headers=DEFAULT_HEADERS.copy(), allow_redirects=True, timeout=BaseProtocol.TIMEOUT)
+    try:
+        with BaseProtocol.raw_session() as s:
+            r = s.get(url=docs_url, headers=DEFAULT_HEADERS.copy(), allow_redirects=True, timeout=BaseProtocol.TIMEOUT)
+    except CONNECTION_ERRORS as e:
+        raise TransportError(str(e))
     return _get_auth_method_from_response(response=r)
 
 
@@ -132,8 +141,11 @@ def get_service_authtype(service_endpoint, versions, name):
         for version in versions:
             data = dummy_xml(version=version, name=name)
             log.debug('Requesting %s from %s', data, service_endpoint)
-            r = s.post(url=service_endpoint, headers=DEFAULT_HEADERS.copy(), data=data, allow_redirects=True,
-                       timeout=BaseProtocol.TIMEOUT)
+            try:
+                r = s.post(url=service_endpoint, headers=DEFAULT_HEADERS.copy(), data=data, allow_redirects=True,
+                           timeout=BaseProtocol.TIMEOUT)
+            except CONNECTION_ERRORS as e:
+                raise TransportError(str(e))
             try:
                 auth_type = _get_auth_method_from_response(response=r)
                 log.debug('Auth type is %s', auth_type)
