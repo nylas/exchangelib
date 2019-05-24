@@ -6202,14 +6202,14 @@ class MessagesTest(CommonItemTest):
     TEST_FOLDER = 'inbox'
     FOLDER_CLASS = Inbox
     ITEM_CLASS = Message
-    INCOMING_MESSAGE_TIMEOUT = 180
+    INCOMING_MESSAGE_TIMEOUT = 20
 
     def get_incoming_message(self, subject):
         t1 = time.time()
         while True:
             t2 = time.time()
-            self.assertLess(t2 - t1, self.INCOMING_MESSAGE_TIMEOUT,
-                            'Gave up waiting for the incoming message to show up in the inbox')
+            if t2 - t1 > self.INCOMING_MESSAGE_TIMEOUT:
+                raise self.skipTest('Too bad. Gave up in %s waiting for the incoming message to show up' % self.id())
             try:
                 return self.account.inbox.get(subject=subject)
             except DoesNotExist:
