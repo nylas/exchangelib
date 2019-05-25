@@ -474,6 +474,12 @@ class EWSDateTimeTest(TimedTestCase):
         with self.assertRaises(UnknownTimeZone):
             EWSTimeZone.from_pytz(tz)
 
+        # Test __eq__ with non-EWSTimeZone compare
+        self.assertFalse(EWSTimeZone.timezone('GMT') == pytz.utc)
+
+        # Test from_ms_id() with non-standard MS ID
+        self.assertEqual(EWSTimeZone.timezone('Europe/Copenhagen'), EWSTimeZone.from_ms_id('Europe/Copenhagen'))
+
     def test_localize(self):
         # Test some cornercases around DST
         tz = EWSTimeZone.timezone('Europe/Copenhagen')
@@ -565,6 +571,16 @@ class EWSDateTimeTest(TimedTestCase):
         self.assertIsInstance(dt, EWSDateTime)
         self.assertEqual(dt, tz.localize(EWSDateTime(2000, 1, 1, 3, 4, 5)))
 
+        # Test ewsformat() failure
+        dt = EWSDateTime(2000, 1, 2, 3, 4, 5)
+        with self.assertRaises(ValueError):
+            dt.ewsformat()
+        # Test wrong tzinfo type
+        with self.assertRaises(ValueError):
+            EWSDateTime(2000, 1, 2, 3, 4, 5, tzinfo=pytz.utc)
+        with self.assertRaises(ValueError):
+            EWSDateTime.from_datetime(EWSDateTime(2000, 1, 2, 3, 4, 5))
+
     def test_generate(self):
         try:
             self.assertDictEqual(generate_map(), CLDR_TO_MS_TIMEZONE_MAP)
@@ -599,6 +615,8 @@ class EWSDateTimeTest(TimedTestCase):
         self.assertIsInstance(dt, EWSDate)
         self.assertEqual(dt, EWSDate(2000, 1, 1))
 
+        with self.assertRaises(ValueError):
+            EWSDate.from_date(EWSDate(2000, 1, 2))
 
 class PropertiesTest(TimedTestCase):
     def test_unique_field_names(self):
