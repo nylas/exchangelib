@@ -124,7 +124,7 @@ def get_docs_authtype(docs_url):
     from .protocol import BaseProtocol
     try:
         with BaseProtocol.raw_session() as s:
-            r = s.get(url=docs_url, headers=DEFAULT_HEADERS.copy(), allow_redirects=True, timeout=BaseProtocol.TIMEOUT)
+            r = s.get(url=docs_url, headers=DEFAULT_HEADERS.copy(), allow_redirects=False, timeout=BaseProtocol.TIMEOUT)
     except CONNECTION_ERRORS as e:
         raise TransportError(str(e))
     return _get_auth_method_from_response(response=r)
@@ -142,7 +142,7 @@ def get_service_authtype(service_endpoint, versions, name):
             data = dummy_xml(version=version, name=name)
             log.debug('Requesting %s from %s', data, service_endpoint)
             try:
-                r = s.post(url=service_endpoint, headers=DEFAULT_HEADERS.copy(), data=data, allow_redirects=True,
+                r = s.post(url=service_endpoint, headers=DEFAULT_HEADERS.copy(), data=data, allow_redirects=False,
                            timeout=BaseProtocol.TIMEOUT)
             except CONNECTION_ERRORS as e:
                 raise TransportError(str(e))
