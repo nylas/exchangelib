@@ -96,8 +96,8 @@ def get_autodiscover_authtype(service_endpoint, data):
     from .autodiscover import AutodiscoverProtocol
     with AutodiscoverProtocol.raw_session() as s:
         try:
-            r = s.head(url=service_endpoint, headers=DEFAULT_HEADERS.copy(), timeout=AutodiscoverProtocol.TIMEOUT,
-                       allow_redirects=False)
+            r = s.head(url=service_endpoint, headers=DEFAULT_HEADERS.copy(), allow_redirects=False,
+                       timeout=AutodiscoverProtocol.TIMEOUT)
         except CONNECTION_ERRORS as e:
             raise TransportError(str(e))
         if r.status_code in (301, 302):
@@ -111,8 +111,8 @@ def get_autodiscover_authtype(service_endpoint, data):
             # Some MS servers are masters of messing up HTTP, issuing 302 to an error page with zero content.
             # Give this URL a chance with a POST request.
         try:
-            r = s.post(url=service_endpoint, headers=DEFAULT_HEADERS.copy(), data=data,
-                       timeout=AutodiscoverProtocol.TIMEOUT, allow_redirects=False)
+            r = s.post(url=service_endpoint, headers=DEFAULT_HEADERS.copy(), data=data, allow_redirects=False,
+                       timeout=AutodiscoverProtocol.TIMEOUT)
         except CONNECTION_ERRORS as e:
             raise TransportError(str(e))
     return _get_auth_method_from_response(response=r)
