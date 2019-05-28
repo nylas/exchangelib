@@ -53,7 +53,7 @@ from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextFie
     ChoiceField, BodyField, DateTimeField, Base64Field, PhoneNumberField, EmailAddressesField, TimeZoneField, \
     PhysicalAddressField, ExtendedPropertyField, MailboxField, AttendeesField, AttachmentField, CharListField, \
     MailboxListField, Choice, FieldPath, EWSElementField, CultureField, DateField, EnumField, EnumListField, IdField, \
-    CharField, TextListField, PermissionSetField, \
+    CharField, TextListField, PermissionSetField, MimeContentField, \
     MONDAY, WEDNESDAY, FEBRUARY, AUGUST, SECOND, LAST, DAY, WEEK_DAY, WEEKEND_DAY
 from exchangelib.folders import Calendar, DeletedItems, Drafts, Inbox, Outbox, SentItems, JunkEmail, Messages, Tasks, \
     Contacts, Folder, RecipientCache, GALContacts, System, AllContacts, MyContactsExtended, Reminders, Favorites, \
@@ -1634,6 +1634,8 @@ class EWSTest(TimedTestCase):
         if isinstance(field, CharField):
             return get_random_string(field.max_length)
         if isinstance(field, TextField):
+            return get_random_string(400)
+        if isinstance(field, MimeContentField):
             return get_random_string(400)
         if isinstance(field, Base64Field):
             return get_random_bytes(400)
@@ -6342,7 +6344,7 @@ class MessagesTest(CommonItemTest):
         msg['Subject'] = subject
         body = 'MIME test mail'
         msg.attach(MIMEText(body, 'plain', _charset='utf-8'))
-        mime_content = msg.as_string().encode('utf-8')
+        mime_content = msg.as_string()
         item = self.ITEM_CLASS(
             folder=self.test_folder,
             to_recipients=[self.account.primary_smtp_address],

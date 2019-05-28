@@ -656,7 +656,7 @@ a = Account(...)
 qs = a.inbox.all().only('mime_content')
 qs.page_size = 5
 for msg in qs.iterator():
-    with open('%s.eml' % msg.item_id, 'wb') as f:
+    with open('%s.eml' % msg.item_id, 'w') as f:
         f.write(msg.mime_content)
 ```
 

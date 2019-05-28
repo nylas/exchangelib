@@ -543,6 +543,28 @@ class Base64Field(FieldURIField):
         return set_xml_value(field_elem, base64.b64encode(value).decode('ascii'), version=version)
 
 
+class MimeContentField(Base64Field):
+    # EWS: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/mimecontent
+    value_cls = string_types[0]
+    default_encoding = 'utf-8'
+
+    def from_xml(self, elem, account):
+        val = super(MimeContentField, self).from_xml(elem=elem, account=account)
+        if val is None or val == self.default:
+            # Return default values unaltered
+            return val
+
+        charset = elem.find(self.response_tag()).get('CharacterSet').lower() or self.default_encoding
+        try:
+            return val.decode(charset)
+        except UnicodeDecodeError:
+            log.warning("Cannot decode value '%s' on field '%s' to charset %s", val, self.name, self.value_cls)
+            return None
+
+    def to_xml(self, value, version):
+        return super(MimeContentField, self).to_xml(value=value.encode(self.default_encoding), version=version)
+
+
 class DateField(FieldURIField):
     value_cls = EWSDate
 

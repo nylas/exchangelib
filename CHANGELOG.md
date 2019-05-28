@@ -3,6 +3,8 @@ Change Log
 
 HEAD
 ----
+`Item.mime_content` is now a text field instead of a binary field. Encoding and
+decoding is done automatically.
 
 
 1.12.5
