@@ -9,7 +9,7 @@ from six import text_type
 
 from .errors import TransportError, ErrorInvalidSchemaVersionForMailboxVersion, ErrorInvalidServerVersion, \
     ErrorIncorrectSchemaVersion, ResponseMessageError
-from .transport import get_auth_instance
+from .transport import get_auth_instance, DEFAULT_HEADERS
 from .util import is_xml, to_xml, TNS, SOAPNS, ParseError, CONNECTION_ERRORS
 
 log = logging.getLogger(__name__)
@@ -223,7 +223,8 @@ class Version(object):
         from .protocol import BaseProtocol
         with BaseProtocol.raw_session() as s:
             try:
-                r = s.get(url=types_url, auth=auth, allow_redirects=False, stream=False)
+                r = s.get(url=types_url, headers=DEFAULT_HEADERS.copy(), auth=auth, allow_redirects=False,
+                          timeout=BaseProtocol.TIMEOUT)
             except CONNECTION_ERRORS as e:
                 raise TransportError(str(e))
         log.debug('Request headers: %s', r.request.headers)
