@@ -5,6 +5,11 @@ HEAD
 ----
 
 
+1.12.5
+------
+-   Bugfix release.
+
+
 1.12.4
 ------
 - Fix bug that left out parts of the folder hierarchy when traversing `account.root`.

@@ -17,7 +17,7 @@ from .transport import BASIC, DIGEST, NTLM, GSSAPI
 from .version import Build, Version
 from .settings import OofSettings
 
-__version__ = '1.12.4'
+__version__ = '1.12.5'
 
 __all__ = [
     '__version__',
