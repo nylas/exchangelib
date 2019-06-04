@@ -17,7 +17,7 @@ before_install:
 
 install:
 # Only lxml master branch compiles with Python nightly
-# - if [[ "$( python --version | grep 'a' )" ]] ; then pip install cython && pip install git+https://github.com/lxml/lxml.git ; fi
+- if [[ "$( python --version | grep 'a' )" ]] ; then pip install cython && pip install git+https://github.com/lxml/lxml.git ; fi
 # Only PyYAML master branch compiles with Python nightly
 # - if [[ "$( python --version | grep 'a' )" ]] ; then pip install git+https://github.com/yaml/pyyaml.git ; fi
 - pip install .
