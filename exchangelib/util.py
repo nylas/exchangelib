@@ -227,12 +227,13 @@ def safe_xml_value(value, replacement='?'):
     return text_type(_ILLEGAL_XML_CHARS_RE.sub(replacement, value))
 
 
-def create_element(name, **attrs):
-    # copy.deepcopy() is an order of magnitude faster than creating a new Element() every time
+def create_element(name, attrs=None, nsmap=None):
+    # Python versions prior to 3.6 do not preserve dict or kwarg ordering, so we cannot pull in attrs as **kwargs if we
+    # also want stable XML attribute output. Instead, let callers supply us with an OrderedDict instance.
     if ':' in name:
         ns, name = name.split(':')
         name = '{%s}%s' % (ns_translation[ns], name)
-    elem = RestrictedElement(**attrs)
+    elem = RestrictedElement(attrib=attrs, nsmap=nsmap)
     elem.tag = name
     return elem
 

@@ -1,5 +1,6 @@
 # coding=utf-8
 import base64
+from collections import OrderedDict
 import logging
 
 from future.utils import python_2_unicode_compatible
@@ -264,7 +265,13 @@ class Q(object):
             compare_mode = 'IgnoreCase'
         else:
             compare_mode = 'Exact'
-        return create_element('t:Contains', ContainmentMode=match_mode, ContainmentComparison=compare_mode)
+        return create_element(
+            't:Contains',
+            attrs=OrderedDict([
+                ('ContainmentMode', match_mode),
+                ('ContainmentComparison', compare_mode),
+            ])
+        )
 
     def is_leaf(self):
         return not self.children

@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 import abc
 import base64
 import binascii
+from collections import OrderedDict
 import datetime
 from decimal import Decimal, InvalidOperation
 import logging
@@ -233,7 +234,7 @@ class FieldOrder(object):
         )
 
     def to_xml(self):
-        field_order = create_element('t:FieldOrder', Order='Descending' if self.reverse else 'Ascending')
+        field_order = create_element('t:FieldOrder', attrs=dict(Order='Descending' if self.reverse else 'Ascending'))
         field_order.append(self.field_path.to_xml())
         return field_order
 
@@ -365,7 +366,7 @@ class FieldURIField(Field):
     def field_uri_xml(self):
         if not self.field_uri:
             raise ValueError("'field_uri' value is missing")
-        return create_element('t:FieldURI', FieldURI=self.field_uri)
+        return create_element('t:FieldURI', attrs=dict(FieldURI=self.field_uri))
 
     def request_tag(self):
         if not self.field_uri_postfix:
@@ -646,7 +647,13 @@ class TimeZoneField(FieldURIField):
         return self.default
 
     def to_xml(self, value, version):
-        return create_element('t:%s' % self.field_uri_postfix, Id=value.ms_id, Name=value.ms_name)
+        return create_element(
+            't:%s' % self.field_uri_postfix,
+            attrs=OrderedDict([
+                ('Id', value.ms_id),
+                ('Name', value.ms_name),
+            ])
+        )
 
 
 class TextField(FieldURIField):
@@ -1041,7 +1048,13 @@ class SubField(Field):
 
     @staticmethod
     def field_uri_xml(field_uri, label):
-        return create_element('t:IndexedFieldURI', FieldURI=field_uri, FieldIndex=label)
+        return create_element(
+            't:IndexedFieldURI',
+            attrs=OrderedDict([
+                ('FieldURI', field_uri),
+                ('FieldIndex', label),
+            ])
+        )
 
     def __hash__(self):
         return hash(self.name)
@@ -1077,7 +1090,13 @@ class NamedSubField(SubField):
         return set_xml_value(field_elem, value, version=version)
 
     def field_uri_xml(self, field_uri, label):
-        return create_element('t:IndexedFieldURI', FieldURI='%s:%s' % (field_uri, self.field_uri), FieldIndex=label)
+        return create_element(
+            't:IndexedFieldURI',
+            attrs=OrderedDict([
+                ('FieldURI', '%s:%s' % (field_uri, self.field_uri)),
+                ('FieldIndex', label),
+            ])
+        )
 
     def request_tag(self):
         return 't:%s' % self.field_uri

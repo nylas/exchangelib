@@ -53,7 +53,7 @@ def wrap(content, version, account=None):
     """
     envelope = create_element('s:Envelope', nsmap=ns_translation)
     header = create_element('s:Header')
-    requestserverversion = create_element('t:RequestServerVersion', Version=version)
+    requestserverversion = create_element('t:RequestServerVersion', attrs=dict(Version=version))
     header.append(requestserverversion)
     if account:
         if account.access_type == IMPERSONATION:
@@ -63,7 +63,7 @@ def wrap(content, version, account=None):
             exchangeimpersonation.append(connectingsid)
             header.append(exchangeimpersonation)
         timezonecontext = create_element('t:TimeZoneContext')
-        timezonedefinition = create_element('t:TimeZoneDefinition', Id=account.default_timezone.ms_id)
+        timezonedefinition = create_element('t:TimeZoneDefinition', attrs=dict(Id=account.default_timezone.ms_id))
         timezonecontext.append(timezonedefinition)
         header.append(timezonecontext)
     envelope.append(header)

@@ -512,7 +512,7 @@ class GetServerTimeZones(EWSService):
     def get_payload(self, timezones, return_full_timezone_data):
         payload = create_element(
             'm:%s' % self.SERVICE_NAME,
-            ReturnFullTimeZoneData='true' if return_full_timezone_data else 'false',
+            attrs=dict(ReturnFullTimeZoneData='true' if return_full_timezone_data else 'false'),
         )
         if timezones is not None:
             is_empty, timezones = peek(timezones)
@@ -753,8 +753,10 @@ class CreateItem(EWSAccountService, EWSPooledMixIn):
         # last two are not supported yet.
         createitem = create_element(
             'm:%s' % self.SERVICE_NAME,
-            MessageDisposition=message_disposition,
-            SendMeetingInvitations=send_meeting_invitations,
+            attrs=OrderedDict([
+                ('MessageDisposition', message_disposition),
+                ('SendMeetingInvitations', send_meeting_invitations),
+            ])
         )
         if folder:
             saveditemfolderid = create_element('m:SavedItemFolderId')
@@ -903,17 +905,21 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
         if self.account.version.build >= EXCHANGE_2013_SP1:
             updateitem = create_element(
                 'm:%s' % self.SERVICE_NAME,
-                ConflictResolution=conflict_resolution,
-                MessageDisposition=message_disposition,
-                SendMeetingInvitationsOrCancellations=send_meeting_invitations_or_cancellations,
-                SuppressReadReceipts='true' if suppress_read_receipts else 'false',
+                attrs=OrderedDict([
+                    ('ConflictResolution', conflict_resolution),
+                    ('MessageDisposition', message_disposition),
+                    ('SendMeetingInvitationsOrCancellations', send_meeting_invitations_or_cancellations),
+                    ('SuppressReadReceipts', 'true' if suppress_read_receipts else 'false'),
+                ])
             )
         else:
             updateitem = create_element(
                 'm:%s' % self.SERVICE_NAME,
-                ConflictResolution=conflict_resolution,
-                MessageDisposition=message_disposition,
-                SendMeetingInvitationsOrCancellations=send_meeting_invitations_or_cancellations,
+                attrs=OrderedDict([
+                    ('ConflictResolution', conflict_resolution),
+                    ('MessageDisposition', message_disposition),
+                    ('SendMeetingInvitationsOrCancellations', send_meeting_invitations_or_cancellations),
+                ])
             )
         itemchanges = create_element('m:ItemChanges')
         for item, fieldnames in items:
@@ -960,17 +966,21 @@ class DeleteItem(EWSAccountService, EWSPooledMixIn):
         if self.account.version.build >= EXCHANGE_2013_SP1:
             deleteitem = create_element(
                 'm:%s' % self.SERVICE_NAME,
-                DeleteType=delete_type,
-                SendMeetingCancellations=send_meeting_cancellations,
-                AffectedTaskOccurrences=affected_task_occurrences,
-                SuppressReadReceipts='true' if suppress_read_receipts else 'false',
+                attrs=OrderedDict([
+                    ('DeleteType', delete_type),
+                    ('SendMeetingCancellations', send_meeting_cancellations),
+                    ('AffectedTaskOccurrences', affected_task_occurrences),
+                    ('SuppressReadReceipts', 'true' if suppress_read_receipts else 'false'),
+                ])
             )
         else:
             deleteitem = create_element(
                 'm:%s' % self.SERVICE_NAME,
-                DeleteType=delete_type,
-                SendMeetingCancellations=send_meeting_cancellations,
-                AffectedTaskOccurrences=affected_task_occurrences,
+                attrs=OrderedDict([
+                    ('DeleteType', delete_type),
+                    ('SendMeetingCancellations', send_meeting_cancellations),
+                    ('AffectedTaskOccurrences', affected_task_occurrences),
+                 ])
             )
 
         item_ids = create_element('m:ItemIds')
@@ -1020,7 +1030,7 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
 
     def get_payload(self, additional_fields, restriction, order_fields, query_string, shape, depth, calendar_view,
                     page_size, offset=0):
-        finditem = create_element('m:%s' % self.SERVICE_NAME, Traversal=depth)
+        finditem = create_element('m:%s' % self.SERVICE_NAME, attrs=dict(Traversal=depth))
         itemshape = create_element('m:ItemShape')
         add_xml_child(itemshape, 't:BaseShape', shape)
         if additional_fields:
@@ -1032,10 +1042,14 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
             ))
         finditem.append(itemshape)
         if calendar_view is None:
-            view_type = create_element('m:IndexedPageItemView',
-                                       MaxEntriesReturned=text_type(page_size),
-                                       Offset=text_type(offset),
-                                       BasePoint='Beginning')
+            view_type = create_element(
+                'm:IndexedPageItemView',
+                attrs=OrderedDict([
+                    ('MaxEntriesReturned', text_type(page_size)),
+                    ('Offset', text_type(offset)),
+                    ('BasePoint', 'Beginning'),
+                ])
+            )
         else:
             view_type = calendar_view.to_xml(version=self.account.version)
         finditem.append(view_type)
@@ -1094,7 +1108,7 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
             yield Folder.from_xml_with_root(elem=elem, root=root)
 
     def get_payload(self, additional_fields, restriction, shape, depth, page_size, offset=0):
-        findfolder = create_element('m:%s' % self.SERVICE_NAME, Traversal=depth)
+        findfolder = create_element('m:%s' % self.SERVICE_NAME, attrs=dict(Traversal=depth))
         foldershape = create_element('m:FolderShape')
         add_xml_child(foldershape, 't:BaseShape', shape)
         if additional_fields:
@@ -1105,8 +1119,14 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
             foldershape.append(additional_properties)
         findfolder.append(foldershape)
         if self.account.version.build >= EXCHANGE_2010:
-            indexedpageviewitem = create_element('m:IndexedPageFolderView', MaxEntriesReturned=text_type(page_size),
-                                                 Offset=text_type(offset), BasePoint='Beginning')
+            indexedpageviewitem = create_element(
+                'm:IndexedPageFolderView',
+                attrs=OrderedDict([
+                    ('MaxEntriesReturned', text_type(page_size)),
+                    ('Offset', text_type(offset)),
+                    ('BasePoint', 'Beginning'),
+                ])
+            )
             findfolder.append(indexedpageviewitem)
         else:
             if offset != 0:
@@ -1337,7 +1357,7 @@ class DeleteFolder(EWSAccountService):
 
     def get_payload(self, folders, delete_type):
         from .folders import Folder, FolderId, DistinguishedFolderId
-        deletefolder = create_element('m:%s' % self.SERVICE_NAME, DeleteType=delete_type)
+        deletefolder = create_element('m:%s' % self.SERVICE_NAME, attrs=dict(DeleteType=delete_type))
         folder_ids = create_element('m:FolderIds')
         for folder in folders:
             log.debug('Deleting folder %s', folder)
@@ -1363,8 +1383,13 @@ class EmptyFolder(EWSAccountService):
 
     def get_payload(self, folders, delete_type, delete_sub_folders):
         from .folders import Folder, FolderId, DistinguishedFolderId
-        emptyfolder = create_element('m:%s' % self.SERVICE_NAME, DeleteType=delete_type,
-                                     DeleteSubFolders='true' if delete_sub_folders else 'false')
+        emptyfolder = create_element(
+            'm:%s' % self.SERVICE_NAME,
+            attrs=OrderedDict([
+                ('DeleteType', delete_type),
+                ('DeleteSubFolders', 'true' if delete_sub_folders else 'false'),
+            ])
+        )
         folder_ids = create_element('m:FolderIds')
         for folder in folders:
             log.debug('Emptying folder %s', folder)
@@ -1391,7 +1416,7 @@ class SendItem(EWSAccountService):
         from .properties import ItemId
         senditem = create_element(
             'm:%s' % self.SERVICE_NAME,
-            SaveItemToFolder='true' if saved_item_folder else 'false',
+            attrs=dict(SaveItemToFolder='true' if saved_item_folder else 'false'),
         )
         item_ids = create_element('m:ItemIds')
         for item in items:
@@ -1511,7 +1536,7 @@ class FindPeople(EWSAccountService, PagingEWSMixIn):
 
     def get_payload(self, folder, additional_fields, restriction, order_fields, query_string, shape, depth, page_size,
                     offset=0):
-        findpeople = create_element('m:%s' % self.SERVICE_NAME, Traversal=depth)
+        findpeople = create_element('m:%s' % self.SERVICE_NAME, attrs=dict(Traversal=depth))
         personashape = create_element('m:PersonaShape')
         add_xml_child(personashape, 't:BaseShape', shape)
         if additional_fields:
@@ -1522,10 +1547,14 @@ class FindPeople(EWSAccountService, PagingEWSMixIn):
                 version=self.account.version
             ))
         findpeople.append(personashape)
-        view_type = create_element('m:IndexedPageItemView',
-                                   MaxEntriesReturned=text_type(page_size),
-                                   Offset=text_type(offset),
-                                   BasePoint='Beginning')
+        view_type = create_element(
+            'm:IndexedPageItemView',
+            attrs=OrderedDict([
+                ('MaxEntriesReturned', text_type(page_size)),
+                ('Offset', text_type(offset)),
+                ('BasePoint', 'Beginning'),
+            ])
+        )
         findpeople.append(view_type)
         if restriction:
             findpeople.append(restriction.to_xml(version=self.account.version))
@@ -1665,7 +1694,7 @@ class ResolveNames(EWSService):
                     contact_data_shape):
         payload = create_element(
             'm:%s' % self.SERVICE_NAME,
-            ReturnFullContactData='true' if return_full_contact_data else 'false',
+            attrs=dict(ReturnFullContactData='true' if return_full_contact_data else 'false'),
         )
         if search_scope:
             payload.set('SearchScope', search_scope)
@@ -1888,7 +1917,7 @@ class UploadItems(EWSAccountService, EWSPooledMixIn):
         itemselement = create_element('m:Items')
         uploaditems.append(itemselement)
         for parent_folder, data_str in items:
-            item = create_element('t:Item', CreateAction='CreateNew')
+            item = create_element('t:Item', attrs=dict(CreateAction='CreateNew'))
             parentfolderid = ParentFolderId(parent_folder.id, parent_folder.changekey)
             set_xml_value(item, parentfolderid, version=self.account.version)
             add_xml_child(item, 't:Data', data_str)

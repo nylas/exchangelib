@@ -345,7 +345,7 @@ def _autodiscover_quick(credentials, email, protocol):
 
 def _get_payload(email):
     # Builds a full Autodiscover XML request
-    payload = create_element('Autodiscover', xmlns=REQUEST_NS)
+    payload = create_element('Autodiscover', attrs=dict(xmlns=REQUEST_NS))
     request = create_element('Request')
     add_xml_child(request, 'EMailAddress', email)
     add_xml_child(request, 'AcceptableResponseSchema', RESPONSE_NS)
