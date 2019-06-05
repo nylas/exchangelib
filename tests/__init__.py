@@ -1148,11 +1148,11 @@ class RestrictionTest(TimedTestCase):
 <m:Restriction xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages">
     <t:And xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
         <t:Or>
-            <t:Contains ContainmentComparison="Exact" ContainmentMode="Substring">
+            <t:Contains ContainmentMode="Substring" ContainmentComparison="Exact">
                 <t:FieldURI FieldURI="item:Categories"/>
                 <t:Constant Value="FOO"/>
             </t:Contains>
-            <t:Contains ContainmentComparison="Exact" ContainmentMode="Substring">
+            <t:Contains ContainmentMode="Substring" ContainmentComparison="Exact">
                 <t:FieldURI FieldURI="item:Categories"/>
                 <t:Constant Value="BAR"/>
             </t:Contains>
@@ -1737,8 +1737,8 @@ class CommonTest(EWSTest):
             PrettyXmlHandler.prettify_xml(wrapped),
             b'''<?xml version='1.0' encoding='utf-8'?>
 <s:Envelope
-    xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"
     xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"
+    xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"
     xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
   <s:Header>
     <t:RequestServerVersion Version="BBB"/>
@@ -1757,8 +1757,8 @@ class CommonTest(EWSTest):
             PrettyXmlHandler.prettify_xml(wrapped),
             b'''<?xml version='1.0' encoding='utf-8'?>
 <s:Envelope
-    xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"
     xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"
+    xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"
     xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
   <s:Header>
     <t:RequestServerVersion Version="BBB"/>

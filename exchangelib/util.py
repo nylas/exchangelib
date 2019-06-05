@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 
 from base64 import b64decode
 from codecs import BOM_UTF8
+from collections import OrderedDict
 import datetime
 from decimal import Decimal
 import io
@@ -53,11 +54,11 @@ MNS = 'http://schemas.microsoft.com/exchange/services/2006/messages'
 TNS = 'http://schemas.microsoft.com/exchange/services/2006/types'
 ENS = 'http://schemas.microsoft.com/exchange/services/2006/errors'
 
-ns_translation = {
-    's': SOAPNS,
-    't': TNS,
-    'm': MNS,
-}
+ns_translation = OrderedDict([
+    ('s', SOAPNS),
+    ('m', MNS),
+    ('t', TNS),
+])
 for item in ns_translation.items():
     _etree.register_namespace(*item)
 
