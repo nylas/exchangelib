@@ -45,8 +45,19 @@ VERSIONS = {
 API_VERSIONS = sorted({v[0] for v in VERSIONS.values()}, reverse=True)
 
 
+class PickleMixIn(object):
+    if PY2:
+        def __getstate__(self):
+            return {k: getattr(self, k) for k in self.__slots__}
+
+        def __setstate__(self, state):
+            for k in self.__slots__:
+                setattr(self, k, state.get(k))
+
+
+
 @python_2_unicode_compatible
-class Build(object):
+class Build(PickleMixIn):
     """
     Holds methods for working with build numbers
     """
@@ -141,14 +152,6 @@ class Build(object):
     def __ge__(self, other):
         return self.__cmp__(other) >= 0
 
-    if PY2:
-        def __getstate__(self):
-            return {k: getattr(self, k) for k in self.__slots__}
-
-        def __setstate__(self, state):
-            for k in self.__slots__:
-                setattr(self, k, state.get(k))
-
     def __str__(self):
         return '%s.%s.%s.%s' % (self.major_version, self.minor_version, self.major_build, self.minor_build)
 
@@ -170,7 +173,7 @@ EXCHANGE_2019 = Build(15, 2)
 
 
 @python_2_unicode_compatible
-class Version(object):
+class Version(PickleMixIn):
     """
     Holds information about the server version
     """
@@ -292,14 +295,6 @@ class Version(object):
                 log.info('API version "%s" worked but server reports version "%s". Using "%s"', requested_api_version,
                          api_version_from_server, api_version_from_server)
         return cls(build, api_version_from_server)
-
-    if PY2:
-        def __getstate__(self):
-            return {k: getattr(self, k) for k in self.__slots__}
-
-        def __setstate__(self, state):
-            for k in self.__slots__:
-                setattr(self, k, state.get(k))
 
     def __repr__(self):
         return self.__class__.__name__ + repr((self.build, self.api_version))

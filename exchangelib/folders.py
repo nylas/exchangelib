@@ -951,18 +951,21 @@ class Folder(RegisterMixIn, SearchableMixIn):
         raise NotImplementedError('Use from_xml_with_root() instead')
 
     @classmethod
-    def from_xml_with_root(cls, elem, root):
-        # If no root is specified, assume the main root hierarchy
+    def _kwargs_from_elem(cls, elem, account):
         fld_id_elem = elem.find(FolderId.response_tag())
-        fld_id = fld_id_elem.get(FolderId.ID_ATTR)
-        changekey = fld_id_elem.get(FolderId.CHANGEKEY_ATTR)
+        kwargs = dict(id=fld_id_elem.get(FolderId.ID_ATTR), changekey=fld_id_elem.get(FolderId.CHANGEKEY_ATTR))
         # Check for 'DisplayName' element before collecting kwargs because because that clears the elements
         has_name_elem = elem.find(cls.get_field_by_fieldname('name').response_tag()) is not None
-        kwargs = {f.name: f.from_xml(elem=elem, account=root.account) for f in cls.supported_fields()}
+        kwargs.update({f.name: f.from_xml(elem=elem, account=account) for f in cls.supported_fields()})
         if has_name_elem and not kwargs['name']:
             # When we request the 'DisplayName' property, some folders may still be returned with an empty value.
             # Assign a default name to these folders.
             kwargs['name'] = cls.DISTINGUISHED_FOLDER_ID
+        return kwargs
+
+    @classmethod
+    def from_xml_with_root(cls, elem, root):
+        kwargs = cls._kwargs_from_elem(elem=elem, account=root.account)
         cls._clear(elem)
         folder_cls = cls
         if cls == Folder:
@@ -999,7 +1002,7 @@ class Folder(RegisterMixIn, SearchableMixIn):
                     pass
             if folder_cls == Folder:
                 log.debug('Fallback to class Folder (folder_class %s, name %s)', kwargs['folder_class'], kwargs['name'])
-        return folder_cls(root=root, id=fld_id, changekey=changekey, **kwargs)
+        return folder_cls(root=root, **kwargs)
 
     def to_xml(self, version):
         if self.is_distinguished:
@@ -1804,19 +1807,9 @@ class RootOfHierarchy(Folder):
 
     @classmethod
     def from_xml(cls, elem, account):
-        # fld_type = re.sub('{.*}', '', elem.tag)
-        fld_id_elem = elem.find(FolderId.response_tag())
-        fld_id = fld_id_elem.get(FolderId.ID_ATTR)
-        changekey = fld_id_elem.get(FolderId.CHANGEKEY_ATTR)
-        # Check for 'DisplayName' element before collecting kwargs because because that clears the elements
-        has_name_elem = elem.find(cls.get_field_by_fieldname('name').response_tag()) is not None
-        kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.supported_fields()}
-        if has_name_elem and not kwargs['name']:
-            # When we request the 'DisplayName' property, some folders may still be returned with an empty value.
-            # Assign a default name to these folders.
-            kwargs['name'] = cls.DISTINGUISHED_FOLDER_ID
+        kwargs = cls._kwargs_from_elem(elem=elem, account=account)
         cls._clear(elem)
-        return cls(account=account, id=fld_id, changekey=changekey, **kwargs)
+        return cls(account=account, **kwargs)
 
     @classmethod
     def folder_cls_from_folder_name(cls, folder_name, locale):

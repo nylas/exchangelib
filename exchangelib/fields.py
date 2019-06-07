@@ -1105,24 +1105,8 @@ class NamedSubField(SubField):
         return '{%s}%s' % (self.namespace, self.field_uri)
 
 
-class IndexedField(FieldURIField):
+class IndexedField(EWSElementField):
     PARENT_ELEMENT_NAME = None
-
-    def __init__(self, *args, **kwargs):
-        self.value_cls = kwargs.pop('value_cls')
-        super(IndexedField, self).__init__(*args, **kwargs)
-
-    def from_xml(self, elem, account):
-        if self.is_list:
-            iter_elem = elem.find(self.response_tag())
-            if iter_elem is not None:
-                return [self.value_cls.from_xml(elem=e, account=account)
-                        for e in iter_elem.findall(self.value_cls.response_tag())]
-        else:
-            sub_elem = elem.find(self.response_tag())
-            if sub_elem is not None:
-                return self.value_cls.from_xml(elem=sub_elem, account=account)
-        return self.default
 
     def to_xml(self, value, version):
         return set_xml_value(create_element('t:%s' % self.PARENT_ELEMENT_NAME), value, version)

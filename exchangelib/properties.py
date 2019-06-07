@@ -825,6 +825,10 @@ class Permission(EWSElement):
 
     PERMISSION_ENUM = {Choice('None'), Choice('Owned'), Choice('All')}
     FIELDS = [
+        ChoiceField('permission_level', field_uri='PermissionLevel', choices={
+            Choice('None'), Choice('Owner'), Choice('PublishingEditor'), Choice('Editor'), Choice('PublishingAuthor'),
+            Choice('Author'), Choice('NoneditingAuthor'), Choice('Reviewer'), Choice('Contributor'), Choice('Custom')
+        }, default='None'),
         BooleanField('can_create_items', field_uri='CanCreateItems', default=False),
         BooleanField('can_create_subfolders', field_uri='CanCreateSubfolders', default=False),
         BooleanField('is_folder_owner', field_uri='IsFolderOwner', default=False),
@@ -832,10 +836,6 @@ class Permission(EWSElement):
         BooleanField('is_folder_contact', field_uri='IsFolderContact', default=False),
         ChoiceField('edit_items', field_uri='EditItems', choices=PERMISSION_ENUM, default='None'),
         ChoiceField('delete_items', field_uri='DeleteItems', choices=PERMISSION_ENUM, default='None'),
-        ChoiceField('permission_level', field_uri='PermissionLevel', choices={
-            Choice('None'), Choice('Owner'), Choice('PublishingEditor'), Choice('Editor'), Choice('PublishingAuthor'),
-            Choice('Author'), Choice('NoneditingAuthor'), Choice('Reviewer'), Choice('Contributor'), Choice('Custom')
-        }, default='None'),
         ChoiceField('read_items', field_uri='ReadItems', choices={
             Choice('None'), Choice('FullDetails')
         }, default='None'),
@@ -856,18 +856,7 @@ class CalendarPermission(EWSElement):
             Choice('Author'), Choice('NoneditingAuthor'), Choice('Reviewer'), Choice('Contributor'),
             Choice('FreeBusyTimeOnly'), Choice('FreeBusyTimeAndSubjectAndLocation'), Choice('Custom')
         }, default='None'),
-        BooleanField('can_create_items', field_uri='CanCreateItems', default=False),
-        BooleanField('can_create_subfolders', field_uri='CanCreateSubfolders', default=False),
-        BooleanField('is_folder_owner', field_uri='IsFolderOwner', default=False),
-        BooleanField('is_folder_visible', field_uri='IsFolderVisible', default=False),
-        BooleanField('is_folder_contact', field_uri='IsFolderContact', default=False),
-        ChoiceField('edit_items', field_uri='EditItems', choices=PERMISSION_ENUM, default='None'),
-        ChoiceField('delete_items', field_uri='DeleteItems', choices=PERMISSION_ENUM, default='None'),
-        ChoiceField('read_items', field_uri='ReadItems', choices={
-            Choice('None'), Choice('FullDetails')
-        }, default='None'),
-        EWSElementField('user_id', field_uri='UserId', value_cls=UserId, is_required=True)
-    ]
+    ] + Permission.FIELDS[1:]
 
     __slots__ = tuple(f.name for f in FIELDS)
 
