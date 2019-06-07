@@ -312,13 +312,15 @@ class EWSService(object):
         raise SOAPError('SOAP error code: %s string: %s actor: %s detail: %s' % (
             faultcode, faultstring, faultactor, detail))
 
-    def _get_element_container(self, message, name=None):
+    def _get_element_container(self, message, response_message=None, name=None):
+        if response_message is None:
+            response_message = message
         # ResponseClass: See http://msdn.microsoft.com/en-us/library/aa566424(v=EXCHG.140).aspx
-        response_class = message.get('ResponseClass')
+        response_class = response_message.get('ResponseClass')
         # ResponseCode, MessageText: See http://msdn.microsoft.com/en-us/library/aa580757(v=EXCHG.140).aspx
-        response_code = get_xml_attr(message, '{%s}ResponseCode' % MNS)
-        msg_text = get_xml_attr(message, '{%s}MessageText' % MNS)
-        msg_xml = message.find('{%s}MessageXml' % MNS)
+        response_code = get_xml_attr(response_message, '{%s}ResponseCode' % MNS)
+        msg_text = get_xml_attr(response_message, '{%s}MessageText' % MNS)
+        msg_xml = response_message.find('{%s}MessageXml' % MNS)
         if response_class == 'Success' and response_code == 'NoError':
             if not name:
                 return True
@@ -1931,40 +1933,11 @@ class UploadItems(EWSAccountService, EWSPooledMixIn):
 
 class BaseUserOofSettings(EWSAccountService):
     # Common response parsing for non-standard OOF services
-    def _get_element_container(self, message, name=None):
-        # ResponseClass: See http://msdn.microsoft.com/en-us/library/aa566424(v=EXCHG.140).aspx
+    def _get_element_container(self, message, response_message=None, name=None):
         response_message = message.find('{%s}ResponseMessage' % MNS)
-        response_class = response_message.get('ResponseClass')
-        # ResponseCode, MessageText: See http://msdn.microsoft.com/en-us/library/aa580757(v=EXCHG.140).aspx
-        response_code = get_xml_attr(response_message, '{%s}ResponseCode' % MNS)
-        msg_text = get_xml_attr(response_message, '{%s}MessageText' % MNS)
-        msg_xml = response_message.find('{%s}MessageXml' % MNS)
-        if response_class == 'Success' and response_code == 'NoError':
-            if not name:
-                return True
-            container = message.find(name)
-            if container is None:
-                raise MalformedResponseError('No %s elements in ResponseMessage (%s)' % (name, xml_to_str(message)))
-            return container
-        if response_code == 'NoError':
-            return True
-        # Raise any non-acceptable errors in the container, or return the container or the acceptable exception instance
-        if response_class == 'Warning':
-            try:
-                raise self._get_exception(code=response_code, text=msg_text, msg_xml=msg_xml)
-            except self.WARNINGS_TO_CATCH_IN_RESPONSE as e:
-                return e
-            except self.WARNINGS_TO_IGNORE_IN_RESPONSE as e:
-                log.warning(str(e))
-                container = message.find(name)
-                if container is None:
-                    raise MalformedResponseError('No %s elements in ResponseMessage (%s)' % (name, xml_to_str(message)))
-                return container
-        # rspclass == 'Error', or 'Success' and not 'NoError'
-        try:
-            raise self._get_exception(code=response_code, text=msg_text, msg_xml=msg_xml)
-        except self.ERRORS_TO_CATCH_IN_RESPONSE as e:
-            return e
+        return super(BaseUserOofSettings, self)._get_element_container(
+            message=message, response_message=response_message, name=name
+        )
 
 
 class GetUserOofSettings(BaseUserOofSettings):

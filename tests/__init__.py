@@ -2000,6 +2000,9 @@ class CommonTest(EWSTest):
             )
 
     def test_oof_settings(self):
+        # First, ensure a common starting point
+        self.account.oof_settings = OofSettings(state=OofSettings.DISABLED)
+
         oof = OofSettings(
             state=OofSettings.ENABLED,
             external_audience='None',
