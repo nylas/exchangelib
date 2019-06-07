@@ -7,6 +7,8 @@ HEAD
     decoding is done automatically.
 -   The `Item.item_id`, `Folder.folder_id` and `Occurrence.item_id` fields that were renamed
     to just `id` in 1.12.0, have now been removed.
+-   The `Persona.persona_id` field was replaced with `Persona.id` and `Persona.changekey`, to
+    align with the `Item` and `Folder` classes.
 
 
 1.12.5

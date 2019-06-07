@@ -14,7 +14,7 @@ from .fields import BooleanField, IntegerField, DecimalField, Base64Field, TextF
     EffectiveRightsField, TimeZoneField, CultureField, IdField, CharField, TextListField, EnumAsIntField, \
     EmailAddressField, FreeBusyStatusField, ReferenceItemIdField, AssociatedCalendarItemIdField, MimeContentField
 from .properties import EWSElement, ItemId, ConversationId, ParentFolderId, Attendee, ReferenceItemId, \
-    AssociatedCalendarItemId, PersonaId, InvalidField
+    AssociatedCalendarItemId, PersonaId, InvalidField, IdChangeKeyMixIn
 from .recurrence import FirstOccurrence, LastOccurrence, Occurrence, DeletedOccurrence
 from .util import is_iterable
 from .version import EXCHANGE_2007_SP1, EXCHANGE_2010, EXCHANGE_2013
@@ -84,7 +84,7 @@ CONTACTS_ACTIVE_DIRECTORY = 'ContactsActiveDirectory'
 SEARCH_SCOPE_CHOICES = (ACTIVE_DIRECTORY, ACTIVE_DIRECTORY_CONTACTS, CONTACTS, CONTACTS_ACTIVE_DIRECTORY)
 
 
-class RegisterMixIn(EWSElement):
+class RegisterMixIn(IdChangeKeyMixIn):
     INSERT_AFTER_FIELD = None
 
     @classmethod
@@ -134,8 +134,7 @@ class Item(RegisterMixIn):
     # FIELDS is an ordered list of attributes supported by this item class
     FIELDS = [
         MimeContentField('mime_content', field_uri='item:MimeContent', is_read_only_after_send=True),
-        IdField('id', field_uri=ItemId.ID_ATTR, is_read_only=True),
-        IdField('changekey', field_uri=ItemId.CHANGEKEY_ATTR, is_read_only=True),
+    ] + RegisterMixIn.FIELDS + [
         EWSElementField('parent_folder_id', field_uri='item:ParentFolderId', value_cls=ParentFolderId,
                         is_read_only=True),
         CharField('item_class', field_uri='item:ItemClass', is_read_only=True),
@@ -220,6 +219,12 @@ class Item(RegisterMixIn):
                 self.attach(self.attachments)
         else:
             self.attachments = []
+
+    @classmethod
+    def from_xml(cls, elem, account):
+        item = super(Item, cls).from_xml(elem=elem, account=account)
+        item.account = account
+        return item
 
     def save(self, update_fields=None, conflict_resolution=AUTO_RESOLVE, send_meeting_invitations=SEND_TO_NONE):
         if self.id:
@@ -438,40 +443,13 @@ class Item(RegisterMixIn):
             if a in self.attachments:
                 self.attachments.remove(a)
 
-    @classmethod
-    def id_from_xml(cls, elem):
-        id_elem = elem.find(ItemId.response_tag())
-        if id_elem is None:
-            return None, None
-        return id_elem.get(ItemId.ID_ATTR), id_elem.get(ItemId.CHANGEKEY_ATTR)
-
-    @classmethod
-    def from_xml(cls, elem, account):
-        item_id, changekey = cls.id_from_xml(elem=elem)
-        kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.supported_fields()}
-        cls._clear(elem)
-        return cls(account=account, id=item_id, changekey=changekey, **kwargs)
-
-    def __eq__(self, other):
-        if isinstance(other, tuple):
-            return hash((self.id, self.changekey)) == hash(other)
-        return super(Item, self).__eq__(other)
-
-    def __hash__(self):
-        # If we have an ID and changekey, use that as key. Else return a hash of all attributes
-        if self.id:
-            return hash((self.id, self.changekey))
-        return super(Item, self).__hash__()
-
 
 @python_2_unicode_compatible
 class BulkCreateResult(Item):
     """
     A dummy class to store return values from a CreateItem service call
     """
-    FIELDS = [
-        IdField('id', field_uri=ItemId.ID_ATTR, is_required=True, is_read_only=True),
-        IdField('changekey', field_uri=ItemId.CHANGEKEY_ATTR, is_required=True, is_read_only=True),
+    FIELDS = IdChangeKeyMixIn.FIELDS + [
         AttachmentField('attachments', field_uri='item:Attachments'),  # ItemAttachment or FileAttachment
     ]
 
@@ -1279,11 +1257,11 @@ class CancelCalendarItem(BaseReplyItem):
     ELEMENT_NAME = 'CancelCalendarItem'
 
 
-class Persona(EWSElement):
+class Persona(IdChangeKeyMixIn):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/jj191299(v=exchg.150).aspx
     ELEMENT_NAME = 'Persona'
-    FIELDS = [
-        EWSElementField('persona_id', field_uri='persona:PersonaId', value_cls=PersonaId),
+    ID_ELEMENT_CLS = PersonaId
+    FIELDS = IdChangeKeyMixIn.FIELDS + [
         CharField('file_as', field_uri='persona:FileAs'),
         CharField('display_name', field_uri='persona:DisplayName'),
         CharField('given_name', field_uri='persona:GivenName'),
@@ -1297,24 +1275,6 @@ class Persona(EWSElement):
         CharField('im_address', field_uri='persona:ImAddress'),
         TextField('initials', field_uri='persona:Initials'),
     ]
-
-    @classmethod
-    def id_from_xml(cls, elem):
-        id_elem = elem.find(PersonaId.response_tag())
-        if id_elem is None:
-            return None, None
-        return id_elem.get(PersonaId.ID_ATTR), id_elem.get(PersonaId.CHANGEKEY_ATTR)
-
-    def __eq__(self, other):
-        if isinstance(other, tuple):
-            return hash(self.persona_id) == hash(other)
-        return super(Persona, self).__eq__(other)
-
-    def __hash__(self):
-        # If we have a persona_id, use that as key. Else return a hash of all attributes
-        if self.persona_id:
-            return hash(self.persona_id)
-        return super(Persona, self).__hash__()
 
 
 ITEM_CLASSES = (Item, CalendarItem, Contact, DistributionList, Message, PostItem, Task, MeetingRequest, MeetingResponse,

@@ -926,3 +926,40 @@ class FailedMailbox(EWSElement):
     ]
 
     __slots__ = tuple(f.name for f in FIELDS)
+
+
+class IdChangeKeyMixIn(EWSElement):
+    # A class that has 'id' and 'changekey' fields which are actually attributes on ID element
+    ID_ELEMENT_CLS = ItemId
+
+    FIELDS = [
+        IdField('id', field_uri=ID_ELEMENT_CLS.ID_ATTR, is_read_only=True),
+        IdField('changekey', field_uri=ID_ELEMENT_CLS.CHANGEKEY_ATTR, is_read_only=True),
+    ]
+
+    __slots__ = tuple(f.name for f in FIELDS)
+
+    @classmethod
+    def id_from_xml(cls, elem):
+        id_elem = elem.find(cls.ID_ELEMENT_CLS.response_tag())
+        if id_elem is None:
+            return None, None
+        return id_elem.get(cls.ID_ELEMENT_CLS.ID_ATTR), id_elem.get(cls.ID_ELEMENT_CLS.CHANGEKEY_ATTR)
+
+    @classmethod
+    def from_xml(cls, elem, account):
+        item_id, changekey = cls.id_from_xml(elem)
+        kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.supported_fields()}
+        cls._clear(elem)
+        return cls(id=item_id, changekey=changekey, **kwargs)
+
+    def __eq__(self, other):
+        if isinstance(other, tuple):
+            return hash((self.id, self.changekey)) == hash(other)
+        return super(IdChangeKeyMixIn, self).__eq__(other)
+
+    def __hash__(self):
+        # If we have an ID and changekey, use that as key. Else return a hash of all attributes
+        if self.id:
+            return hash((self.id, self.changekey))
+        return super(IdChangeKeyMixIn, self).__hash__()

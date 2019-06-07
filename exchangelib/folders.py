@@ -509,9 +509,8 @@ class Folder(RegisterMixIn, SearchableMixIn):
     get_folder_allowed = True
     LOCALIZED_NAMES = dict()  # A map of (str)locale: (tuple)localized_folder_names
     ITEM_MODEL_MAP = {cls.response_tag(): cls for cls in ITEM_CLASSES}
-    FIELDS = [
-        IdField('id', field_uri=FolderId.ID_ATTR),
-        IdField('changekey', field_uri=FolderId.CHANGEKEY_ATTR),
+    ID_ELEMENT_CLS = FolderId
+    FIELDS = RegisterMixIn.FIELDS + [
         EWSElementField('parent_folder_id', field_uri='folder:ParentFolderId', value_cls=ParentFolderId,
                         is_read_only=True),
         CharField('folder_class', field_uri='folder:FolderClass', is_required_after_save=True),
@@ -952,8 +951,8 @@ class Folder(RegisterMixIn, SearchableMixIn):
 
     @classmethod
     def _kwargs_from_elem(cls, elem, account):
-        fld_id_elem = elem.find(FolderId.response_tag())
-        kwargs = dict(id=fld_id_elem.get(FolderId.ID_ATTR), changekey=fld_id_elem.get(FolderId.CHANGEKEY_ATTR))
+        folder_id, changekey = cls.id_from_xml(elem)
+        kwargs = dict(id=folder_id, changekey=changekey)
         # Check for 'DisplayName' element before collecting kwargs because because that clears the elements
         has_name_elem = elem.find(cls.get_field_by_fieldname('name').response_tag()) is not None
         kwargs.update({f.name: f.from_xml(elem=elem, account=account) for f in cls.supported_fields()})

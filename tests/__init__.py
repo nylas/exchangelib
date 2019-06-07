@@ -6325,7 +6325,7 @@ class ContactsTest(CommonItemTest):
 
     def test_get_persona(self):
         # The test server may not have any personas. Just test that the service response with something we can parse
-        persona = Persona(persona_id=PersonaId(id='AAA=', changekey='xxx'))
+        persona = Persona(id='AAA=', changekey='xxx')
         try:
             GetPersona(protocol=self.account.protocol).call(persona=persona)
         except ErrorInvalidIdMalformed:

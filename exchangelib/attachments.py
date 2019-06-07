@@ -179,7 +179,7 @@ class FileAttachment(Attachment):
         return cls(**kwargs)
 
     def to_xml(self, version):
-        self.content = self.content  # Make sure content is available, to avoid ErrorRequiredPropertyMissing
+        self._content = self.content  # Make sure content is available, to avoid ErrorRequiredPropertyMissing
         return super(FileAttachment, self).to_xml(version=version)
 
     def __getstate__(self):

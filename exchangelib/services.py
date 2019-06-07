@@ -1646,8 +1646,6 @@ class GetPersona(EWSService):
         from .items import Persona
         from .properties import PersonaId
         payload = create_element('m:%s' % self.SERVICE_NAME)
-        if isinstance(persona, Persona):
-            persona = persona.persona_id
         set_xml_value(payload, to_item_id(persona, PersonaId), version=self.protocol.version)
         return payload
 

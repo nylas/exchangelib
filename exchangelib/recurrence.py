@@ -4,7 +4,7 @@ from six import string_types
 
 from .fields import IntegerField, IdField, EnumField, EnumListField, DateField, DateTimeField, EWSElementField, \
     WEEKDAY_NAMES, MONTHS, WEEK_NUMBERS, WEEKDAYS, EXTRA_WEEKDAY_OPTIONS
-from .properties import EWSElement, ItemId
+from .properties import EWSElement, IdChangeKeyMixIn
 
 log = logging.getLogger(__name__)
 
@@ -226,15 +226,11 @@ class NumberedPattern(Boundary):
     __slots__ = tuple(f.name for f in FIELDS)
 
 
-class Occurrence(EWSElement):
+class Occurrence(IdChangeKeyMixIn):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa565603(v=exchg.150).aspx
     ELEMENT_NAME = 'Occurrence'
 
-    ID_ATTR = 'ItemId'
-    CHANGEKEY_ATTR = 'ChangeKey'
-    FIELDS = [
-        IdField('id', field_uri=ID_ATTR),
-        IdField('changekey', field_uri=CHANGEKEY_ATTR),
+    FIELDS = IdChangeKeyMixIn.FIELDS + [
         # The modified start time of the item, as EWSDateTime
         DateTimeField('start', field_uri='t:Start'),
         # The modified end time of the item, as EWSDateTime
@@ -244,20 +240,6 @@ class Occurrence(EWSElement):
     ]
 
     __slots__ = tuple(f.name for f in FIELDS)
-
-    @classmethod
-    def id_from_xml(cls, elem):
-        id_elem = elem.find(ItemId.response_tag())
-        if id_elem is None:
-            return None, None
-        return id_elem.get(ItemId.ID_ATTR), id_elem.get(ItemId.CHANGEKEY_ATTR)
-
-    @classmethod
-    def from_xml(cls, elem, account):
-        item_id, changekey = cls.id_from_xml(elem)
-        kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.supported_fields()}
-        cls._clear(elem)
-        return cls(id=item_id, changekey=changekey, **kwargs)
 
 
 # Container elements:
