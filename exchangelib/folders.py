@@ -5,7 +5,6 @@ from copy import deepcopy
 from fnmatch import fnmatch
 import logging
 from operator import attrgetter
-import warnings
 
 from cached_property import threaded_cached_property
 from future.utils import python_2_unicode_compatible, PY2

@@ -1,5 +1,4 @@
 import logging
-import warnings
 
 from six import string_types
 

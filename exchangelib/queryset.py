@@ -4,7 +4,6 @@ from __future__ import unicode_literals
 from copy import deepcopy
 from itertools import islice
 import logging
-import warnings
 
 from future.utils import python_2_unicode_compatible
 

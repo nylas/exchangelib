@@ -2,7 +2,6 @@ from __future__ import unicode_literals
 
 from decimal import Decimal
 import logging
-import warnings
 
 from future.utils import python_2_unicode_compatible
 
