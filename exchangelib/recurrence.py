@@ -246,29 +246,6 @@ class Occurrence(EWSElement):
 
     __slots__ = tuple(f.name for f in FIELDS)
 
-    def __init__(self, **kwargs):
-        if 'item_id' in kwargs:
-            warnings.warn("The 'item_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
-            kwargs['id'] = kwargs.pop('item_id')
-        super(Occurrence, self).__init__(**kwargs)
-
-    @property
-    def item_id(self):
-        warnings.warn("The 'item_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
-        return self.id
-
-    @item_id.setter
-    def item_id(self, value):
-        warnings.warn("The 'item_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
-        self.id = value
-
-    @classmethod
-    def get_field_by_fieldname(cls, fieldname):
-        if fieldname == 'item_id':
-            warnings.warn("The 'item_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
-            fieldname = 'id'
-        return super(Occurrence, cls).get_field_by_fieldname(fieldname)
-
     @classmethod
     def id_from_xml(cls, elem):
         id_elem = elem.find(ItemId.response_tag())

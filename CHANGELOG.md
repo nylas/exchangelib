@@ -3,8 +3,10 @@ Change Log
 
 HEAD
 ----
-`Item.mime_content` is now a text field instead of a binary field. Encoding and
-decoding is done automatically.
+-   `Item.mime_content` is now a text field instead of a binary field. Encoding and
+    decoding is done automatically.
+-   The `Item.item_id`, `Folder.folder_id` and `Occurrence.item_id` fields that were renamed
+    to just `id` in 1.12.0, have now been removed.
 
 
 1.12.5

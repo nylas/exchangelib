@@ -1025,29 +1025,6 @@ class FieldTest(TimedTestCase):
 
 
 class ItemTest(TimedTestCase):
-    def test_item_id_deprecation(self):
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            # Trigger a warning
-            Message(id='XXX', changekey='YYY').item_id
-            self.assertEqual(len(w), 1, w)
-            self.assertTrue(issubclass(w[0].category, PendingDeprecationWarning), w[0].category)
-            self.assertIn("Use 'id' instead", str(w[0].message))
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            # Trigger a warning
-            Message.get_field_by_fieldname('item_id')
-            self.assertEqual(len(w), 1, w)
-            self.assertTrue(issubclass(w[0].category, PendingDeprecationWarning), w[0].category)
-            self.assertIn("Use 'id' instead", str(w[0].message))
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            # Trigger a warning
-            Message(item_id='XXX')
-            self.assertEqual(len(w), 1, w)
-            self.assertTrue(issubclass(w[0].category, PendingDeprecationWarning), w[0].category)
-            self.assertIn("Use 'id' instead", str(w[0].message))
-
     def test_task_validation(self):
         tz = EWSTimeZone.timezone('Europe/Copenhagen')
         task = Task(due_date=tz.localize(EWSDateTime(2017, 1, 1)), start_date=tz.localize(EWSDateTime(2017, 2, 1)))
@@ -1080,29 +1057,6 @@ class ItemTest(TimedTestCase):
 
 
 class RecurrenceTest(TimedTestCase):
-    def test_item_id_deprecation(self):
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            # Trigger a warning
-            Occurrence(id='XXX', changekey='YYY').item_id
-            self.assertEqual(len(w), 1, w)
-            self.assertTrue(issubclass(w[0].category, PendingDeprecationWarning), w[0].category)
-            self.assertIn("Use 'id' instead", str(w[0].message))
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            # Trigger a warning
-            Occurrence.get_field_by_fieldname('item_id')
-            self.assertEqual(len(w), 1, w)
-            self.assertTrue(issubclass(w[0].category, PendingDeprecationWarning), w[0].category)
-            self.assertIn("Use 'id' instead", str(w[0].message))
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            # Trigger a warning
-            Occurrence(item_id='XXX')
-            self.assertEqual(len(w), 1, w)
-            self.assertTrue(issubclass(w[0].category, PendingDeprecationWarning), w[0].category)
-            self.assertIn("Use 'id' instead", str(w[0].message))
-
     def test_magic(self):
         pattern = AbsoluteYearlyPattern(month=FEBRUARY, day_of_month=28)
         self.assertEqual(str(pattern), 'Occurs on day 28 of February')
@@ -2933,59 +2887,6 @@ r5p9FrBgavAw5bKO54C0oQKpN/5fta5l6Ws0
 
 
 class FolderTest(EWSTest):
-    def test_folder_id_deprecation(self):
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            # Trigger a warning
-            Folder(id='XXX', changekey='YYY').folder_id
-            self.assertEqual(len(w), 1, w)
-            self.assertTrue(issubclass(w[0].category, PendingDeprecationWarning), w[0].category)
-            self.assertIn("Use 'id' instead", str(w[0].message))
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            # Trigger a warning
-            Folder.get_field_by_fieldname('folder_id')
-            self.assertEqual(len(w), 1, w)
-            self.assertTrue(issubclass(w[0].category, PendingDeprecationWarning), w[0].category)
-            self.assertIn("Use 'id' instead", str(w[0].message))
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            # Trigger a warning
-            Folder(folder_id='XXX')
-            self.assertEqual(len(w), 1, w)
-            self.assertTrue(issubclass(w[0].category, PendingDeprecationWarning), w[0].category)
-            self.assertIn("Use 'id' instead", str(w[0].message))
-
-    def test_item_id_deprecation(self):
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            # Trigger a warning
-            Messages(root=self.account.root, id='ZZZ').get(item_id='XXX')
-            self.assertGreaterEqual(len(w), 1)
-            self.assertTrue(issubclass(w[0].category, PendingDeprecationWarning), w[0].category)
-            self.assertIn("Use 'id' instead", str(w[0].message))
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            # Trigger a warning
-            Messages(root=self.account.root, id='ZZZ').all().only('item_id')
-            self.assertGreaterEqual(len(w), 1)
-            self.assertTrue(issubclass(w[0].category, PendingDeprecationWarning), w[0].category)
-            self.assertIn("Use 'id' instead", str(w[0].message))
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            # Trigger a warning
-            Messages(root=self.account.root, id='ZZZ').all().values('item_id')
-            self.assertGreaterEqual(len(w), 1)
-            self.assertTrue(issubclass(w[0].category, PendingDeprecationWarning), w[0].category)
-            self.assertIn("Use 'id' instead", str(w[0].message))
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            # Trigger a warning
-            Messages(root=self.account.root, id='ZZZ').all().values_list('item_id')
-            self.assertGreaterEqual(len(w), 1)
-            self.assertTrue(issubclass(w[0].category, PendingDeprecationWarning), w[0].category)
-            self.assertIn("Use 'id' instead", str(w[0].message))
-
     def test_folders(self):
         for f in self.account.root.walk():
             if isinstance(f, System):

@@ -210,9 +210,6 @@ class Item(RegisterMixIn):
                     if self.account != self.folder.root.account:
                         raise ValueError("'account' does not match 'folder.root.account'")
                 self.account = self.folder.root.account
-        if 'item_id' in kwargs:
-            warnings.warn("The 'item_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
-            kwargs['id'] = kwargs.pop('item_id')
         super(Item, self).__init__(**kwargs)
         # pylint: disable=access-member-before-definition
         if self.attachments:
@@ -224,23 +221,6 @@ class Item(RegisterMixIn):
                 self.attach(self.attachments)
         else:
             self.attachments = []
-
-    @property
-    def item_id(self):
-        warnings.warn("The 'item_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
-        return self.id
-
-    @item_id.setter
-    def item_id(self, value):
-        warnings.warn("The 'item_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
-        self.id = value
-
-    @classmethod
-    def get_field_by_fieldname(cls, fieldname):
-        if fieldname == 'item_id':
-            warnings.warn("The 'item_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
-            fieldname = 'id'
-        return super(Item, cls).get_field_by_fieldname(fieldname)
 
     def save(self, update_fields=None, conflict_resolution=AUTO_RESOLVE, send_meeting_invitations=SEND_TO_NONE):
         if self.id:

@@ -541,27 +541,7 @@ class Folder(RegisterMixIn, SearchableMixIn):
                 if parent.id != kwargs['parent_folder_id']:
                     raise ValueError("'parent_folder_id' must match 'parent' ID")
             kwargs['parent_folder_id'] = ParentFolderId(id=parent.id, changekey=parent.changekey)
-        if 'folder_id' in kwargs:
-            warnings.warn("The 'folder_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
-            kwargs['id'] = kwargs.pop('folder_id')
         super(Folder, self).__init__(**kwargs)
-
-    @property
-    def folder_id(self):
-        warnings.warn("The 'folder_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
-        return self.id
-
-    @folder_id.setter
-    def folder_id(self, value):
-        warnings.warn("The 'folder_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
-        self.id = value
-
-    @classmethod
-    def get_field_by_fieldname(cls, fieldname):
-        if fieldname == 'folder_id':
-            warnings.warn("The 'folder_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
-            fieldname = 'id'
-        return super(Folder, cls).get_field_by_fieldname(fieldname)
 
     @property
     def is_deleteable(self):
@@ -734,9 +714,6 @@ class Folder(RegisterMixIn, SearchableMixIn):
     def validate_item_field(self, field):
         # Takes a fieldname, Field or FieldPath object pointing to an item field, and checks that it is valid
         # for the item types supported by this folder.
-        if field == 'item_id':
-            warnings.warn("The 'item_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
-            field = 'id'
         version = self.root.account.version if self.root and self.root.account else None
         # For each field, check if the field is valid for any of the item models supported by this folder
         for item_model in self.supported_item_models:
@@ -755,9 +732,6 @@ class Folder(RegisterMixIn, SearchableMixIn):
         fields = list(fields)
         has_start, has_end = False, False
         for i, field_path in enumerate(fields):
-            if field_path == 'item_id':
-                warnings.warn("The 'item_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
-                field_path = 'id'
             # Allow both Field and FieldPath instances and string field paths as input
             if isinstance(field_path, string_types):
                 field_path = FieldPath.from_string(field_path=field_path, folder=self)

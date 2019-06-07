@@ -541,9 +541,6 @@ class QuerySet(SearchableMixIn):
 
     def get(self, *args, **kwargs):
         """ Assume the query will return exactly one item. Return that item """
-        if 'item_id' in kwargs:
-            warnings.warn("The 'item_id' attribute is deprecated. Use 'id' instead.", PendingDeprecationWarning)
-            kwargs['id'] = kwargs.pop('item_id')
         if self.is_cached and not args and not kwargs:
             # We can only safely use the cache if get() is called without args
             items = self._cache
