@@ -1837,11 +1837,13 @@ class DeleteAttachment(EWSAccountService):
             items=items,
         ))
 
-    def _get_element_container(self, message, name=None):
+    def _get_element_container(self, message, response_message=None, name=None):
         # DeleteAttachment returns RootItemIds directly beneath DeleteAttachmentResponseMessage. Collect the elements
         # and make our own fake container.
         from .properties import RootItemId
-        res = super(DeleteAttachment, self)._get_element_container(message=message, name=name)
+        res = super(DeleteAttachment, self)._get_element_container(
+            message=message, response_message=response_message, name=name
+        )
         if not res:
             return res
         fake_elem = create_element('FakeContainer')
