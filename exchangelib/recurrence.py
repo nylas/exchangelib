@@ -2,7 +2,7 @@ import logging
 
 from six import string_types
 
-from .fields import IntegerField, IdField, EnumField, EnumListField, DateField, DateTimeField, EWSElementField, \
+from .fields import IntegerField, EnumField, EnumListField, DateField, DateTimeField, EWSElementField, \
     WEEKDAY_NAMES, MONTHS, WEEK_NUMBERS, WEEKDAYS, EXTRA_WEEKDAY_OPTIONS
 from .properties import EWSElement, IdChangeKeyMixIn
 

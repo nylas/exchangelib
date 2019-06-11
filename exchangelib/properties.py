@@ -5,7 +5,6 @@ import binascii
 import codecs
 import datetime
 from inspect import getmro
-from itertools import chain
 import logging
 import struct
 from threading import Lock

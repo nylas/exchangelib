@@ -11,9 +11,9 @@ from .fields import BooleanField, IntegerField, DecimalField, Base64Field, TextF
     URIField, BodyField, DateTimeField, MessageHeaderField, PhoneNumberField, EmailAddressesField, \
     PhysicalAddressField, ExtendedPropertyField, AttachmentField, RecurrenceField, MailboxField, MailboxListField, \
     AttendeesField, Choice, OccurrenceField, OccurrenceListField, MemberListField, EWSElementField, \
-    EffectiveRightsField, TimeZoneField, CultureField, IdField, CharField, TextListField, EnumAsIntField, \
+    EffectiveRightsField, TimeZoneField, CultureField, CharField, TextListField, EnumAsIntField, \
     EmailAddressField, FreeBusyStatusField, ReferenceItemIdField, AssociatedCalendarItemIdField, MimeContentField
-from .properties import EWSElement, ItemId, ConversationId, ParentFolderId, Attendee, ReferenceItemId, \
+from .properties import EWSElement, ConversationId, ParentFolderId, Attendee, ReferenceItemId, \
     AssociatedCalendarItemId, PersonaId, InvalidField, IdChangeKeyMixIn
 from .recurrence import FirstOccurrence, LastOccurrence, Occurrence, DeletedOccurrence
 from .util import is_iterable

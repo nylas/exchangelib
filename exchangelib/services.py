@@ -1643,7 +1643,6 @@ class GetPersona(EWSService):
         return Persona.from_xml(elem=elem.find(Persona.response_tag()), account=None)
 
     def get_payload(self, persona):
-        from .items import Persona
         from .properties import PersonaId
         payload = create_element('m:%s' % self.SERVICE_NAME)
         set_xml_value(payload, to_item_id(persona, PersonaId), version=self.protocol.version)
