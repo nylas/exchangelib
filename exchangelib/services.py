@@ -91,16 +91,7 @@ class EWSService(object):
                 # Read the XML and throw any general EWS error messages. Return a generator over the result elements
                 return self._get_elements_in_response(response=response)
             except ErrorServerBusy as e:
-                log.debug('Got ErrorServerBusy (back off %s seconds)', e.back_off)
-                # ErrorServerBusy is very often a symptom of sending too many requests. Scale back if possible.
-                try:
-                    self.protocol.decrease_poolsize()
-                except SessionPoolMinSizeReached:
-                    pass
-                if self.protocol.credentials.fail_fast:
-                    raise
-                self.protocol.credentials.back_off(e.back_off)
-                # We'll warn about this if we actually need to sleep
+                self._handle_backoff(e)
                 continue
             except (
                     ErrorAccessDenied,
@@ -225,6 +216,18 @@ class EWSService(object):
             raise ErrorInvalidSchemaVersionForMailboxVersion('Tried versions %s but all were invalid for account %s' %
                                                              (api_versions, account))
         raise ErrorInvalidServerVersion('Tried versions %s but all were invalid' % api_versions)
+
+    def _handle_backoff(self, e):
+        log.debug('Got ErrorServerBusy (back off %s seconds)', e.back_off)
+        # ErrorServerBusy is very often a symptom of sending too many requests. Scale back if possible.
+        try:
+            self.protocol.decrease_poolsize()
+        except SessionPoolMinSizeReached:
+            pass
+        if self.protocol.credentials.fail_fast:
+            raise
+        self.protocol.credentials.back_off(e.back_off)
+        # We'll warn about this later if we actually need to sleep
 
     def _update_api_version(self, hint, api_version, response):
         if api_version == hint.api_version and hint.build is not None:
@@ -419,16 +422,7 @@ class PagingEWSMixIn(EWSService):
             try:
                 response = self._get_response_xml(payload=payload)
             except ErrorServerBusy as e:
-                log.debug('Got ErrorServerBusy (back off %s seconds)', e.back_off)
-                # ErrorServerBusy is very often a symptom of sending too many requests. Scale back if possible.
-                try:
-                    self.protocol.decrease_poolsize()
-                except SessionPoolMinSizeReached:
-                    pass
-                if self.protocol.credentials.fail_fast:
-                    raise
-                self.protocol.credentials.back_off(e.back_off)
-                # We'll warn about this if we actually need to sleep
+                self._handle_backoff(e)
                 continue
             # Collect a tuple of (rootfolder, next_offset) tuples
             parsed_pages = [self._get_page(message) for message in response]
@@ -1584,16 +1578,7 @@ class FindPeople(EWSAccountService, PagingEWSMixIn):
             try:
                 response = self._get_response_xml(payload=payload_func(**kwargs))
             except ErrorServerBusy as e:
-                log.debug('Got ErrorServerBusy (back off %s seconds)', e.back_off)
-                # ErrorServerBusy is very often a symptom of sending too many requests. Scale back if possible.
-                try:
-                    self.protocol.decrease_poolsize()
-                except SessionPoolMinSizeReached:
-                    pass
-                if self.protocol.credentials.fail_fast:
-                    raise
-                self.protocol.credentials.back_off(e.back_off)
-                # We'll warn about this if we actually need to sleep
+                self._handle_backoff(e)
                 continue
             # Collect a tuple of (rootfolder, total_items) tuples
             parsed_pages = [self._get_page(message) for message in response]
