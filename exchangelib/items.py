@@ -85,6 +85,8 @@ SEARCH_SCOPE_CHOICES = (ACTIVE_DIRECTORY, ACTIVE_DIRECTORY_CONTACTS, CONTACTS, C
 
 
 class RegisterMixIn(IdChangeKeyMixIn):
+    __slots__ = tuple()
+
     INSERT_AFTER_FIELD = None
 
     @classmethod
@@ -187,7 +189,7 @@ class Item(RegisterMixIn):
     # Used to register extended properties
     INSERT_AFTER_FIELD = 'has_attachments'
 
-    # We can't use __slots__ because we need to add extended properties dynamically
+    # Using __slots__ here doesn't make much sense because we have so many fields
 
     def __init__(self, **kwargs):
         # 'account' is optional but allows calling 'send()' and 'delete()'

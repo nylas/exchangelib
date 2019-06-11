@@ -183,7 +183,7 @@ class DailyPattern(Pattern):
 
 
 class Boundary(EWSElement):
-    pass
+    __slots__ = tuple()
 
 
 class NoEndPattern(Boundary):
@@ -250,13 +250,13 @@ class Occurrence(IdChangeKeyMixIn):
 class FirstOccurrence(Occurrence):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa565661(v=exchg.150).aspx
     ELEMENT_NAME = 'FirstOccurrence'
-    __slots__ = Occurrence.__slots__
+    __slots__ = tuple()
 
 
 class LastOccurrence(Occurrence):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa565375(v=exchg.150).aspx
     ELEMENT_NAME = 'LastOccurrence'
-    __slots__ = Occurrence.__slots__
+    __slots__ = tuple()
 
 
 class DeletedOccurrence(EWSElement):

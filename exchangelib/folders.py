@@ -37,7 +37,7 @@ class FolderId(ItemId):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa579461(v=exchg.150).aspx
     ELEMENT_NAME = 'FolderId'
 
-    __slots__ = ItemId.__slots__
+    __slots__ = tuple()
 
 
 class DistinguishedFolderId(ItemId):
@@ -50,7 +50,7 @@ class DistinguishedFolderId(ItemId):
         MailboxField('mailbox'),
     ]
 
-    __slots__ = tuple(f.name for f in FIELDS)
+    __slots__ = ('mailbox',)
 
     def clean(self, version=None):
         super(DistinguishedFolderId, self).clean(version=version)
@@ -521,6 +521,8 @@ class Folder(RegisterMixIn, SearchableMixIn):
         PermissionSetField('permission_set', field_uri='folder:PermissionSet'),
         EffectiveRightsField('effective_rights', field_uri='folder:EffectiveRights', is_read_only=True),
     ]
+
+    __slots__ = tuple(f.name for f in FIELDS) + ('root', 'is_distinguished', '__dict__')
 
     # Used to register extended properties
     INSERT_AFTER_FIELD = 'child_folder_count'
@@ -1671,6 +1673,8 @@ class RootOfHierarchy(Folder):
     # 'RootOfHierarchy' subclasses must not be in this list.
     WELLKNOWN_FOLDERS = []
     TRAVERSAL_DEPTH = DEEP
+
+    __slots__ = ('account', '_subfolders')
 
     # A special folder that acts as the top of a folder hierarchy. Finds and caches subfolders at arbitrary depth.
     def __init__(self, **kwargs):

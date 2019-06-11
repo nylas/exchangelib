@@ -13,11 +13,11 @@ log = logging.getLogger(__name__)
 class IndexedElement(EWSElement):
     LABELS = set()
 
-    __slots__ = ('label',)
+    __slots__ = tuple()
 
 
 class SingleFieldIndexedElement(IndexedElement):
-    __slots__ = IndexedElement.__slots__
+    __slots__ = tuple()
 
     @classmethod
     def value_field(cls, version=None):
@@ -57,7 +57,7 @@ class PhoneNumber(SingleFieldIndexedElement):
 
 
 class MultiFieldIndexedElement(IndexedElement):
-    __slots__ = IndexedElement.__slots__
+    __slots__ = tuple()
 
 
 class PhysicalAddress(MultiFieldIndexedElement):

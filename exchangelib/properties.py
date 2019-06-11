@@ -4,6 +4,8 @@ import abc
 import binascii
 import codecs
 import datetime
+from inspect import getmro
+from itertools import chain
 import logging
 import struct
 from threading import Lock
@@ -104,12 +106,30 @@ class EWSElement(object):
     _fields_lock = Lock()
 
     __slots__ = tuple()
+    __slots_keys = None
 
     def __init__(self, **kwargs):
         for f in self.FIELDS:
             setattr(self, f.name, kwargs.pop(f.name, None))
         if kwargs:
             raise AttributeError("%s are invalid kwargs for this class" % ', '.join("'%s'" % k for k in kwargs))
+
+    @classmethod
+    def _slots_keys(cls):
+        # Find __slots__ entries for this and all parent classes. Keep order, with parent slots first.
+        if cls.__slots_keys is None:
+            seen = set()
+            keys = []
+            for c in reversed(getmro(cls)):
+                if not hasattr(c, '__slots__'):
+                    continue
+                for k in c.__slots__:
+                    if k in seen:
+                        continue
+                    keys.append(k)
+                    seen.add(k)
+            cls.__slots_keys = tuple(keys)
+        return cls.__slots_keys
 
     def clean(self, version=None):
         # Validate attribute values using the field validator
@@ -238,18 +258,22 @@ class EWSElement(object):
     if PY2:
         def __getstate__(self):
             try:
-                return self.__dict__.copy()
+                state = self.__dict__.copy()
             except AttributeError:
-                # This is a class where __slots__ is defined
-                return {k: getattr(self, k) for k in self.__class__.__slots__}
+                # This is a class where only __slots__ is defined
+                state = {}
+            state.update({k: getattr(self, k) for k in self._slots_keys()})
+            return state
 
         def __setstate__(self, state):
             try:
-                self.__dict__.update(state)
+                for k in self.__dict__.keys():
+                    setattr(self, k, state.get(k))
             except AttributeError:
-                # This is a class where __slots__ is defined
-                for k, v in state.items():
-                    setattr(self, k, v)
+                # This is a class where only __slots__ is defined
+                pass
+            for k in self._slots_keys():
+                setattr(self, k, state.get(k))
 
     def _field_vals(self):
         field_vals = []  # Keep sorting
@@ -300,7 +324,7 @@ class ItemId(EWSElement):
     def __init__(self, *args, **kwargs):
         if not kwargs:
             # Allow to set attributes without keyword
-            kwargs = dict(zip(self.__slots__, args))
+            kwargs = dict(zip(self._slots_keys(), args))
         super(ItemId, self).__init__(**kwargs)
 
 
@@ -309,7 +333,7 @@ class ParentItemId(ItemId):
     ELEMENT_NAME = 'ParentItemId'
     NAMESPACE = MNS
 
-    __slots__ = ItemId.__slots__
+    __slots__ = tuple()
 
 
 class RootItemId(ItemId):
@@ -324,14 +348,14 @@ class RootItemId(ItemId):
         IdField('changekey', field_uri=CHANGEKEY_ATTR, is_required=True),
     ]
 
-    __slots__ = ItemId.__slots__
+    __slots__ = tuple()
 
 
 class AssociatedCalendarItemId(ItemId):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa581060(v=exchg.150).aspx
     ELEMENT_NAME = 'AssociatedCalendarItemId'
 
-    __slots__ = ItemId.__slots__
+    __slots__ = tuple()
 
 
 class ConversationId(ItemId):
@@ -344,21 +368,21 @@ class ConversationId(ItemId):
         IdField('changekey', field_uri=ItemId.CHANGEKEY_ATTR),
     ]
 
-    __slots__ = ItemId.__slots__
+    __slots__ = tuple()
 
 
 class ParentFolderId(ItemId):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa494327(v=exchg.150).aspx
     ELEMENT_NAME = 'ParentFolderId'
 
-    __slots__ = ItemId.__slots__
+    __slots__ = tuple()
 
 
 class ReferenceItemId(ItemId):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa564031(v=exchg.150).aspx
     ELEMENT_NAME = 'ReferenceItemId'
 
-    __slots__ = ItemId.__slots__
+    __slots__ = tuple()
 
 
 class PersonaId(ItemId):
@@ -371,7 +395,7 @@ class PersonaId(ItemId):
         # For some reason, EWS wants this in the MNS namespace in a request, but TNS namespace in a response...
         return '{%s}%s' % (TNS, cls.ELEMENT_NAME)
 
-    __slots__ = ItemId.__slots__
+    __slots__ = tuple()
 
 
 class Mailbox(EWSElement):
@@ -407,7 +431,7 @@ class Mailbox(EWSElement):
 class DLMailbox(Mailbox):
     # Like Mailbox, but creates elements in the 'messages' namespace when sending requests
     NAMESPACE = MNS
-    __slots__ = Mailbox.__slots__
+    __slots__ = tuple()
 
 
 class AvailabilityMailbox(EWSElement):
@@ -440,7 +464,7 @@ class Email(AvailabilityMailbox):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa565868(v=exchg.150).aspx
     ELEMENT_NAME = 'Email'
 
-    __slots__ = AvailabilityMailbox.__slots__
+    __slots__ = tuple()
 
     def __hash__(self):
         # Exchange may add 'name' on insert. We're satisfied if the email address matches.
@@ -545,13 +569,13 @@ class TimeZoneTransition(EWSElement):
 class StandardTime(TimeZoneTransition):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa563445(v=exchg.150).aspx
     ELEMENT_NAME = 'StandardTime'
-    __slots__ = TimeZoneTransition.__slots__
+    __slots__ = tuple()
 
 
 class DaylightTime(TimeZoneTransition):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa564336(v=exchg.150).aspx
     ELEMENT_NAME = 'DaylightTime'
-    __slots__ = TimeZoneTransition.__slots__
+    __slots__ = tuple()
 
 
 class TimeZone(EWSElement):
@@ -755,7 +779,7 @@ class RoomList(Mailbox):
     ELEMENT_NAME = 'RoomList'
     NAMESPACE = MNS
 
-    __slots__ = Mailbox.__slots__
+    __slots__ = tuple()
 
     @classmethod
     def response_tag(cls):
@@ -768,7 +792,7 @@ class Room(Mailbox):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/dd899479(v=exchg.150).aspx
     ELEMENT_NAME = 'Room'
 
-    __slots__ = Mailbox.__slots__
+    __slots__ = tuple()
 
     @classmethod
     def from_xml(cls, elem, account):

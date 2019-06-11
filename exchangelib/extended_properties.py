@@ -73,7 +73,7 @@ class ExtendedProperty(EWSElement):
     def __init__(self, *args, **kwargs):
         if not kwargs:
             # Allow to set attributes without keyword
-            kwargs = dict(zip(self.__slots__, args))
+            kwargs = dict(zip(self._slots_keys(), args))
         self.value = kwargs.pop('value')
         super(ExtendedProperty, self).__init__(**kwargs)
 
@@ -265,4 +265,4 @@ class ExternId(ExtendedProperty):
     property_name = 'External ID'
     property_type = 'String'
 
-    __slots__ = ExtendedProperty.__slots__
+    __slots__ = tuple()
