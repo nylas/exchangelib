@@ -128,7 +128,32 @@ class RegisterMixIn(IdChangeKeyMixIn):
         cls.remove_field(field)
 
 
-class Item(RegisterMixIn):
+class BaseItem(RegisterMixIn):
+    __slots__ = ('account', 'folder')
+
+    def __init__(self, **kwargs):
+        # 'account' is optional but allows calling 'send()' and 'delete()'
+        # 'folder' is optional but allows calling 'save()'. If 'folder' has an account, and 'account' is not set,
+        # we use folder.root.account.
+        from .folders import Folder
+        from .account import Account
+        self.account = kwargs.pop('account', None)
+        if self.account is not None and not isinstance(self.account, Account):
+            raise ValueError("'account' %r must be an Account instance" % self.account)
+        self.folder = kwargs.pop('folder', None)
+        if self.folder is not None:
+            if not isinstance(self.folder, Folder):
+                raise ValueError("'folder' %r must be a Folder instance" % self.folder)
+            if self.folder.root.account is not None:
+                if self.account is not None:
+                    # Make sure the account from kwargs matches the folder account
+                    if self.account != self.folder.root.account:
+                        raise ValueError("'account' does not match 'folder.root.account'")
+                self.account = self.folder.root.account
+        super(BaseItem, self).__init__(**kwargs)
+
+
+class Item(BaseItem):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa580790(v=exchg.150).aspx
     """
@@ -187,30 +212,12 @@ class Item(RegisterMixIn):
 
     FIELDS = LOCAL_FIELDS[0:1] + RegisterMixIn.FIELDS + LOCAL_FIELDS[1:]
 
-    __slots__ = tuple(f.name for f in LOCAL_FIELDS) + ('account', 'folder')
+    __slots__ = tuple(f.name for f in LOCAL_FIELDS)
 
     # Used to register extended properties
     INSERT_AFTER_FIELD = 'has_attachments'
 
     def __init__(self, **kwargs):
-        # 'account' is optional but allows calling 'send()' and 'delete()'
-        # 'folder' is optional but allows calling 'save()'. If 'folder' has an account, and 'account' is not set,
-        # we use folder.root.account.
-        from .folders import Folder
-        from .account import Account
-        self.account = kwargs.pop('account', None)
-        if self.account is not None and not isinstance(self.account, Account):
-            raise ValueError("'account' %r must be an Account instance" % self.account)
-        self.folder = kwargs.pop('folder', None)
-        if self.folder is not None:
-            if not isinstance(self.folder, Folder):
-                raise ValueError("'folder' %r must be a Folder instance" % self.folder)
-            if self.folder.root.account is not None:
-                if self.account is not None:
-                    # Make sure the account from kwargs matches the folder account
-                    if self.account != self.folder.root.account:
-                        raise ValueError("'account' does not match 'folder.root.account'")
-                self.account = self.folder.root.account
         super(Item, self).__init__(**kwargs)
         # pylint: disable=access-member-before-definition
         if self.attachments:
@@ -469,7 +476,31 @@ CALENDAR_ITEM_CHOICES = (SINGLE, OCCURRENCE, EXCEPTION, RECURRING_MASTER)
 
 
 @python_2_unicode_compatible
-class CalendarItem(Item):
+class AcceptDeclineMixIn(object):
+    def accept(self, **kwargs):
+        return AcceptItem(
+            account=self.account,
+            reference_item_id=ReferenceItemId(id=self.id, changekey=self.changekey),
+            **kwargs
+        ).send()
+
+    def decline(self, **kwargs):
+        return DeclineItem(
+            account=self.account,
+            reference_item_id=ReferenceItemId(id=self.id, changekey=self.changekey),
+            **kwargs
+        ).send()
+
+    def tentatively_accept(self, **kwargs):
+        return TentativelyAcceptItem(
+            account=self.account,
+            reference_item_id=ReferenceItemId(id=self.id, changekey=self.changekey),
+            **kwargs
+        ).send()
+
+
+@python_2_unicode_compatible
+class CalendarItem(Item, AcceptDeclineMixIn):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa564765(v=exchg.150).aspx
     """
@@ -565,29 +596,8 @@ class CalendarItem(Item):
         if version:
             self.clean_timezone_fields(version=version)
 
-    def accept(self, **kwargs):
-        return AcceptItem(
-            account=self.account,
-            reference_item_id=ReferenceItemId(id=self.id, changekey=self.changekey),
-            **kwargs
-        ).send()
-
     def cancel(self, **kwargs):
         return CancelCalendarItem(
-            account=self.account,
-            reference_item_id=ReferenceItemId(id=self.id, changekey=self.changekey),
-            **kwargs
-        ).send()
-
-    def decline(self, **kwargs):
-        return DeclineItem(
-            account=self.account,
-            reference_item_id=ReferenceItemId(id=self.id, changekey=self.changekey),
-            **kwargs
-        ).send()
-
-    def tentatively_accept(self, **kwargs):
-        return TentativelyAcceptItem(
             account=self.account,
             reference_item_id=ReferenceItemId(id=self.id, changekey=self.changekey),
             **kwargs
@@ -973,30 +983,7 @@ class PostReplyItem(Item):
     # TODO: Untested and unfinished.
     ELEMENT_NAME = 'PostReplyItem'
 
-    LOCAL_FIELDS = [
-        MailboxField('sender', field_uri='message:Sender', is_read_only=True, is_read_only_after_send=True),
-        MailboxListField('to_recipients', field_uri='message:ToRecipients', is_read_only_after_send=True,
-                         is_searchable=False),
-        MailboxListField('cc_recipients', field_uri='message:CcRecipients', is_read_only_after_send=True,
-                         is_searchable=False),
-        MailboxListField('bcc_recipients', field_uri='message:BccRecipients', is_read_only_after_send=True,
-                         is_searchable=False),
-        BooleanField('is_read_receipt_requested', field_uri='message:IsReadReceiptRequested',
-                     is_required=True, default=False, is_read_only_after_send=True),
-        BooleanField('is_delivery_receipt_requested', field_uri='message:IsDeliveryReceiptRequested',
-                     is_required=True, default=False, is_read_only_after_send=True),
-        Base64Field('conversation_index', field_uri='message:ConversationIndex', is_read_only=True),
-        CharField('conversation_topic', field_uri='message:ConversationTopic', is_read_only=True),
-        # Rename 'From' to 'author'. We can't use fieldname 'from' since it's a Python keyword.
-        MailboxField('author', field_uri='message:From', is_read_only_after_send=True),
-        CharField('message_id', field_uri='message:InternetMessageId', is_read_only_after_send=True),
-        BooleanField('is_read', field_uri='message:IsRead', is_required=True, default=False),
-        BooleanField('is_response_requested', field_uri='message:IsResponseRequested', default=False, is_required=True),
-        TextField('references', field_uri='message:References'),
-        MailboxField('reply_to', field_uri='message:ReplyTo', is_read_only_after_send=True, is_searchable=False),
-        EffectiveRightsField('effective_rights', field_uri='item:EffectiveRights', is_read_only=True),
-        MailboxField('received_by', field_uri='message:ReceivedBy', is_read_only=True),
-        MailboxField('received_representing', field_uri='message:ReceivedRepresenting', is_read_only=True),
+    LOCAL_FIELDS = Message.LOCAL_FIELDS + [
         BodyField('new_body', field_uri='NewBodyContent'),  # Accepts and returns Body or HTMLBody instances
     ]
     # FIELDS on this element only has Item fields up to 'culture'
@@ -1021,27 +1008,7 @@ class BaseMeetingItem(Item):
     Therefore BaseMeetingItem inherits from  EWSElement has no save() or send() method
 
     """
-    LOCAL_FIELDS = [
-        MailboxField('sender', field_uri='message:Sender', is_read_only=True, is_read_only_after_send=True),
-        MailboxListField('to_recipients', field_uri='message:ToRecipients', is_read_only_after_send=True,
-                         is_searchable=False),
-        MailboxListField('cc_recipients', field_uri='message:CcRecipients', is_read_only_after_send=True,
-                         is_searchable=False),
-        MailboxListField('bcc_recipients', field_uri='message:BccRecipients', is_read_only_after_send=True,
-                         is_searchable=False),
-        BooleanField('is_read_receipt_requested', field_uri='message:IsReadReceiptRequested',
-                     is_required=True, default=False, is_read_only_after_send=True),
-        BooleanField('is_delivery_receipt_requested', field_uri='message:IsDeliveryReceiptRequested',
-                     is_required=True, default=False, is_read_only_after_send=True),
-        Base64Field('conversation_index', field_uri='message:ConversationIndex', is_read_only=True),
-        CharField('conversation_topic', field_uri='message:ConversationTopic', is_read_only=True),
-        # Rename 'From' to 'author'. We can't use fieldname 'from' since it's a Python keyword.
-        MailboxField('author', field_uri='message:From', is_read_only_after_send=True),
-        CharField('message_id', field_uri='message:InternetMessageId', is_read_only_after_send=True),
-        BooleanField('is_read', field_uri='message:IsRead', is_required=True, default=False),
-        BooleanField('is_response_requested', field_uri='message:IsResponseRequested', default=False, is_required=True),
-        TextField('references', field_uri='message:References'),
-        MailboxField('reply_to', field_uri='message:ReplyTo', is_read_only_after_send=True, is_searchable=False),
+    LOCAL_FIELDS = Message.LOCAL_FIELDS[:-2] + [
         AssociatedCalendarItemIdField('associated_calendar_item_id', field_uri='meeting:AssociatedCalendarItemId',
                                       value_cls=AssociatedCalendarItemId),
         BooleanField('is_delegated', field_uri='meeting:IsDelegated', is_read_only=True, default=False),
@@ -1056,11 +1023,8 @@ class BaseMeetingItem(Item):
 
     __slots__ = tuple(f.name for f in LOCAL_FIELDS)
 
-    # Used to register extended properties
-    INSERT_AFTER_FIELD = 'has_attachments'
 
-
-class MeetingRequest(BaseMeetingItem):
+class MeetingRequest(BaseMeetingItem, AcceptDeclineMixIn):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa565229(v=exchg.150).aspx
     """
@@ -1074,66 +1038,8 @@ class MeetingRequest(BaseMeetingItem):
         ChoiceField('intended_free_busy_status', field_uri='meetingRequest:IntendedFreeBusyStatus', choices={
                     Choice('Free'), Choice('Tentative'), Choice('Busy'), Choice('OOF'), Choice('NoData')},
                     is_required=True, default='Busy'),
-        DateTimeField('start', field_uri='calendar:Start', is_read_only=True, supported_from=EXCHANGE_2010),
-        DateTimeField('end', field_uri='calendar:End', is_read_only=True, supported_from=EXCHANGE_2010),
-        DateTimeField('original_start', field_uri='calendar:OriginalStart', is_read_only=True),
-        BooleanField('is_all_day', field_uri='calendar:IsAllDayEvent', is_required=True, default=False),
-        ChoiceField('legacy_free_busy_status', field_uri='calendar:LegacyFreeBusyStatus', choices={
-            Choice('Free'), Choice('Tentative'), Choice('Busy'), Choice('OOF'), Choice('NoData'),
-            Choice('WorkingElsewhere', supported_from=EXCHANGE_2013)
-        }, is_required=True, default='Busy'),
-        TextField('location', field_uri='calendar:Location'),
-        TextField('when', field_uri='calendar:When'),
-        BooleanField('is_meeting', field_uri='calendar:IsMeeting', is_read_only=True),
-        BooleanField('is_cancelled', field_uri='calendar:IsCancelled', is_read_only=True),
-        BooleanField('is_recurring', field_uri='calendar:IsRecurring', is_read_only=True),
-        BooleanField('meeting_request_was_sent', field_uri='calendar:MeetingRequestWasSent', is_read_only=True),
-        ChoiceField('type', field_uri='calendar:CalendarItemType', choices={
-            Choice('Single'), Choice('Occurrence'), Choice('Exception'), Choice('RecurringMaster'),
-        }, is_read_only=True),
-        ChoiceField('my_response_type', field_uri='calendar:MyResponseType', choices={
-            Choice(c) for c in Attendee.RESPONSE_TYPES
-        }, is_read_only=True),
-        MailboxField('organizer', field_uri='calendar:Organizer', is_read_only=True),
-        AttendeesField('required_attendees', field_uri='calendar:RequiredAttendees', is_searchable=False),
-        AttendeesField('optional_attendees', field_uri='calendar:OptionalAttendees', is_searchable=False),
-        AttendeesField('resources', field_uri='calendar:Resources', is_searchable=False),
-        IntegerField('conflicting_meeting_count', field_uri='calendar:ConflictingMeetingCount', is_read_only=True),
-        IntegerField('adjacent_meeting_count', field_uri='calendar:AdjacentMeetingCount', is_read_only=True),
-        # Placeholder for calendar:ConflictingMeetings
-        # Placeholder for calendar:AdjacentMeetings
-        CharField('duration', field_uri='calendar:Duration', is_read_only=True),
-        # Placeholder for calendar:TimeZone
-        DateTimeField('appointment_reply_time', field_uri='calendar:AppointmentReplyTime', is_read_only=True),
-        IntegerField('appointment_sequence_number', field_uri='calendar:AppointmentSequenceNumber', is_read_only=True),
-        # Placeholder for calendar:AppointmentState
-        # AppointmentState is an EnumListField-like field, but with bitmask values:
-        #    https://msdn.microsoft.com/en-us/library/office/aa564700(v=exchg.150).aspx
-        # We could probably subclass EnumListField to implement this field.
-        RecurrenceField('recurrence', field_uri='calendar:Recurrence', is_searchable=False),
-        OccurrenceField('first_occurrence', field_uri='calendar:FirstOccurrence', value_cls=FirstOccurrence,
-                        is_read_only=True),
-        OccurrenceField('last_occurrence', field_uri='calendar:LastOccurrence', value_cls=LastOccurrence,
-                        is_read_only=True),
-        OccurrenceListField('modified_occurrences', field_uri='calendar:ModifiedOccurrences', value_cls=Occurrence,
-                            is_read_only=True),
-        OccurrenceListField('deleted_occurrences', field_uri='calendar:DeletedOccurrences', value_cls=DeletedOccurrence,
-                            is_read_only=True),
-        TimeZoneField('_meeting_timezone', field_uri='calendar:MeetingTimeZone', deprecated_from=EXCHANGE_2010,
-                      is_read_only=True, is_searchable=False),
-        TimeZoneField('_start_timezone', field_uri='calendar:StartTimeZone', supported_from=EXCHANGE_2010,
-                      is_read_only=True, is_searchable=False),
-        TimeZoneField('_end_timezone', field_uri='calendar:EndTimeZone', supported_from=EXCHANGE_2010,
-                      is_read_only=True, is_searchable=False),
-        EnumAsIntField('conference_type', field_uri='calendar:ConferenceType', enum=CONFERENCE_TYPES, min=0,
-                       default=None, is_required_after_save=True),
-        BooleanField('allow_new_time_proposal', field_uri='calendar:AllowNewTimeProposal', default=None,
-                     is_required_after_save=True, is_searchable=False),
-        BooleanField('is_online_meeting', field_uri='calendar:IsOnlineMeeting', default=None,
-                     is_required_after_save=True),
-        URIField('meeting_workspace_url', field_uri='calendar:MeetingWorkspaceUrl'),
-        URIField('net_show_url', field_uri='calendar:NetShowUrl'),
-    ]
+    ] + [f for f in CalendarItem.LOCAL_FIELDS[1:] if f.name != 'is_response_requested']
+
     # FIELDS on this element are shuffled compared to other elements
     culture_idx = None
     for i, f in enumerate(Item.FIELDS):
@@ -1143,27 +1049,6 @@ class MeetingRequest(BaseMeetingItem):
     FIELDS = Item.FIELDS[:culture_idx + 1] + BaseMeetingItem.LOCAL_FIELDS + LOCAL_FIELDS + Item.FIELDS[culture_idx + 1:]
 
     __slots__ = tuple(f.name for f in LOCAL_FIELDS)
-
-    def accept(self, **kwargs):
-        return AcceptItem(
-            account=self.account,
-            reference_item_id=ReferenceItemId(id=self.id, changekey=self.changekey),
-            **kwargs
-        ).send()
-
-    def decline(self, **kwargs):
-        return DeclineItem(
-            account=self.account,
-            reference_item_id=ReferenceItemId(id=self.id, changekey=self.changekey),
-            **kwargs
-        ).send()
-
-    def tentatively_accept(self, **kwargs):
-        return TentativelyAcceptItem(
-            account=self.account,
-            reference_item_id=ReferenceItemId(id=self.id, changekey=self.changekey),
-            **kwargs
-        ).send()
 
 
 class MeetingMessage(BaseMeetingItem):
@@ -1213,7 +1098,7 @@ class MeetingCancellation(BaseMeetingItem):
     __slots__ = tuple()
 
 
-class BaseMeetingReplyItem(EWSElement):
+class BaseMeetingReplyItem(BaseItem):
     # A base class for meeting request reply items that share the same fields (Accept, TentativelyAccept, Decline)
     FIELDS = [
         CharField('item_class', field_uri='item:ItemClass', is_read_only=True),
@@ -1241,28 +1126,7 @@ class BaseMeetingReplyItem(EWSElement):
         DateTimeField('proposed_end', field_uri='meeting:ProposedEnd', supported_from=EXCHANGE_2013),
     ]
 
-    __slots__ = tuple(f.name for f in FIELDS) + ('account', 'folder')
-
-    def __init__(self, **kwargs):
-        # 'account' is optional but allows calling 'send()'
-        # 'folder' is optional but allows calling 'send()'. If 'folder' has an account, and 'account' is not set,
-        # we use folder.root.account.
-        from .folders import Folder
-        from .account import Account
-        self.account = kwargs.pop('account', None)
-        if self.account is not None and not isinstance(self.account, Account):
-            raise ValueError("'account' %r must be an Account instance" % self.account)
-        self.folder = kwargs.pop('folder', None)
-        if self.folder is not None:
-            if not isinstance(self.folder, Folder):
-                raise ValueError("'folder' %r must be a Folder instance" % self.folder)
-            if self.folder.root.account is not None:
-                if self.account is not None:
-                    # Make sure the account from kwargs matches the folder account
-                    if self.account != self.folder.root.account:
-                        raise ValueError("'account' does not match 'folder.root.account'")
-                self.account = self.folder.root.account
-        super(BaseMeetingReplyItem, self).__init__(**kwargs)
+    __slots__ = tuple(f.name for f in FIELDS)
 
     def send(self, message_disposition=SEND_AND_SAVE_COPY):
         if not self.account:
