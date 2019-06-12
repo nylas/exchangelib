@@ -1076,7 +1076,7 @@ class MeetingResponse(Item):
     # Item fields, but only until the 'effective_rights' field
     ITEM_FIELDS = []
     for field in Item.FIELDS:
-        ITEM_FIELDS.append(f)
+        ITEM_FIELDS.append(field)
         if field.name == 'effective_rights':
             break
     FIELDS = ITEM_FIELDS + LOCAL_FIELDS
