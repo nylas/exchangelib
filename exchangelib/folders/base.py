@@ -45,7 +45,7 @@ class Folder(RegisterMixIn, SearchableMixIn):
     LOCALIZED_NAMES = dict()  # A map of (str)locale: (tuple)localized_folder_names
     ITEM_MODEL_MAP = {cls.response_tag(): cls for cls in ITEM_CLASSES}
     ID_ELEMENT_CLS = FolderId
-    FIELDS = RegisterMixIn.FIELDS + [
+    LOCAL_FIELDS = [
         EWSElementField('parent_folder_id', field_uri='folder:ParentFolderId', value_cls=ParentFolderId,
                         is_read_only=True),
         CharField('folder_class', field_uri='folder:FolderClass', is_required_after_save=True),
@@ -56,8 +56,9 @@ class Folder(RegisterMixIn, SearchableMixIn):
         PermissionSetField('permission_set', field_uri='folder:PermissionSet'),
         EffectiveRightsField('effective_rights', field_uri='folder:EffectiveRights', is_read_only=True),
     ]
+    FIELDS = RegisterMixIn.FIELDS + LOCAL_FIELDS
 
-    __slots__ = tuple(f.name for f in FIELDS) + ('root', 'is_distinguished', '__dict__')
+    __slots__ = tuple(f.name for f in LOCAL_FIELDS) + ('root', 'is_distinguished')
 
     # Used to register extended properties
     INSERT_AFTER_FIELD = 'child_folder_count'

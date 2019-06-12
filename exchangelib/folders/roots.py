@@ -2,22 +2,15 @@ from __future__ import unicode_literals
 
 import logging
 
+from six import text_type
+
 from ..errors import ErrorAccessDenied, ErrorFolderNotFound, ErrorNoPublicFolderReplicaAvailable, ErrorItemNotFound, \
     ErrorInvalidOperation
 from ..version import EXCHANGE_2007_SP1, EXCHANGE_2010_SP1
 from .collections import FolderCollection
 from .base import Folder
-from .known_folders import AdminAuditLogs, ArchiveDeletedItems, ArchiveInbox, \
-    ArchiveMsgFolderRoot, ArchiveRecoverableItemsDeletions, ArchiveRecoverableItemsPurges, \
-    ArchiveRecoverableItemsRoot, ArchiveRecoverableItemsVersions, Calendar, \
-    Conflicts, Contacts, ConversationHistory, \
-    DeletedItems, Directory, Drafts, Favorites, \
-    IMContactList, Inbox, Journal, JunkEmail, LocalFailures, \
-    MsgFolderRoot, MyContacts, Notes, Outbox, \
-    PeopleConnect, QuickContacts, RecipientCache, \
-    RecoverableItemsDeletions, RecoverableItemsPurges, RecoverableItemsRoot, RecoverableItemsVersions, \
-    SearchFolders, SentItems, ServerFailures, \
-    SyncIssues, Tasks, ToDoSearch, VoiceMail, NON_DELETEABLE_FOLDERS
+from .known_folders import MsgFolderRoot, NON_DELETEABLE_FOLDERS, WELLKNOWN_FOLDERS_IN_ROOT, \
+    WELLKNOWN_FOLDERS_IN_ARCHIVE_ROOT
 from .queryset import SingleFolderQuerySet, SHALLOW, DEEP
 
 log = logging.getLogger(__name__)
@@ -191,40 +184,7 @@ class RootOfHierarchy(Folder):
 
 class Root(RootOfHierarchy):
     DISTINGUISHED_FOLDER_ID = 'root'
-    WELLKNOWN_FOLDERS = [
-        AdminAuditLogs,
-        Calendar,
-        Conflicts,
-        Contacts,
-        ConversationHistory,
-        DeletedItems,
-        Directory,
-        Drafts,
-        Favorites,
-        IMContactList,
-        Inbox,
-        Journal,
-        JunkEmail,
-        LocalFailures,
-        MsgFolderRoot,
-        MyContacts,
-        Notes,
-        Outbox,
-        PeopleConnect,
-        QuickContacts,
-        RecipientCache,
-        RecoverableItemsDeletions,
-        RecoverableItemsPurges,
-        RecoverableItemsRoot,
-        RecoverableItemsVersions,
-        SearchFolders,
-        SentItems,
-        ServerFailures,
-        SyncIssues,
-        Tasks,
-        ToDoSearch,
-        VoiceMail,
-    ]
+    WELLKNOWN_FOLDERS = WELLKNOWN_FOLDERS_IN_ROOT
 
     @property
     def tois(self):
@@ -325,12 +285,4 @@ class PublicFoldersRoot(RootOfHierarchy):
 class ArchiveRoot(RootOfHierarchy):
     DISTINGUISHED_FOLDER_ID = 'archiveroot'
     supported_from = EXCHANGE_2010_SP1
-    WELLKNOWN_FOLDERS = [
-        ArchiveDeletedItems,
-        ArchiveInbox,
-        ArchiveMsgFolderRoot,
-        ArchiveRecoverableItemsDeletions,
-        ArchiveRecoverableItemsPurges,
-        ArchiveRecoverableItemsRoot,
-        ArchiveRecoverableItemsVersions,
-    ]
+    WELLKNOWN_FOLDERS = WELLKNOWN_FOLDERS_IN_ARCHIVE_ROOT
