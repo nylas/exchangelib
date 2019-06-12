@@ -698,23 +698,12 @@ class GetItem(EWSAccountService, EWSPooledMixIn):
         ))
 
     def get_payload(self, items, additional_fields, shape):
-        from .properties import ItemId
         getitem = create_element('m:%s' % self.SERVICE_NAME)
-        itemshape = create_element('m:ItemShape')
-        add_xml_child(itemshape, 't:BaseShape', shape)
-        if additional_fields:
-            additional_properties = create_element('t:AdditionalProperties')
-            expanded_fields = chain(*(f.expand(version=self.account.version) for f in additional_fields))
-            set_xml_value(additional_properties, sorted(expanded_fields, key=lambda f: f.path),
-                          version=self.account.version)
-            itemshape.append(additional_properties)
+        itemshape = create_shape_element(
+            tag='m:ItemShape', shape=shape, additional_fields=additional_fields, version=self.account.version
+        )
         getitem.append(itemshape)
-        item_ids = create_element('m:ItemIds')
-        for item in items:
-            log.debug('Getting item %s', item)
-            set_xml_value(item_ids, to_item_id(item, ItemId), version=self.account.version)
-        if not len(item_ids):
-            raise ValueError('"items" must not be empty')
+        item_ids = create_item_ids_element(items=items, version=self.account.version)
         getitem.append(item_ids)
         return getitem
 
@@ -958,7 +947,6 @@ class DeleteItem(EWSAccountService, EWSPooledMixIn):
     def get_payload(self, items, delete_type, send_meeting_cancellations, affected_task_occurrences,
                     suppress_read_receipts):
         # Takes a list of (id, changekey) tuples or Item objects and returns the XML for a DeleteItem request.
-        from .properties import ItemId
         if self.account.version.build >= EXCHANGE_2013_SP1:
             deleteitem = create_element(
                 'm:%s' % self.SERVICE_NAME,
@@ -979,12 +967,7 @@ class DeleteItem(EWSAccountService, EWSPooledMixIn):
                  ])
             )
 
-        item_ids = create_element('m:ItemIds')
-        for item in items:
-            log.debug('Deleting item %s', item)
-            set_xml_value(item_ids, to_item_id(item, ItemId), version=self.account.version)
-        if not len(item_ids):
-            raise ValueError('"items" must not be empty')
+        item_ids = create_item_ids_element(items=items, version=self.account.version)
         deleteitem.append(item_ids)
         return deleteitem
 
@@ -1027,15 +1010,9 @@ class FindItem(EWSFolderService, PagingEWSMixIn):
     def get_payload(self, additional_fields, restriction, order_fields, query_string, shape, depth, calendar_view,
                     page_size, offset=0):
         finditem = create_element('m:%s' % self.SERVICE_NAME, attrs=dict(Traversal=depth))
-        itemshape = create_element('m:ItemShape')
-        add_xml_child(itemshape, 't:BaseShape', shape)
-        if additional_fields:
-            expanded_fields = chain(*(f.expand(version=self.account.version) for f in additional_fields))
-            itemshape.append(set_xml_value(
-                create_element('t:AdditionalProperties'),
-                sorted(expanded_fields, key=lambda f: f.path),
-                version=self.account.version
-            ))
+        itemshape = create_shape_element(
+            tag='m:ItemShape', shape=shape, additional_fields=additional_fields, version=self.account.version
+        )
         finditem.append(itemshape)
         if calendar_view is None:
             view_type = create_element(
@@ -1105,14 +1082,9 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
 
     def get_payload(self, additional_fields, restriction, shape, depth, page_size, offset=0):
         findfolder = create_element('m:%s' % self.SERVICE_NAME, attrs=dict(Traversal=depth))
-        foldershape = create_element('m:FolderShape')
-        add_xml_child(foldershape, 't:BaseShape', shape)
-        if additional_fields:
-            additional_properties = create_element('t:AdditionalProperties')
-            expanded_fields = chain(*(f.expand(version=self.account.version) for f in additional_fields))
-            set_xml_value(additional_properties, sorted(expanded_fields, key=lambda f: f.path),
-                          version=self.account.version)
-            foldershape.append(additional_properties)
+        foldershape = create_shape_element(
+            tag='m:FolderShape', shape=shape, additional_fields=additional_fields, version=self.account.version
+        )
         findfolder.append(foldershape)
         if self.account.version.build >= EXCHANGE_2010:
             indexedpageviewitem = create_element(
@@ -1156,57 +1128,21 @@ class GetFolder(EWSAccountService):
         """
         # We can't easily find the correct folder class from the returned XML. Instead, return objects with the same
         # class as the folder instance it was requested with.
-        from .folders import Folder, DistinguishedFolderId, RootOfHierarchy
         folders_list = list(folders)  # Convert to a list, in case 'folders' is a generator
         for folder, elem in zip(folders_list, self._get_elements(payload=self.get_payload(
             folders=folders,
             additional_fields=additional_fields,
             shape=shape,
         ))):
-            if isinstance(elem, Exception):
-                yield elem
-                continue
-            if isinstance(folder, RootOfHierarchy):
-                f = folder.from_xml(elem=elem, account=folder.account)
-            elif isinstance(folder, Folder):
-                f = folder.from_xml_with_root(elem=elem, root=folder.root)
-            elif isinstance(folder, DistinguishedFolderId):
-                # We don't know the root, so assume account.root.
-                for folder_cls in self.account.root.WELLKNOWN_FOLDERS:
-                    if folder_cls.DISTINGUISHED_FOLDER_ID == folder.id:
-                        break
-                else:
-                    raise ValueError('Unknown distinguished folder ID: %s', folder.id)
-                f = folder_cls.from_xml_with_root(elem=elem, root=self.account.root)
-            else:
-                # 'folder' is a generic FolderId instance. We don't know the root so assume account.root.
-                f = Folder.from_xml_with_root(elem=elem, root=self.account.root)
-            if isinstance(folder, DistinguishedFolderId):
-                f.is_distinguished = True
-            elif isinstance(folder, Folder) and folder.is_distinguished:
-                f.is_distinguished = True
-            yield f
+            yield parse_folder_elem(elem=elem, folder=folder, account=self.account)
 
     def get_payload(self, folders, additional_fields, shape):
-        from .folders import Folder, FolderId, DistinguishedFolderId
         getfolder = create_element('m:%s' % self.SERVICE_NAME)
-        foldershape = create_element('m:FolderShape')
-        add_xml_child(foldershape, 't:BaseShape', shape)
-        if additional_fields:
-            additional_properties = create_element('t:AdditionalProperties')
-            expanded_fields = chain(*(f.expand(version=self.account.version) for f in additional_fields))
-            set_xml_value(additional_properties, sorted(expanded_fields, key=lambda f: f.path),
-                          version=self.account.version)
-            foldershape.append(additional_properties)
+        foldershape = create_shape_element(
+            tag='m:FolderShape', shape=shape, additional_fields=additional_fields, version=self.account.version
+        )
         getfolder.append(foldershape)
-        folder_ids = create_element('m:FolderIds')
-        for folder in folders:
-            log.debug('Getting folder %s', folder)
-            if not isinstance(folder, (Folder, FolderId, DistinguishedFolderId)):
-                folder = to_item_id(folder, FolderId)
-            set_xml_value(folder_ids, folder, version=self.account.version)
-        if not len(folder_ids):
-            raise ValueError('"folders" must not be empty')
+        folder_ids = create_folder_ids_element(tag='m:FolderIds', folders=folders, version=self.account.version)
         getfolder.append(folder_ids)
         return getfolder
 
@@ -1222,36 +1158,18 @@ class CreateFolder(EWSAccountService):
         # We can't easily find the correct folder class from the returned XML. Instead, return objects with the same
         # class as the folder instance it was requested with.
         folders_list = list(folders)  # Convert to a list, in case 'folders' is a generator
-        from .folders import RootOfHierarchy
         for folder, elem in zip(folders_list, self._get_elements(payload=self.get_payload(
                 parent_folder=parent_folder, folders=folders
         ))):
-            if isinstance(elem, Exception):
-                yield elem
-                continue
-            if isinstance(folder, RootOfHierarchy):
-                f = folder.from_xml(elem=elem, account=folder.root.account)
-            else:
-                f = folder.from_xml_with_root(elem=elem, root=folder.root)
-            if folder.is_distinguished:
-                f.is_distinguished = True
-            yield f
+            yield parse_folder_elem(elem=elem, folder=folder, account=self.account)
 
     def get_payload(self, parent_folder, folders):
-        from .folders import Folder, FolderId, DistinguishedFolderId
         create_folder = create_element('m:%s' % self.SERVICE_NAME)
         parentfolderid = create_element('m:ParentFolderId')
         set_xml_value(parentfolderid, parent_folder, version=self.account.version)
         set_xml_value(create_folder, parentfolderid, version=self.account.version)
-        folders_elem = create_element('m:Folders')
-        for folder in folders:
-            log.debug('Creating folder %s', folder)
-            if not isinstance(folder, (Folder, FolderId, DistinguishedFolderId)):
-                folder = to_item_id(folder, FolderId)
-            set_xml_value(folders_elem, folder, version=self.account.version)
-        if not len(folders_elem):
-            raise ValueError('"folders" must not be empty')
-        create_folder.append(folders_elem)
+        folder_ids = create_folder_ids_element(tag='m:Folders', folders=folders, version=self.account.version)
+        create_folder.append(folder_ids)
         return create_folder
 
 
@@ -1265,19 +1183,9 @@ class UpdateFolder(EWSAccountService):
     def call(self, folders):
         # We can't easily find the correct folder class from the returned XML. Instead, return objects with the same
         # class as the folder instance it was requested with.
-        from .folders import RootOfHierarchy
         folders_list = list(f[0] for f in folders)  # Convert to a list, in case 'folders' is a generator
         for folder, elem in zip(folders_list, self._get_elements(payload=self.get_payload(folders=folders))):
-            if isinstance(elem, Exception):
-                yield elem
-                continue
-            if isinstance(folder, RootOfHierarchy):
-                f = folder.from_xml(elem=elem, account=folder.root.account)
-            else:
-                f = folder.from_xml_with_root(elem=elem, root=folder.root)
-            if folder.is_distinguished:
-                f.is_distinguished = True
-            yield f
+            yield parse_folder_elem(elem=elem, folder=folder, account=self.account)
 
     @staticmethod
     def _sort_fieldnames(folder_model, fieldnames):
@@ -1352,16 +1260,8 @@ class DeleteFolder(EWSAccountService):
         return self._get_elements(payload=self.get_payload(folders=folders, delete_type=delete_type))
 
     def get_payload(self, folders, delete_type):
-        from .folders import Folder, FolderId, DistinguishedFolderId
         deletefolder = create_element('m:%s' % self.SERVICE_NAME, attrs=dict(DeleteType=delete_type))
-        folder_ids = create_element('m:FolderIds')
-        for folder in folders:
-            log.debug('Deleting folder %s', folder)
-            if not isinstance(folder, (Folder, FolderId, DistinguishedFolderId)):
-                folder = to_item_id(folder, FolderId)
-            set_xml_value(folder_ids, folder, version=self.account.version)
-        if not len(folder_ids):
-            raise ValueError('"folders" must not be empty')
+        folder_ids = create_folder_ids_element(tag='m:FolderIds', folders=folders, version=self.account.version)
         deletefolder.append(folder_ids)
         return deletefolder
 
@@ -1378,7 +1278,6 @@ class EmptyFolder(EWSAccountService):
                                                            delete_sub_folders=delete_sub_folders))
 
     def get_payload(self, folders, delete_type, delete_sub_folders):
-        from .folders import Folder, FolderId, DistinguishedFolderId
         emptyfolder = create_element(
             'm:%s' % self.SERVICE_NAME,
             attrs=OrderedDict([
@@ -1386,14 +1285,7 @@ class EmptyFolder(EWSAccountService):
                 ('DeleteSubFolders', 'true' if delete_sub_folders else 'false'),
             ])
         )
-        folder_ids = create_element('m:FolderIds')
-        for folder in folders:
-            log.debug('Emptying folder %s', folder)
-            if not isinstance(folder, (Folder, FolderId, DistinguishedFolderId)):
-                folder = to_item_id(folder, FolderId)
-            set_xml_value(folder_ids, folder, version=self.account.version)
-        if not len(folder_ids):
-            raise ValueError('"folders" must not be empty')
+        folder_ids = create_folder_ids_element(tag='m:FolderIds', folders=folders, version=self.account.version)
         emptyfolder.append(folder_ids)
         return emptyfolder
 
@@ -1409,17 +1301,11 @@ class SendItem(EWSAccountService):
         return self._get_elements(payload=self.get_payload(items=items, saved_item_folder=saved_item_folder))
 
     def get_payload(self, items, saved_item_folder):
-        from .properties import ItemId
         senditem = create_element(
             'm:%s' % self.SERVICE_NAME,
             attrs=dict(SaveItemToFolder='true' if saved_item_folder else 'false'),
         )
-        item_ids = create_element('m:ItemIds')
-        for item in items:
-            log.debug('Sending item %s', item)
-            set_xml_value(item_ids, to_item_id(item, ItemId), version=self.account.version)
-        if not len(item_ids):
-            raise ValueError('"items" must not be empty')
+        item_ids = create_item_ids_element(items=items, version=self.account.version)
         senditem.append(item_ids)
         if saved_item_folder:
             saveditemfolderid = create_element('m:SavedItemFolderId')
@@ -1443,50 +1329,20 @@ class MoveItem(EWSAccountService):
 
     def get_payload(self, items, to_folder):
         # Takes a list of items and returns their new item IDs
-        from .properties import ItemId
         moveitem = create_element('m:%s' % self.SERVICE_NAME)
-
         tofolderid = create_element('m:ToFolderId')
         set_xml_value(tofolderid, to_folder, version=self.account.version)
         moveitem.append(tofolderid)
-        item_ids = create_element('m:ItemIds')
-        for item in items:
-            log.debug('Moving item %s to %s', item, to_folder)
-            set_xml_value(item_ids, to_item_id(item, ItemId), version=self.account.version)
-        if not len(item_ids):
-            raise ValueError('"items" must not be empty')
+        item_ids = create_item_ids_element(items=items, version=self.account.version)
         moveitem.append(item_ids)
         return moveitem
 
 
-class CopyItem(EWSAccountService):
+class CopyItem(MoveItem):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa565012(v=exchg.150).aspx
     """
     SERVICE_NAME = 'CopyItem'
-    element_container_name = '{%s}Items' % MNS
-
-    def call(self, items, to_folder):
-        return self._get_elements(payload=self.get_payload(
-            items=items,
-            to_folder=to_folder,
-        ))
-
-    def get_payload(self, items, to_folder):
-        from .properties import ItemId
-        copyitem = create_element('m:%s' % self.SERVICE_NAME)
-
-        tofolderid = create_element('m:ToFolderId')
-        set_xml_value(tofolderid, to_folder, version=self.account.version)
-        copyitem.append(tofolderid)
-        item_ids = create_element('m:ItemIds')
-        for item in items:
-            log.debug('Copying item %s to %s', item, to_folder)
-            set_xml_value(item_ids, to_item_id(item, ItemId), version=self.account.version)
-        if not len(item_ids):
-            raise ValueError('"items" must not be empty')
-        copyitem.append(item_ids)
-        return copyitem
 
 
 class FindPeople(EWSAccountService, PagingEWSMixIn):
@@ -1533,15 +1389,9 @@ class FindPeople(EWSAccountService, PagingEWSMixIn):
     def get_payload(self, folder, additional_fields, restriction, order_fields, query_string, shape, depth, page_size,
                     offset=0):
         findpeople = create_element('m:%s' % self.SERVICE_NAME, attrs=dict(Traversal=depth))
-        personashape = create_element('m:PersonaShape')
-        add_xml_child(personashape, 't:BaseShape', shape)
-        if additional_fields:
-            expanded_fields = chain(*(f.expand(version=self.account.version) for f in additional_fields))
-            personashape.append(set_xml_value(
-                create_element('t:AdditionalProperties'),
-                sorted(expanded_fields, key=lambda f: f.path),
-                version=self.account.version
-            ))
+        personashape = create_shape_element(
+            tag='m:PersonaShape', shape=shape, additional_fields=additional_fields, version=self.account.version
+        )
         findpeople.append(personashape)
         view_type = create_element(
             'm:IndexedPageItemView',
@@ -1735,7 +1585,6 @@ class GetAttachment(EWSAccountService):
         ))
 
     def get_payload(self, items, include_mime_content):
-        from .attachments import AttachmentId
         payload = create_element('m:%s' % self.SERVICE_NAME)
         # TODO: Support additional properties of AttachmentShape. See
         # https://msdn.microsoft.com/en-us/library/office/aa563727(v=exchg.150).aspx
@@ -1743,12 +1592,7 @@ class GetAttachment(EWSAccountService):
             attachment_shape = create_element('m:AttachmentShape')
             add_xml_child(attachment_shape, 't:IncludeMimeContent', 'true')
             payload.append(attachment_shape)
-        attachment_ids = create_element('m:AttachmentIds')
-        for item in items:
-            attachment_id = item if isinstance(item, AttachmentId) else AttachmentId(id=item)
-            set_xml_value(attachment_ids, attachment_id, version=self.account.version)
-        if not len(attachment_ids):
-            raise ValueError('"items" must not be empty')
+        attachment_ids = create_attachment_ids_element(items=items, version=self.account.version)
         payload.append(attachment_ids)
         return payload
 
@@ -1836,14 +1680,8 @@ class DeleteAttachment(EWSAccountService):
         return fake_elem
 
     def get_payload(self, items):
-        from .attachments import AttachmentId
         payload = create_element('m:%s' % self.SERVICE_NAME)
-        attachment_ids = create_element('m:AttachmentIds')
-        for item in items:
-            attachment_id = item if isinstance(item, AttachmentId) else AttachmentId(id=item)
-            set_xml_value(attachment_ids, attachment_id, version=self.account.version)
-        if not len(attachment_ids):
-            raise ValueError('"items" must not be empty')
+        attachment_ids = create_attachment_ids_element(items=items, version=self.account.version)
         payload.append(attachment_ids)
         return payload
 
@@ -1860,12 +1698,9 @@ class ExportItems(EWSAccountService, EWSPooledMixIn):
         return self._pool_requests(payload_func=self.get_payload, **dict(items=items))
 
     def get_payload(self, items):
-        from .properties import ItemId
         exportitems = create_element('m:%s' % self.SERVICE_NAME)
-        itemids = create_element('m:ItemIds')
-        exportitems.append(itemids)
-        for item in items:
-            set_xml_value(itemids, to_item_id(item, ItemId), version=self.account.version)
+        item_ids = create_item_ids_element(items=items, version=self.account.version)
+        exportitems.append(item_ids)
         return exportitems
 
     # We need to override this since ExportItemsResponseMessage is formatted a
@@ -2082,3 +1917,75 @@ def to_item_id(item, item_cls):
     if isinstance(item, dict):
         return item_cls(**item)
     return item_cls(item.id, item.changekey)
+
+
+def create_shape_element(tag, shape, additional_fields, version):
+    shape_elem = create_element(tag)
+    add_xml_child(shape_elem, 't:BaseShape', shape)
+    if additional_fields:
+        additional_properties = create_element('t:AdditionalProperties')
+        expanded_fields = chain(*(f.expand(version=version) for f in additional_fields))
+        set_xml_value(additional_properties, sorted(expanded_fields, key=lambda f: f.path), version=version)
+        shape_elem.append(additional_properties)
+    return shape_elem
+
+
+def create_folder_ids_element(tag, folders, version):
+    from .folders import Folder, FolderId, DistinguishedFolderId
+    folder_ids = create_element(tag)
+    for folder in folders:
+        log.debug('Collecting folder %s', folder)
+        if not isinstance(folder, (Folder, FolderId, DistinguishedFolderId)):
+            folder = to_item_id(folder, FolderId)
+        set_xml_value(folder_ids, folder, version=version)
+    if not len(folder_ids):
+        raise ValueError('"folders" must not be empty')
+    return folder_ids
+
+
+def create_item_ids_element(items, version):
+    from .properties import ItemId
+    item_ids = create_element('m:ItemIds')
+    for item in items:
+        log.debug('Collecting item %s', item)
+        set_xml_value(item_ids, to_item_id(item, ItemId), version=version)
+    if not len(item_ids):
+        raise ValueError('"items" must not be empty')
+    return item_ids
+
+
+def create_attachment_ids_element(items, version):
+    from .attachments import AttachmentId
+    attachment_ids = create_element('m:AttachmentIds')
+    for item in items:
+        attachment_id = item if isinstance(item, AttachmentId) else AttachmentId(id=item)
+        set_xml_value(attachment_ids, attachment_id, version=version)
+    if not len(attachment_ids):
+        raise ValueError('"items" must not be empty')
+    return attachment_ids
+
+
+def parse_folder_elem(elem, folder, account):
+    from .folders import Folder, DistinguishedFolderId, RootOfHierarchy
+    if isinstance(elem, Exception):
+        return elem
+    if isinstance(folder, RootOfHierarchy):
+        f = folder.from_xml(elem=elem, account=folder.account)
+    elif isinstance(folder, Folder):
+        f = folder.from_xml_with_root(elem=elem, root=folder.root)
+    elif isinstance(folder, DistinguishedFolderId):
+        # We don't know the root, so assume account.root.
+        for folder_cls in account.root.WELLKNOWN_FOLDERS:
+            if folder_cls.DISTINGUISHED_FOLDER_ID == folder.id:
+                break
+        else:
+            raise ValueError('Unknown distinguished folder ID: %s', folder.id)
+        f = folder_cls.from_xml_with_root(elem=elem, root=account.root)
+    else:
+        # 'folder' is a generic FolderId instance. We don't know the root so assume account.root.
+        f = Folder.from_xml_with_root(elem=elem, root=account.root)
+    if isinstance(folder, DistinguishedFolderId):
+        f.is_distinguished = True
+    elif isinstance(folder, Folder) and folder.is_distinguished:
+        f.is_distinguished = True
+    return f
