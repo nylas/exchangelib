@@ -98,9 +98,9 @@ class UID(bytes):
 class EWSElement(object):
     __metaclass__ = abc.ABCMeta
 
-    ELEMENT_NAME = None
-    FIELDS = []
-    NAMESPACE = TNS  # Either TNS or MNS
+    ELEMENT_NAME = None  # The name of the XML tag
+    FIELDS = []  # A list of attributes supported by this item class, ordered the same way as in EWS documentation
+    NAMESPACE = TNS  # The XML tag namespace. Either TNS or MNS
 
     _fields_lock = Lock()
 
