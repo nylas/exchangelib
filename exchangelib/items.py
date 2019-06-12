@@ -961,12 +961,7 @@ class PostItem(Item):
     MSDN: https://msdn.microsoft.com/en-us/library/office/bb891851(v=exchg.150).aspx
     """
     ELEMENT_NAME = 'PostItem'
-    LOCAL_FIELDS = [
-        Base64Field('conversation_index', field_uri='message:ConversationIndex', is_read_only=True),
-        CharField('conversation_topic', field_uri='message:ConversationTopic', is_read_only=True),
-        MailboxField('author', field_uri='message:From', is_read_only_after_send=True),
-        CharField('message_id', field_uri='message:InternetMessageId', is_read_only_after_send=True),
-        BooleanField('is_read', field_uri='message:IsRead', is_required=True, default=False),
+    LOCAL_FIELDS = Message.FIELDS[6:11] + [
         DateTimeField('posted_time', field_uri='postitem:PostedTime', is_read_only=True),
         TextField('references', field_uri='message:References'),
         MailboxField('sender', field_uri='message:Sender', is_read_only=True, is_read_only_after_send=True),
@@ -988,8 +983,8 @@ class PostReplyItem(Item):
     ]
     # FIELDS on this element only has Item fields up to 'culture'
     culture_idx = None
-    for i, f in enumerate(Item.FIELDS):
-        if f.name == 'culture':
+    for i, field in enumerate(Item.FIELDS):
+        if field.name == 'culture':
             culture_idx = i
             break
     FIELDS = Item.FIELDS[:culture_idx + 1] + LOCAL_FIELDS
@@ -1042,8 +1037,8 @@ class MeetingRequest(BaseMeetingItem, AcceptDeclineMixIn):
 
     # FIELDS on this element are shuffled compared to other elements
     culture_idx = None
-    for i, f in enumerate(Item.FIELDS):
-        if f.name == 'culture':
+    for i, field in enumerate(Item.FIELDS):
+        if field.name == 'culture':
             culture_idx = i
             break
     FIELDS = Item.FIELDS[:culture_idx + 1] + BaseMeetingItem.LOCAL_FIELDS + LOCAL_FIELDS + Item.FIELDS[culture_idx + 1:]
@@ -1060,8 +1055,8 @@ class MeetingMessage(BaseMeetingItem):
 
     # FIELDS on this element are shuffled compared to other elements
     culture_idx = None
-    for i, f in enumerate(Item.FIELDS):
-        if f.name == 'culture':
+    for i, field in enumerate(Item.FIELDS):
+        if field.name == 'culture':
             culture_idx = i
             break
     FIELDS = Item.FIELDS[:culture_idx + 1] + BaseMeetingItem.LOCAL_FIELDS + Item.FIELDS[culture_idx + 1:]
@@ -1080,9 +1075,9 @@ class MeetingResponse(Item):
     ]
     # Item fields, but only until the 'effective_rights' field
     ITEM_FIELDS = []
-    for f in Item.FIELDS:
+    for field in Item.FIELDS:
         ITEM_FIELDS.append(f)
-        if f.name == 'effective_rights':
+        if field.name == 'effective_rights':
             break
     FIELDS = ITEM_FIELDS + LOCAL_FIELDS
 
@@ -1108,17 +1103,7 @@ class BaseMeetingReplyItem(BaseItem):
         BodyField('body', field_uri='item:Body'),  # Accepts and returns Body or HTMLBody instances
         AttachmentField('attachments', field_uri='item:Attachments'),  # ItemAttachment or FileAttachment
         MessageHeaderField('headers', field_uri='item:InternetMessageHeaders', is_read_only=True),
-        MailboxField('sender', field_uri='message:Sender', is_read_only=True, is_read_only_after_send=True),
-        MailboxListField('to_recipients', field_uri='message:ToRecipients', is_read_only_after_send=True,
-                         is_searchable=False),
-        MailboxListField('cc_recipients', field_uri='message:CcRecipients', is_read_only_after_send=True,
-                         is_searchable=False),
-        MailboxListField('bcc_recipients', field_uri='message:BccRecipients', is_read_only_after_send=True,
-                         is_searchable=False),
-        BooleanField('is_read_receipt_requested', field_uri='message:IsReadReceiptRequested',
-                     is_required=True, default=False, is_read_only_after_send=True),
-        BooleanField('is_delivery_receipt_requested', field_uri='message:IsDeliveryReceiptRequested',
-                     is_required=True, default=False, is_read_only_after_send=True),
+    ] + Message.FIELDS[:6] + [
         ReferenceItemIdField('reference_item_id', field_uri='item:ReferenceItemId', value_cls=ReferenceItemId),
         MailboxField('received_by', field_uri='message:ReceivedBy', is_read_only=True),
         MailboxField('received_representing', field_uri='message:ReceivedRepresenting', is_read_only=True),
