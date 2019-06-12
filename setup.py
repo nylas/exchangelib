@@ -11,7 +11,7 @@ Release notes:
 import io
 import os
 
-from setuptools import setup
+from setuptools import setup, find_packages
 
 
 __version__ = None
@@ -44,7 +44,7 @@ setup(
     extras_require={
         'kerberos': ['requests_kerberos'],
     },
-    packages=['exchangelib'],
+    packages=find_packages(exclude=('tests',)),
     tests_require=['PyYAML', 'requests_mock', 'psutil'],
     python_requires=">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*",
     test_suite='tests',
