@@ -192,7 +192,7 @@ def xml_text_to_value(value, value_type):
 def set_xml_value(elem, value, version):
     from .ewsdatetime import EWSDateTime, EWSDate
     from .fields import FieldPath, FieldOrder
-    from .folders import EWSElement
+    from .properties import EWSElement
     from .version import Version
     if isinstance(value, string_types + (bool, bytes, int, Decimal, datetime.time, EWSDate, EWSDateTime)):
         elem.text = value_to_xml_text(value)

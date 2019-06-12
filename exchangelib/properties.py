@@ -397,6 +397,13 @@ class PersonaId(ItemId):
     __slots__ = tuple()
 
 
+class FolderId(ItemId):
+    # MSDN: https://msdn.microsoft.com/en-us/library/office/aa579461(v=exchg.150).aspx
+    ELEMENT_NAME = 'FolderId'
+
+    __slots__ = tuple()
+
+
 class Mailbox(EWSElement):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa565036(v=exchg.150).aspx
     ELEMENT_NAME = 'Mailbox'
@@ -486,6 +493,26 @@ class MailboxData(EWSElement):
     def __hash__(self):
         # Exchange may add 'name' on insert. We're satisfied if the email address matches.
         return hash((self.email.email_address.lower(), self.attendee_type, self.exclude_conflicts))
+
+
+class DistinguishedFolderId(ItemId):
+    # MSDN: https://msdn.microsoft.com/en-us/library/office/aa580808(v=exchg.150).aspx
+    ELEMENT_NAME = 'DistinguishedFolderId'
+
+    FIELDS = [
+        IdField('id', field_uri=ItemId.ID_ATTR, is_required=True),
+        IdField('changekey', field_uri=ItemId.CHANGEKEY_ATTR),
+        MailboxField('mailbox'),
+    ]
+
+    __slots__ = ('mailbox',)
+
+    def clean(self, version=None):
+        from .folders import PublicFoldersRoot
+        super(DistinguishedFolderId, self).clean(version=version)
+        if self.id == PublicFoldersRoot.DISTINGUISHED_FOLDER_ID:
+            # Avoid "ErrorInvalidOperation: It is not valid to specify a mailbox with the public folder root" from EWS
+            self.mailbox = None
 
 
 class TimeWindow(EWSElement):
@@ -710,6 +737,27 @@ class TimeZone(EWSElement):
                 continue
             raise ValueError('Unknown transition: %s' % transition)
         return standard_time, daylight_time
+
+
+class CalendarView(EWSElement):
+    """
+    MSDN: https://msdn.microsoft.com/en-US/library/office/aa564515%28v=exchg.150%29.aspx
+    """
+    ELEMENT_NAME = 'CalendarView'
+    NAMESPACE = MNS
+
+    FIELDS = [
+        DateTimeField('start', field_uri='StartDate', is_required=True, is_attribute=True),
+        DateTimeField('end', field_uri='EndDate', is_required=True, is_attribute=True),
+        IntegerField('max_items', field_uri='MaxEntriesReturned', min=1, is_attribute=True),
+    ]
+
+    __slots__ = tuple(f.name for f in FIELDS)
+
+    def clean(self, version=None):
+        super(CalendarView, self).clean(version=version)
+        if self.end < self.start:
+            raise ValueError("'start' must be before 'end'")
 
 
 class CalendarEvent(EWSElement):
