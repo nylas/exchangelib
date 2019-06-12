@@ -225,7 +225,7 @@ class EWSService(object):
         except SessionPoolMinSizeReached:
             pass
         if self.protocol.credentials.fail_fast:
-            raise
+            raise e
         self.protocol.credentials.back_off(e.back_off)
         # We'll warn about this later if we actually need to sleep
 
