@@ -85,7 +85,8 @@ SEARCH_SCOPE_CHOICES = (ACTIVE_DIRECTORY, ACTIVE_DIRECTORY_CONTACTS, CONTACTS, C
 
 
 class RegisterMixIn(IdChangeKeyMixIn):
-    __slots__ = tuple()
+    # This class implements dynamic fields on an element class, so we need to include __dict__ in __slots__
+    __slots__ = ('__dict__',)
 
     INSERT_AFTER_FIELD = None
 
@@ -133,10 +134,8 @@ class Item(RegisterMixIn):
     """
     ELEMENT_NAME = 'Item'
 
-    # FIELDS is an ordered list of attributes supported by this item class
-    FIELDS = [
+    LOCAL_FIELDS = [
         MimeContentField('mime_content', field_uri='item:MimeContent', is_read_only_after_send=True),
-    ] + RegisterMixIn.FIELDS + [
         EWSElementField('parent_folder_id', field_uri='item:ParentFolderId', value_cls=ParentFolderId,
                         is_read_only=True),
         CharField('item_class', field_uri='item:ItemClass', is_read_only=True),
@@ -186,10 +185,12 @@ class Item(RegisterMixIn):
         BodyField('unique_body', field_uri='item:UniqueBody', is_read_only=True, supported_from=EXCHANGE_2010),
     ]
 
+    FIELDS = LOCAL_FIELDS[0:1] + RegisterMixIn.FIELDS + LOCAL_FIELDS[1:]
+
+    __slots__ = tuple(f.name for f in LOCAL_FIELDS) + ('account', 'folder')
+
     # Used to register extended properties
     INSERT_AFTER_FIELD = 'has_attachments'
-
-    # Using __slots__ here doesn't make much sense because we have so many fields
 
     def __init__(self, **kwargs):
         # 'account' is optional but allows calling 'send()' and 'delete()'
@@ -451,9 +452,12 @@ class BulkCreateResult(Item):
     """
     A dummy class to store return values from a CreateItem service call
     """
-    FIELDS = IdChangeKeyMixIn.FIELDS + [
+    LOCAL_FIELDS = [
         AttachmentField('attachments', field_uri='item:Attachments'),  # ItemAttachment or FileAttachment
     ]
+    FIELDS = IdChangeKeyMixIn.FIELDS + LOCAL_FIELDS
+
+    __slots__ = tuple(f.name for f in LOCAL_FIELDS)
 
 
 # CalendarItemType enums
@@ -470,7 +474,7 @@ class CalendarItem(Item):
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa564765(v=exchg.150).aspx
     """
     ELEMENT_NAME = 'CalendarItem'
-    FIELDS = Item.FIELDS + [
+    LOCAL_FIELDS = [
         TextField('uid', field_uri='calendar:UID', is_required_after_save=True, is_searchable=False),
         DateTimeField('start', field_uri='calendar:Start', is_required=True),
         DateTimeField('end', field_uri='calendar:End', is_required=True),
@@ -530,6 +534,9 @@ class CalendarItem(Item):
         URIField('meeting_workspace_url', field_uri='calendar:MeetingWorkspaceUrl'),
         URIField('net_show_url', field_uri='calendar:NetShowUrl'),
     ]
+    FIELDS = Item.FIELDS + LOCAL_FIELDS
+
+    __slots__ = tuple(f.name for f in LOCAL_FIELDS)
 
     @classmethod
     def timezone_fields(cls):
@@ -601,7 +608,7 @@ class Message(Item):
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa494306(v=exchg.150).aspx
     """
     ELEMENT_NAME = 'Message'
-    FIELDS = Item.FIELDS + [
+    LOCAL_FIELDS = [
         MailboxField('sender', field_uri='message:Sender', is_read_only=True, is_read_only_after_send=True),
         MailboxListField('to_recipients', field_uri='message:ToRecipients', is_read_only_after_send=True,
                          is_searchable=False),
@@ -626,6 +633,9 @@ class Message(Item):
         MailboxField('received_representing', field_uri='message:ReceivedRepresenting', is_read_only=True),
         # Placeholder for ReminderMessageData
     ]
+    FIELDS = Item.FIELDS + LOCAL_FIELDS
+
+    __slots__ = tuple(f.name for f in LOCAL_FIELDS)
 
     def send(self, save_copy=True, copy_to_folder=None, conflict_resolution=AUTO_RESOLVE,
              send_meeting_invitations=SEND_TO_NONE):
@@ -772,7 +782,7 @@ class Task(Item):
     ELEMENT_NAME = 'Task'
     NOT_STARTED = 'NotStarted'
     COMPLETED = 'Completed'
-    FIELDS = Item.FIELDS + [
+    LOCAL_FIELDS = [
         IntegerField('actual_work', field_uri='task:ActualWork', min=0),
         DateTimeField('assigned_time', field_uri='task:AssignedTime', is_read_only=True),
         TextField('billing_information', field_uri='task:BillingInformation'),
@@ -802,6 +812,9 @@ class Task(Item):
         CharField('status_description', field_uri='task:StatusDescription', is_read_only=True),
         IntegerField('total_work', field_uri='task:TotalWork', min=0),
     ]
+    FIELDS = Item.FIELDS + LOCAL_FIELDS
+
+    __slots__ = tuple(f.name for f in LOCAL_FIELDS)
 
     def clean(self, version=None):
         # pylint: disable=access-member-before-definition
@@ -852,7 +865,7 @@ class Contact(Item):
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa581315(v=exchg.150).aspx
     """
     ELEMENT_NAME = 'Contact'
-    FIELDS = Item.FIELDS + [
+    LOCAL_FIELDS = [
         TextField('file_as', field_uri='contacts:FileAs'),
         ChoiceField('file_as_mapping', field_uri='contacts:FileAsMapping', choices={
             Choice('None'), Choice('LastCommaFirst'), Choice('FirstSpaceLast'), Choice('Company'),
@@ -910,6 +923,9 @@ class Contact(Item):
         # Placeholder for ManagerMailbox
         # Placeholder for DirectReports
     ]
+    FIELDS = Item.FIELDS + LOCAL_FIELDS
+
+    __slots__ = tuple(f.name for f in LOCAL_FIELDS)
 
 
 class DistributionList(Item):
@@ -917,7 +933,7 @@ class DistributionList(Item):
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa566353(v=exchg.150).aspx
     """
     ELEMENT_NAME = 'DistributionList'
-    FIELDS = Item.FIELDS + [
+    LOCAL_FIELDS = [
         CharField('display_name', field_uri='contacts:DisplayName', is_required=True),
         CharField('file_as', field_uri='contacts:FileAs', is_read_only=True),
         ChoiceField('contact_source', field_uri='contacts:ContactSource', choices={
@@ -925,6 +941,9 @@ class DistributionList(Item):
         }, is_read_only=True),
         MemberListField('members', field_uri='distributionlist:Members'),
     ]
+    FIELDS = Item.FIELDS + LOCAL_FIELDS
+
+    __slots__ = tuple(f.name for f in LOCAL_FIELDS)
 
 
 class PostItem(Item):
@@ -932,15 +951,19 @@ class PostItem(Item):
     MSDN: https://msdn.microsoft.com/en-us/library/office/bb891851(v=exchg.150).aspx
     """
     ELEMENT_NAME = 'PostItem'
-    FIELDS = Item.FIELDS + [
+    LOCAL_FIELDS = [
         Base64Field('conversation_index', field_uri='message:ConversationIndex', is_read_only=True),
         CharField('conversation_topic', field_uri='message:ConversationTopic', is_read_only=True),
         MailboxField('author', field_uri='message:From', is_read_only_after_send=True),
         CharField('message_id', field_uri='message:InternetMessageId', is_read_only_after_send=True),
         BooleanField('is_read', field_uri='message:IsRead', is_required=True, default=False),
         DateTimeField('posted_time', field_uri='postitem:PostedTime', is_read_only=True),
+        TextField('references', field_uri='message:References'),
         MailboxField('sender', field_uri='message:Sender', is_read_only=True, is_read_only_after_send=True),
     ]
+    FIELDS = Item.FIELDS + LOCAL_FIELDS
+
+    __slots__ = tuple(f.name for f in LOCAL_FIELDS)
 
 
 class PostReplyItem(Item):
@@ -949,6 +972,42 @@ class PostReplyItem(Item):
     """
     # TODO: Untested and unfinished.
     ELEMENT_NAME = 'PostReplyItem'
+
+    LOCAL_FIELDS = [
+        MailboxField('sender', field_uri='message:Sender', is_read_only=True, is_read_only_after_send=True),
+        MailboxListField('to_recipients', field_uri='message:ToRecipients', is_read_only_after_send=True,
+                         is_searchable=False),
+        MailboxListField('cc_recipients', field_uri='message:CcRecipients', is_read_only_after_send=True,
+                         is_searchable=False),
+        MailboxListField('bcc_recipients', field_uri='message:BccRecipients', is_read_only_after_send=True,
+                         is_searchable=False),
+        BooleanField('is_read_receipt_requested', field_uri='message:IsReadReceiptRequested',
+                     is_required=True, default=False, is_read_only_after_send=True),
+        BooleanField('is_delivery_receipt_requested', field_uri='message:IsDeliveryReceiptRequested',
+                     is_required=True, default=False, is_read_only_after_send=True),
+        Base64Field('conversation_index', field_uri='message:ConversationIndex', is_read_only=True),
+        CharField('conversation_topic', field_uri='message:ConversationTopic', is_read_only=True),
+        # Rename 'From' to 'author'. We can't use fieldname 'from' since it's a Python keyword.
+        MailboxField('author', field_uri='message:From', is_read_only_after_send=True),
+        CharField('message_id', field_uri='message:InternetMessageId', is_read_only_after_send=True),
+        BooleanField('is_read', field_uri='message:IsRead', is_required=True, default=False),
+        BooleanField('is_response_requested', field_uri='message:IsResponseRequested', default=False, is_required=True),
+        TextField('references', field_uri='message:References'),
+        MailboxField('reply_to', field_uri='message:ReplyTo', is_read_only_after_send=True, is_searchable=False),
+        EffectiveRightsField('effective_rights', field_uri='item:EffectiveRights', is_read_only=True),
+        MailboxField('received_by', field_uri='message:ReceivedBy', is_read_only=True),
+        MailboxField('received_representing', field_uri='message:ReceivedRepresenting', is_read_only=True),
+        BodyField('new_body', field_uri='NewBodyContent'),  # Accepts and returns Body or HTMLBody instances
+    ]
+    # FIELDS on this element only has Item fields up to 'culture'
+    culture_idx = None
+    for i, f in enumerate(Item.FIELDS):
+        if f.name == 'culture':
+            culture_idx = i
+            break
+    FIELDS = Item.FIELDS[:culture_idx + 1] + LOCAL_FIELDS
+
+    __slots__ = tuple(f.name for f in LOCAL_FIELDS)
 
 
 class BaseMeetingItem(Item):
@@ -962,7 +1021,7 @@ class BaseMeetingItem(Item):
     Therefore BaseMeetingItem inherits from  EWSElement has no save() or send() method
 
     """
-    FIELDS = Item.FIELDS + [
+    LOCAL_FIELDS = [
         MailboxField('sender', field_uri='message:Sender', is_read_only=True, is_read_only_after_send=True),
         MailboxListField('to_recipients', field_uri='message:ToRecipients', is_read_only_after_send=True,
                          is_searchable=False),
@@ -993,6 +1052,9 @@ class BaseMeetingItem(Item):
                              Choice('Accept'), Choice('Decline'), Choice('NoResponseReceived')},
                     is_required=True, default='Unknown'),
     ]
+    FIELDS = Item.FIELDS + LOCAL_FIELDS
+
+    __slots__ = tuple(f.name for f in LOCAL_FIELDS)
 
     # Used to register extended properties
     INSERT_AFTER_FIELD = 'has_attachments'
@@ -1003,7 +1065,7 @@ class MeetingRequest(BaseMeetingItem):
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa565229(v=exchg.150).aspx
     """
     ELEMENT_NAME = 'MeetingRequest'
-    FIELDS = Message.FIELDS + [
+    LOCAL_FIELDS = [
         ChoiceField('meeting_request_type', field_uri='meetingRequest:MeetingRequestType',
                     choices={Choice('FullUpdate'), Choice('InformationalUpdate'), Choice('NewMeetingRequest'),
                              Choice('None'), Choice('Outdated'), Choice('PrincipalWantsCopy'),
@@ -1072,6 +1134,15 @@ class MeetingRequest(BaseMeetingItem):
         URIField('meeting_workspace_url', field_uri='calendar:MeetingWorkspaceUrl'),
         URIField('net_show_url', field_uri='calendar:NetShowUrl'),
     ]
+    # FIELDS on this element are shuffled compared to other elements
+    culture_idx = None
+    for i, f in enumerate(Item.FIELDS):
+        if f.name == 'culture':
+            culture_idx = i
+            break
+    FIELDS = Item.FIELDS[:culture_idx + 1] + BaseMeetingItem.LOCAL_FIELDS + LOCAL_FIELDS + Item.FIELDS[culture_idx + 1:]
+
+    __slots__ = tuple(f.name for f in LOCAL_FIELDS)
 
     def accept(self, **kwargs):
         return AcceptItem(
@@ -1102,13 +1173,35 @@ class MeetingMessage(BaseMeetingItem):
     # TODO: Untested - not sure if this is ever used
     ELEMENT_NAME = 'MeetingMessage'
 
+    # FIELDS on this element are shuffled compared to other elements
+    culture_idx = None
+    for i, f in enumerate(Item.FIELDS):
+        if f.name == 'culture':
+            culture_idx = i
+            break
+    FIELDS = Item.FIELDS[:culture_idx + 1] + BaseMeetingItem.LOCAL_FIELDS + Item.FIELDS[culture_idx + 1:]
 
-class MeetingResponse(BaseMeetingItem):
+    __slots__ = tuple()
+
+
+class MeetingResponse(Item):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa564337(v=exchg.150).aspx
     """
     ELEMENT_NAME = 'MeetingResponse'
-    FIELDS = list(Message.FIELDS)
+    LOCAL_FIELDS = [
+        MailboxField('received_by', field_uri='message:ReceivedBy', is_read_only=True),
+        MailboxField('received_representing', field_uri='message:ReceivedRepresenting', is_read_only=True),
+    ]
+    # Item fields, but only until the 'effective_rights' field
+    ITEM_FIELDS = []
+    for f in Item.FIELDS:
+        ITEM_FIELDS.append(f)
+        if f.name == 'effective_rights':
+            break
+    FIELDS = ITEM_FIELDS + LOCAL_FIELDS
+
+    __slots__ = tuple(f.name for f in LOCAL_FIELDS)
 
 
 class MeetingCancellation(BaseMeetingItem):
@@ -1117,8 +1210,10 @@ class MeetingCancellation(BaseMeetingItem):
     """
     ELEMENT_NAME = 'MeetingCancellation'
 
+    __slots__ = tuple()
 
-class BaseMeetingReplyItem(Item):
+
+class BaseMeetingReplyItem(EWSElement):
     # A base class for meeting request reply items that share the same fields (Accept, TentativelyAccept, Decline)
     FIELDS = [
         CharField('item_class', field_uri='item:ItemClass', is_read_only=True),
@@ -1146,6 +1241,29 @@ class BaseMeetingReplyItem(Item):
         DateTimeField('proposed_end', field_uri='meeting:ProposedEnd', supported_from=EXCHANGE_2013),
     ]
 
+    __slots__ = tuple(f.name for f in FIELDS) + ('account', 'folder')
+
+    def __init__(self, **kwargs):
+        # 'account' is optional but allows calling 'send()'
+        # 'folder' is optional but allows calling 'send()'. If 'folder' has an account, and 'account' is not set,
+        # we use folder.root.account.
+        from .folders import Folder
+        from .account import Account
+        self.account = kwargs.pop('account', None)
+        if self.account is not None and not isinstance(self.account, Account):
+            raise ValueError("'account' %r must be an Account instance" % self.account)
+        self.folder = kwargs.pop('folder', None)
+        if self.folder is not None:
+            if not isinstance(self.folder, Folder):
+                raise ValueError("'folder' %r must be a Folder instance" % self.folder)
+            if self.folder.root.account is not None:
+                if self.account is not None:
+                    # Make sure the account from kwargs matches the folder account
+                    if self.account != self.folder.root.account:
+                        raise ValueError("'account' does not match 'folder.root.account'")
+                self.account = self.folder.root.account
+        super(BaseMeetingReplyItem, self).__init__(**kwargs)
+
     def send(self, message_disposition=SEND_AND_SAVE_COPY):
         if not self.account:
             raise ValueError('%s must have an account' % self.__class__.__name__)
@@ -1164,6 +1282,8 @@ class AcceptItem(BaseMeetingReplyItem):
     """
     ELEMENT_NAME = 'AcceptItem'
 
+    __slots__ = tuple()
+
 
 class TentativelyAcceptItem(BaseMeetingReplyItem):
     """
@@ -1171,12 +1291,16 @@ class TentativelyAcceptItem(BaseMeetingReplyItem):
     """
     ELEMENT_NAME = 'TentativelyAcceptItem'
 
+    __slots__ = tuple()
+
 
 class DeclineItem(BaseMeetingReplyItem):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/aa579729(v=exchg.150).aspx
     """
     ELEMENT_NAME = 'DeclineItem'
+
+    __slots__ = tuple()
 
 
 class BaseReplyItem(EWSElement):
@@ -1196,8 +1320,10 @@ class BaseReplyItem(EWSElement):
         MailboxField('received_by_representing', field_uri='ReceivedRepresenting', supported_from=EXCHANGE_2007_SP1),
     ]
 
+    __slots__ = tuple(f.name for f in FIELDS) + ('account',)
+
     def __init__(self, **kwargs):
-        # 'account' is optional but allows calling 'send()'
+        # 'account' is optional but allows calling 'send()' and 'save()'
         from .account import Account
         self.account = kwargs.pop('account', None)
         if self.account is not None and not isinstance(self.account, Account):
@@ -1237,12 +1363,16 @@ class ReplyToItem(BaseReplyItem):
     """
     ELEMENT_NAME = 'ReplyToItem'
 
+    __slots__ = tuple()
+
 
 class ReplyAllToItem(BaseReplyItem):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa563988(v=exchg.150).aspx
     """
     ELEMENT_NAME = 'ReplyAllToItem'
+
+    __slots__ = tuple()
 
 
 class ForwardItem(BaseReplyItem):
@@ -1251,19 +1381,23 @@ class ForwardItem(BaseReplyItem):
     """
     ELEMENT_NAME = 'ForwardItem'
 
+    __slots__ = tuple()
+
 
 class CancelCalendarItem(BaseReplyItem):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/aa564482(v=exchg.150).aspx
     """
     ELEMENT_NAME = 'CancelCalendarItem'
+    FIELDS = [f for f in BaseReplyItem.FIELDS if f.name != 'author']
+    __slots__ = tuple()
 
 
 class Persona(IdChangeKeyMixIn):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/jj191299(v=exchg.150).aspx
     ELEMENT_NAME = 'Persona'
     ID_ELEMENT_CLS = PersonaId
-    FIELDS = IdChangeKeyMixIn.FIELDS + [
+    LOCAL_FIELDS = [
         CharField('file_as', field_uri='persona:FileAs'),
         CharField('display_name', field_uri='persona:DisplayName'),
         CharField('given_name', field_uri='persona:GivenName'),
@@ -1277,6 +1411,9 @@ class Persona(IdChangeKeyMixIn):
         CharField('im_address', field_uri='persona:ImAddress'),
         TextField('initials', field_uri='persona:Initials'),
     ]
+    FIELDS = IdChangeKeyMixIn.FIELDS + LOCAL_FIELDS
+
+    __slots__ = tuple(f.name for f in LOCAL_FIELDS)
 
 
 ITEM_CLASSES = (Item, CalendarItem, Contact, DistributionList, Message, PostItem, Task, MeetingRequest, MeetingResponse,
