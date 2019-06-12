@@ -1,4 +1,5 @@
 # coding=utf-8
+# flake8: noqa
 """
 Stores errors specific to this package, and mirrors all the possible errors that EWS can return.
 """

@@ -14,7 +14,7 @@ class Configuration(object):
 
     If the server is not configured with autodiscover, the following should be sufficient:
 
-        config = Configuration(server='example.com', credentials=Credentials('MYWINDOMAIN\myusername', 'topsecret'))
+        config = Configuration(server='example.com', credentials=Credentials('MYWINDOMAIN\\myusername', 'topsecret'))
         account = Account(primary_smtp_address='john@example.com', config=config)
 
     You can also set the EWS service endpoint directly:
@@ -27,7 +27,7 @@ class Configuration(object):
 
     If you want to use autodiscover, don't use a Configuration object. Instead, set up an account like this:
 
-        credentials = Credentials(username='MYWINDOMAIN\myusername', password='topsecret')
+        credentials = Credentials(username='MYWINDOMAIN\\myusername', password='topsecret')
         account = Account(primary_smtp_address='john@example.com', credentials=credentials, autodiscover=True)
 
     """

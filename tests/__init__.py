@@ -75,10 +75,10 @@ from exchangelib.recurrence import Recurrence, AbsoluteYearlyPattern, RelativeYe
 from exchangelib.restriction import Restriction, Q
 from exchangelib.settings import OofSettings
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, GetAttachment, ResolveNames, GetPersona, \
-    GetFolder, TNS
+    GetFolder
 from exchangelib.transport import NOAUTH, BASIC, DIGEST, NTLM, wrap, _get_auth_method_from_response
 from exchangelib.util import chunkify, peek, get_redirect_url, to_xml, BOM_UTF8, get_domain, value_to_xml_text, \
-    post_ratelimited, create_element, CONNECTION_ERRORS, PrettyXmlHandler, xml_to_str, ParseError
+    post_ratelimited, create_element, CONNECTION_ERRORS, PrettyXmlHandler, xml_to_str, ParseError, TNS
 from exchangelib.version import Build, Version, EXCHANGE_2007, EXCHANGE_2010, EXCHANGE_2013
 from exchangelib.winzone import generate_map, CLDR_TO_MS_TIMEZONE_MAP, CLDR_WINZONE_URL
 

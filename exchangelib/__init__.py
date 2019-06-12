@@ -1,4 +1,3 @@
-# Add noqa on top-level convenience imports
 from __future__ import unicode_literals
 
 from .account import Account

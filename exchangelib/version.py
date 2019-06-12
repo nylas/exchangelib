@@ -55,7 +55,6 @@ class PickleMixIn(object):
                 setattr(self, k, state.get(k))
 
 
-
 @python_2_unicode_compatible
 class Build(PickleMixIn):
     """

@@ -1225,7 +1225,7 @@ class BaseReplyItem(EWSElement):
         res = self.account.bulk_create(items=[self], folder=folder, message_disposition=SAVE_ONLY)
         if res and isinstance(res[0], Exception):
             raise res[0]
-        res = list(self.account.fetch(res)) # retrieve result
+        res = list(self.account.fetch(res))  # retrieve result
         if res and isinstance(res[0], Exception):
             raise res[0]
         return res[0]
