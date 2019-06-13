@@ -961,7 +961,7 @@ class PostItem(Item):
     MSDN: https://msdn.microsoft.com/en-us/library/office/bb891851(v=exchg.150).aspx
     """
     ELEMENT_NAME = 'PostItem'
-    LOCAL_FIELDS = Message.FIELDS[6:11] + [
+    LOCAL_FIELDS = Message.LOCAL_FIELDS[6:11] + [
         DateTimeField('posted_time', field_uri='postitem:PostedTime', is_read_only=True),
         TextField('references', field_uri='message:References'),
         MailboxField('sender', field_uri='message:Sender', is_read_only=True, is_read_only_after_send=True),
@@ -1103,7 +1103,7 @@ class BaseMeetingReplyItem(BaseItem):
         BodyField('body', field_uri='item:Body'),  # Accepts and returns Body or HTMLBody instances
         AttachmentField('attachments', field_uri='item:Attachments'),  # ItemAttachment or FileAttachment
         MessageHeaderField('headers', field_uri='item:InternetMessageHeaders', is_read_only=True),
-    ] + Message.FIELDS[:6] + [
+    ] + Message.LOCAL_FIELDS[:6] + [
         ReferenceItemIdField('reference_item_id', field_uri='item:ReferenceItemId', value_cls=ReferenceItemId),
         MailboxField('received_by', field_uri='message:ReceivedBy', is_read_only=True),
         MailboxField('received_representing', field_uri='message:ReceivedRepresenting', is_read_only=True),
