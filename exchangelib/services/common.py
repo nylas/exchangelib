@@ -343,6 +343,21 @@ class EWSService(object):
                 field_uri_elem = msg_xml.find('{%s}%s' % (TNS, tag_name))
                 if field_uri_elem is not None:
                     text += ' (field: %s)' % xml_to_str(field_uri_elem)
+            # If this is an ErrorInternalServerError error, the xml may contain a more specific error code
+            inner_code, inner_text = None, None
+            for value_elem in msg_xml.findall('{%s}Value' % TNS):
+                name = value_elem.get('Name')
+                if name == 'InnerErrorResponseCode':
+                    inner_code = value_elem.text
+                elif name == 'InnerErrorMessageText':
+                    inner_text = value_elem.text
+            if inner_code:
+                try:
+                    # Raise the error as the inner error code
+                    return vars(errors)[inner_code]('%s (raised from: %s(%r))' % (inner_text, code, text))
+                except KeyError:
+                    # Inner code is unknown to us. Just append to the original text
+                    text += ' (inner error: %s(%r))' % (inner_code, inner_text)
         try:
             # Raise the error corresponding to the ResponseCode
             return vars(errors)[code](text)
