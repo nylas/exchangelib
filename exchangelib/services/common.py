@@ -17,7 +17,7 @@ from ..errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired,
     ErrorItemSave, ErrorInvalidIdMalformed, ErrorMessageSizeExceeded, UnauthorizedError, \
     ErrorCannotDeleteTaskOccurrence, ErrorMimeContentConversionFailed, ErrorRecurrenceHasNoOccurrence, \
     ErrorNoPublicFolderReplicaAvailable, MalformedResponseError, ErrorExceededConnectionCount, \
-    SessionPoolMinSizeReached, ErrorIncorrectSchemaVersion
+    SessionPoolMinSizeReached, ErrorIncorrectSchemaVersion, ErrorInvalidRequest
 from ..transport import wrap, extra_headers
 from ..util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, \
     xml_to_str, set_xml_value, SOAPNS, TNS, MNS, ENS, ParseError
@@ -144,7 +144,7 @@ class EWSService(object):
                 res = self._get_soap_payload(response=r, **parse_opts)
             except ParseError as e:
                 raise SOAPError('Bad SOAP response: %s' % e)
-            except (ErrorInvalidServerVersion, ErrorIncorrectSchemaVersion):
+            except (ErrorInvalidServerVersion, ErrorIncorrectSchemaVersion, ErrorInvalidRequest):
                 # The guessed server version is wrong. Try the next version
                 log.debug('API version %s was invalid', api_version)
                 continue
