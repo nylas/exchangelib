@@ -2381,8 +2381,10 @@ class CommonTest(EWSTest):
 
     def test_get_elements(self):
         # Test that we can handle SOAP-level error messages
+        # TODO: The request actually raises ErrorInvalidRequest, but we interpret that to mean a wrong API version and
+        # end up throwing ErrorInvalidServerVersion. We should make a more direct test.
         svc = ResolveNames(self.account.protocol)
-        with self.assertRaises(ErrorInvalidRequest):
+        with self.assertRaises(ErrorInvalidServerVersion):
             svc._get_elements(create_element('XXX'))
 
     @requests_mock.mock()
