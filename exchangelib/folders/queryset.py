@@ -29,7 +29,7 @@ class FolderQuerySet(object):
     def _copy_cls(self):
         return self.__class__(folder_collection=self.folder_collection)
 
-    def copy(self):
+    def _copy_self(self):
         """Chaining operations must make a copy of self before making any modifications
         """
         new_qs = self._copy_cls()
@@ -50,7 +50,7 @@ class FolderQuerySet(object):
                     break
             else:
                 raise InvalidField("Unknown field %r on folders %s" % (arg, self.folder_collection.folders))
-        new_qs = self.copy()
+        new_qs = self._copy_self()
         new_qs.only_fields = only_fields
         return new_qs
 
@@ -59,7 +59,7 @@ class FolderQuerySet(object):
         """
         if depth not in FOLDER_TRAVERSAL_CHOICES:
             raise ValueError("'depth' %s must be one of %s" % (depth, FOLDER_TRAVERSAL_CHOICES))
-        new_qs = self.copy()
+        new_qs = self._copy_self()
         new_qs.traversal_depth = depth
         return new_qs
 
@@ -82,13 +82,13 @@ class FolderQuerySet(object):
     def all(self):
         """Return all child folders at the depth specified
         """
-        new_qs = self.copy()
+        new_qs = self._copy_self()
         return new_qs
 
     def filter(self, *args, **kwargs):
         """Add restrictions to the folder search
         """
-        new_qs = self.copy()
+        new_qs = self._copy_self()
         q = Q(*args, **kwargs)
         new_qs.q = q if new_qs.q is None else new_qs.q & q
         return new_qs

@@ -484,6 +484,16 @@ delete_results = a.bulk_delete(ids=calendar_ids)
 
 # Bulk delete items found as a queryset
 a.inbox.filter(subject__startswith='Invoice').delete()
+
+# Likewise, you can bulk send, copy or move items found in a QuerySet
+a.drafts.filter(subject__startswith='Invoice').send()
+# All kwargs are passed on to the equivalent bulk methods on the Account
+a.drafts.filter(subject__startswith='Invoice').send(save_copy=False)
+a.inbox.filter(subject__startswith='Invoice').copy(to_folder=a.inbox / 'Archive')
+a.inbox.filter(subject__startswith='Invoice').move(to_folder=a.inbox / 'Archive')
+
+# You can change the default page size of bulk operations if you have a slow or busy server
+a.inbox.filter(subject__startswith='Invoice').delete(page_size=25)
 ```
 
 ## Searching
@@ -1053,7 +1063,7 @@ for mailbox, contact in a.protocol.resolve_names(['anne', 'bart'], return_full_c
     print(mailbox.email_address, contact.display_name)
 
 # Get all mailboxes on a distribution list
-for mailbox in a.protocol.expand_dl(DLMailbox(email_address='distro@example.com', mailbox_type='PublicDL'):
+for mailbox in a.protocol.expand_dl(DLMailbox(email_address='distro@example.com', mailbox_type='PublicDL')):
     print(mailbox.email_address)
 # Or just pass a string containing the SMTP address
 for mailbox in a.protocol.expand_dl('distro@example.com'):

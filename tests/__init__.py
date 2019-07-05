@@ -1239,7 +1239,7 @@ class QuerySetTest(TimedTestCase):
         qs.return_format = QuerySet.NONE
 
         # Initially, immutable items have the same id()
-        new_qs = qs.copy()
+        new_qs = qs._copy_self()
         self.assertNotEqual(id(qs), id(new_qs))
         self.assertEqual(id(qs.folder_collection), id(new_qs.folder_collection))
         self.assertEqual(id(qs._cache), id(new_qs._cache))
@@ -3794,70 +3794,123 @@ class ItemQuerySetTest(BaseItemTest):
 
         # Test positive index
         self.assertEqual(
-            qs.copy()[0].subject,
+            qs._copy_self()[0].subject,
             'Subj 0'
         )
         # Test positive index
         self.assertEqual(
-            qs.copy()[3].subject,
+            qs._copy_self()[3].subject,
             'Subj 3'
         )
         # Test negative index
         self.assertEqual(
-            qs.copy()[-2].subject,
+            qs._copy_self()[-2].subject,
             'Subj 2'
         )
         # Test positive slice
         self.assertEqual(
-            [i.subject for i in qs.copy()[0:2]],
+            [i.subject for i in qs._copy_self()[0:2]],
             ['Subj 0', 'Subj 1']
         )
         # Test positive slice
         self.assertEqual(
-            [i.subject for i in qs.copy()[2:4]],
+            [i.subject for i in qs._copy_self()[2:4]],
             ['Subj 2', 'Subj 3']
         )
         # Test positive open slice
         self.assertEqual(
-            [i.subject for i in qs.copy()[:2]],
+            [i.subject for i in qs._copy_self()[:2]],
             ['Subj 0', 'Subj 1']
         )
         # Test positive open slice
         self.assertEqual(
-            [i.subject for i in qs.copy()[2:]],
+            [i.subject for i in qs._copy_self()[2:]],
             ['Subj 2', 'Subj 3']
         )
         # Test negative slice
         self.assertEqual(
-            [i.subject for i in qs.copy()[-3:-1]],
+            [i.subject for i in qs._copy_self()[-3:-1]],
             ['Subj 1', 'Subj 2']
         )
         # Test negative slice
         self.assertEqual(
-            [i.subject for i in qs.copy()[1:-1]],
+            [i.subject for i in qs._copy_self()[1:-1]],
             ['Subj 1', 'Subj 2']
         )
         # Test negative open slice
         self.assertEqual(
-            [i.subject for i in qs.copy()[:-2]],
+            [i.subject for i in qs._copy_self()[:-2]],
             ['Subj 0', 'Subj 1']
         )
         # Test negative open slice
         self.assertEqual(
-            [i.subject for i in qs.copy()[-2:]],
+            [i.subject for i in qs._copy_self()[-2:]],
             ['Subj 2', 'Subj 3']
         )
         # Test positive slice with step
         self.assertEqual(
-            [i.subject for i in qs.copy()[0:4:2]],
+            [i.subject for i in qs._copy_self()[0:4:2]],
             ['Subj 0', 'Subj 2']
         )
         # Test negative slice with step
         self.assertEqual(
-            [i.subject for i in qs.copy()[4:0:-2]],
+            [i.subject for i in qs._copy_self()[4:0:-2]],
             ['Subj 3', 'Subj 1']
         )
         self.bulk_delete(ids)
+
+    def test_delete_via_queryset(self):
+        self.get_test_item().save()
+        qs = self.test_folder.filter(categories__contains=self.categories)
+        self.assertEqual(qs.count(), 1)
+        qs.delete()
+        self.assertEqual(qs.count(), 0)
+
+    def test_send_via_queryset(self):
+        self.get_test_item().save()
+        qs = self.test_folder.filter(categories__contains=self.categories)
+        to_folder = self.account.sent
+        to_folder_qs = to_folder.filter(categories__contains=self.categories)
+        self.assertEqual(qs.count(), 1)
+        self.assertEqual(to_folder_qs.count(), 0)
+        qs.send(copy_to_folder=to_folder)
+        time.sleep(5)  # Requests are supposed to be transactional, but apparently not...
+        self.assertEqual(qs.count(), 0)
+        self.assertEqual(to_folder_qs.count(), 1)
+
+    def test_send_with_no_copy_via_queryset(self):
+        self.get_test_item().save()
+        qs = self.test_folder.filter(categories__contains=self.categories)
+        to_folder = self.account.sent
+        to_folder_qs = to_folder.filter(categories__contains=self.categories)
+        self.assertEqual(qs.count(), 1)
+        self.assertEqual(to_folder_qs.count(), 0)
+        qs.send(save_copy=False)
+        time.sleep(5)  # Requests are supposed to be transactional, but apparently not...
+        self.assertEqual(qs.count(), 0)
+        self.assertEqual(to_folder_qs.count(), 0)
+
+    def test_copy_via_queryset(self):
+        self.get_test_item().save()
+        qs = self.test_folder.filter(categories__contains=self.categories)
+        to_folder = self.account.trash
+        to_folder_qs = to_folder.filter(categories__contains=self.categories)
+        self.assertEqual(qs.count(), 1)
+        self.assertEqual(to_folder_qs.count(), 0)
+        qs.copy(to_folder=to_folder)
+        self.assertEqual(qs.count(), 1)
+        self.assertEqual(to_folder_qs.count(), 1)
+
+    def test_move_via_queryset(self):
+        self.get_test_item().save()
+        qs = self.test_folder.filter(categories__contains=self.categories)
+        to_folder = self.account.trash
+        to_folder_qs = to_folder.filter(categories__contains=self.categories)
+        self.assertEqual(qs.count(), 1)
+        self.assertEqual(to_folder_qs.count(), 0)
+        qs.move(to_folder=to_folder)
+        self.assertEqual(qs.count(), 0)
+        self.assertEqual(to_folder_qs.count(), 1)
 
 
 class ItemHelperTest(BaseItemTest):

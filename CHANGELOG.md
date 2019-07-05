@@ -9,6 +9,9 @@ HEAD
     to just `id` in 1.12.0, have now been removed.
 -   The `Persona.persona_id` field was replaced with `Persona.id` and `Persona.changekey`, to
     align with the `Item` and `Folder` classes.
+-   In addition to bulk deleting via a QuerySet (`qs.delete()`), it is now possible to also
+    bulk send, move and copy items in a QuerySet (via `qs.send()`, `qs.move()` and `qs.copy()`,
+    respectively).
 
 
 1.12.5
