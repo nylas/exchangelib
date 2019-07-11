@@ -942,29 +942,13 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
                 yield f.name
 
     def _get_item_update_elems(self, item, fieldnames):
-        from .items import CalendarItem
         fieldnames_set = set(fieldnames)
-
-        if item.__class__ == CalendarItem:
-            # For CalendarItem items where we update 'start' or 'end', we want to update internal timezone fields
-            item.clean_timezone_fields(version=self.account.version)  # Possibly also sets timezone values
-            meeting_tz_field, start_tz_field, end_tz_field = CalendarItem.timezone_fields()
-            if self.account.version.build < EXCHANGE_2010:
-                if 'start' in fieldnames_set or 'end' in fieldnames_set:
-                    fieldnames_set.add(meeting_tz_field.name)
-            else:
-                if 'start' in fieldnames_set:
-                    fieldnames_set.add(start_tz_field.name)
-                if 'end' in fieldnames_set:
-                    fieldnames_set.add(end_tz_field.name)
-        else:
-            meeting_tz_field, start_tz_field, end_tz_field = None, None, None
 
         for fieldname in self._sort_fieldnames(item_model=item.__class__, fieldnames=fieldnames_set):
             field = item.get_field_by_fieldname(fieldname)
             if field.is_read_only:
                 raise ValueError('%s is a read-only field' % field.name)
-            value = self._get_item_value(item, field, meeting_tz_field, start_tz_field, end_tz_field)
+            value = self._get_item_value(item, field)
             if value is None or (field.is_list and not value):
                 # A value of None or [] means we want to remove this field from the item
                 for elem in self._get_delete_item_elems(field=field):
@@ -973,19 +957,8 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
                 for elem in self._get_set_item_elems(item_model=item.__class__, field=field, value=value):
                     yield elem
 
-    def _get_item_value(self, item, field, meeting_tz_field, start_tz_field, end_tz_field):
-        from .items import CalendarItem
+    def _get_item_value(self, item, field):
         value = field.clean(getattr(item, field.name), version=self.account.version)  # Make sure the value is OK
-        if item.__class__ == CalendarItem:
-            # For CalendarItem items where we update 'start' or 'end', we want to send values in the local timezone
-            if self.account.version.build < EXCHANGE_2010:
-                if field.name in ('start', 'end'):
-                    value = value.astimezone(getattr(item, meeting_tz_field.name))
-            else:
-                if field.name == 'start':
-                    value = value.astimezone(getattr(item, start_tz_field.name))
-                elif field.name == 'end':
-                    value = value.astimezone(getattr(item, end_tz_field.name))
         return value
 
     def _get_delete_item_elems(self, field):
