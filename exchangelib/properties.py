@@ -490,10 +490,6 @@ class Email(AvailabilityMailbox):
 
     __slots__ = tuple()
 
-    def __hash__(self):
-        # Exchange may add 'name' on insert. We're satisfied if the email address matches.
-        return hash(self.email_address.lower())
-
 
 class MailboxData(EWSElement):
     # MSDN: https://msdn.microsoft.com/en-us/library/office/aa566036(v=exchg.150).aspx

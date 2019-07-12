@@ -920,8 +920,6 @@ class OccurrenceListField(OccurrenceField):
 
 
 class MessageHeaderField(EWSElementListField):
-    is_complex = True
-
     def __init__(self, *args, **kwargs):
         from .properties import MessageHeader
         kwargs['value_cls'] = MessageHeader
@@ -957,8 +955,6 @@ class BaseEmailField(EWSElementField):
 
 
 class EmailField(BaseEmailField):
-    is_complex = True  # FindItem only returns the name, not the email address
-
     def __init__(self, *args, **kwargs):
         from .properties import Email
         kwargs['value_cls'] = Email
@@ -980,8 +976,6 @@ class MailboxField(BaseEmailField):
 
 
 class MailboxListField(EWSElementListField):
-    is_complex = True
-
     def __init__(self, *args, **kwargs):
         from .properties import Mailbox
         kwargs['value_cls'] = Mailbox
@@ -994,8 +988,6 @@ class MailboxListField(EWSElementListField):
 
 
 class MemberListField(EWSElementListField):
-    is_complex = True
-
     def __init__(self, *args, **kwargs):
         from .properties import Member
         kwargs['value_cls'] = Member
@@ -1011,8 +1003,6 @@ class MemberListField(EWSElementListField):
 
 
 class AttendeesField(EWSElementListField):
-    is_complex = True
-
     def __init__(self, *args, **kwargs):
         from .properties import Attendee
         kwargs['value_cls'] = Attendee
@@ -1027,8 +1017,6 @@ class AttendeesField(EWSElementListField):
 
 
 class AttachmentField(EWSElementListField):
-    is_complex = True
-
     def __init__(self, *args, **kwargs):
         from .attachments import Attachment
         kwargs['value_cls'] = Attachment
