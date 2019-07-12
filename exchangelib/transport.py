@@ -105,7 +105,7 @@ def get_autodiscover_authtype(service_endpoint, data):
                 redirect_url = get_redirect_url(r, require_relative=True)
                 log.debug('Autodiscover HTTP redirect to %s', redirect_url)
             except RelativeRedirect as e:
-                # We were redirected to a different domain or sheme. Raise RedirectError so higher-level code can
+                # We were redirected to a different domain or scheme. Raise RedirectError so higher-level code can
                 # try again on this new domain or scheme.
                 raise RedirectError(url=e.value)
             # Some MS servers are masters of messing up HTTP, issuing 302 to an error page with zero content.

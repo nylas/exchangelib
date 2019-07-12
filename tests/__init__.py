@@ -2513,6 +2513,10 @@ class AccountTest(EWSTest):
         finally:
             item.delete()
 
+    def test_mail_tips(self):
+        # Test that mail tips work
+        self.assertEqual(self.account.mail_tips.email_address, self.account.primary_smtp_address)
+
 
 class AutodiscoverTest(EWSTest):
     def test_magic(self):

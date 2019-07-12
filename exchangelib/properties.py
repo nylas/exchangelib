@@ -14,7 +14,8 @@ from six import text_type, string_types
 
 from .fields import SubField, TextField, EmailAddressField, ChoiceField, DateTimeField, EWSElementField, MailboxField, \
     Choice, BooleanField, IdField, ExtendedPropertyField, IntegerField, TimeField, EnumField, CharField, EmailField, \
-    EWSElementListField, EnumListField, FreeBusyStatusField, UnknownEntriesField, WEEKDAY_NAMES, FieldPath, Field
+    EWSElementListField, EnumListField, FreeBusyStatusField, UnknownEntriesField, MessageField, RecipientAddressField, \
+    WEEKDAY_NAMES, FieldPath, Field
 from .util import get_xml_attr, create_element, set_xml_value, value_to_xml_text, MNS, TNS
 from .version import EXCHANGE_2013
 
@@ -437,6 +438,23 @@ class Mailbox(EWSElement):
 class DLMailbox(Mailbox):
     # Like Mailbox, but creates elements in the 'messages' namespace when sending requests
     NAMESPACE = MNS
+    __slots__ = tuple()
+
+
+class SendingAs(Mailbox):
+    # MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/sendingas
+    # Like Mailbox, but creates elements in the 'messages' namespace when sending requests
+    ELEMENT_NAME = 'SendingAs'
+    NAMESPACE = MNS
+    __slots__ = tuple()
+
+
+class RecipientAddress(Mailbox):
+    # Like Mailbox, but with a different tag name
+    #
+    # MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/recipientaddress
+    ELEMENT_NAME = 'RecipientAddress'
+
     __slots__ = tuple()
 
 
@@ -997,6 +1015,66 @@ class FailedMailbox(EWSElement):
     ]
 
     __slots__ = tuple(f.name for f in FIELDS)
+
+
+# MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/mailtipsrequested
+MAIL_TIPS_TYPES = (
+    'All',
+    'OutOfOfficeMessage',
+    'MailboxFullStatus',
+    'CustomMailTip',
+    'ExternalMemberCount',
+    'TotalMemberCount',
+    'MaxMessageSize',
+    'DeliveryRestriction',
+    'ModerationStatus',
+    'InvalidRecipient',
+)
+
+
+class OutOfOffice(EWSElement):
+    # MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/outofoffice
+    ELEMENT_NAME = 'OutOfOffice'
+
+    FIELDS = [
+        MessageField('reply_body', field_uri='ReplyBody'),
+        DateTimeField('start', field_uri='StartTime', is_required=False),
+        DateTimeField('end', field_uri='EndTime', is_required=False),
+    ]
+
+    @classmethod
+    def from_xml(cls, elem, account):
+        kwargs = {}
+        for attr in ('reply_body'):
+            f = cls.get_field_by_fieldname(attr)
+            kwargs[attr] = f.from_xml(elem=elem, account=account)
+        duration = elem.find('{%s}Duration' % TNS)
+        if duration is not None:
+            for attr in ('start', 'end'):
+                f = cls.get_field_by_fieldname(attr)
+                kwargs[attr] = f.from_xml(elem=duration, account=account)
+        cls._clear(elem)
+        return cls(**kwargs)
+
+
+class MailTips(EWSElement):
+    # MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/mailtips
+    ELEMENT_NAME = 'MailTips'
+    NAMESPACE = MNS
+
+    FIELDS = [
+        RecipientAddressField('recipient_address'),
+        ChoiceField('pending_mail_tips', field_uri='PendingMailTips', choices={Choice(c) for c in MAIL_TIPS_TYPES}),
+        EWSElementField('out_of_office', field_uri='OutOfOffice', value_cls=OutOfOffice),
+        BooleanField('mailbox_full', field_uri='MailboxFull'),
+        TextField('custom_mail_tip', field_uri='CustomMailTip'),
+        IntegerField('total_member_count', field_uri='TotalMemberCount'),
+        IntegerField('external_member_count', field_uri='ExternalMemberCount'),
+        IntegerField('max_message_size', field_uri='MaxMessageSize'),
+        BooleanField('delivery_restricted', field_uri='DeliveryRestricted'),
+        BooleanField('is_moderated', field_uri='IsModerated'),
+        BooleanField('invalid_recipient', field_uri='InvalidRecipient'),
+    ]
 
 
 class IdChangeKeyMixIn(EWSElement):

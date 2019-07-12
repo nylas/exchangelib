@@ -26,10 +26,10 @@ from .items import Item, BulkCreateResult, HARD_DELETE, \
     DELETE_TYPE_CHOICES, MESSAGE_DISPOSITION_CHOICES, CONFLICT_RESOLUTION_CHOICES, AFFECTED_TASK_OCCURRENCES_CHOICES, \
     SEND_MEETING_INVITATIONS_CHOICES, SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES, \
     SEND_MEETING_CANCELLATIONS_CHOICES, ID_ONLY
-from .properties import Mailbox
+from .properties import Mailbox, SendingAs
 from .queryset import QuerySet
 from .services import ExportItems, UploadItems, GetItem, CreateItem, UpdateItem, DeleteItem, MoveItem, SendItem, \
-    CopyItem, GetUserOofSettings, SetUserOofSettings
+    CopyItem, GetUserOofSettings, SetUserOofSettings, GetMailTips
 from .settings import OofSettings
 from .util import get_domain, peek
 
@@ -584,6 +584,22 @@ class Account(object):
             else:
                 item = validation_folder.item_model_from_tag(i.tag).from_xml(elem=i, account=self)
                 yield item
+
+    @property
+    def mail_tips(self):
+        """See self.oof_settings about caching considerations
+        """
+        # mail_tips_requested must be one of properties.MAIL_TIPS_TYPES
+        res = list(GetMailTips(protocol=self.protocol).call(
+            sending_as=SendingAs(email_address=self.primary_smtp_address),
+            recipients=[Mailbox(email_address=self.primary_smtp_address)],
+            mail_tips_requested='All',
+        ))
+        if len(res) != 1:
+            raise ValueError('Expected result length 1, but got %s' % res)
+        if isinstance(res[0], Exception):
+            raise res[0]
+        return res[0]
 
     def __str__(self):
         txt = '%s' % self.primary_smtp_address

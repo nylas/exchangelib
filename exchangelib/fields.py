@@ -681,6 +681,25 @@ class TextListField(TextField):
         return self.default
 
 
+class MessageField(TextField):
+    INNER_ELEMENT_NAME = 'Message'
+
+    def from_xml(self, elem, account):
+        reply = elem.find(self.response_tag())
+        if reply is None:
+            return None
+        message = reply.find('{%s}%s' % (TNS, self.INNER_ELEMENT_NAME))
+        if message is None:
+            return None
+        return message.text
+
+    def to_xml(self, value, version):
+        field_elem = create_element(self.request_tag())
+        message = create_element('t:%s' % self.INNER_ELEMENT_NAME)
+        message.text = value
+        return set_xml_value(field_elem, message, version=version)
+
+
 class CharField(TextField):
     # A field that stores a string value with a limited length
     is_complex = False
@@ -946,9 +965,14 @@ class EmailField(BaseEmailField):
         super(EmailField, self).__init__(*args, **kwargs)
 
 
-class MailboxField(BaseEmailField):
-    is_complex = True  # FindItem only returns the name, not the email address
+class RecipientAddressField(BaseEmailField):
+    def __init__(self, *args, **kwargs):
+        from .properties import RecipientAddress
+        kwargs['value_cls'] = RecipientAddress
+        super(RecipientAddressField, self).__init__(*args, **kwargs)
 
+
+class MailboxField(BaseEmailField):
     def __init__(self, *args, **kwargs):
         from .properties import Mailbox
         kwargs['value_cls'] = Mailbox

@@ -1,26 +1,7 @@
 from .ewsdatetime import UTC_NOW
-from .fields import DateTimeField, TextField, ChoiceField, Choice
+from .fields import DateTimeField, MessageField, ChoiceField, Choice
 from .properties import EWSElement
 from .util import create_element, set_xml_value, TNS
-
-
-class ReplyField(TextField):
-    INNER_ELEMENT_NAME = 'Message'
-
-    def from_xml(self, elem, account):
-        reply = elem.find(self.response_tag())
-        if reply is None:
-            return None
-        message = reply.find('{%s}%s' % (TNS, self.INNER_ELEMENT_NAME))
-        if message is None:
-            return None
-        return message.text
-
-    def to_xml(self, value, version):
-        field_elem = create_element(self.request_tag())
-        message = create_element('t:%s' % self.INNER_ELEMENT_NAME)
-        message.text = value
-        return set_xml_value(field_elem, message, version=version)
 
 
 class OofSettings(EWSElement):
@@ -37,8 +18,8 @@ class OofSettings(EWSElement):
                     choices={Choice('None'), Choice('Known'), Choice('All')}, default='All'),
         DateTimeField('start', field_uri='StartTime'),
         DateTimeField('end', field_uri='EndTime'),
-        ReplyField('internal_reply', field_uri='InternalReply'),
-        ReplyField('external_reply', field_uri='ExternalReply'),
+        MessageField('internal_reply', field_uri='InternalReply'),
+        MessageField('external_reply', field_uri='ExternalReply'),
     ]
 
     def clean(self, version=None):
