@@ -427,7 +427,7 @@ forward_draft = m.create_forward(
     body='Hey, look at this!',
     to_recipients=['carl@example.com', 'denice@example.com']
 ).save(a.drafts) # gives you back the item
-forward_draft.reply_to = 'eric@example.com'
+forward_draft.reply_to = ['erik@example.com']
 forward_draft.attach(FileAttachment(name='my_file.txt', content='hello world'.encode('utf-8')))
 forward_draft.send() # now our forward has an extra reply_to field and an extra attachment.
 
