@@ -597,7 +597,7 @@ class QuerySet(SearchableMixIn):
         res = self.folder_collection.account.bulk_delete(
             ids=ids,
             chunk_size=page_size,
-            **delete_kwargs,
+            **delete_kwargs
         )
         self._cache = None  # Invalidate the cache, regardless of the results
         return res
@@ -613,7 +613,7 @@ class QuerySet(SearchableMixIn):
         res = self.folder_collection.account.bulk_send(
             ids=ids,
             chunk_size=page_size,
-            **send_kwargs,
+            **send_kwargs
         )
         self._cache = None  # Invalidate the cache, regardless of the results
         return res
@@ -630,7 +630,7 @@ class QuerySet(SearchableMixIn):
             ids=ids,
             to_folder=to_folder,
             chunk_size=page_size,
-            **copy_kwargs,
+            **copy_kwargs
         )
         self._cache = None  # Invalidate the cache, regardless of the results
         return res
