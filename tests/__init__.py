@@ -2515,7 +2515,7 @@ class AccountTest(EWSTest):
 
     def test_mail_tips(self):
         # Test that mail tips work
-        self.assertEqual(self.account.mail_tips.email_address, self.account.primary_smtp_address)
+        self.assertEqual(self.account.mail_tips.recipient_address, self.account.primary_smtp_address)
 
 
 class AutodiscoverTest(EWSTest):
