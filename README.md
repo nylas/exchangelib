@@ -1025,6 +1025,20 @@ a.oof_settings = OofSettings(
 )
 ```
 
+
+## Mail tips
+Mail tips for an account contain some extra information about the account,
+e.g. OOF information, max message size, whether the mailbox is full, messages
+are moderated etc. Here's how to get mail tips for a single account:
+
+```python
+from exchangelib import Account
+
+a = Account(...)
+print(a.mail_tips)
+```
+
+
 ## Export and upload
 
 Exchange supports backup and restore of folder contents using special
