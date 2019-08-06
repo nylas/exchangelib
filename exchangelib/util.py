@@ -233,7 +233,11 @@ def create_element(name, attrs=None, nsmap=None):
     if ':' in name:
         ns, name = name.split(':')
         name = '{%s}%s' % (ns_translation[ns], name)
-    elem = RestrictedElement(attrib=attrs, nsmap=nsmap)
+    elem = RestrictedElement(nsmap=nsmap)
+    if attrs:
+        # Try hard to keep attribute order, to ensure deterministic output. This simplifies testing.
+        for k, v in attrs.items():
+            elem.set(k, v)
     elem.tag = name
     return elem
 
