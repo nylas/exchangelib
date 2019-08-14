@@ -1215,13 +1215,7 @@ class ExtendedPropertyField(Field):
     def from_xml(self, elem, account):
         extended_properties = elem.findall(self.value_cls.response_tag())
         for extended_property in extended_properties:
-            extended_field_uri = extended_property.find('{%s}ExtendedFieldURI' % TNS)
-            match = True
-            for k, v in self.value_cls.properties_map().items():
-                if extended_field_uri.get(k) != v:
-                    match = False
-                    break
-            if match:
+            if self.value_cls.is_property_instance(extended_property):
                 return self.value_cls.from_xml(elem=extended_property, account=account)
         return self.default
 

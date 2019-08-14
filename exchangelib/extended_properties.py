@@ -61,6 +61,30 @@ class ExtendedProperty(EWSElement):
         'StringArray',
     }  # The commented-out types cannot be used for setting or getting (see docs) and are thus not very useful here
 
+    # Translation table between common distinguished_property_set_id and property_set_id values. See
+    # https://docs.microsoft.com/en-us/office/client-developer/outlook/mapi/commonly-used-property-sets
+    # ID values must be lowercase.
+    DISTINGUISHED_SET_NAME_TO_ID_MAP = {
+        'PublicStrings': '00020329-0000-0000-c000-000000000046',
+        'Common': '00062008-0000-0000-c000-000000000046',
+        'Address': '00062004-0000-0000-c000-000000000046',
+        'InternetHeaders': '00020386-0000-0000-c000-000000000046',
+        'Appointment': '00062002-0000-0000-c000-000000000046',
+        'Meeting': '6ed8da90-450b-101b-98da-00aa003f1305',
+        'Log': '0006200a-0000-0000-c000-000000000046',
+        'Messaging': '41f28f13-83f4-4114-a584-eedb5a6b0bff',
+        'Note': '0006200e-0000-0000-c000-000000000046',
+        'PostRss': '00062041-0000-0000-c000-000000000046',
+        'Task': '00062003-0000-0000-c000-000000000046',
+        'UnifiedMessaging': '4442858e-a9e3-4e80-b900-317a210cc15b',
+        'Mapi': '00020328-0000-0000-c000-000000000046',
+        'AirSync': '71035549-0739-4dcb-9163-00f0580dbbdf',
+        'Sharing': '00062040-0000-0000-c000-000000000046',
+        'Report': '00062013-0000-0000-c000-000000000046',
+        'Remote': '00062014-0000-0000-c000-000000000046',
+    }
+    DISTINGUISHED_SET_ID_TO_NAME_MAP = {v: k for k, v in DISTINGUISHED_SET_NAME_TO_ID_MAP.items()}
+
     distinguished_property_set_id = None
     property_set_id = None
     property_tag = None  # hex integer (e.g. 0x8000) or string ('0x8000')
@@ -169,6 +193,32 @@ class ExtendedProperty(EWSElement):
             if not isinstance(self.value, python_type):
                 raise TypeError(
                     "'%s' value %r must be an instance of %s" % (self.__class__.__name__, self.value, python_type))
+
+    @classmethod
+    def is_property_instance(cls, elem):
+        # Returns whether an 'ExtendedProperty' element matches the definition for this class. Extended property fields
+        # do not have a name, so we must match on the cls.property_* attributes to match a field in the request with a
+        # field in the response.
+        extended_field_uri = elem.find('{%s}ExtendedFieldURI' % TNS)
+        cls_props = cls.properties_map()
+        elem_props = {k: extended_field_uri.get(k) for k in cls_props.keys()}
+        # Sometimes, EWS will helpfully translate a 'distinguished_property_set_id' value to a 'property_set_id' value
+        # and vice versa. Align these values.
+        cls_set_id = cls.DISTINGUISHED_SET_NAME_TO_ID_MAP.get(cls_props.get('DistinguishedPropertySetId'))
+        if cls_set_id:
+            cls_props['PropertySetId'] = cls_set_id
+        else:
+            cls_set_name = cls.DISTINGUISHED_SET_ID_TO_NAME_MAP.get(cls_props.get('PropertySetId', ''))
+            if cls_set_name:
+                cls_props['DistinguishedPropertySetId'] = cls_set_name
+        elem_set_id = cls.DISTINGUISHED_SET_NAME_TO_ID_MAP.get(elem_props.get('DistinguishedPropertySetId'))
+        if elem_set_id:
+            elem_props['PropertySetId'] = elem_set_id
+        else:
+            elem_set_name = cls.DISTINGUISHED_SET_ID_TO_NAME_MAP.get(elem_props.get('PropertySetId', ''))
+            if elem_set_name:
+                elem_props['DistinguishedPropertySetId'] = elem_set_name
+        return cls_props == elem_props
 
     @classmethod
     def from_xml(cls, elem, account):
