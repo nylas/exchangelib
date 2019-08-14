@@ -17,21 +17,23 @@ log = logging.getLogger(__name__)
 class ExtendedProperty(EWSElement):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa566405(v=exchg.150).aspx
-
-    Property_* values: https://msdn.microsoft.com/en-us/library/office/aa564843(v=exchg.150).aspx
     """
     ELEMENT_NAME = 'ExtendedProperty'
 
+    # Enum values: https://docs.microsoft.com/en-us/dotnet/api/exchangewebservices.distinguishedpropertysettype
     DISTINGUISHED_SETS = {
-        'Meeting',
-        'Appointment',
-        'Common',
-        'PublicStrings',
         'Address',
-        'InternetHeaders',
+        'Appointment',
         'CalendarAssistant',
+        'Common',
+        'InternetHeaders',
+        'Meeting',
+        'PublicStrings',
+        'Sharing',
+        'Task',
         'UnifiedMessaging',
     }
+    # Enum values: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/extendedfielduri
     PROPERTY_TYPES = {
         'ApplicationTime',
         'Binary',
@@ -65,23 +67,23 @@ class ExtendedProperty(EWSElement):
     # https://docs.microsoft.com/en-us/office/client-developer/outlook/mapi/commonly-used-property-sets
     # ID values must be lowercase.
     DISTINGUISHED_SET_NAME_TO_ID_MAP = {
-        'PublicStrings': '00020329-0000-0000-c000-000000000046',
-        'Common': '00062008-0000-0000-c000-000000000046',
         'Address': '00062004-0000-0000-c000-000000000046',
-        'InternetHeaders': '00020386-0000-0000-c000-000000000046',
+        'AirSync': '71035549-0739-4dcb-9163-00f0580dbbdf',
         'Appointment': '00062002-0000-0000-c000-000000000046',
-        'Meeting': '6ed8da90-450b-101b-98da-00aa003f1305',
+        'Common': '00062008-0000-0000-c000-000000000046',
+        'InternetHeaders': '00020386-0000-0000-c000-000000000046',
         'Log': '0006200a-0000-0000-c000-000000000046',
+        'Mapi': '00020328-0000-0000-c000-000000000046',
+        'Meeting': '6ed8da90-450b-101b-98da-00aa003f1305',
         'Messaging': '41f28f13-83f4-4114-a584-eedb5a6b0bff',
         'Note': '0006200e-0000-0000-c000-000000000046',
         'PostRss': '00062041-0000-0000-c000-000000000046',
+        'PublicStrings': '00020329-0000-0000-c000-000000000046',
+        'Remote': '00062014-0000-0000-c000-000000000046',
+        'Report': '00062013-0000-0000-c000-000000000046',
+        'Sharing': '00062040-0000-0000-c000-000000000046',
         'Task': '00062003-0000-0000-c000-000000000046',
         'UnifiedMessaging': '4442858e-a9e3-4e80-b900-317a210cc15b',
-        'Mapi': '00020328-0000-0000-c000-000000000046',
-        'AirSync': '71035549-0739-4dcb-9163-00f0580dbbdf',
-        'Sharing': '00062040-0000-0000-c000-000000000046',
-        'Report': '00062013-0000-0000-c000-000000000046',
-        'Remote': '00062014-0000-0000-c000-000000000046',
     }
     DISTINGUISHED_SET_ID_TO_NAME_MAP = {v: k for k, v in DISTINGUISHED_SET_NAME_TO_ID_MAP.items()}
 
