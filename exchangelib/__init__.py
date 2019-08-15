@@ -5,7 +5,7 @@ from .account import Account
 from .attachments import FileAttachment, ItemAttachment
 from .autodiscover import discover
 from .configuration import Configuration
-from .credentials import DELEGATE, IMPERSONATION, Credentials, ServiceAccount
+from .credentials import DELEGATE, IMPERSONATION, Credentials, OAuthCredentials, ServiceAccount
 from .ewsdatetime import EWSDate, EWSDateTime, EWSTimeZone, UTC, UTC_NOW
 from .extended_properties import ExtendedProperty, ExternId, Flag
 from .folders import Folder, FolderCollection, SHALLOW, DEEP

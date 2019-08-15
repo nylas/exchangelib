@@ -9,7 +9,7 @@ import requests_kerberos
 
 from .credentials import IMPERSONATION
 from .errors import UnauthorizedError, TransportError, RedirectError, RelativeRedirect
-from .util import create_element, add_xml_child, get_redirect_url, xml_to_str, ns_translation
+from .util import create_element, add_xml_child, get_redirect_url, xml_to_str, ns_translation, HTTPOAuthAuth
 
 log = logging.getLogger(__name__)
 
@@ -19,12 +19,15 @@ NTLM = 'NTLM'
 BASIC = 'basic'
 DIGEST = 'digest'
 GSSAPI = 'gssapi'
+OAUTH = 'OAuth'
+
 
 AUTH_TYPE_MAP = {
     NTLM: requests_ntlm.HttpNtlmAuth,
     BASIC: requests.auth.HTTPBasicAuth,
     DIGEST: requests.auth.HTTPDigestAuth,
     GSSAPI: requests_kerberos.HTTPKerberosAuth,
+    OAUTH: HTTPOAuthAuth,
     NOAUTH: None,
 }
 
@@ -76,6 +79,10 @@ def get_auth_instance(credentials, auth_type):
     model = AUTH_TYPE_MAP[auth_type]
     if model is None:
         return None
+
+    if auth_type == OAUTH:
+        return model(token=credentials.token)
+
     username = credentials.username
     if auth_type == NTLM and credentials.type == credentials.EMAIL:
         username = '\\' + username

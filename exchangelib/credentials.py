@@ -73,6 +73,27 @@ class Credentials(object):
         return self.username
 
 
+@python_2_unicode_compatible
+class OAuthCredentials(Credentials):
+    """
+    Keeps login info the way Office365 likes it.
+    :param token: Office365 access token
+
+    Note that you should either pass a password or an access token, not both.
+    """
+    def __init__(self, token):
+        self.token = token
+
+    def __eq__(self, other):
+        return self.token == other.token
+
+    def __hash__(self):
+        return hash(self.token)
+
+    def __repr__(self):
+        return self.__class__.__name__ + ' ********'
+
+
 class ServiceAccount(Credentials):
     def __init__(self, username, password, max_wait=3600):
         """

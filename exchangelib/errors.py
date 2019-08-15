@@ -60,6 +60,10 @@ class UnauthorizedError(EWSError):
     pass
 
 
+class InvalidTokenError(EWSError):
+    pass
+
+
 @python_2_unicode_compatible
 class RedirectError(TransportError):
     def __init__(self, url):
