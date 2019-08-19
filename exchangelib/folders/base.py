@@ -19,7 +19,7 @@ from ..queryset import QuerySet, SearchableMixIn, DoesNotExist
 from ..restriction import Restriction
 from ..services import CreateFolder, UpdateFolder, DeleteFolder, EmptyFolder, FindPeople
 from ..util import TNS
-from ..version import EXCHANGE_2010
+from ..version import EXCHANGE_2007_SP1, EXCHANGE_2010
 from .collections import FolderCollection
 from .queryset import SingleFolderQuerySet, SHALLOW
 
@@ -53,8 +53,9 @@ class Folder(RegisterMixIn, SearchableMixIn):
         IntegerField('total_count', field_uri='folder:TotalCount', is_read_only=True),
         IntegerField('child_folder_count', field_uri='folder:ChildFolderCount', is_read_only=True),
         IntegerField('unread_count', field_uri='folder:UnreadCount', is_read_only=True),
-        PermissionSetField('permission_set', field_uri='folder:PermissionSet'),
-        EffectiveRightsField('effective_rights', field_uri='folder:EffectiveRights', is_read_only=True),
+        PermissionSetField('permission_set', field_uri='folder:PermissionSet', supported_from=EXCHANGE_2007_SP1),
+        EffectiveRightsField('effective_rights', field_uri='folder:EffectiveRights', is_read_only=True,
+                             supported_from=EXCHANGE_2007_SP1),
     ]
     FIELDS = RegisterMixIn.FIELDS + LOCAL_FIELDS
 
