@@ -5,7 +5,7 @@ from .common import EWSAccountService, EWSPooledMixIn, create_item_ids_element
 
 class ExportItems(EWSAccountService, EWSPooledMixIn):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/office/ff709523(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/exportitems-operation
     """
     ERRORS_TO_CATCH_IN_RESPONSE = ResponseMessageError
     SERVICE_NAME = 'ExportItems'

@@ -21,17 +21,22 @@ from .version import EXCHANGE_2007_SP1, EXCHANGE_2010, EXCHANGE_2013
 
 log = logging.getLogger(__name__)
 
-# Overall Types Schema: https://msdn.microsoft.com/en-us/library/hh354700(v=exchg.150).aspx
+# Overall Types Schema:
+# https://docs.microsoft.com/en-us/openspecs/exchange_server_protocols/ms-oxwscdata/41101cdd-ba47-4e71-aaae-30f65b13f464
 
-# MessageDisposition values. See https://msdn.microsoft.com/en-us/library/office/aa565209(v=exchg.150).aspx
+# MessageDisposition values. See
+# https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/createitem
 SAVE_ONLY = 'SaveOnly'
 SEND_ONLY = 'SendOnly'
 SEND_AND_SAVE_COPY = 'SendAndSaveCopy'
 MESSAGE_DISPOSITION_CHOICES = (SAVE_ONLY, SEND_ONLY, SEND_AND_SAVE_COPY)
 
-# SendMeetingInvitations values: see https://msdn.microsoft.com/en-us/library/office/aa565209(v=exchg.150).aspx
-# SendMeetingInvitationsOrCancellations: see https://msdn.microsoft.com/en-us/library/office/aa580254(v=exchg.150).aspx
-# SendMeetingCancellations values: see https://msdn.microsoft.com/en-us/library/office/aa562961(v=exchg.150).aspx
+# SendMeetingInvitations values. See
+# https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/createitem
+# SendMeetingInvitationsOrCancellations. See
+# https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/updateitem
+# SendMeetingCancellations values. See
+# https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/deleteitem
 SEND_TO_NONE = 'SendToNone'
 SEND_ONLY_TO_ALL = 'SendOnlyToAll'
 SEND_ONLY_TO_CHANGED = 'SendOnlyToChanged'
@@ -42,21 +47,25 @@ SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES = (SEND_TO_NONE, SEND_ONLY_TO
                                                       SEND_TO_ALL_AND_SAVE_COPY, SEND_TO_CHANGED_AND_SAVE_COPY)
 SEND_MEETING_CANCELLATIONS_CHOICES = (SEND_TO_NONE, SEND_ONLY_TO_ALL, SEND_TO_ALL_AND_SAVE_COPY)
 
-# AffectedTaskOccurrences values. See https://msdn.microsoft.com/en-us/library/office/aa562961(v=exchg.150).aspx
+# AffectedTaskOccurrences values. See
+# https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/deleteitem
 ALL_OCCURRENCIES = 'AllOccurrences'
 SPECIFIED_OCCURRENCE_ONLY = 'SpecifiedOccurrenceOnly'
 AFFECTED_TASK_OCCURRENCES_CHOICES = (ALL_OCCURRENCIES, SPECIFIED_OCCURRENCE_ONLY)
 
-# Conference Type values. See https://msdn.microsoft.com/en-US/library/office/aa563529(v=exchg.150).aspx
+# Conference Type values. See
+# https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/conferencetype
 CONFERENCE_TYPES = ('NetMeeting', 'NetShow', 'Chat')
 
-# ConflictResolution values. See https://msdn.microsoft.com/en-us/library/office/aa580254(v=exchg.150).aspx
+# ConflictResolution values. See
+# https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/updateitem
 NEVER_OVERWRITE = 'NeverOverwrite'
 AUTO_RESOLVE = 'AutoResolve'
 ALWAYS_OVERWRITE = 'AlwaysOverwrite'
 CONFLICT_RESOLUTION_CHOICES = (NEVER_OVERWRITE, AUTO_RESOLVE, ALWAYS_OVERWRITE)
 
-# DeleteType values. See https://msdn.microsoft.com/en-us/library/office/aa562961(v=exchg.150).aspx
+# DeleteType values. See
+# https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/deleteitem
 HARD_DELETE = 'HardDelete'
 SOFT_DELETE = 'SoftDelete'
 MOVE_TO_DELETED_ITEMS = 'MoveToDeletedItems'
@@ -72,7 +81,7 @@ ITEM_TRAVERSAL_CHOICES = (SHALLOW, SOFT_DELETED, ASSOCIATED)
 ID_ONLY = 'IdOnly'
 DEFAULT = 'Default'
 # AllProperties doesn't actually get all properties in FindItem, just the "first-class" ones. See
-#    http://msdn.microsoft.com/en-us/library/office/dn600367(v=exchg.150).aspx
+# https://docs.microsoft.com/en-us/exchange/client-developer/exchange-web-services/email-properties-and-elements-in-ews-in-exchange
 ALL_PROPERTIES = 'AllProperties'
 SHAPE_CHOICES = (ID_ONLY, DEFAULT, ALL_PROPERTIES)
 
@@ -108,7 +117,7 @@ class RegisterMixIn(IdChangeKeyMixIn):
         # Check if class attributes are properly defined
         attr_cls.validate_cls()
         # ExtendedProperty is not a real field, but a placeholder in the fields list. See
-        #   https://msdn.microsoft.com/en-us/library/office/aa580790(v=exchg.150).aspx
+        #   https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/item
         #
         # Find the correct index for the new extended property, and insert.
         field = ExtendedPropertyField(attr_name, value_cls=attr_cls)
@@ -155,7 +164,7 @@ class BaseItem(RegisterMixIn):
 
 class Item(BaseItem):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/office/aa580790(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/item
     """
     ELEMENT_NAME = 'Item'
 
@@ -502,7 +511,7 @@ class AcceptDeclineMixIn(object):
 @python_2_unicode_compatible
 class CalendarItem(Item, AcceptDeclineMixIn):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/office/aa564765(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/calendaritem
     """
     ELEMENT_NAME = 'CalendarItem'
     LOCAL_FIELDS = [
@@ -539,7 +548,7 @@ class CalendarItem(Item, AcceptDeclineMixIn):
         IntegerField('appointment_sequence_number', field_uri='calendar:AppointmentSequenceNumber', is_read_only=True),
         # Placeholder for AppointmentState
         # AppointmentState is an EnumListField-like field, but with bitmask values:
-        #    https://msdn.microsoft.com/en-us/library/office/aa564700(v=exchg.150).aspx
+        #    https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/appointmentstate
         # We could probably subclass EnumListField to implement this field.
         RecurrenceField('recurrence', field_uri='calendar:Recurrence', is_searchable=False),
         OccurrenceField('first_occurrence', field_uri='calendar:FirstOccurrence', value_cls=FirstOccurrence,
@@ -615,7 +624,7 @@ class CalendarItem(Item, AcceptDeclineMixIn):
 
 class Message(Item):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/office/aa494306(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/message-ex15websvcsotherref
     """
     ELEMENT_NAME = 'Message'
     LOCAL_FIELDS = [
@@ -787,7 +796,7 @@ class Message(Item):
 
 class Task(Item):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/office/aa563930(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/task
     """
     ELEMENT_NAME = 'Task'
     NOT_STARTED = 'NotStarted'
@@ -872,7 +881,7 @@ class Task(Item):
 
 class Contact(Item):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/office/aa581315(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/contact
     """
     ELEMENT_NAME = 'Contact'
     LOCAL_FIELDS = [
@@ -940,7 +949,7 @@ class Contact(Item):
 
 class DistributionList(Item):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/office/aa566353(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/distributionlist
     """
     ELEMENT_NAME = 'DistributionList'
     LOCAL_FIELDS = [
@@ -958,7 +967,7 @@ class DistributionList(Item):
 
 class PostItem(Item):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/office/bb891851(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/postitem
     """
     ELEMENT_NAME = 'PostItem'
     LOCAL_FIELDS = Message.LOCAL_FIELDS[6:11] + [
@@ -973,7 +982,7 @@ class PostItem(Item):
 
 class PostReplyItem(Item):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/bb891896(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/postreplyitem
     """
     # TODO: Untested and unfinished.
     ELEMENT_NAME = 'PostReplyItem'
@@ -996,7 +1005,7 @@ class BaseMeetingItem(Item):
     """
     A base class for meeting requests that share the same fields (Message, Request, Response, Cancellation)
 
-    MSDN: https://msdn.microsoft.com/en-us/library/aa580757(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/responsecode
         Certain types are created as a side effect of doing something else. Meeting messages, for example, are created
         when you send a calendar item to attendees; they are not explicitly created.
 
@@ -1021,7 +1030,7 @@ class BaseMeetingItem(Item):
 
 class MeetingRequest(BaseMeetingItem, AcceptDeclineMixIn):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/office/aa565229(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/meetingrequest
     """
     ELEMENT_NAME = 'MeetingRequest'
     LOCAL_FIELDS = [
@@ -1048,7 +1057,7 @@ class MeetingRequest(BaseMeetingItem, AcceptDeclineMixIn):
 
 class MeetingMessage(BaseMeetingItem):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/office/aa565359(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/meetingmessage
     """
     # TODO: Untested - not sure if this is ever used
     ELEMENT_NAME = 'MeetingMessage'
@@ -1066,7 +1075,7 @@ class MeetingMessage(BaseMeetingItem):
 
 class MeetingResponse(Item):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/office/aa564337(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/meetingresponse
     """
     ELEMENT_NAME = 'MeetingResponse'
     LOCAL_FIELDS = [
@@ -1086,7 +1095,7 @@ class MeetingResponse(Item):
 
 class MeetingCancellation(BaseMeetingItem):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/office/aa564685(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/meetingcancellation
     """
     ELEMENT_NAME = 'MeetingCancellation'
 
@@ -1127,7 +1136,7 @@ class BaseMeetingReplyItem(BaseItem):
 
 class AcceptItem(BaseMeetingReplyItem):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/aa562964(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/acceptitem
     """
     ELEMENT_NAME = 'AcceptItem'
 
@@ -1136,7 +1145,7 @@ class AcceptItem(BaseMeetingReplyItem):
 
 class TentativelyAcceptItem(BaseMeetingReplyItem):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/aa565438(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/tentativelyacceptitem
     """
     ELEMENT_NAME = 'TentativelyAcceptItem'
 
@@ -1145,7 +1154,7 @@ class TentativelyAcceptItem(BaseMeetingReplyItem):
 
 class DeclineItem(BaseMeetingReplyItem):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/aa579729(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/declineitem
     """
     ELEMENT_NAME = 'DeclineItem'
 
@@ -1208,7 +1217,7 @@ class BaseReplyItem(EWSElement):
 
 class ReplyToItem(BaseReplyItem):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/office/aa580287(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/replytoitem
     """
     ELEMENT_NAME = 'ReplyToItem'
 
@@ -1217,7 +1226,7 @@ class ReplyToItem(BaseReplyItem):
 
 class ReplyAllToItem(BaseReplyItem):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/office/aa563988(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/replyalltoitem
     """
     ELEMENT_NAME = 'ReplyAllToItem'
 
@@ -1226,7 +1235,7 @@ class ReplyAllToItem(BaseReplyItem):
 
 class ForwardItem(BaseReplyItem):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/office/aa564250(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/forwarditem
     """
     ELEMENT_NAME = 'ForwardItem'
 
@@ -1235,7 +1244,7 @@ class ForwardItem(BaseReplyItem):
 
 class CancelCalendarItem(BaseReplyItem):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/aa564482(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/cancelcalendaritem
     """
     ELEMENT_NAME = 'CancelCalendarItem'
     FIELDS = [f for f in BaseReplyItem.FIELDS if f.name != 'author']
@@ -1243,7 +1252,7 @@ class CancelCalendarItem(BaseReplyItem):
 
 
 class Persona(IdChangeKeyMixIn):
-    # MSDN: https://msdn.microsoft.com/en-us/library/office/jj191299(v=exchg.150).aspx
+    # MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/persona
     ELEMENT_NAME = 'Persona'
     ID_ELEMENT_CLS = PersonaId
     LOCAL_FIELDS = [

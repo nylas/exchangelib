@@ -3,8 +3,10 @@
 Autodiscover is a Microsoft method for automatically getting the hostname of the Exchange server and the server
 version of the server holding the email address using only the email address and password of the user (and possibly
 User Principal Name). The protocol for autodiscovering an email address is described in detail in
-http://msdn.microsoft.com/en-us/library/hh352638(v=exchg.140).aspx. Handling error messages is described here:
-http://msdn.microsoft.com/en-us/library/office/dn467392(v=exchg.150).aspx. This is not fully implemented.
+https://docs.microsoft.com/en-us/previous-versions/office/developer/exchange-server-interoperability-guidance. Handling
+error messages is described here:
+https://docs.microsoft.com/en-us/exchange/client-developer/exchange-web-services/handling-autodiscover-error-messages.
+This is not fully implemented.
 
 WARNING: We are taking many shortcuts here, like assuming TLS and following 302 Redirects automatically.
 If you have problems autodiscovering, start by doing an official test at https://testconnectivity.microsoft.com
@@ -430,7 +432,8 @@ def _parse_response(bytes_content):
     primary_smtp_address = get_xml_attr(user, '{%s}AutoDiscoverSMTPAddress' % RESPONSE_NS)
     protocols = {get_xml_attr(p, '{%s}Type' % RESPONSE_NS): p for p in account.findall('{%s}Protocol' % RESPONSE_NS)}
     # There are three possible protocol types: EXCH, EXPR and WEB.
-    # EXPR is meant for EWS. See http://blogs.technet.com/b/exchange/archive/2008/09/26/3406344.aspx
+    # EXPR is meant for EWS. See
+    # https://techcommunity.microsoft.com/t5/Exchange-Team-Blog/The-Autodiscover-Service-and-Outlook-Providers-how-does-this/ba-p/584403
     # We allow fallback to EXCH if EXPR is not available to support installations where EXPR is not available.
     try:
         protocol = protocols['EXPR']

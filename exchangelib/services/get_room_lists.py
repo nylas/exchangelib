@@ -5,7 +5,7 @@ from .common import EWSService
 
 class GetRoomLists(EWSService):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/office/dd899486(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/getroomlists
     """
     SERVICE_NAME = 'GetRoomLists'
     element_container_name = '{%s}RoomLists' % MNS

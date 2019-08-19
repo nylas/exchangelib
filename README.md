@@ -615,7 +615,7 @@ qs.filter(categories__exists=False)
 # - we just pass the string verbatim to EWS.
 #
 # Read more about the QueryString syntax here:
-# https://msdn.microsoft.com/en-us/library/ee693615.aspx
+# https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/querystring-querystringtype
 a.inbox.filter('subject:XXX')
 
 # filter() also supports Q objects that are modeled after Django Q objects, for building complex
@@ -854,17 +854,18 @@ Folder.register('size', FolderSize)
 print(a.inbox.size)
 
 # In general, here's how to work with any MAPI property as listed in e.g.
-# https://msdn.microsoft.com/EN-US/library/office/cc815517.aspx. Let's take `PidLidTaskDueDate` as
-# an example. This is the due date for a message maked with the follow-up flag in Microsoft 
-# Outlook.
+# https://docs.microsoft.com/en-us/office/client-developer/outlook/mapi/mapi-properties. Let's
+# take `PidLidTaskDueDate` as an example. This is the due date for a message maked with the
+# follow-up flag in Microsoft Outlook.
 #
-# PidLidTaskDueDate is documented at https://msdn.microsoft.com/en-us/library/office/cc839641.aspx.
+# PidLidTaskDueDate is documented at
+# https://docs.microsoft.com/en-us/office/client-developer/outlook/mapi/pidlidtaskduedate-canonical-property.
 # The property ID is `0x00008105` and the property set is `PSETID_Task`. But EWS wants the UUID for
 # `PSETID_Task`, so we look that up in the MS-OXPROPS pdf:
-# https://msdn.microsoft.com/en-us/library/cc433490(v=exchg.80).aspx. The UUID is
-# `00062003-0000-0000-C000-000000000046`. The property type is `PT_SYSTIME` which is also called
+# https://docs.microsoft.com/en-us/openspecs/exchange_server_protocols/ms-oxprops/f6ab1613-aefe-447d-a49c-18217230b148
+# The UUID is `00062003-0000-0000-C000-000000000046`. The property type is `PT_SYSTIME` which is also called
 # `SystemTime` (see
-# https://msdn.microsoft.com/en-us/library/microsoft.exchange.webservices.data.mapipropertytype(v=exchg.80).aspx).
+# https://docs.microsoft.com/en-us/dotnet/api/microsoft.exchange.webservices.data.mapipropertytype )
 #
 # In conclusion, the definition for the due date becomes:
 

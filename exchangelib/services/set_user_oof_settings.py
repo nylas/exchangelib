@@ -5,7 +5,7 @@ from .common import EWSAccountService
 class SetUserOofSettings(EWSAccountService):
     """
     Set automatic replies for the specified mailbox.
-    MSDN: https://msdn.microsoft.com/en-us/library/aa580294(v=exchg.140).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/setuseroofsettings-operation
     """
     SERVICE_NAME = 'SetUserOofSettings'
 

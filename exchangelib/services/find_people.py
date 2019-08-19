@@ -12,7 +12,7 @@ log = logging.getLogger(__name__)
 
 class FindPeople(EWSAccountService, PagingEWSMixIn):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/office/jj191039(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/findpeople-operation
     """
     SERVICE_NAME = 'FindPeople'
     element_container_name = '{%s}People' % MNS

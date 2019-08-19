@@ -588,7 +588,7 @@ def post_ratelimited(protocol, session, url, headers, data, allow_redirects=Fals
     intend to raise an exception. We give up on max_wait timeout, not number of retries.
 
     An additional resource on handling throttling policies and client back off strategies:
-        https://msdn.microsoft.com/en-us/library/office/jj945066(v=exchg.150).aspx#bk_ThrottlingBatch
+        https://docs.microsoft.com/en-us/exchange/client-developer/exchange-web-services/ews-throttling-in-exchange
     """
     thread_id = get_ident()
     wait = 10  # seconds

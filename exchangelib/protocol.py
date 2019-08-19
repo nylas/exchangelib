@@ -383,7 +383,7 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
 
     def get_searchable_mailboxes(self, search_filter=None, expand_group_membership=False):
         """This method is only available to users who have been assigned the Discovery Management RBAC role. See
-        https://technet.microsoft.com/en-us/library/jj200692(v=exchg.150).aspx.
+        https://docs.microsoft.com/en-us/exchange/permissions-exo/permissions-exo
 
         :param search_filter: Is set, must be a single email alias
         :param expand_group_membership: If True, returned distribution lists are expanded

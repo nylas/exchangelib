@@ -4,7 +4,7 @@ from .common import EWSAccountService, EWSPooledMixIn, create_item_ids_element, 
 
 class GetItem(EWSAccountService, EWSPooledMixIn):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/office/aa563775(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/getitem
     """
     SERVICE_NAME = 'GetItem'
     element_container_name = '{%s}Items' % MNS

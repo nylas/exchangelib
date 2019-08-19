@@ -9,7 +9,7 @@ from .common import EWSService
 
 class GetServerTimeZones(EWSService):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/office/dd899371(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/getservertimezones
     """
     SERVICE_NAME = 'GetServerTimeZones'
     element_container_name = '{%s}TimeZoneDefinitions' % MNS

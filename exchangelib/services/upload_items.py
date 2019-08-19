@@ -4,7 +4,7 @@ from .common import EWSAccountService, EWSPooledMixIn
 
 class UploadItems(EWSAccountService, EWSPooledMixIn):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/office/ff709490(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/uploaditems-operation
 
     This currently has the existing limitation of only being able to upload
     items that do not yet exist in the database. The full spec also allows

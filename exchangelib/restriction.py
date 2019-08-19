@@ -233,7 +233,7 @@ class Q(object):
             raise ValueError("'op' %s must be one of %s" % (op, valid_ops))
 
         # For description of Contains attribute values, see
-        #     https://msdn.microsoft.com/en-us/library/office/aa580702(v=exchg.150).aspx
+        #     https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/contains
         #
         # Possible ContainmentMode values:
         #     FullString, Prefixed, Substring, PrefixOnWords, ExactPhrase

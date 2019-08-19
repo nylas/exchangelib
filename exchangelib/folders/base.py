@@ -29,12 +29,14 @@ log = logging.getLogger(__name__)
 @python_2_unicode_compatible
 class Folder(RegisterMixIn, SearchableMixIn):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/office/aa581334(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/folder
     """
     ELEMENT_NAME = 'Folder'
     NAMESPACE = TNS
-    DISTINGUISHED_FOLDER_ID = None  # See https://msdn.microsoft.com/en-us/library/office/aa580808(v=exchg.150).aspx
-    # Default item type for this folder. See http://msdn.microsoft.com/en-us/library/hh354773(v=exchg.80).aspx
+    # See https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/distinguishedfolderid
+    DISTINGUISHED_FOLDER_ID = None
+    # Default item type for this folder. See
+    # https://docs.microsoft.com/en-us/openspecs/exchange_server_protocols/ms-oxosfld/68a85898-84fe-43c4-b166-4711c13cdd61
     CONTAINER_CLASS = None
     supported_item_models = ITEM_CLASSES  # The Item types that this folder can contain. Default is all
     # Marks the version from which a distinguished folder was introduced. A possibly authoritative source is:
@@ -518,7 +520,7 @@ class Folder(RegisterMixIn, SearchableMixIn):
             #
             # We should be able to just use the name, but apparently default folder names can be renamed to a set of
             # localized names using a PowerShell command:
-            #     https://technet.microsoft.com/da-dk/library/dd351103(v=exchg.160).aspx
+            # https://docs.microsoft.com/en-us/powershell/module/exchange/client-access/Set-MailboxRegionalConfiguration
             #
             # Instead, search for a folder class using the localized name. If none are found, fall back to getting the
             # folder class by the "FolderClass" value.

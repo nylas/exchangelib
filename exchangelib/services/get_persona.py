@@ -4,7 +4,7 @@ from .common import EWSService, to_item_id
 
 class GetPersona(EWSService):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/office/jj191408(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/getpersona-operation
     """
     SERVICE_NAME = 'GetPersona'
 

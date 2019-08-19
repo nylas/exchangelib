@@ -21,7 +21,7 @@ log = logging.getLogger(__name__)
 # 'shortname' comes from types.xsd and is the official version of the server, corresponding to the version numbers
 # supplied in SOAP headers. 'API version' is the version name supplied in the RequestServerVersion element in SOAP
 # headers and describes the EWS API version the server implements. Valid values for this element are described here:
-#    http://msdn.microsoft.com/en-us/library/bb891876(v=exchg.150).aspx
+#    https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/requestserverversion
 
 VERSIONS = {
     'Exchange2007': ('Exchange2007', 'Microsoft Exchange Server 2007'),
@@ -61,7 +61,7 @@ class Build(PickleMixIn):
     Holds methods for working with build numbers
     """
 
-    # List of build numbers here: https://technet.microsoft.com/en-gb/library/hh135098(v=exchg.150).aspx
+    # List of build numbers here: https://docs.microsoft.com/en-us/exchange/new-features/build-numbers-and-release-dates
     API_VERSION_MAP = {
         8: {
             0: 'Exchange2007',

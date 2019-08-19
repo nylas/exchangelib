@@ -5,7 +5,7 @@ from .common import EWSAccountService, parse_folder_elem, create_folder_ids_elem
 
 class GetFolder(EWSAccountService):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/office/aa580263(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/getfolder
     """
     SERVICE_NAME = 'GetFolder'
     element_container_name = '{%s}Folders' % MNS

@@ -18,7 +18,8 @@ from .version import Build, EXCHANGE_2013
 log = logging.getLogger(__name__)
 
 
-# DayOfWeekIndex enum. See https://msdn.microsoft.com/en-us/library/office/aa581350(v=exchg.150).aspx
+# DayOfWeekIndex enum. See
+# https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/dayofweekindex
 FIRST = 'First'
 SECOND = 'Second'
 THIRD = 'Third'
@@ -57,7 +58,8 @@ WEEK_DAY = 'Weekday'  # Non-weekend day
 WEEKEND_DAY = 'WeekendDay'
 EXTRA_WEEKDAY_OPTIONS = (DAY, WEEK_DAY, WEEKEND_DAY)
 
-# DaysOfWeek enum: See https://msdn.microsoft.com/en-us/library/office/ee332417(v=exchg.150).aspx
+# DaysOfWeek enum: See
+# https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/daysofweek-daysofweektype
 WEEKDAYS = WEEKDAY_NAMES + EXTRA_WEEKDAY_OPTIONS
 
 
@@ -341,7 +343,8 @@ class FieldURIField(Field):
     def __init__(self, *args, **kwargs):
         self.field_uri = kwargs.pop('field_uri', None)
         super(FieldURIField, self).__init__(*args, **kwargs)
-        # See all valid FieldURI values at https://msdn.microsoft.com/en-us/library/office/aa494315(v=exchg.150).aspx
+        # See all valid FieldURI values at
+        # https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/fielduri
         # The field_uri has a prefix when the FieldURI points to an Item field.
         if self.field_uri is None:
             self.field_uri_postfix = None
@@ -726,7 +729,8 @@ class CharField(TextField):
 
 class IdField(CharField):
     # A field to hold the 'Id' and 'Changekey' attributes on 'ItemId' type items. There is no guaranteed max length,
-    # but we can assume 512 bytes in practice. See https://msdn.microsoft.com/en-us/library/office/dn605828(v=exchg.150)
+    # but we can assume 512 bytes in practice. See
+    # https://docs.microsoft.com/en-us/exchange/client-developer/exchange-web-services/ews-identifiers-in-exchange
     def __init__(self, *args, **kwargs):
         super(IdField, self).__init__(*args, **kwargs)
         self.max_length = 512  # This is above the normal 255 limit, but this is actually an attribute, not a field
@@ -1164,7 +1168,7 @@ class PhoneNumberField(IndexedField):
 
 
 class PhysicalAddressField(IndexedField):
-    # MSDN: https://msdn.microsoft.com/en-us/library/office/aa564323(v=exchg.150).aspx
+    # MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/entry-physicaladdress
     is_list = True
 
     PARENT_ELEMENT_NAME = 'PhysicalAddresses'

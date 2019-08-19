@@ -1,14 +1,12 @@
 # coding=utf-8
 """
-Implement a selection of EWS services.
+Implement a selection of EWS services (operations).
 
 Exchange is very picky about things like the order of XML elements in SOAP requests, so we need to generate XML
 automatically instead of taking advantage of Python SOAP libraries and the WSDL file.
 
-Exchange EWS references:
-    - 2007: http://msdn.microsoft.com/en-us/library/bb409286(v=exchg.80).aspx
-    - 2010: http://msdn.microsoft.com/en-us/library/bb409286(v=exchg.140).aspx
-    - 2013: http://msdn.microsoft.com/en-us/library/bb409286(v=exchg.150).aspx
+Exchange EWS operations overview:
+    https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/ews-operations-in-exchange
 """
 
 from .common import CHUNK_SIZE

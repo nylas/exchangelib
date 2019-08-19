@@ -299,9 +299,11 @@ class EWSService(object):
     def _get_element_container(self, message, response_message=None, name=None):
         if response_message is None:
             response_message = message
-        # ResponseClass: See http://msdn.microsoft.com/en-us/library/aa566424(v=EXCHG.140).aspx
+        # ResponseClass: See
+        # https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/finditemresponsemessage
         response_class = response_message.get('ResponseClass')
-        # ResponseCode, MessageText: See http://msdn.microsoft.com/en-us/library/aa580757(v=EXCHG.140).aspx
+        # ResponseCode, MessageText: See
+        # https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/responsecode
         response_code = get_xml_attr(response_message, '{%s}ResponseCode' % MNS)
         msg_text = get_xml_attr(response_message, '{%s}MessageText' % MNS)
         msg_xml = response_message.find('{%s}MessageXml' % MNS)

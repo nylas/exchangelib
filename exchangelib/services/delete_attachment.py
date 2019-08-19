@@ -4,7 +4,7 @@ from .common import EWSAccountService, create_attachment_ids_element
 
 class DeleteAttachment(EWSAccountService):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/office/aa580782(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/deleteattachment-operation
     """
     SERVICE_NAME = 'DeleteAttachment'
 

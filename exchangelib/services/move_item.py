@@ -4,7 +4,7 @@ from .common import EWSAccountService, create_item_ids_element
 
 class MoveItem(EWSAccountService):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/office/aa565781(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/moveitem-operation
     """
     SERVICE_NAME = 'MoveItem'
     element_container_name = '{%s}Items' % MNS

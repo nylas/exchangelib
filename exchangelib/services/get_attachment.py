@@ -5,7 +5,7 @@ from .common import EWSAccountService, create_attachment_ids_element
 
 class GetAttachment(EWSAccountService):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/office/aa494316(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/getattachment-operation
     """
     SERVICE_NAME = 'GetAttachment'
     element_container_name = '{%s}Attachments' % MNS
@@ -20,7 +20,7 @@ class GetAttachment(EWSAccountService):
     def get_payload(self, items, include_mime_content):
         payload = create_element('m:%s' % self.SERVICE_NAME)
         # TODO: Support additional properties of AttachmentShape. See
-        # https://msdn.microsoft.com/en-us/library/office/aa563727(v=exchg.150).aspx
+        # https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/attachmentshape
         if include_mime_content:
             attachment_shape = create_element('m:AttachmentShape')
             add_xml_child(attachment_shape, 't:IncludeMimeContent', 'true')

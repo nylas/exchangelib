@@ -3,6 +3,6 @@ from . import move_item
 
 class CopyItem(move_item.MoveItem):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/office/aa565012(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/copyitem-operation
     """
     SERVICE_NAME = 'CopyItem'

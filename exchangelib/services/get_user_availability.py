@@ -5,13 +5,14 @@ from .common import EWSService
 class GetUserAvailability(EWSService):
     """
      Get detailed availability information for a list of users
-     MSDN: https://msdn.microsoft.com/en-us/library/office/aa564001(v=exchg.150).aspx
+     MSDN:
+     https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/getuseravailability-operation
     """
     SERVICE_NAME = 'GetUserAvailability'
 
     def call(self, timezone, mailbox_data, free_busy_view_options):
         # TODO: Also supports SuggestionsViewOptions, see
-        # https://msdn.microsoft.com/en-us/library/office/aa564990(v=exchg.150).aspx
+        # https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/suggestionsviewoptions
         from ..properties import FreeBusyView
         for elem in self._get_elements(payload=self.get_payload(
             timezone=timezone,

@@ -28,7 +28,7 @@ class SingleFieldIndexedElement(IndexedElement):
 
 
 class EmailAddress(SingleFieldIndexedElement):
-    # MSDN:  https://msdn.microsoft.com/en-us/library/office/aa564757(v=exchg.150).aspx
+    # MSDN:  https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/entry-emailaddress
     ELEMENT_NAME = 'Entry'
     FIELDS = [
         LabelField('label', field_uri='Key', choices={
@@ -41,7 +41,7 @@ class EmailAddress(SingleFieldIndexedElement):
 
 
 class PhoneNumber(SingleFieldIndexedElement):
-    # MSDN: https://msdn.microsoft.com/en-us/library/office/aa565941(v=exchg.150).aspx
+    # MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/entry-phonenumber
     ELEMENT_NAME = 'Entry'
     FIELDS = [
         LabelField('label', field_uri='Key', choices={
@@ -61,7 +61,7 @@ class MultiFieldIndexedElement(IndexedElement):
 
 
 class PhysicalAddress(MultiFieldIndexedElement):
-    # MSDN: https://msdn.microsoft.com/en-us/library/office/aa564323(v=exchg.150).aspx
+    # MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/entry-physicaladdress
     ELEMENT_NAME = 'Entry'
     FIELDS = [
         LabelField('label', field_uri='Key', choices={

@@ -137,7 +137,7 @@ class CASError(EWSError):
 
 
 # Somewhat-authoritative list of possible response message error types from EWS. See full list at
-# https://msdn.microsoft.com/en-us/library/office/aa580757(v=exchg.150).aspx
+# https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/responsecode
 #
 class ErrorAccessDenied(ResponseMessageError): pass
 class ErrorAccessModeSpecified(ResponseMessageError): pass

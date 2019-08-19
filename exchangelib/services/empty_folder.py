@@ -6,7 +6,7 @@ from .common import EWSAccountService, create_folder_ids_element
 
 class EmptyFolder(EWSAccountService):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/office/ff709454(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/emptyfolder
     """
     SERVICE_NAME = 'EmptyFolder'
     element_container_name = None  # EmptyFolder doesn't return a response object, just status in XML attrs

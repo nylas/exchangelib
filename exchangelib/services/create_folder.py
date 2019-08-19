@@ -4,7 +4,7 @@ from .common import EWSAccountService, parse_folder_elem, create_folder_ids_elem
 
 class CreateFolder(EWSAccountService):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/office/aa563574(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/createfolder-operation
     """
     SERVICE_NAME = 'CreateFolder'
     element_container_name = '{%s}Folders' % MNS

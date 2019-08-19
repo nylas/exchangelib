@@ -10,7 +10,7 @@ class DeleteItem(EWSAccountService, EWSPooledMixIn):
     Takes a folder and a list of (id, changekey) tuples. Returns result of deletion as a list of tuples
     (success[True|False], errormessage), in the same order as the input list.
 
-    MSDN: https://msdn.microsoft.com/en-us/library/office/aa562961(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/deleteitem
 
     """
     SERVICE_NAME = 'DeleteItem'

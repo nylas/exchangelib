@@ -6,7 +6,7 @@ from .common import EWSService
 
 class ResolveNames(EWSService):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/office/aa565329(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/resolvenames
     """
     # TODO: Does not support paged responses yet. See example in issue #205
     SERVICE_NAME = 'ResolveNames'

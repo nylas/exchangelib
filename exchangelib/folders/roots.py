@@ -18,8 +18,8 @@ log = logging.getLogger(__name__)
 
 class RootOfHierarchy(Folder):
     # A list of wellknown, or "distinguished", folders that are belong in this folder hierarchy. See
-    # http://msdn.microsoft.com/en-us/library/microsoft.exchange.webservices.data.wellknownfoldername(v=exchg.80).aspx
-    # and https://msdn.microsoft.com/en-us/library/office/aa580808(v=exchg.150).aspx
+    # https://docs.microsoft.com/en-us/dotnet/api/microsoft.exchange.webservices.data.wellknownfoldername
+    # and https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/distinguishedfolderid
     # 'RootOfHierarchy' subclasses must not be in this list.
     WELLKNOWN_FOLDERS = []
     TRAVERSAL_DEPTH = DEEP

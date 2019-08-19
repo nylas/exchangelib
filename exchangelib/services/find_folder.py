@@ -9,7 +9,7 @@ from .common import EWSFolderService, PagingEWSMixIn, create_shape_element
 
 class FindFolder(EWSFolderService, PagingEWSMixIn):
     """
-    MSDN: https://msdn.microsoft.com/en-us/library/office/aa564962(v=exchg.150).aspx
+    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/findfolder
     """
     SERVICE_NAME = 'FindFolder'
     element_container_name = '{%s}Folders' % TNS
