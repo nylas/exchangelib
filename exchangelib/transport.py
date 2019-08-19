@@ -18,6 +18,7 @@ NTLM = 'NTLM'
 BASIC = 'basic'
 DIGEST = 'digest'
 GSSAPI = 'gssapi'
+SSPI = 'sspi'
 
 AUTH_TYPE_MAP = {
     NTLM: requests_ntlm.HttpNtlmAuth,
@@ -30,6 +31,12 @@ try:
     AUTH_TYPE_MAP[GSSAPI] = requests_kerberos.HTTPKerberosAuth
 except ImportError:
     # Kerberos auth is optional
+    pass
+try:
+    import requests_negotiate_sspi
+    AUTH_TYPE_MAP[SSPI] = requests_negotiate_sspi.HttpNegotiateAuth
+except ImportError:
+    # SSPI auth is optional
     pass
 
 DEFAULT_ENCODING = 'utf-8'

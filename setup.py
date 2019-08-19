@@ -43,6 +43,8 @@ setup(
                       'isodate'],
     extras_require={
         'kerberos': ['requests_kerberos'],
+        'sspi': ['requests_negotiate_sspi'],  # Only for Win32 environments
+        'complete': ['requests_kerberos', 'requests_negotiate_sspi'],  # Only for Win32 environments
     },
     packages=find_packages(exclude=('tests',)),
     tests_require=['PyYAML', 'requests_mock', 'psutil'],

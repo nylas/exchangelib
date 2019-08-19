@@ -12,7 +12,7 @@ from .items import AcceptItem, TentativelyAcceptItem, DeclineItem, CalendarItem,
     DistributionList, Message, PostItem, Task
 from .properties import Body, HTMLBody, ItemId, Mailbox, Attendee, Room, RoomList, UID, DLMailbox
 from .restriction import Q
-from .transport import BASIC, DIGEST, NTLM, GSSAPI
+from .transport import BASIC, DIGEST, NTLM, GSSAPI, SSPI
 from .version import Build, Version
 from .settings import OofSettings
 
@@ -33,7 +33,7 @@ __all__ = [
     'OofSettings',
     'Q',
     'Folder', 'FolderCollection', 'SHALLOW', 'DEEP',
-    'BASIC', 'DIGEST', 'NTLM', 'GSSAPI',
+    'BASIC', 'DIGEST', 'NTLM', 'GSSAPI', 'SSPI',
     'Build', 'Version',
 ]
 

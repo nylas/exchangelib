@@ -12,6 +12,9 @@ HEAD
 -   In addition to bulk deleting via a QuerySet (`qs.delete()`), it is now possible to also
     bulk send, move and copy items in a QuerySet (via `qs.send()`, `qs.move()` and `qs.copy()`,
     respectively).
+-   SSPI support was added but dependencies are not installed by default since it only works
+    in Win32 environments. Install as `pip install exchangelib[sspi]` to get SSPI support.
+    Install with `pip install exchangelib[complete]` to get both Kerberos and SSPI auth.
 
 
 1.12.5

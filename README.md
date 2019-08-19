@@ -39,11 +39,19 @@ You can install this package from PyPI:
 pip install exchangelib
 ```
 
-The default installation does not support Kerberos. For additional Kerberos support, install
-with the extra `kerberos` dependencies:
+The default installation does not support Kerberos or SSPI. For additional Kerberos or SSPI support,
+install with the extra `kerberos` or `sspi` dependencies (please note that SSPI is only supported on
+Windows):
 
 ```bash
 pip install exchangelib[kerberos]
+pip install exchangelib[sspi]
+```
+
+To get both, install as:
+
+```bash
+pip install exchangelib[complete]
 ```
 
 To install the very latest code, install directly from GitHub instead:
@@ -87,7 +95,7 @@ fails to install.
 
 ```python
 from exchangelib import DELEGATE, IMPERSONATION, Account, Credentials, ServiceAccount, \
-    Configuration, NTLM, GSSAPI, Build, Version
+    Configuration, NTLM, GSSAPI, SSPI, Build, Version
 
 # Specify your credentials. Username is usually in WINDOMAIN\username format, where WINDOMAIN is
 # the name of the Windows Domain your username is connected to, but some servers also
@@ -149,6 +157,9 @@ config = Configuration(
 # does not work with autodiscover (yet) and is likely to change in future versions.
 credentials = Credentials('', '')
 config = Configuration(server='example.com', credentials=credentials, auth_type=GSSAPI)
+# Likewise, SSPI authentication is also supported:
+credentials = Credentials('', '')
+config = Configuration(server='example.com', credentials=credentials, auth_type=SSPI)
 
 # If you're connecting to the same account very often, you can cache the autodiscover result for
 # later so you can skip the autodiscover lookup:
