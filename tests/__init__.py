@@ -4821,24 +4821,28 @@ class CommonItemTest(BaseItemTest):
         )
         self.bulk_delete(qs)
 
-        # Test order_by() on ExtendedProperty
-        test_items = []
-        for i in range(4):
-            item = self.get_test_item()
-            item.extern_id = 'ID %s' % i
-            test_items.append(item)
-        self.test_folder.bulk_create(items=test_items)
-        qs = QuerySet(
-            folder_collection=FolderCollection(account=self.account, folders=[self.test_folder])
-        ).filter(categories__contains=self.categories)
-        self.assertEqual(
-            [i for i in qs.order_by('extern_id').values_list('extern_id', flat=True)],
-            ['ID 0', 'ID 1', 'ID 2', 'ID 3']
-        )
-        self.assertEqual(
-            [i for i in qs.order_by('-extern_id').values_list('extern_id', flat=True)],
-            ['ID 3', 'ID 2', 'ID 1', 'ID 0']
-        )
+        try:
+            self.ITEM_CLASS.register('extern_id', ExternId)
+            # Test order_by() on ExtendedProperty
+            test_items = []
+            for i in range(4):
+                item = self.get_test_item()
+                item.extern_id = 'ID %s' % i
+                test_items.append(item)
+            self.test_folder.bulk_create(items=test_items)
+            qs = QuerySet(
+                folder_collection=FolderCollection(account=self.account, folders=[self.test_folder])
+            ).filter(categories__contains=self.categories)
+            self.assertEqual(
+                [i for i in qs.order_by('extern_id').values_list('extern_id', flat=True)],
+                ['ID 0', 'ID 1', 'ID 2', 'ID 3']
+            )
+            self.assertEqual(
+                [i for i in qs.order_by('-extern_id').values_list('extern_id', flat=True)],
+                ['ID 3', 'ID 2', 'ID 1', 'ID 0']
+            )
+        finally:
+            self.ITEM_CLASS.deregister('extern_id')
         self.bulk_delete(qs)
 
         # Test order_by() on IndexedField (simple and multi-subfield). Only Contact items have these
@@ -4888,45 +4892,49 @@ class CommonItemTest(BaseItemTest):
             self.bulk_delete(qs)
 
         # Test sorting on multiple fields
-        test_items = []
-        for i in range(2):
-            for j in range(2):
-                item = self.get_test_item()
-                item.subject = 'Subj %s' % i
-                item.extern_id = 'ID %s' % j
-                test_items.append(item)
-        self.test_folder.bulk_create(items=test_items)
-        qs = QuerySet(
-            folder_collection=FolderCollection(account=self.account, folders=[self.test_folder])
-        ).filter(categories__contains=self.categories)
-        self.assertEqual(
-            [i for i in qs.order_by('subject', 'extern_id').values('subject', 'extern_id')],
-            [{'subject': 'Subj 0', 'extern_id': 'ID 0'},
-             {'subject': 'Subj 0', 'extern_id': 'ID 1'},
-             {'subject': 'Subj 1', 'extern_id': 'ID 0'},
-             {'subject': 'Subj 1', 'extern_id': 'ID 1'}]
-        )
-        self.assertEqual(
-            [i for i in qs.order_by('-subject', 'extern_id').values('subject', 'extern_id')],
-            [{'subject': 'Subj 1', 'extern_id': 'ID 0'},
-             {'subject': 'Subj 1', 'extern_id': 'ID 1'},
-             {'subject': 'Subj 0', 'extern_id': 'ID 0'},
-             {'subject': 'Subj 0', 'extern_id': 'ID 1'}]
-        )
-        self.assertEqual(
-            [i for i in qs.order_by('subject', '-extern_id').values('subject', 'extern_id')],
-            [{'subject': 'Subj 0', 'extern_id': 'ID 1'},
-             {'subject': 'Subj 0', 'extern_id': 'ID 0'},
-             {'subject': 'Subj 1', 'extern_id': 'ID 1'},
-             {'subject': 'Subj 1', 'extern_id': 'ID 0'}]
-        )
-        self.assertEqual(
-            [i for i in qs.order_by('-subject', '-extern_id').values('subject', 'extern_id')],
-            [{'subject': 'Subj 1', 'extern_id': 'ID 1'},
-             {'subject': 'Subj 1', 'extern_id': 'ID 0'},
-             {'subject': 'Subj 0', 'extern_id': 'ID 1'},
-             {'subject': 'Subj 0', 'extern_id': 'ID 0'}]
-        )
+        try:
+            self.ITEM_CLASS.register('extern_id', ExternId)
+            test_items = []
+            for i in range(2):
+                for j in range(2):
+                    item = self.get_test_item()
+                    item.subject = 'Subj %s' % i
+                    item.extern_id = 'ID %s' % j
+                    test_items.append(item)
+            self.test_folder.bulk_create(items=test_items)
+            qs = QuerySet(
+                folder_collection=FolderCollection(account=self.account, folders=[self.test_folder])
+            ).filter(categories__contains=self.categories)
+            self.assertEqual(
+                [i for i in qs.order_by('subject', 'extern_id').values('subject', 'extern_id')],
+                [{'subject': 'Subj 0', 'extern_id': 'ID 0'},
+                 {'subject': 'Subj 0', 'extern_id': 'ID 1'},
+                 {'subject': 'Subj 1', 'extern_id': 'ID 0'},
+                 {'subject': 'Subj 1', 'extern_id': 'ID 1'}]
+            )
+            self.assertEqual(
+                [i for i in qs.order_by('-subject', 'extern_id').values('subject', 'extern_id')],
+                [{'subject': 'Subj 1', 'extern_id': 'ID 0'},
+                 {'subject': 'Subj 1', 'extern_id': 'ID 1'},
+                 {'subject': 'Subj 0', 'extern_id': 'ID 0'},
+                 {'subject': 'Subj 0', 'extern_id': 'ID 1'}]
+            )
+            self.assertEqual(
+                [i for i in qs.order_by('subject', '-extern_id').values('subject', 'extern_id')],
+                [{'subject': 'Subj 0', 'extern_id': 'ID 1'},
+                 {'subject': 'Subj 0', 'extern_id': 'ID 0'},
+                 {'subject': 'Subj 1', 'extern_id': 'ID 1'},
+                 {'subject': 'Subj 1', 'extern_id': 'ID 0'}]
+            )
+            self.assertEqual(
+                [i for i in qs.order_by('-subject', '-extern_id').values('subject', 'extern_id')],
+                [{'subject': 'Subj 1', 'extern_id': 'ID 1'},
+                 {'subject': 'Subj 1', 'extern_id': 'ID 0'},
+                 {'subject': 'Subj 0', 'extern_id': 'ID 1'},
+                 {'subject': 'Subj 0', 'extern_id': 'ID 0'}]
+            )
+        finally:
+            self.ITEM_CLASS.deregister('extern_id')
 
     def test_finditems(self):
         now = UTC_NOW()
@@ -5694,16 +5702,20 @@ class CommonItemTest(BaseItemTest):
                 old, new = set(old or ()), set(new or ())
             self.assertEqual(old, new, (f.name, old, new))
 
-        # Test extern_id = None, which deletes the extended property entirely
-        extern_id = None
-        item.extern_id = extern_id
-        wipe2_ids = self.account.bulk_update([(item, ['extern_id']), ])
-        self.assertEqual(len(wipe2_ids), 1)
-        self.assertEqual(len(wipe2_ids[0]), 2, wipe2_ids)
-        self.assertEqual(insert_ids[0].id, wipe2_ids[0][0])  # ID should be the same
-        self.assertNotEqual(insert_ids[0].changekey, wipe2_ids[0][1])  # Changekey should change when item is updated
-        item = list(self.account.fetch(wipe2_ids))[0]
-        self.assertEqual(item.extern_id, extern_id)
+        try:
+            self.ITEM_CLASS.register('extern_id', ExternId)
+            # Test extern_id = None, which deletes the extended property entirely
+            extern_id = None
+            item.extern_id = extern_id
+            wipe2_ids = self.account.bulk_update([(item, ['extern_id']), ])
+            self.assertEqual(len(wipe2_ids), 1)
+            self.assertEqual(len(wipe2_ids[0]), 2, wipe2_ids)
+            self.assertEqual(insert_ids[0].id, wipe2_ids[0][0])  # ID should be the same
+            self.assertNotEqual(insert_ids[0].changekey, wipe2_ids[0][1])  # Changekey should change when item is updated
+            item = list(self.account.fetch(wipe2_ids))[0]
+            self.assertEqual(item.extern_id, extern_id)
+        finally:
+            self.ITEM_CLASS.deregister('extern_id')
 
         # Remove test item. Test with generator as argument
         self.bulk_delete(ids=(i for i in wipe2_ids))
