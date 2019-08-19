@@ -761,7 +761,8 @@ syntax as folders. Just start your query with `.people()`:
 
 ```python
 # Navigate to a contact folder and start the search
-from exchangelib import Account
+from exchangelib import Account, DistributionList
+from exchangelib.indexed_properties import EmailAddress
 
 a = Account(...)
 folder = a.root / 'AllContacts'
@@ -769,6 +770,19 @@ for p in folder.people():
     print(p)
 for p in folder.people().only('display_name').filter(display_name='john').order_by('display_name'):
     print(p)
+
+# Getting a single contact in the GAL contact list
+gal = a.contacts / 'GAL Contacts'
+contact = gal.get(email_addresses=EmailAddress(email='lucas@example.com'))
+# All contacts with a gmail address
+gmail_contacts = list(gal.filter(email_addresses__contains=EmailAddress(email='gmail.com')))
+# All Gmail email addresses
+gmail_addresses = [e.email for c in
+                   gal.filter(email_addresses__contains=EmailAddress(email='gmail.com'))
+                   for e in c.email_addresses]
+# All email addresses
+all_addresses = [e.email for c in gal.all()
+                 for e in c.email_addresses if not isinstance(c, DistributionList)]
 ```
 
 ## Extended properties
