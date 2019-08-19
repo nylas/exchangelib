@@ -15,6 +15,18 @@ HEAD
 -   SSPI support was added but dependencies are not installed by default since it only works
     in Win32 environments. Install as `pip install exchangelib[sspi]` to get SSPI support.
     Install with `pip install exchangelib[complete]` to get both Kerberos and SSPI auth.
+-   The custom `extern_id` field is no longer registered by default. If you require this field,
+    register it manually as part of your setup code on the item types you need:
+
+    ```python
+    from exchangelib import CalendarItem, Message, Contact, Task
+    from exchangelib.extended_properties import ExternId
+
+    CalendarItem.register('extern_id', ExternId)
+    Message.register('extern_id', ExternId)
+    Contact.register('extern_id', ExternId)
+    Task.register('extern_id', ExternId)
+    ```
 
 
 1.12.5

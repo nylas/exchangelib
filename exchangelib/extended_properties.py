@@ -308,11 +308,9 @@ class ExtendedProperty(EWSElement):
 
 
 class ExternId(ExtendedProperty):
-    # This is a custom extended property defined by us. It's useful for synchronization purposes, to attach a unique ID
-    # from an external system. Strictly, this is an field that should probably not be registered by default since it's
-    # not part of EWS, but it's been around since the beginning of this library and would be a pain for consumers to
-    # register manually.
-
+    """This is a custom extended property defined by us. It's useful for synchronization purposes, to attach a unique ID
+    from an external system.
+    """
     property_set_id = 'c11ff724-aa03-4555-9952-8fa248a11c3e'  # This is arbitrary. We just want a unique UUID.
     property_name = 'External ID'
     property_type = 'String'
