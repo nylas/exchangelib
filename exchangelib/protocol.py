@@ -7,6 +7,7 @@ when creating an Account.
 """
 from __future__ import unicode_literals
 
+import datetime
 import logging
 from multiprocessing.pool import ThreadPool
 import os
@@ -53,16 +54,20 @@ class BaseProtocol(object):
     # The adapter class to use for HTTP requests. Override this if you need e.g. proxy support or specific TLS versions
     HTTP_ADAPTER_CLS = requests.adapters.HTTPAdapter
 
-    def __init__(self, service_endpoint, credentials, auth_type):
-        if not isinstance(credentials, Credentials):
-            raise ValueError("'credentials' %r must be a Credentials instance" % credentials)
+    def __init__(self, service_endpoint, credentials, auth_type, retry_policy):
+        if credentials is not None:
+            if not isinstance(credentials, Credentials):
+                raise ValueError("'credentials' %r must be a Credentials instance" % credentials)
         if auth_type is not None:
             if auth_type not in AUTH_TYPE_MAP:
                 raise ValueError("'auth_type' %s must be one if %s" % (auth_type, AUTH_TYPE_MAP.keys()))
+        if not isinstance(retry_policy, RetryPolicy):
+            raise ValueError("'retry_policy' %r must be a RetryPolicy instance" % retry_policy)
         self.has_ssl, self.server, _ = split_url(service_endpoint)
         self.credentials = credentials
         self.service_endpoint = service_endpoint
         self.auth_type = auth_type
+        self.retry_policy = retry_policy
         self._session_pool_size = self.SESSION_POOLSIZE
         self._session_pool = None  # Consumers need to fill the session pool themselves
         self._session_pool_lock = None
@@ -243,7 +248,7 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
         # pylint: disable=access-member-before-definition
         if self.auth_type is None:
             self.auth_type = get_service_authtype(service_endpoint=self.service_endpoint, versions=API_VERSIONS,
-                                                  name=self.credentials.username)
+                                                  name=self.credentials.username if self.credentials else 'DUMMY')
 
         # Default to the auth type used by the service. We only need this if 'version' is None
         self.docs_auth_type = self.auth_type
@@ -435,3 +440,83 @@ class NoVerifyHTTPAdapter(requests.adapters.HTTPAdapter):
         # pylint: disable=unused-argument
         # We're overiding a method so we have to keep the signature
         super(NoVerifyHTTPAdapter, self).cert_verify(conn=conn, url=url, verify=False, cert=cert)
+
+
+class RetryPolicy(object):
+    """Stores retry logic used when faced with errors from the server
+    """
+    @property
+    def fail_fast(self):
+        # Used to choose the error handling policy. When True, a fault-tolerant policy is used. False, a fail-fast
+        # policy is used.
+        raise NotImplementedError()
+
+    @property
+    def back_off_until(self):
+        raise NotImplementedError()
+
+    @back_off_until.setter
+    def back_off_until(self, value):
+        raise NotImplementedError()
+
+
+class FailFast(RetryPolicy):
+    """Fail immediately on server errors
+    """
+    @property
+    def fail_fast(self):
+        return True
+
+    @property
+    def back_off_until(self):
+        return None
+
+
+class FaultTolerance(RetryPolicy):
+    """Enables fault-tolerant error handling. Tells internal methods to do an exponential back off when requests start
+    failing, and wait up to max_wait seconds before failing.
+    """
+    def __init__(self, max_wait=3600):
+        self.max_wait = max_wait
+        self._back_off_until = None
+        self._back_off_lock = Lock()
+
+    def __getstate__(self):
+        # Locks cannot be pickled
+        state = self.__dict__.copy()
+        del state['_back_off_lock']
+        return state
+
+    def __setstate__(self, state):
+        # Restore the lock
+        self.__dict__.update(state)
+        self._back_off_lock = Lock()
+
+    @property
+    def fail_fast(self):
+        return False
+
+    @property
+    def back_off_until(self):
+        """Returns the back off value as a datetime. Resets the current back off value if it has expired."""
+        if self._back_off_until is None:
+            return None
+        with self._back_off_lock:
+            if self._back_off_until is None:
+                return None
+            if self._back_off_until < datetime.datetime.now():
+                self._back_off_until = None  # The back off value has expired. Reset
+                return None
+            return self._back_off_until
+
+    @back_off_until.setter
+    def back_off_until(self, value):
+        with self._back_off_lock:
+            self._back_off_until = value
+
+    def back_off(self, seconds):
+        if seconds is None:
+            seconds = 60  # Back off 60 seconds if we didn't get an explicit suggested value
+        value = datetime.datetime.now() + datetime.timedelta(seconds=seconds)
+        with self._back_off_lock:
+            self._back_off_until = value

@@ -87,12 +87,19 @@ def get_auth_instance(credentials, auth_type):
     model = AUTH_TYPE_MAP[auth_type]
     if model is None:
         return None
-    username = credentials.username
-    if auth_type == NTLM and credentials.type == credentials.EMAIL:
-        username = '\\' + username
     if auth_type == GSSAPI:
         # Kerberos auth relies on credentials supplied via a ticket available externally to this library
         return model()
+    if auth_type == SSPI:
+        # SSPI auth does not require credentials
+        if credentials is None:
+            return model()
+        return model(username=credentials.username, password=credentials.password)
+    if not credentials:
+        raise ValueError('Auth type %r requires credentials' % auth_type)
+    username = credentials.username
+    if auth_type == NTLM and credentials.type == credentials.EMAIL:
+        username = '\\' + username
     return model(username=username, password=credentials.password)
 
 

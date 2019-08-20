@@ -27,7 +27,20 @@ HEAD
     Contact.register('extern_id', ExternId)
     Task.register('extern_id', ExternId)
     ```
+-   The `ServiceAccount` class has been removed. If you want fault tolerance, set it in a
+    `Configuration` object:
 
+    ```python
+    from exchangelib import Configuration, Credentials, FaultTolerance
+    c = Credentials('foo', 'bar')
+    config = Configuration(credentials=c, retry_policy=FaultTolerance())
+    ```
+-   It is now possible to use Kerberos and SSPI auth without providing a dummy
+    `Credentials('', '')` object.
+-   The `has_ssl` argument of `Configuration` was removed. If you want to connect to a
+    plain HTTP endpoint, pass the full URL in the `service_endpoint` argument.
+-   The `Configuration.credentals` property was removed. Use `Configuration.protocol.credentals`
+    instead.
 
 1.12.5
 ------

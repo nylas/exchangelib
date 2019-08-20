@@ -4,17 +4,18 @@ from .account import Account
 from .attachments import FileAttachment, ItemAttachment
 from .autodiscover import discover
 from .configuration import Configuration
-from .credentials import DELEGATE, IMPERSONATION, Credentials, ServiceAccount
+from .credentials import DELEGATE, IMPERSONATION, Credentials
 from .ewsdatetime import EWSDate, EWSDateTime, EWSTimeZone, UTC, UTC_NOW
 from .extended_properties import ExtendedProperty
 from .folders import Folder, FolderCollection, SHALLOW, DEEP
 from .items import AcceptItem, TentativelyAcceptItem, DeclineItem, CalendarItem, CancelCalendarItem, Contact, \
     DistributionList, Message, PostItem, Task
 from .properties import Body, HTMLBody, ItemId, Mailbox, Attendee, Room, RoomList, UID, DLMailbox
+from .protocol import FaultTolerance, FailFast
+from .settings import OofSettings
 from .restriction import Q
 from .transport import BASIC, DIGEST, NTLM, GSSAPI, SSPI
 from .version import Build, Version
-from .settings import OofSettings
 
 __version__ = '1.12.5'
 
@@ -24,15 +25,16 @@ __all__ = [
     'FileAttachment', 'ItemAttachment',
     'discover',
     'Configuration',
-    'DELEGATE', 'IMPERSONATION', 'Credentials', 'ServiceAccount',
+    'DELEGATE', 'IMPERSONATION', 'Credentials',
     'EWSDate', 'EWSDateTime', 'EWSTimeZone', 'UTC', 'UTC_NOW',
     'ExtendedProperty',
-    'AcceptItem', 'TentativelyAcceptItem', 'DeclineItem',
-    'CalendarItem', 'CancelCalendarItem', 'Contact', 'DistributionList', 'Message', 'PostItem', 'Task',
+    'Folder', 'FolderCollection', 'SHALLOW', 'DEEP',
+    'AcceptItem', 'TentativelyAcceptItem', 'DeclineItem', 'CalendarItem', 'CancelCalendarItem', 'Contact',
+    'DistributionList', 'Message', 'PostItem', 'Task',
     'ItemId', 'Mailbox', 'DLMailbox', 'Attendee', 'Room', 'RoomList', 'Body', 'HTMLBody', 'UID',
+    'FailFast', 'FaultTolerance',
     'OofSettings',
     'Q',
-    'Folder', 'FolderCollection', 'SHALLOW', 'DEEP',
     'BASIC', 'DIGEST', 'NTLM', 'GSSAPI', 'SSPI',
     'Build', 'Version',
 ]

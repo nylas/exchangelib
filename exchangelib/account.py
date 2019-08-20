@@ -81,18 +81,23 @@ class Account(object):
         if not isinstance(self.default_timezone, EWSTimeZone):
             raise ValueError("Expected 'default_timezone' to be an EWSTimeZone, got %r" % self.default_timezone)
         if autodiscover:
-            if not credentials:
-                raise AttributeError('autodiscover requires credentials')
             if config:
-                raise AttributeError('config is ignored when autodiscover is active')
-            self.primary_smtp_address, self.protocol = discover(email=self.primary_smtp_address,
-                                                                credentials=credentials)
+                retry_policy, auth_type = config.protocol.retry_policy, config.protocol.auth_type
+                if not credentials:
+                    credentials = config.protocol.credentials
+            else:
+                retry_policy, auth_type = None, None
+            self.primary_smtp_address, self.protocol = discover(
+                email=self.primary_smtp_address, credentials=credentials, auth_type=auth_type, retry_policy=retry_policy
+            )
         else:
             if not config:
                 raise AttributeError('non-autodiscover requires a config')
             if not isinstance(config, Configuration):
                 raise ValueError("Expected 'config' to be a Configuration, got %r" % config)
             self.protocol = config.protocol
+            if credentials:
+                self.protocol.credentials = credentials
         # We may need to override the default server version on a per-account basis because Microsoft may report one
         # server version up-front but delegate account requests to an older backend server.
         self.version = self.protocol.version

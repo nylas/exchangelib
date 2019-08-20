@@ -37,7 +37,7 @@ from exchangelib.attachments import FileAttachment, ItemAttachment, AttachmentId
 from exchangelib.autodiscover import AutodiscoverProtocol, discover
 import exchangelib.autodiscover
 from exchangelib.configuration import Configuration
-from exchangelib.credentials import DELEGATE, IMPERSONATION, Credentials, ServiceAccount
+from exchangelib.credentials import DELEGATE, IMPERSONATION, Credentials
 from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalidOperation, AutoDiscoverRedirect, \
     AutoDiscoverCircularRedirect, AutoDiscoverFailed, ErrorNonExistentMailbox, UnknownTimeZone, \
     ErrorNameResolutionNoResults, TransportError, RedirectError, CASError, RateLimitError, UnauthorizedError, \
@@ -67,7 +67,7 @@ from exchangelib.items import Item, CalendarItem, Message, Contact, Task, Distri
 from exchangelib.properties import Attendee, Mailbox, RoomList, MessageHeader, Room, ItemId, Member, EWSElement, Body, \
     HTMLBody, TimeZone, FreeBusyView, UID, InvalidField, InvalidFieldForVersion, DLMailbox, PermissionSet, \
     Permission, UserId
-from exchangelib.protocol import BaseProtocol, Protocol, NoVerifyHTTPAdapter
+from exchangelib.protocol import BaseProtocol, Protocol, NoVerifyHTTPAdapter, FaultTolerance, FailFast
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.recurrence import Recurrence, AbsoluteYearlyPattern, RelativeYearlyPattern, AbsoluteMonthlyPattern, \
     RelativeMonthlyPattern, WeeklyPattern, DailyPattern, FirstOccurrence, LastOccurrence, Occurrence, \
@@ -277,7 +277,6 @@ class ConfigurationTest(TimedTestCase):
     def test_magic(self):
         config = Configuration(
             server='example.com',
-            has_ssl=True,
             credentials=Credentials('foo', 'bar'),
             auth_type=NTLM,
             version=Version(build=Build(15, 1, 2, 3), api_version='foo'),
@@ -292,21 +291,48 @@ class ConfigurationTest(TimedTestCase):
         # guessing missing values works.
         Configuration(
             server='example.com',
-            has_ssl=True,
             credentials=Credentials('foo', 'bar'),
             auth_type=NTLM,
             version=Version(build=Build(15, 1, 2, 3), api_version='foo'),
         )
 
-    def test_credentials_helper(self):
-        c = Configuration(
-            server='example.com',
-            has_ssl=True,
-            credentials=Credentials('foo', 'bar'),
-            auth_type=NTLM,
-            version=Version(build=Build(15, 1, 2, 3), api_version='foo'),
-        )
-        self.assertEqual(c.credentials, Credentials('foo', 'bar'))
+    def test_fail_fast_back_off(self):
+        # Test that FailFast does not support back-off logic
+        c = FailFast()
+        self.assertIsNone(c.back_off_until)
+        with self.assertRaises(AttributeError):
+            c.back_off_until = 1
+
+    def test_service_account_back_off(self):
+        # Test back-off logic in FaultTolerance
+        sa = FaultTolerance()
+
+        # Initially, the value is None
+        self.assertIsNone(sa.back_off_until)
+
+        # Test a non-expired back off value
+        in_a_while = datetime.datetime.now() + datetime.timedelta(seconds=10)
+        sa.back_off_until = in_a_while
+        self.assertEqual(sa.back_off_until, in_a_while)
+
+        # Test an expired back off value
+        sa.back_off_until = datetime.datetime.now()
+        time.sleep(0.001)
+        self.assertIsNone(sa.back_off_until)
+
+        # Test the back_off() helper
+        sa.back_off(10)
+        # This is not a precise test. Assuming fast computers, there should be less than 1 second between the two lines.
+        self.assertEqual(int(math.ceil((sa.back_off_until - datetime.datetime.now()).total_seconds())), 10)
+
+        # Test expiry
+        sa.back_off(0)
+        time.sleep(0.001)
+        self.assertIsNone(sa.back_off_until)
+
+        # Test default value
+        sa.back_off(None)
+        self.assertEqual(int(math.ceil((sa.back_off_until - datetime.datetime.now()).total_seconds())), 60)
 
 
 class ProtocolTest(TimedTestCase):
@@ -315,7 +341,7 @@ class ProtocolTest(TimedTestCase):
     def test_session(self, m):
         m.get('https://example.com/EWS/types.xsd', status_code=200)
         protocol = Protocol(service_endpoint='https://example.com/Foo.asmx', credentials=Credentials('A', 'B'),
-                            auth_type=NTLM, version=Version(Build(15, 1)))
+                            auth_type=NTLM, version=Version(Build(15, 1)), retry_policy=FailFast())
         session = protocol.create_session()
         new_session = protocol.renew_session(session)
         self.assertNotEqual(id(session), id(new_session))
@@ -325,11 +351,11 @@ class ProtocolTest(TimedTestCase):
         # Verify that we get the same Protocol instance for the same combination of (endpoint, credentials)
         m.get('https://example.com/EWS/types.xsd', status_code=200)
         base_p = Protocol(service_endpoint='https://example.com/Foo.asmx', credentials=Credentials('A', 'B'),
-                          auth_type=NTLM, version=Version(Build(15, 1)))
+                          auth_type=NTLM, version=Version(Build(15, 1)), retry_policy=FailFast())
 
         for i in range(10):
             p = Protocol(service_endpoint='https://example.com/Foo.asmx', credentials=Credentials('A', 'B'),
-                         auth_type=NTLM, version=Version(Build(15, 1)))
+                         auth_type=NTLM, version=Version(Build(15, 1)), retry_policy=FailFast())
             self.assertEqual(base_p, p)
             self.assertEqual(id(base_p), id(p))
             self.assertEqual(hash(base_p), hash(p))
@@ -343,7 +369,7 @@ class ProtocolTest(TimedTestCase):
         )}
         self.assertGreater(len(ip_addresses), 0)
         protocol = Protocol(service_endpoint='http://example.com', credentials=Credentials('A', 'B'),
-                            auth_type=NOAUTH, version=Version(Build(15, 1)))
+                            auth_type=NOAUTH, version=Version(Build(15, 1)), retry_policy=FailFast())
         session = protocol.get_session()
         session.get('http://example.com')
         self.assertEqual(len({p.raddr[0] for p in proc.connections() if p.raddr[0] in ip_addresses}), 1)
@@ -353,7 +379,7 @@ class ProtocolTest(TimedTestCase):
 
     def test_decrease_poolsize(self):
         protocol = Protocol(service_endpoint='https://example.com/Foo.asmx', credentials=Credentials('A', 'B'),
-                            auth_type=NTLM, version=Version(Build(15, 1)))
+                            auth_type=NTLM, version=Version(Build(15, 1)), retry_policy=FailFast())
         self.assertEqual(protocol._session_pool.qsize(), Protocol.SESSION_POOLSIZE)
         protocol.decrease_poolsize()
         self.assertEqual(protocol._session_pool.qsize(), 3)
@@ -382,44 +408,6 @@ class CredentialsTest(TimedTestCase):
         self.assertEqual(Credentials('a', 'b').type, Credentials.UPN)
         self.assertEqual(Credentials('a@example.com', 'b').type, Credentials.EMAIL)
         self.assertEqual(Credentials('a\\n', 'b').type, Credentials.DOMAIN)
-
-    def test_credentials_back_off(self):
-        # Test Credentials that does not support back-off logic
-        c = Credentials('a', 'b')
-        self.assertIsNone(c.back_off_until)
-        with self.assertRaises(NotImplementedError):
-            c.back_off_until = 1
-
-    def test_service_account_back_off(self):
-        # Test back-off logic in ServiceAccount
-        sa = ServiceAccount('a', 'b')
-
-        # Initially, the value is None
-        self.assertIsNone(sa.back_off_until)
-
-        # Test a non-expired back off value
-        in_a_while = datetime.datetime.now() + datetime.timedelta(seconds=10)
-        sa.back_off_until = in_a_while
-        self.assertEqual(sa.back_off_until, in_a_while)
-
-        # Test an expired back off value
-        sa.back_off_until = datetime.datetime.now()
-        time.sleep(0.001)
-        self.assertIsNone(sa.back_off_until)
-
-        # Test the back_off() helper
-        sa.back_off(10)
-        # This is not a precise test. Assuming fast computers, there should be less than 1 second between the two lines.
-        self.assertEqual(int(math.ceil((sa.back_off_until - datetime.datetime.now()).total_seconds())), 10)
-
-        # Test expiry
-        sa.back_off(0)
-        time.sleep(0.001)
-        self.assertIsNone(sa.back_off_until)
-
-        # Test default value
-        sa.back_off(None)
-        self.assertEqual(int(math.ceil((sa.back_off_until - datetime.datetime.now()).total_seconds())), 60)
 
 
 class EWSDateTimeTest(TimedTestCase):
@@ -2182,9 +2170,9 @@ class CommonTest(EWSTest):
         url = 'https://example.com'
 
         protocol = self.account.protocol
-        credentials = protocol.credentials
+        retry_policy = protocol.retry_policy
         # Make sure we fail fast in error cases
-        protocol.credentials = Credentials(username=credentials.username, password=credentials.password)
+        protocol.retry_policy = FailFast()
 
         session = protocol.get_session()
 
@@ -2253,7 +2241,7 @@ class CommonTest(EWSTest):
             r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
 
         # Rate limit exceeded
-        protocol.credentials = ServiceAccount(username=credentials.username, password=credentials.password, max_wait=1)
+        protocol.retry_policy = FaultTolerance(max_wait=1)
         session.post = mock_post(url, 503, {'connection': 'close'})
         protocol.renew_session = lambda s: s  # Return the same session so it's still mocked
         with self.assertRaises(RateLimitError) as rle:
@@ -2265,7 +2253,7 @@ class CommonTest(EWSTest):
         self.assertEqual(rle.exception.url, url)
         self.assertEqual(rle.exception.status_code, 503)
         # Test something larger than the default wait, so we retry at least once
-        protocol.credentials.max_wait = 15
+        protocol.retry_policy.max_wait = 15
         session.post = mock_post(url, 503, {'connection': 'close'})
         with self.assertRaises(RateLimitError) as rle:
             r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
@@ -2276,7 +2264,7 @@ class CommonTest(EWSTest):
         self.assertEqual(rle.exception.url, url)
         self.assertEqual(rle.exception.status_code, 503)
         protocol.release_session(session)
-        protocol.credentials = credentials
+        protocol.retry_policy = retry_policy
 
     def test_version_renegotiate(self):
         # Test that we can recover from a wrong API version. This is needed in version guessing and when the
@@ -2420,14 +2408,6 @@ class AccountTest(EWSTest):
             Account(primary_smtp_address='blah')
         self.assertEqual(str(e.exception), "primary_smtp_address 'blah' is not an email address")
         with self.assertRaises(AttributeError) as e:
-            # Autodiscover requires credentials
-            Account(primary_smtp_address='blah@example.com', autodiscover=True)
-        self.assertEqual(str(e.exception), 'autodiscover requires credentials')
-        with self.assertRaises(AttributeError) as e:
-            # Autodiscover must have credentials but must not have config
-            Account(primary_smtp_address='blah@example.com', credentials='FOO', config='FOO', autodiscover=True)
-        self.assertEqual(str(e.exception), 'config is ignored when autodiscover is active')
-        with self.assertRaises(AttributeError) as e:
             # Non-autodiscover requires a config
             Account(primary_smtp_address='blah@example.com', autodiscover=False)
         self.assertEqual(str(e.exception), 'non-autodiscover requires a config')
@@ -2502,13 +2482,13 @@ class AccountTest(EWSTest):
                 self.account.inbox,
                 self.account,
                 Credentials('XXX', 'YYY'),
-                ServiceAccount('XXX', 'YYY'),
+                FaultTolerance(max_wait=3600),
             ):
                 pickled_o = pickle.dumps(o)
                 unpickled_o = pickle.loads(pickled_o)
                 self.assertIsInstance(unpickled_o, type(o))
-                if not isinstance(o, (Account, Protocol)):
-                    # __eq__ is not defined on Protocol and Account
+                if not isinstance(o, (Account, Protocol, FaultTolerance)):
+                    # __eq__ is not defined on some classes
                     self.assertEqual(o, unpickled_o)
         finally:
             item.delete()
@@ -2584,7 +2564,8 @@ class AutodiscoverTest(EWSTest):
         _autodiscover_cache[cache_key] = AutodiscoverProtocol(
             service_endpoint='https://example.com/blackhole.asmx',
             credentials=Credentials('leet_user', 'cannaguess'),
-            auth_type=NTLM
+            auth_type=NTLM,
+            retry_policy=FailFast(),
         )
         m.post('https://example.com/blackhole.asmx', status_code=404)
         discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
@@ -2612,7 +2593,7 @@ class AutodiscoverTest(EWSTest):
         # Insert a fake Protocol instance into the cache
         from exchangelib.autodiscover import _autodiscover_cache
         key = (2, 'foo', 4)
-        _autodiscover_cache[key] = namedtuple('P', ['service_endpoint', 'auth_type'])(1, 'bar')
+        _autodiscover_cache[key] = namedtuple('P', ['service_endpoint', 'auth_type', 'retry_policy'])(1, 'bar', 'baz')
         # Check that it exists. 'in' goes directly to the file
         self.assertTrue(key in _autodiscover_cache)
         # Destroy the backing cache file(s)
@@ -2651,14 +2632,15 @@ class AutodiscoverTest(EWSTest):
         _orig = exchangelib.autodiscover._autodiscover_quick
 
         # Test that we can get another address back than the address we're looking up
-        def _mock1(credentials, email, protocol):
+        def _mock1(*args, **kwargs):
             return 'john@example.com', p
         exchangelib.autodiscover._autodiscover_quick = _mock1
         test_email, p = discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
         self.assertEqual(test_email, 'john@example.com')
 
         # Test that we can survive being asked to lookup with another address
-        def _mock2(credentials, email, protocol):
+        def _mock2(*args, **kwargs):
+            email = kwargs['email']
             if email == 'xxxxxx@%s' % self.account.domain:
                 raise ErrorNonExistentMailbox(email)
             raise AutoDiscoverRedirect(redirect_email='xxxxxx@'+self.account.domain)
@@ -2667,7 +2649,7 @@ class AutodiscoverTest(EWSTest):
             discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
 
         # Test that we catch circular redirects
-        def _mock3(credentials, email, protocol):
+        def _mock3(*args, **kwargs):
             raise AutoDiscoverRedirect(redirect_email=self.account.primary_smtp_address)
         exchangelib.autodiscover._autodiscover_quick = _mock3
         with self.assertRaises(AutoDiscoverCircularRedirect):
@@ -2676,7 +2658,7 @@ class AutodiscoverTest(EWSTest):
 
         # Test that we catch circular redirects when cache is empty. This is a different code path
         _orig = exchangelib.autodiscover._try_autodiscover
-        def _mock4(hostname, credentials, email):
+        def _mock4(*args, **kwargs):
             raise AutoDiscoverRedirect(redirect_email=self.account.primary_smtp_address)
         exchangelib.autodiscover._try_autodiscover = _mock4
         exchangelib.autodiscover._autodiscover_cache.clear()
@@ -2685,7 +2667,8 @@ class AutodiscoverTest(EWSTest):
         exchangelib.autodiscover._try_autodiscover = _orig
 
         # Test that we can survive being asked to lookup with another address, when cache is empty
-        def _mock5(hostname, credentials, email):
+        def _mock5(*args, **kwargs):
+            email = kwargs['email']
             if email == 'xxxxxx@%s' % self.account.domain:
                 raise ErrorNonExistentMailbox(email)
             raise AutoDiscoverRedirect(redirect_email='xxxxxx@'+self.account.domain)

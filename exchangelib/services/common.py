@@ -205,9 +205,9 @@ class EWSService(object):
             self.protocol.decrease_poolsize()
         except SessionPoolMinSizeReached:
             pass
-        if self.protocol.credentials.fail_fast:
+        if self.protocol.retry_policy.fail_fast:
             raise e
-        self.protocol.credentials.back_off(e.back_off)
+        self.protocol.retry_policy.back_off(e.back_off)
         # We'll warn about this later if we actually need to sleep
 
     def _update_api_version(self, hint, api_version, response):

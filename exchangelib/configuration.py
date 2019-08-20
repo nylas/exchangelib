@@ -2,7 +2,7 @@ from __future__ import unicode_literals
 
 import logging
 
-from .protocol import Protocol
+from .protocol import Protocol, FailFast
 from .transport import AUTH_TYPE_MAP
 
 log = logging.getLogger(__name__)
@@ -31,24 +31,22 @@ class Configuration(object):
         account = Account(primary_smtp_address='john@example.com', credentials=credentials, autodiscover=True)
 
     """
-    def __init__(self, credentials, server=None, has_ssl=True, service_endpoint=None, auth_type=None, version=None):
-        if auth_type is not None and auth_type not in AUTH_TYPE_MAP:
-            raise ValueError('Unsupported auth type %s' % auth_type)
+    def __init__(self, credentials=None, server=None, service_endpoint=None, auth_type=None, version=None,
+                 retry_policy=None):
         if not (server or service_endpoint):
             raise AttributeError('Either server or service_endpoint must be provided')
         # Set up a default protocol that non-autodiscover accounts can use
         if not service_endpoint:
-            service_endpoint = '%s://%s/EWS/Exchange.asmx' % ('https' if has_ssl else 'http', server)
+            service_endpoint = 'https://%s/EWS/Exchange.asmx' % server
+        if not retry_policy:
+            retry_policy = FailFast()
         self.protocol = Protocol(
             service_endpoint=service_endpoint,
             auth_type=auth_type,
             credentials=credentials,
-            version=version
+            version=version,
+            retry_policy=retry_policy,
         )
-
-    @property
-    def credentials(self):
-        return self.protocol.credentials
 
     def __repr__(self):
         return self.__class__.__name__ + repr((self.protocol,))

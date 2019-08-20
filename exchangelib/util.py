@@ -635,7 +635,7 @@ Response data: %(xml_response)s
     )
     try:
         while True:
-            _back_off_if_needed(protocol.credentials.back_off_until)
+            _back_off_if_needed(protocol.retry_policy.back_off_until)
             log.debug('Session %s thread %s: retry %s timeout %s POST\'ing to %s after %ss wait', session.session_id,
                       thread_id, retry, protocol.TIMEOUT, url, wait)
             d_start = time_func()
@@ -718,9 +718,9 @@ def _may_retry_on_error(response, protocol, wait):
         if response.status_code not in (301, 302, 401, 503):
             # Don't retry if we didn't get a status code that we can hope to recover from
             return False
-        if protocol.credentials.fail_fast:
+        if protocol.retry_policy.fail_fast:
             return False
-        if wait > protocol.credentials.max_wait:
+        if wait > protocol.retry_policy.max_wait:
             # We lost patience. Session is cleaned up in outer loop
             raise RateLimitError(
                 'Max timeout reached', url=response.url, status_code=response.status_code, total_wait=wait)
@@ -757,7 +757,7 @@ def _raise_response_errors(response, protocol, log_msg, log_vals):
         raise ErrorInvalidSchemaVersionForMailboxVersion('Invalid server version')
     if b'The referenced account is currently locked out' in response.content:
         raise TransportError('The service account is currently locked out')
-    if response.status_code == 401 and protocol.credentials.fail_fast:
+    if response.status_code == 401 and protocol.retry_policy.fail_fast:
         # This is a login failure
         raise UnauthorizedError('Wrong username or password for %s' % response.url)
     if 'TimeoutException' in response.headers:

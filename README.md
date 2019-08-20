@@ -94,7 +94,7 @@ fails to install.
 ## Setup and connecting
 
 ```python
-from exchangelib import DELEGATE, IMPERSONATION, Account, Credentials, ServiceAccount, \
+from exchangelib import DELEGATE, IMPERSONATION, Account, Credentials, FaultTolerance, \
     Configuration, NTLM, GSSAPI, SSPI, Build, Version
 
 # Specify your credentials. Username is usually in WINDOMAIN\username format, where WINDOMAIN is
@@ -108,9 +108,6 @@ credentials = Credentials(username='MYWINDOMAIN\\myusername', password='topsecre
 # threshold before giving up, if the server is unavailable or responding with error messages.
 # This prevents automated scripts from overwhelming a failing or overloaded server, and hides
 # intermittent service outages that often happen in large Exchange installations.
-
-# If you want to enable the fault tolerance, create credentials as a service account instead:
-credentials = ServiceAccount(username='FOO\\bar', password='topsecret')
 
 # An Account is the account on the Exchange server that you want to connect to. This can be
 # the account associated with the credentials you connect with, or any other account on the
@@ -153,13 +150,16 @@ config = Configuration(
     server='example.com', credentials=credentials, version=version, auth_type=NTLM
 )
 
-# Kerberos authentication is supported via the 'gssapi' auth type. Enabling it is slightly awkward,
-# does not work with autodiscover (yet) and is likely to change in future versions.
-credentials = Credentials('', '')
-config = Configuration(server='example.com', credentials=credentials, auth_type=GSSAPI)
-# Likewise, SSPI authentication is also supported:
-credentials = Credentials('', '')
-config = Configuration(server='example.com', credentials=credentials, auth_type=SSPI)
+# By default, we fail on all exceptions from the server. If you want to enable fault
+# tolerance, add a retry policy to your configuration. We will then retry on certain
+# transient errors. By default, we back off exponentially and retry for up to an hour.
+# This is configurable:
+config = Configuration(retry_policy=FaultTolerance(max_wait=3600), credentials=credentials)
+account = Account(primary_smtp_address='john@example.com', config=config)
+
+# Kerberos and SSPI authentication are supported via the 'gssapi' and 'sspi' auth types.
+config = Configuration(server='example.com', auth_type=GSSAPI)
+config = Configuration(server='example.com', auth_type=SSPI)
 
 # If you're connecting to the same account very often, you can cache the autodiscover result for
 # later so you can skip the autodiscover lookup:

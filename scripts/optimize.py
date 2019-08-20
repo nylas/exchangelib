@@ -8,7 +8,8 @@ import time
 
 from yaml import safe_load
 
-from exchangelib import DELEGATE, ServiceAccount, Configuration, Account, EWSDateTime, EWSTimeZone, CalendarItem
+from exchangelib import DELEGATE, Configuration, Account, EWSDateTime, EWSTimeZone, CalendarItem, Credentials, \
+    FaultTolerance
 
 logging.basicConfig(level=logging.WARNING)
 
@@ -29,7 +30,8 @@ if not verify_ssl:
 
 config = Configuration(
     server=settings['server'],
-    credentials=ServiceAccount(settings['username'], settings['password'])
+    credentials=Credentials(settings['username'], settings['password']),
+    retry_policy=FaultTolerance(),
 )
 print('Exchange server: %s' % config.protocol.server)
 
