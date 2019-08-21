@@ -3,6 +3,10 @@ Change Log
 
 HEAD
 ----
+
+
+2.0.0
+-----
 -   `Item.mime_content` is now a text field instead of a binary field. Encoding and
     decoding is done automatically.
 -   The `Item.item_id`, `Folder.folder_id` and `Occurrence.item_id` fields that were renamed
@@ -43,6 +47,7 @@ HEAD
     instead.
 -   We no longer look in `types.xsd` for a hint of which API version the server is running. Instead,
     we query the service directly, starting with the latest version first.
+
 
 1.12.5
 ------

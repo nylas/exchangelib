@@ -17,7 +17,7 @@ from .restriction import Q
 from .transport import BASIC, DIGEST, NTLM, GSSAPI, SSPI
 from .version import Build, Version
 
-__version__ = '1.12.5'
+__version__ = '2.0.0'
 
 __all__ = [
     '__version__',
