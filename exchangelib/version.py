@@ -4,13 +4,13 @@ from __future__ import unicode_literals
 import logging
 import re
 
-from future.utils import python_2_unicode_compatible, PY2
+from future.utils import python_2_unicode_compatible
 from six import text_type
 
 from .errors import TransportError, ErrorInvalidSchemaVersionForMailboxVersion, ErrorInvalidServerVersion, \
     ErrorIncorrectSchemaVersion, ResponseMessageError
 from .transport import get_auth_instance, DEFAULT_HEADERS
-from .util import is_xml, to_xml, TNS, SOAPNS, ParseError, CONNECTION_ERRORS
+from .util import PickleMixIn, is_xml, to_xml, TNS, SOAPNS, ParseError, CONNECTION_ERRORS
 
 log = logging.getLogger(__name__)
 
@@ -43,16 +43,6 @@ VERSIONS = {
 # Build a list of unique API versions, used when guessing API version supported by the server.  Use reverse order so we
 # get the newest API version supported by the server.
 API_VERSIONS = sorted({v[0] for v in VERSIONS.values()}, reverse=True)
-
-
-class PickleMixIn(object):
-    if PY2:
-        def __getstate__(self):
-            return {k: getattr(self, k) for k in self.__slots__}
-
-        def __setstate__(self, state):
-            for k in self.__slots__:
-                setattr(self, k, state.get(k))
 
 
 @python_2_unicode_compatible

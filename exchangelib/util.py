@@ -45,6 +45,16 @@ class ElementNotFound(Exception):
         self.data = data
 
 
+class PickleMixIn(object):
+    if PY2:
+        def __getstate__(self):
+            return {k: getattr(self, k) for k in self.__slots__}
+
+        def __setstate__(self, state):
+            for k in self.__slots__:
+                setattr(self, k, state.get(k))
+
+
 # Regex of UTF-8 control characters that are illegal in XML 1.0 (and XML 1.1)
 _ILLEGAL_XML_CHARS_RE = re.compile('[\x00-\x08\x0b\x0c\x0e-\x1F\uD800-\uDFFF\uFFFE\uFFFF]')
 

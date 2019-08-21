@@ -11,6 +11,8 @@ import logging
 
 from future.utils import python_2_unicode_compatible
 
+from .util import PickleMixIn
+
 log = logging.getLogger(__name__)
 
 IMPERSONATION = 'impersonation'
@@ -19,7 +21,7 @@ ACCESS_TYPES = (IMPERSONATION, DELEGATE)
 
 
 @python_2_unicode_compatible
-class Credentials(object):
+class Credentials(PickleMixIn):
     """
     Keeps login info the way Exchange likes it.
 
