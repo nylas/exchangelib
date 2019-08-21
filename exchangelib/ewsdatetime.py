@@ -277,33 +277,25 @@ class EWSTimeZone(object):
         return cls.from_pytz(tz)
 
     def normalize(self, dt, is_dst=False):
-        # super() returns a dt.tzinfo of class pytz.tzinfo.FooBar. We need to return type EWSTimeZone
-        if is_dst is not False:
-            # Not all pytz timezones support 'is_dst' argument. Only pass it on if it's set explicitly.
-            try:
-                res = super(EWSTimeZone, self).normalize(dt, is_dst=is_dst)
-            except pytz.exceptions.AmbiguousTimeError as exc:
-                six.raise_from(AmbiguousTimeError(str(dt)), exc)
-            except pytz.exceptions.NonExistentTimeError as exc:
-                six.raise_from(NonExistentTimeError(str(dt)), exc)
-        else:
-            res = super(EWSTimeZone, self).normalize(dt)
-        if not isinstance(res.tzinfo, EWSTimeZone):
-            return res.replace(tzinfo=self.from_pytz(res.tzinfo))
-        return res
+        return self._localize_or_normalize(func='normalize', dt=dt, is_dst=is_dst)
 
     def localize(self, dt, is_dst=False):
+        return self._localize_or_normalize(func='localize', dt=dt, is_dst=is_dst)
+
+    def _localize_or_normalize(self, func, dt, is_dst=False):
+        """localize() and normalize() have common code paths
+        """
         # super() returns a dt.tzinfo of class pytz.tzinfo.FooBar. We need to return type EWSTimeZone
         if is_dst is not False:
             # Not all pytz timezones support 'is_dst' argument. Only pass it on if it's set explicitly.
             try:
-                res = super(EWSTimeZone, self).localize(dt, is_dst=is_dst)
+                res = getattr(super(EWSTimeZone, self), func)(dt, is_dst=is_dst)
             except pytz.exceptions.AmbiguousTimeError as exc:
                 six.raise_from(AmbiguousTimeError(str(dt)), exc)
             except pytz.exceptions.NonExistentTimeError as exc:
                 six.raise_from(NonExistentTimeError(str(dt)), exc)
         else:
-            res = super(EWSTimeZone, self).localize(dt)
+            res = getattr(super(EWSTimeZone, self), func)(dt)
         if not isinstance(res.tzinfo, EWSTimeZone):
             return res.replace(tzinfo=self.from_pytz(res.tzinfo))
         return res
