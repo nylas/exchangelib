@@ -249,8 +249,9 @@ class Version(PickleMixIn):
         # will try to guess the version automatically.
         from .services import ResolveNames
         protocol.version = Version(build=None, api_version=hint or API_VERSIONS[-1])
+        name = protocol.credentials.username if protocol.credentials and protocol.credentials.username else 'DUMMY'
         try:
-            list(ResolveNames(protocol=protocol).call(unresolved_entries=[protocol.credentials.username]))
+            list(ResolveNames(protocol=protocol).call(unresolved_entries=[name]))
         except (ErrorInvalidSchemaVersionForMailboxVersion, ErrorInvalidServerVersion, ErrorIncorrectSchemaVersion):
             raise TransportError('Unable to guess version')
         except ResponseMessageError:

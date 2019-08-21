@@ -247,8 +247,10 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
         # Autodetect authentication type if necessary
         # pylint: disable=access-member-before-definition
         if self.auth_type is None:
-            self.auth_type = get_service_authtype(service_endpoint=self.service_endpoint, versions=API_VERSIONS,
-                                                  name=self.credentials.username if self.credentials else 'DUMMY')
+            name = self.credentials.username if self.credentials and self.credentials.username else 'DUMMY'
+            self.auth_type = get_service_authtype(
+                service_endpoint=self.service_endpoint, versions=API_VERSIONS, name=name
+            )
 
         # Default to the auth type used by the service. We only need this if 'version' is None
         self.docs_auth_type = self.auth_type
