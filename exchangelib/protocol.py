@@ -241,19 +241,16 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
 
         scheme = 'https' if self.has_ssl else 'http'
         self.wsdl_url = '%s://%s/EWS/Services.wsdl' % (scheme, self.server)
-        self.messages_url = '%s://%s/EWS/messages.xsd' % (scheme, self.server)
-        self.types_url = '%s://%s/EWS/types.xsd' % (scheme, self.server)
 
         # Autodetect authentication type if necessary
         # pylint: disable=access-member-before-definition
         if self.auth_type is None:
             name = self.credentials.username if self.credentials and self.credentials.username else 'DUMMY'
-            self.auth_type = get_service_authtype(
+            self.auth_type, version_hint = get_service_authtype(
                 service_endpoint=self.service_endpoint, versions=API_VERSIONS, name=name
             )
-
-        # Default to the auth type used by the service. We only need this if 'version' is None
-        self.docs_auth_type = self.auth_type
+        else:
+            version_hint = None
 
         # Try to behave nicely with the Exchange server. We want to keep the connection open between requests.
         # We also want to re-use sessions, to avoid the NTLM auth handshake on every request.
@@ -265,12 +262,7 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
             self.version = version
         else:
             # Version.guess() needs auth objects and a working session pool
-            try:
-                # Try to get the auth_type of 'types.xsd' so we can fetch it and look at the version contained there
-                self.docs_auth_type = get_docs_authtype(docs_url=self.types_url)
-            except TransportError:
-                pass
-            self.version = Version.guess(self)
+            self.version = Version.guess(self, hint=version_hint)
 
     def _create_session_pool(self):
         # Create a pool to reuse sessions containing connections to the server
@@ -425,14 +417,12 @@ EWS url: %s
 Product name: %s
 EWS API version: %s
 Build number: %s
-EWS auth: %s
-XSD auth: %s''' % (
+EWS auth: %s''' % (
             self.service_endpoint,
             self.version.fullname,
             self.version.api_version,
             self.version.build,
             self.auth_type,
-            self.docs_auth_type,
         )
 
 

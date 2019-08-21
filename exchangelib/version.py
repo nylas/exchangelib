@@ -40,7 +40,7 @@ VERSIONS = {
     'Exchange2019': ('Exchange2019', 'Microsoft Exchange Server 2019'),
 }
 
-# Build a list of unique API versions, used when guessing API version supported by the server.  Use reverse order so we
+# Build a list of unique API versions, used when guessing API version supported by the server. Use reverse order so we
 # get the newest API version supported by the server.
 API_VERSIONS = sorted({v[0] for v in VERSIONS.values()}, reverse=True)
 
@@ -179,66 +179,22 @@ class Version(PickleMixIn):
         return VERSIONS[self.api_version][1]
 
     @classmethod
-    def guess(cls, protocol):
+    def guess(cls, protocol, hint=None):
         """
         Tries to ask the server which version it has. We haven't set up an Account object yet, so we generate requests
         by hand. We only need a response header containing a ServerVersionInfo element.
 
-        The types.xsd document contains a 'shortname' value that we can use as a key for VERSIONS to get the API version
-        that we need in SOAP headers to generate valid requests. Unfortunately, the Exchagne server may be misconfigured
-        to either block access to types.xsd or serve up a wrong version of the document. Therefore, we only use
-        'shortname' as a hint, but trust the SOAP version returned in response headers.
-
         To get API version and build numbers from the server, we need to send a valid SOAP request. We can't do that
         without a valid API version. To solve this chicken-and-egg problem, we try all possible API versions that this
-        package supports, until we get a valid response. If we managed to get a 'shortname' previously, we try the
-        corresponding API version first.
+        package supports, until we get a valid response.
         """
-        log.debug('Asking server for version info')
-        # We can't use a session object from the protocol pool for docs because sessions are created with service auth.
-        auth = get_auth_instance(credentials=protocol.credentials, auth_type=protocol.docs_auth_type)
-        try:
-            shortname = cls._get_shortname_from_docs(auth=auth, types_url=protocol.types_url)
-            log.debug('Shortname according to %s: %s', protocol.types_url, shortname)
-        except (TransportError, ParseError) as e:
-            log.info(text_type(e))
-            shortname = None
-        api_version = VERSIONS[shortname][0] if shortname else None
-        return cls._guess_version_from_service(protocol=protocol, hint=api_version)
-
-    @staticmethod
-    def _get_shortname_from_docs(auth, types_url):
-        # Get the server version from types.xsd. We can't necessarily use the service auth type since it may not be the
-        # same as the auth type for docs.
-        log.debug('Getting %s with auth type %s', types_url, auth.__class__.__name__)
-        # Some servers send an empty response if we send 'Connection': 'close' header
-        from .protocol import BaseProtocol
-        with BaseProtocol.raw_session() as s:
-            try:
-                r = s.get(url=types_url, headers=DEFAULT_HEADERS.copy(), auth=auth, allow_redirects=False,
-                          timeout=BaseProtocol.TIMEOUT)
-            except CONNECTION_ERRORS as e:
-                raise TransportError(str(e))
-        log.debug('Request headers: %s', r.request.headers)
-        log.debug('Response code: %s', r.status_code)
-        log.debug('Response headers: %s', r.headers)
-        log.debug('Response data: %s', r.content[:1000])
-        if r.status_code != 200:
-            raise TransportError('Unexpected HTTP %s when getting %s (%r)' % (r.status_code, types_url, r.content))
-        if not is_xml(r.content):
-            raise TransportError('Unexpected result when getting %s. Maybe this is not an EWS server?%s' % (
-                types_url,
-                '\n\n%r[...]' % r.content[:200] if len(r.content) > 200 else '\n\n%r' % r.content if r.content else '',
-            ))
-        return to_xml(r.content).getroot().get('version')
-
-    @classmethod
-    def _guess_version_from_service(cls, protocol, hint=None):
-        # The protocol doesn't have a version yet, so add one with our hint, or default to latest supported version.
+        from .services import ResolveNames
+        # The protocol doesn't have a version yet, so default to latest supported version if we don't have a hint.
+        api_version = hint or API_VERSIONS[0]
+        log.debug('Asking server for version info using API version %s', api_version)
+        protocol.version = Version(build=None, api_version=api_version)
         # Use ResolveNames as a minimal request to the server to test if the version is correct. If not, ResolveNames
         # will try to guess the version automatically.
-        from .services import ResolveNames
-        protocol.version = Version(build=None, api_version=hint or API_VERSIONS[-1])
         name = protocol.credentials.username if protocol.credentials and protocol.credentials.username else 'DUMMY'
         try:
             list(ResolveNames(protocol=protocol).call(unresolved_entries=[name]))

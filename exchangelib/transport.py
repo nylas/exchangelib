@@ -163,7 +163,7 @@ def get_service_authtype(service_endpoint, versions, name):
             try:
                 auth_type = _get_auth_method_from_response(response=r)
                 log.debug('Auth type is %s', auth_type)
-                return auth_type
+                return auth_type, version
             except TransportError:
                 continue
     raise TransportError('Failed to get auth type from service')
