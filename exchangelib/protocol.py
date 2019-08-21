@@ -25,7 +25,7 @@ from .errors import TransportError, SessionPoolMinSizeReached
 from .properties import FreeBusyViewOptions, MailboxData, TimeWindow, TimeZone
 from .services import GetServerTimeZones, GetRoomLists, GetRooms, ResolveNames, GetUserAvailability, \
     GetSearchableMailboxes, ExpandDL
-from .transport import get_auth_instance, get_service_authtype, get_docs_authtype, AUTH_TYPE_MAP, DEFAULT_HEADERS
+from .transport import get_auth_instance, get_service_authtype, AUTH_TYPE_MAP, DEFAULT_HEADERS
 from .util import split_url
 from .version import Version, API_VERSIONS
 

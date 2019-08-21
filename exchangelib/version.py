@@ -9,8 +9,7 @@ from six import text_type
 
 from .errors import TransportError, ErrorInvalidSchemaVersionForMailboxVersion, ErrorInvalidServerVersion, \
     ErrorIncorrectSchemaVersion, ResponseMessageError
-from .transport import get_auth_instance, DEFAULT_HEADERS
-from .util import PickleMixIn, is_xml, to_xml, TNS, SOAPNS, ParseError, CONNECTION_ERRORS
+from .util import PickleMixIn, to_xml, TNS, SOAPNS, ParseError
 
 log = logging.getLogger(__name__)
 

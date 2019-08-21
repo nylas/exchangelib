@@ -3,7 +3,6 @@ from __future__ import unicode_literals
 import logging
 
 from .protocol import Protocol, FailFast
-from .transport import AUTH_TYPE_MAP
 
 log = logging.getLogger(__name__)
 
