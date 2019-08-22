@@ -20,12 +20,11 @@ from future.utils import with_metaclass, python_2_unicode_compatible
 from future.moves.queue import LifoQueue, Empty, Full
 from six import string_types
 
-from .credentials import Credentials
 from .errors import TransportError, SessionPoolMinSizeReached
 from .properties import FreeBusyViewOptions, MailboxData, TimeWindow, TimeZone
 from .services import GetServerTimeZones, GetRoomLists, GetRooms, ResolveNames, GetUserAvailability, \
     GetSearchableMailboxes, ExpandDL
-from .transport import get_auth_instance, get_service_authtype, AUTH_TYPE_MAP, DEFAULT_HEADERS
+from .transport import get_auth_instance, get_service_authtype, DEFAULT_HEADERS
 from .util import split_url
 from .version import Version, API_VERSIONS
 
@@ -54,23 +53,36 @@ class BaseProtocol(object):
     # The adapter class to use for HTTP requests. Override this if you need e.g. proxy support or specific TLS versions
     HTTP_ADAPTER_CLS = requests.adapters.HTTPAdapter
 
-    def __init__(self, service_endpoint, credentials, auth_type, retry_policy):
-        if credentials is not None:
-            if not isinstance(credentials, Credentials):
-                raise ValueError("'credentials' %r must be a Credentials instance" % credentials)
-        if auth_type is not None:
-            if auth_type not in AUTH_TYPE_MAP:
-                raise ValueError("'auth_type' %s must be one if %s" % (auth_type, AUTH_TYPE_MAP.keys()))
-        if not isinstance(retry_policy, RetryPolicy):
-            raise ValueError("'retry_policy' %r must be a RetryPolicy instance" % retry_policy)
-        self.has_ssl, self.server, _ = split_url(service_endpoint)
-        self.credentials = credentials
-        self.service_endpoint = service_endpoint
-        self.auth_type = auth_type
-        self.retry_policy = retry_policy
+    def __init__(self, config):
+        from .configuration import Configuration
+        if not isinstance(config, Configuration):
+            raise ValueError("'config' %r must be a Configuration instance" % config)
+        if not config.service_endpoint:
+            raise AttributeError("'config.service_endpoint' must be set")
+        self.config = config
         self._session_pool_size = self.SESSION_POOLSIZE
         self._session_pool = None  # Consumers need to fill the session pool themselves
         self._session_pool_lock = None
+
+    @property
+    def service_endpoint(self):
+        return self.config.service_endpoint
+
+    @property
+    def auth_type(self):
+        return self.config.auth_type
+
+    @property
+    def credentials(self):
+        return self.config.credentials
+
+    @property
+    def retry_policy(self):
+        return self.config.retry_policy
+
+    @threaded_cached_property
+    def server(self):
+        return split_url(self.service_endpoint)[1]
 
     def __del__(self):
         # pylint: disable=bare-except
@@ -191,7 +203,7 @@ class CachingProtocol(type):
 
         # We may be using multiple different credentials and changing our minds on TLS verification. This key
         # combination should be safe.
-        _protocol_cache_key = kwargs['service_endpoint'], kwargs['credentials']
+        _protocol_cache_key = kwargs['config'].service_endpoint, kwargs['config'].credentials
 
         protocol = cls._protocol_cache.get(_protocol_cache_key)
         if isinstance(protocol, Exception):
@@ -236,17 +248,13 @@ class CachingProtocol(type):
 @python_2_unicode_compatible
 class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
     def __init__(self, *args, **kwargs):
-        version = kwargs.pop('version', None)
         super(Protocol, self).__init__(*args, **kwargs)
-
-        scheme = 'https' if self.has_ssl else 'http'
-        self.wsdl_url = '%s://%s/EWS/Services.wsdl' % (scheme, self.server)
 
         # Autodetect authentication type if necessary
         # pylint: disable=access-member-before-definition
-        if self.auth_type is None:
+        if self.config.auth_type is None:
             name = self.credentials.username if self.credentials and self.credentials.username else 'DUMMY'
-            self.auth_type, version_hint = get_service_authtype(
+            self.config.auth_type, version_hint = get_service_authtype(
                 service_endpoint=self.service_endpoint, versions=API_VERSIONS, name=name
             )
         else:
@@ -257,12 +265,13 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
         self._session_pool = self._create_session_pool()
         self._session_pool_lock = Lock()
 
-        if version:
-            isinstance(version, Version)
-            self.version = version
-        else:
+        if not self.config.version:
             # Version.guess() needs auth objects and a working session pool
-            self.version = Version.guess(self, hint=version_hint)
+            self.config.version = Version.guess(self, hint=version_hint)
+
+    @property
+    def version(self):
+        return self.config.version
 
     def _create_session_pool(self):
         # Create a pool to reuse sessions containing connections to the server

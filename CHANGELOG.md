@@ -43,8 +43,6 @@ HEAD
     `Credentials('', '')` object.
 -   The `has_ssl` argument of `Configuration` was removed. If you want to connect to a
     plain HTTP endpoint, pass the full URL in the `service_endpoint` argument.
--   The `Configuration.credentals` property was removed. Use `Configuration.protocol.credentals`
-    instead.
 -   We no longer look in `types.xsd` for a hint of which API version the server is running. Instead,
     we query the service directly, starting with the latest version first.
 

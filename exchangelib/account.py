@@ -68,9 +68,8 @@ class Account(object):
             # getlocale() may throw ValueError if it fails to parse the system locale
             log.warning('Failed to get locale (%s)' % e)
             self.locale = None
-        if self.locale is not None:
-            if not isinstance(self.locale, string_types):
-                raise ValueError("Expected 'locale' to be a string, got %r" % self.locale)
+        if not isinstance(self.locale, string_types + (type(None),)):
+            raise ValueError("Expected 'locale' to be a string, got %r" % self.locale)
         try:
             self.default_timezone = default_timezone or EWSTimeZone.localzone()
         except (ValueError, UnknownTimeZone) as e:
@@ -80,11 +79,13 @@ class Account(object):
             self.default_timezone = UTC
         if not isinstance(self.default_timezone, EWSTimeZone):
             raise ValueError("Expected 'default_timezone' to be an EWSTimeZone, got %r" % self.default_timezone)
+        if not isinstance(config, (Configuration, type(None))):
+            raise ValueError("Expected 'config' to be a Configuration, got %r" % config)
         if autodiscover:
             if config:
-                retry_policy, auth_type = config.protocol.retry_policy, config.protocol.auth_type
+                retry_policy, auth_type = config.retry_policy, config.auth_type
                 if not credentials:
-                    credentials = config.protocol.credentials
+                    credentials = config.credentials
             else:
                 retry_policy, auth_type = None, None
             self.primary_smtp_address, self.protocol = discover(
@@ -93,11 +94,7 @@ class Account(object):
         else:
             if not config:
                 raise AttributeError('non-autodiscover requires a config')
-            if not isinstance(config, Configuration):
-                raise ValueError("Expected 'config' to be a Configuration, got %r" % config)
             self.protocol = config.protocol
-            if credentials:
-                self.protocol.credentials = credentials
         # We may need to override the default server version on a per-account basis because Microsoft may report one
         # server version up-front but delegate account requests to an older backend server.
         self.version = self.protocol.version

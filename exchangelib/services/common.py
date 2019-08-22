@@ -225,7 +225,7 @@ class EWSService(object):
         if isinstance(self, EWSAccountService):
             self.account.version = new_version
         else:
-            self.protocol.version = new_version
+            self.protocol.config.version = new_version
 
     @classmethod
     def _response_tag(cls):

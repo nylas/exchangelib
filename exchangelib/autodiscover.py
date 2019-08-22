@@ -119,9 +119,9 @@ class AutodiscoverCache(object):
         domain, credentials = key
         with shelve_open_with_failover(self._storage_file) as db:
             endpoint, auth_type, retry_policy = db[str(domain)]  # It's OK to fail with KeyError here
-        protocol = AutodiscoverProtocol(
+        protocol = AutodiscoverProtocol(config=Configuration(
             service_endpoint=endpoint, credentials=credentials, auth_type=auth_type, retry_policy=retry_policy
-        )
+        ))
         self._protocols[key] = protocol
         return protocol
 
@@ -201,7 +201,7 @@ def discover(email, credentials=None, auth_type=None, retry_policy=None):
             protocol = _autodiscover_cache[autodiscover_key]
             if not isinstance(protocol, AutodiscoverProtocol):
                 raise ValueError('Unexpected autodiscover cache contents: %s' % protocol)
-            log.debug('Cache hit for domain %s credentials %s: %s', domain, credentials, protocol.server)
+            log.debug('Cache hit for domain %s credentials %s: %s', domain, credentials, protocol.service_endpoint)
             try:
                 # This is the main path when the cache is primed
                 return _autodiscover_quick(credentials=credentials, email=email, protocol=protocol)
@@ -326,8 +326,9 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl, retry_policy, 
     log.info('Trying autodiscover on %s', url)
     if auth_type is None:
         auth_type = _get_auth_type_or_raise(url=url, email=email, hostname=hostname)
-    autodiscover_protocol = AutodiscoverProtocol(service_endpoint=url, credentials=credentials, auth_type=auth_type,
-                                                 retry_policy=retry_policy)
+    autodiscover_protocol = AutodiscoverProtocol(config=Configuration(
+        service_endpoint=url, credentials=credentials, auth_type=auth_type, retry_policy=retry_policy
+    ))
     r = _get_response(protocol=autodiscover_protocol, email=email)
     domain = get_domain(email)
     try:
@@ -348,8 +349,9 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl, retry_policy, 
     _autodiscover_cache[(domain, credentials)] = autodiscover_protocol
     # Autodiscover response contains an auth type, but we don't want to spend time here testing if it actually works.
     # Instead of forcing a possibly-wrong auth type, just let Protocol auto-detect the auth type.
-    return primary_smtp_address, Protocol(service_endpoint=ews_url, credentials=credentials, auth_type=None,
-                                          retry_policy=retry_policy)
+    return primary_smtp_address, Protocol(config=Configuration(
+        service_endpoint=ews_url, credentials=credentials, auth_type=None, retry_policy=retry_policy
+    ))
 
 
 def _autodiscover_quick(credentials, email, protocol):
@@ -360,8 +362,9 @@ def _autodiscover_quick(credentials, email, protocol):
     log.debug('Autodiscover success: %s may connect to %s as primary email %s', email, ews_url, primary_smtp_address)
     # Autodiscover response contains an auth type, but we don't want to spend time here testing if it actually works.
     # Instead of forcing a possibly-wrong auth type, just let Protocol auto-detect the auth type.
-    return primary_smtp_address, Protocol(service_endpoint=ews_url, credentials=credentials, auth_type=None,
-                                          retry_policy=protocol.retry_policy)
+    return primary_smtp_address, Protocol(config=Configuration(
+        service_endpoint=ews_url, credentials=credentials, auth_type=None, retry_policy=protocol.retry_policy
+    ))
 
 
 def _get_payload(email):

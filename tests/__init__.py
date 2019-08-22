@@ -76,7 +76,7 @@ from exchangelib.restriction import Restriction, Q
 from exchangelib.settings import OofSettings
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, GetAttachment, ResolveNames, GetPersona, \
     GetFolder
-from exchangelib.transport import NOAUTH, BASIC, DIGEST, NTLM, wrap, _get_auth_method_from_response
+from exchangelib.transport import NOAUTH, BASIC, DIGEST, NTLM, AUTH_TYPE_MAP, wrap, _get_auth_method_from_response
 from exchangelib.util import chunkify, peek, get_redirect_url, to_xml, BOM_UTF8, get_domain, value_to_xml_text, \
     post_ratelimited, create_element, CONNECTION_ERRORS, PrettyXmlHandler, xml_to_str, ParseError, TNS
 from exchangelib.version import Build, Version, EXCHANGE_2007, EXCHANGE_2010, EXCHANGE_2013
@@ -340,8 +340,10 @@ class ProtocolTest(TimedTestCase):
     @requests_mock.mock()
     def test_session(self, m):
         m.get('https://example.com/EWS/types.xsd', status_code=200)
-        protocol = Protocol(service_endpoint='https://example.com/Foo.asmx', credentials=Credentials('A', 'B'),
-                            auth_type=NTLM, version=Version(Build(15, 1)), retry_policy=FailFast())
+        protocol = Protocol(config=Configuration(
+            service_endpoint='https://example.com/Foo.asmx', credentials=Credentials('A', 'B'),
+            auth_type=NTLM, version=Version(Build(15, 1)), retry_policy=FailFast()
+        ))
         session = protocol.create_session()
         new_session = protocol.renew_session(session)
         self.assertNotEqual(id(session), id(new_session))
@@ -350,12 +352,16 @@ class ProtocolTest(TimedTestCase):
     def test_protocol_instance_caching(self, m):
         # Verify that we get the same Protocol instance for the same combination of (endpoint, credentials)
         m.get('https://example.com/EWS/types.xsd', status_code=200)
-        base_p = Protocol(service_endpoint='https://example.com/Foo.asmx', credentials=Credentials('A', 'B'),
-                          auth_type=NTLM, version=Version(Build(15, 1)), retry_policy=FailFast())
+        base_p = Protocol(config=Configuration(
+            service_endpoint='https://example.com/Foo.asmx', credentials=Credentials('A', 'B'),
+            auth_type=NTLM, version=Version(Build(15, 1)), retry_policy=FailFast()
+        ))
 
         for i in range(10):
-            p = Protocol(service_endpoint='https://example.com/Foo.asmx', credentials=Credentials('A', 'B'),
-                         auth_type=NTLM, version=Version(Build(15, 1)), retry_policy=FailFast())
+            p = Protocol(config=Configuration(
+                service_endpoint='https://example.com/Foo.asmx', credentials=Credentials('A', 'B'),
+                auth_type=NTLM, version=Version(Build(15, 1)), retry_policy=FailFast()
+            ))
             self.assertEqual(base_p, p)
             self.assertEqual(id(base_p), id(p))
             self.assertEqual(hash(base_p), hash(p))
@@ -368,8 +374,10 @@ class ProtocolTest(TimedTestCase):
             'example.com', 80, socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_IP
         )}
         self.assertGreater(len(ip_addresses), 0)
-        protocol = Protocol(service_endpoint='http://example.com', credentials=Credentials('A', 'B'),
-                            auth_type=NOAUTH, version=Version(Build(15, 1)), retry_policy=FailFast())
+        protocol = Protocol(config=Configuration(
+            service_endpoint='http://example.com', credentials=Credentials('A', 'B'),
+            auth_type=NOAUTH, version=Version(Build(15, 1)), retry_policy=FailFast()
+        ))
         session = protocol.get_session()
         session.get('http://example.com')
         self.assertEqual(len({p.raddr[0] for p in proc.connections() if p.raddr[0] in ip_addresses}), 1)
@@ -378,8 +386,10 @@ class ProtocolTest(TimedTestCase):
         self.assertEqual(len({p.raddr[0] for p in proc.connections() if p.raddr[0] in ip_addresses}), 0)
 
     def test_decrease_poolsize(self):
-        protocol = Protocol(service_endpoint='https://example.com/Foo.asmx', credentials=Credentials('A', 'B'),
-                            auth_type=NTLM, version=Version(Build(15, 1)), retry_policy=FailFast())
+        protocol = Protocol(config=Configuration(
+            service_endpoint='https://example.com/Foo.asmx', credentials=Credentials('A', 'B'),
+            auth_type=NTLM, version=Version(Build(15, 1)), retry_policy=FailFast()
+        ))
         self.assertEqual(protocol._session_pool.qsize(), Protocol.SESSION_POOLSIZE)
         protocol.decrease_poolsize()
         self.assertEqual(protocol._session_pool.qsize(), 3)
@@ -2146,33 +2156,53 @@ class CommonTest(EWSTest):
                 self.assertTrue(item.is_distinguished)
 
     def test_configuration(self):
-        with self.assertRaises(AttributeError):
-            Configuration(credentials=Credentials(username='foo', password='bar'))
-        with self.assertRaises(ValueError):
-            Configuration(credentials=Credentials(username='foo', password='bar'),
-                          service_endpoint='http://example.com/svc',
-                          auth_type='XXX')
+        with self.assertRaises(ValueError) as e:
+            Configuration(credentials='foo')
+        self.assertEqual(e.exception.args[0], "'credentials' 'foo' must be a Credentials instance")
+        with self.assertRaises(AttributeError) as e:
+            Configuration(server='foo', service_endpoint='bar')
+        self.assertEqual(e.exception.args[0], "Only one of 'server' or 'service_endpoint' must be provided")
+        with self.assertRaises(ValueError) as e:
+            Configuration(auth_type='foo')
+        self.assertEqual(
+            e.exception.args[0],
+            "'auth_type' 'foo' must be one of %s" % ', '.join("'%s'" % k for k in sorted(AUTH_TYPE_MAP.keys()))
+        )
+        with self.assertRaises(ValueError) as e:
+            Configuration(version='foo')
+        self.assertEqual(e.exception.args[0], "'version' 'foo' must be a Version instance")
+        with self.assertRaises(ValueError) as e:
+            Configuration(retry_policy='foo')
+        self.assertEqual(e.exception.args[0], "'retry_policy' 'foo' must be a RetryPolicy instance")
 
     def test_failed_login(self):
         with self.assertRaises(UnauthorizedError):
-            Configuration(
-                service_endpoint=self.account.protocol.service_endpoint,
-                credentials=Credentials(self.account.protocol.credentials.username, 'WRONG_PASSWORD'))
+            Account(
+                primary_smtp_address=self.account.primary_smtp_address,
+                access_type=DELEGATE,
+                config=Configuration(
+                    service_endpoint=self.account.protocol.service_endpoint,
+                    credentials=Credentials(self.account.protocol.credentials.username, 'WRONG_PASSWORD')
+                ),
+                autodiscover=False,
+                locale='da_DK',
+            )
         with self.assertRaises(AutoDiscoverFailed):
             Account(
                 primary_smtp_address=self.account.primary_smtp_address,
                 access_type=DELEGATE,
                 credentials=Credentials(self.account.protocol.credentials.username, 'WRONG_PASSWORD'),
                 autodiscover=True,
-                locale='da_DK')
+                locale='da_DK',
+            )
 
     def test_post_ratelimited(self):
         url = 'https://example.com'
 
         protocol = self.account.protocol
-        retry_policy = protocol.retry_policy
+        retry_policy = protocol.config.retry_policy
         # Make sure we fail fast in error cases
-        protocol.retry_policy = FailFast()
+        protocol.config.retry_policy = FailFast()
 
         session = protocol.get_session()
 
@@ -2241,7 +2271,7 @@ class CommonTest(EWSTest):
             r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
 
         # Rate limit exceeded
-        protocol.retry_policy = FaultTolerance(max_wait=1)
+        protocol.config.retry_policy = FaultTolerance(max_wait=1)
         session.post = mock_post(url, 503, {'connection': 'close'})
         protocol.renew_session = lambda s: s  # Return the same session so it's still mocked
         with self.assertRaises(RateLimitError) as rle:
@@ -2264,7 +2294,7 @@ class CommonTest(EWSTest):
         self.assertEqual(rle.exception.url, url)
         self.assertEqual(rle.exception.status_code, 503)
         protocol.release_session(session)
-        protocol.retry_policy = retry_policy
+        protocol.config.retry_policy = retry_policy
 
     def test_version_renegotiate(self):
         # Test that we can recover from a wrong API version. This is needed in version guessing and when the
@@ -2561,12 +2591,12 @@ class AutodiscoverTest(EWSTest):
             True
         ), _autodiscover_cache)
         # Poison the cache. discover() must survive and rebuild the cache
-        _autodiscover_cache[cache_key] = AutodiscoverProtocol(
+        _autodiscover_cache[cache_key] = AutodiscoverProtocol(config=Configuration(
             service_endpoint='https://example.com/blackhole.asmx',
             credentials=Credentials('leet_user', 'cannaguess'),
             auth_type=NTLM,
             retry_policy=FailFast(),
-        )
+        ))
         m.post('https://example.com/blackhole.asmx', status_code=404)
         discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
         self.assertIn(cache_key, _autodiscover_cache)

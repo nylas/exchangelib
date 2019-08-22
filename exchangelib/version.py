@@ -191,7 +191,7 @@ class Version(PickleMixIn):
         # The protocol doesn't have a version yet, so default to latest supported version if we don't have a hint.
         api_version = hint or API_VERSIONS[0]
         log.debug('Asking server for version info using API version %s', api_version)
-        protocol.version = Version(build=None, api_version=api_version)
+        protocol.config.version = Version(build=None, api_version=api_version)
         # Use ResolveNames as a minimal request to the server to test if the version is correct. If not, ResolveNames
         # will try to guess the version automatically.
         name = protocol.credentials.username if protocol.credentials and protocol.credentials.username else 'DUMMY'

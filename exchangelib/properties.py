@@ -226,7 +226,7 @@ class EWSElement(object):
         elif isinstance(field, FieldPath):
             field = field.field
         if not isinstance(field, Field):
-            raise ValueError("Field %r must be a string, Field or FieldPath object" % field)
+            raise ValueError("Field %r must be a string, Field or FieldPath instance" % field)
         cls.get_field_by_fieldname(fieldname=field.name)  # Will raise if field name is invalid
         if not field.supports_version(version):
             # The field exists but is not valid for this version

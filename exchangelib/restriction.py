@@ -85,7 +85,7 @@ class Q(object):
         # Parse args which must be Q objects
         for q in args:
             if not isinstance(q, self.__class__):
-                raise ValueError("Non-keyword arg %r must be a Q object" % q)
+                raise ValueError("Non-keyword arg %r must be a Q instance" % q)
             if q.query_string:
                 raise ValueError(
                     'A query string cannot be combined with other restrictions (args: %r, kwargs: %r)' % (args, kwargs)

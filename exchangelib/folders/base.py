@@ -281,7 +281,7 @@ class Folder(RegisterMixIn, SearchableMixIn):
                 field_path = FieldPath(field=field_path)
                 fields[i] = field_path
             if not isinstance(field_path, FieldPath):
-                raise ValueError("Field %r must be a string or FieldPath object" % field_path)
+                raise ValueError("Field %r must be a string or FieldPath instance" % field_path)
             if field_path.field.name == 'start':
                 has_start = True
             elif field_path.field.name == 'end':
