@@ -20,8 +20,12 @@ DELEGATE = 'delegate'
 ACCESS_TYPES = (IMPERSONATION, DELEGATE)
 
 
+class BaseCredentials(object):
+    pass
+
+
 @python_2_unicode_compatible
-class Credentials(PickleMixIn):
+class Credentials(BaseCredentials, PickleMixIn):
     """
     Keeps login info the way Exchange likes it.
 

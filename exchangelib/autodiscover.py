@@ -29,7 +29,8 @@ from future.utils import raise_from, PY2, python_2_unicode_compatible
 from six import text_type
 
 from . import transport
-from .credentials import Credentials
+from .configuration import Configuration
+from .credentials import BaseCredentials
 from .errors import AutoDiscoverFailed, AutoDiscoverRedirect, AutoDiscoverCircularRedirect, TransportError, \
     RedirectError, ErrorNonExistentMailbox, UnauthorizedError
 from .protocol import BaseProtocol, Protocol, RetryPolicy, FailFast
@@ -182,7 +183,7 @@ def discover(email, credentials=None, auth_type=None, retry_policy=None):
     """
     log.debug('Attempting autodiscover on email %s', email)
     if credentials is not None:
-        if not isinstance(credentials, Credentials):
+        if not isinstance(credentials, BaseCredentials):
             raise ValueError("'credentials' %r must be a Credentials instance" % credentials)
     if retry_policy is None:
         retry_policy = FailFast()
