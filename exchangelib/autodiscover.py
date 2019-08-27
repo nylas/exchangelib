@@ -33,7 +33,7 @@ from .configuration import Configuration
 from .credentials import BaseCredentials
 from .errors import AutoDiscoverFailed, AutoDiscoverRedirect, AutoDiscoverCircularRedirect, TransportError, \
     RedirectError, ErrorNonExistentMailbox, UnauthorizedError
-from .protocol import BaseProtocol, Protocol, RetryPolicy, FailFast
+from .protocol import BaseProtocol, Protocol, RetryPolicy
 from .transport import DEFAULT_ENCODING, DEFAULT_HEADERS
 from .util import create_element, get_xml_attr, add_xml_child, to_xml, is_xml, post_ratelimited, xml_to_str, \
     get_domain, CONNECTION_ERRORS, TLS_ERRORS
@@ -182,12 +182,9 @@ def discover(email, credentials=None, auth_type=None, retry_policy=None):
     and return a hopefully-cached Protocol to the callee.
     """
     log.debug('Attempting autodiscover on email %s', email)
-    if credentials is not None:
-        if not isinstance(credentials, BaseCredentials):
-            raise ValueError("'credentials' %r must be a Credentials instance" % credentials)
-    if retry_policy is None:
-        retry_policy = FailFast()
-    if not isinstance(retry_policy, RetryPolicy):
+    if not isinstance(credentials, (BaseCredentials, type(None))):
+        raise ValueError("'credentials' %r must be a Credentials instance" % credentials)
+    if not isinstance(retry_policy, (RetryPolicy, type(None))):
         raise ValueError("'retry_policy' %r must be a RetryPolicy instance" % retry_policy)
     domain = get_domain(email)
     # We may be using multiple different credentials and changing our minds on TLS verification. This key combination
@@ -202,6 +199,11 @@ def discover(email, credentials=None, auth_type=None, retry_policy=None):
             protocol = _autodiscover_cache[autodiscover_key]
             if not isinstance(protocol, AutodiscoverProtocol):
                 raise ValueError('Unexpected autodiscover cache contents: %s' % protocol)
+            # Reset auth type and retry policy if we requested non-default values
+            if auth_type:
+                protocol.config.auth_type = auth_type
+            if retry_policy:
+                protocol.config.retry_policy = retry_policy
             log.debug('Cache hit for domain %s credentials %s: %s', domain, credentials, protocol.service_endpoint)
             try:
                 # This is the main path when the cache is primed
