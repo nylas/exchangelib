@@ -125,6 +125,8 @@ class EWSElement(object):
                     continue
                 for k in c.__slots__:
                     if k in seen:
+                        # We allow duplicate keys because we don't want to require subclasses of e.g.
+                        # ExtendedProperty to define an empty __slots__ class attribute.
                         continue
                     keys.append(k)
                     seen.add(k)
