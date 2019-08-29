@@ -1083,6 +1083,8 @@ class MailTips(EWSElement):
         BooleanField('invalid_recipient', field_uri='InvalidRecipient'),
     ]
 
+    __slots__ = tuple(f.name for f in FIELDS)
+
 
 class IdChangeKeyMixIn(EWSElement):
     # A class that has 'id' and 'changekey' fields which are actually attributes on ID element

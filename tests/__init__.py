@@ -616,6 +616,7 @@ class EWSDateTimeTest(TimedTestCase):
         with self.assertRaises(ValueError):
             EWSDate.from_date(EWSDate(2000, 1, 2))
 
+
 class PropertiesTest(TimedTestCase):
     def test_unique_field_names(self):
         from exchangelib import attachments, properties, items, folders, indexed_properties, recurrence, settings
@@ -623,11 +624,16 @@ class PropertiesTest(TimedTestCase):
             for cls in vars(module).values():
                 if not isclass(cls) or not issubclass(cls, EWSElement):
                     continue
-                # Assert that all FIELDS names are unique on the model
+                # Assert that all FIELDS names are unique on the model. Also assert that the class defines __slots__,
+                # that all fields are mentioned in __slots__ and that __slots__ is unique.
                 field_names = set()
+                all_slots = tuple(chain(*(getattr(c, '__slots__', ()) for c in cls.__mro__)))
+                self.assertEqual(len(all_slots), len(set(all_slots)),
+                                 '__slots__ contains duplicates: %s' % sorted(all_slots))
                 for f in cls.FIELDS:
                     self.assertNotIn(f.name, field_names,
                                      'Field name %r is not unique on model %r' % (f.name, cls.__name__))
+                    self.assertIn(f.name, all_slots)
                     field_names.add(f.name)
 
     def test_uid(self):
