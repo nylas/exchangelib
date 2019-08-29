@@ -1,7 +1,7 @@
 from .ewsdatetime import UTC_NOW
 from .fields import DateTimeField, MessageField, ChoiceField, Choice
 from .properties import EWSElement, OutOfOffice
-from .util import create_element, set_xml_value, TNS
+from .util import create_element, set_xml_value
 
 
 class OofSettings(EWSElement):
