@@ -24,6 +24,8 @@ import warnings
 
 from dateutil.relativedelta import relativedelta
 import dns.resolver
+import flake8.defaults
+import flake8.main.application
 import psutil
 import pytz
 import requests
@@ -127,6 +129,16 @@ class TimedTestCase(unittest.TestCase):
         t2 = time.time() - self.t1
         if t2 > self.SLOW_TEST_DURATION:
             print("{:07.3f} : {}".format(t2, self.id()))
+
+
+class StyleTest(TimedTestCase):
+    def test_flake8(self):
+        import exchangelib
+        flake8.defaults.MAX_LINE_LENGTH = 120
+        app = flake8.main.application.Application()
+        app.run(exchangelib.__path__)
+        # If this fails, look at stdout for actual error messages
+        self.assertEqual(app.result_count, 0)
 
 
 class BuildTest(TimedTestCase):
