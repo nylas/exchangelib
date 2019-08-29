@@ -1041,17 +1041,25 @@ class OutOfOffice(EWSElement):
         DateTimeField('end', field_uri='EndTime', is_required=False),
     ]
 
+    __slots__ = tuple(f.name for f in FIELDS)
+
     @classmethod
-    def from_xml(cls, elem, account):
+    def duration_to_start_end(cls, elem, account):
         kwargs = {}
-        for attr in ('reply_body'):
-            f = cls.get_field_by_fieldname(attr)
-            kwargs[attr] = f.from_xml(elem=elem, account=account)
         duration = elem.find('{%s}Duration' % TNS)
         if duration is not None:
             for attr in ('start', 'end'):
                 f = cls.get_field_by_fieldname(attr)
                 kwargs[attr] = f.from_xml(elem=duration, account=account)
+        return kwargs
+
+    @classmethod
+    def from_xml(cls, elem, account):
+        kwargs = {}
+        for attr in ('reply_body',):
+            f = cls.get_field_by_fieldname(attr)
+            kwargs[attr] = f.from_xml(elem=elem, account=account)
+        kwargs.update(cls.duration_to_start_end(elem=elem, account=account))
         cls._clear(elem)
         return cls(**kwargs)
 
