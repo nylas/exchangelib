@@ -828,7 +828,7 @@ class Task(Item):
         TextField('mileage', field_uri='task:Mileage'),
         CharField('owner', field_uri='task:Owner', is_read_only=True),
         DecimalField('percent_complete', field_uri='task:PercentComplete', is_required=True, default=Decimal(0.0),
-                     is_searchable=False),
+                     min=Decimal(0), max=Decimal(100), is_searchable=False),
         # Placeholder for Recurrence
         DateTimeField('start_date', field_uri='task:StartDate'),
         ChoiceField('status', field_uri='task:Status', choices={
@@ -864,8 +864,6 @@ class Task(Item):
                             self.complete_date, self.start_date)
                 self.complete_date = self.start_date
         if self.percent_complete is not None:
-            if not Decimal(0) <= self.percent_complete <= Decimal(100):
-                raise ValueError("'percent_complete' must be in range 0.0 - 100.0")
             if self.status == self.COMPLETED and self.percent_complete != Decimal(100):
                 # percent_complete must be 100% if task is complete
                 log.warning("'percent_complete' must be 100 when 'status' is '%s' (%s). Resetting",

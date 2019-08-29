@@ -840,6 +840,15 @@ class FieldTest(TimedTestCase):
             field.clean(12)
         self.assertEqual(str(e.exception), "Value 12 on field 'foo' must be less than 10")
 
+        # Test min/max on DecimalField
+        field = DecimalField('foo', field_uri='bar', min=5, max=10)
+        with self.assertRaises(ValueError) as e:
+            field.clean(Decimal(2))
+        self.assertEqual(str(e.exception), "Value Decimal('2') on field 'foo' must be greater than 5")
+        with self.assertRaises(ValueError)as e:
+            field.clean(Decimal(12))
+        self.assertEqual(str(e.exception), "Value Decimal('12') on field 'foo' must be less than 10")
+
         # Test enum validation
         field = EnumField('foo', field_uri='bar', enum=['a', 'b', 'c'])
         with self.assertRaises(ValueError)as e:
