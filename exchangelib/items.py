@@ -161,6 +161,12 @@ class BaseItem(RegisterMixIn):
                 self.account = self.folder.root.account
         super(BaseItem, self).__init__(**kwargs)
 
+    @classmethod
+    def from_xml(cls, elem, account):
+        item = super(BaseItem, cls).from_xml(elem=elem, account=account)
+        item.account = account
+        return item
+
 
 class Item(BaseItem):
     """
@@ -219,7 +225,7 @@ class Item(BaseItem):
         BodyField('unique_body', field_uri='item:UniqueBody', is_read_only=True, supported_from=EXCHANGE_2010),
     ]
 
-    FIELDS = LOCAL_FIELDS[0:1] + RegisterMixIn.FIELDS + LOCAL_FIELDS[1:]
+    FIELDS = LOCAL_FIELDS[0:1] + BaseItem.FIELDS + LOCAL_FIELDS[1:]
 
     __slots__ = tuple(f.name for f in LOCAL_FIELDS)
 
@@ -238,12 +244,6 @@ class Item(BaseItem):
                 self.attach(self.attachments)
         else:
             self.attachments = []
-
-    @classmethod
-    def from_xml(cls, elem, account):
-        item = super(Item, cls).from_xml(elem=elem, account=account)
-        item.account = account
-        return item
 
     def save(self, update_fields=None, conflict_resolution=AUTO_RESOLVE, send_meeting_invitations=SEND_TO_NONE):
         if self.id:
@@ -464,16 +464,22 @@ class Item(BaseItem):
 
 
 @python_2_unicode_compatible
-class BulkCreateResult(Item):
+class BulkCreateResult(BaseItem):
     """
     A dummy class to store return values from a CreateItem service call
     """
     LOCAL_FIELDS = [
         AttachmentField('attachments', field_uri='item:Attachments'),  # ItemAttachment or FileAttachment
     ]
-    FIELDS = IdChangeKeyMixIn.FIELDS + LOCAL_FIELDS
+    FIELDS = BaseItem.FIELDS + LOCAL_FIELDS
 
     __slots__ = tuple(f.name for f in LOCAL_FIELDS)
+
+    def __init__(self, **kwargs):
+        super(BulkCreateResult, self).__init__(**kwargs)
+        # pylint: disable=access-member-before-definition
+        if self.attachments is None:
+            self.attachments = []
 
 
 # CalendarItemType enums

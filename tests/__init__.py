@@ -63,7 +63,7 @@ from exchangelib.folders import Calendar, DeletedItems, Drafts, Inbox, Outbox, S
     PdpProfileV2Secured, VoiceMail, FolderQuerySet, SingleFolderQuerySet, SHALLOW
 from exchangelib.indexed_properties import EmailAddress, PhysicalAddress, PhoneNumber, \
     SingleFieldIndexedElement, MultiFieldIndexedElement
-from exchangelib.items import Item, CalendarItem, Message, Contact, Task, DistributionList, Persona
+from exchangelib.items import Item, CalendarItem, Message, Contact, Task, DistributionList, Persona, BaseItem
 from exchangelib.properties import Attendee, Mailbox, RoomList, MessageHeader, Room, ItemId, Member, EWSElement, Body, \
     HTMLBody, TimeZone, FreeBusyView, UID, InvalidField, InvalidFieldForVersion, DLMailbox, PermissionSet, \
     Permission, UserId
@@ -5595,7 +5595,7 @@ class CommonItemTest(BaseItemTest):
         # Test with generator as argument
         insert_ids = self.test_folder.bulk_create(items=(i for i in [item]))
         self.assertEqual(len(insert_ids), 1)
-        self.assertIsInstance(insert_ids[0], Item)
+        self.assertIsInstance(insert_ids[0], BaseItem)
         find_ids = self.test_folder.filter(categories__contains=item.categories).values_list('id', 'changekey')
         self.assertEqual(len(find_ids), 1)
         self.assertEqual(len(find_ids[0]), 2, find_ids[0])
