@@ -12,6 +12,14 @@ from six import text_type
 import pytz.exceptions
 
 
+class MultipleObjectsReturned(Exception):
+    pass
+
+
+class DoesNotExist(Exception):
+    pass
+
+
 @python_2_unicode_compatible
 class EWSError(Exception):
     """Global error type within this module.

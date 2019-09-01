@@ -7,6 +7,7 @@ import logging
 
 from future.utils import python_2_unicode_compatible
 
+from .errors import MultipleObjectsReturned, DoesNotExist
 from .items import CalendarItem, ID_ONLY
 from .fields import FieldPath, FieldOrder
 from .properties import InvalidField
@@ -15,14 +16,6 @@ from .services import CHUNK_SIZE
 from .version import EXCHANGE_2010
 
 log = logging.getLogger(__name__)
-
-
-class MultipleObjectsReturned(Exception):
-    pass
-
-
-class DoesNotExist(Exception):
-    pass
 
 
 class SearchableMixIn(object):
