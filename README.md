@@ -94,8 +94,8 @@ fails to install.
 ## Setup and connecting
 
 ```python
-from exchangelib import DELEGATE, IMPERSONATION, Account, Credentials, FaultTolerance, \
-    Configuration, NTLM, GSSAPI, SSPI, Build, Version
+from exchangelib import DELEGATE, IMPERSONATION, Account, Credentials, OAuth2Credentials, \
+    FaultTolerance, Configuration, NTLM, GSSAPI, SSPI, OAUTH2, Build, Version
 
 # Specify your credentials. Username is usually in WINDOMAIN\username format, where WINDOMAIN is
 # the name of the Windows Domain your username is connected to, but some servers also
@@ -157,9 +157,13 @@ config = Configuration(
 config = Configuration(retry_policy=FaultTolerance(max_wait=3600), credentials=credentials)
 account = Account(primary_smtp_address='john@example.com', config=config)
 
-# Kerberos and SSPI authentication are supported via the 'gssapi' and 'sspi' auth types.
+# Kerberos and SSPI authentication are supported via the GSSAPI and SSPI auth types.
 config = Configuration(server='example.com', auth_type=GSSAPI)
 config = Configuration(server='example.com', auth_type=SSPI)
+
+# OAuth is supported via the OAUTH2 auth type and the OAuth2Credentials class.
+credentials = OAuth2Credentials(client_id='MY_ID', client_secret='MY_SECRET', tenant_id='TENANT_ID')
+config = Configuration(credentials=credentials, auth_type=OAUTH2)
 
 # If you're connecting to the same account very often, you can cache the autodiscover result for
 # later so you can skip the autodiscover lookup:

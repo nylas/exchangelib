@@ -158,6 +158,7 @@ EXCHANGE_2013 = Build(15, 0)
 EXCHANGE_2013_SP1 = Build(15, 0, 847)
 EXCHANGE_2016 = Build(15, 1)
 EXCHANGE_2019 = Build(15, 2)
+EXCHANGE_O365 = Build(15, 20)
 
 
 @python_2_unicode_compatible
@@ -194,7 +195,7 @@ class Version(PickleMixIn):
         protocol.config.version = Version(build=None, api_version=api_version)
         # Use ResolveNames as a minimal request to the server to test if the version is correct. If not, ResolveNames
         # will try to guess the version automatically.
-        name = protocol.credentials.username if protocol.credentials and protocol.credentials.username else 'DUMMY'
+        name = str(protocol.credentials) if protocol.credentials and str(protocol.credentials) else 'DUMMY'
         try:
             list(ResolveNames(protocol=protocol).call(unresolved_entries=[name]))
         except (ErrorInvalidSchemaVersionForMailboxVersion, ErrorInvalidServerVersion, ErrorIncorrectSchemaVersion):

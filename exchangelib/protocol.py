@@ -18,13 +18,16 @@ import requests.adapters
 import requests.sessions
 from future.utils import with_metaclass, python_2_unicode_compatible
 from future.moves.queue import LifoQueue, Empty, Full
+from oauthlib.oauth2 import BackendApplicationClient
+from requests_oauthlib import OAuth2Session
 from six import string_types
 
+from .credentials import OAuth2Credentials
 from .errors import TransportError, SessionPoolMinSizeReached
 from .properties import FreeBusyViewOptions, MailboxData, TimeWindow, TimeZone
 from .services import GetServerTimeZones, GetRoomLists, GetRooms, ResolveNames, GetUserAvailability, \
     GetSearchableMailboxes, ExpandDL
-from .transport import get_auth_instance, get_service_authtype, DEFAULT_HEADERS
+from .transport import get_auth_instance, get_service_authtype, NTLM, GSSAPI, SSPI, OAUTH2, DEFAULT_HEADERS
 from .util import split_url
 from .version import Version, API_VERSIONS
 
@@ -166,11 +169,34 @@ class BaseProtocol(object):
         return self.create_session()
 
     def create_session(self):
-        session = requests.sessions.Session()
+        if isinstance(self.credentials, OAuth2Credentials):
+            if self.auth_type != OAUTH2:
+                raise ValueError('Auth type must be %r for credentials type OAuth2Credentials' % OAUTH2)
+
+            token_url = 'https://login.microsoftonline.com/%s/oauth2/v2.0/token' % {self.credentials.tenant_id}
+            scope = ['https://outlook.office365.com/.default']
+            client = BackendApplicationClient(client_id=self.credentials.client_id)
+            session = OAuth2Session(client=client)
+            # Fetch the token explicitly -- it doesn't occur implicitly
+            session.fetch_token(token_url=token_url, client_id=self.credentials.client_id,
+                                client_secret=self.credentials.client_secret, scope=scope)
+            session.auth = get_auth_instance(auth_type=OAUTH2, client=client)
+        elif self.credentials:
+            if self.auth_type == NTLM and self.credentials.type == self.credentials.EMAIL:
+                username = '\\' + self.credentials.username
+            else:
+                username = self.credentials.username
+            session = requests.sessions.Session()
+            session.auth = get_auth_instance(auth_type=self.auth_type, username=username,
+                                             password=self.credentials.password)
+        else:
+            if self.auth_type not in (GSSAPI, SSPI):
+                raise ValueError('Auth type %r requires credentials' % self.auth_type)
+            session = requests.sessions.Session()
+            session.auth = get_auth_instance(auth_type=self.auth_type)
         # Add some extra info
         session.session_id = sum(map(ord, str(os.urandom(100))))  # Used for debugging messages in services
         session.protocol = self
-        session.auth = get_auth_instance(credentials=self.credentials, auth_type=self.auth_type)
         # Create a copy of the headers because headers are mutable and session users may modify headers
         session.headers.update(DEFAULT_HEADERS.copy())
         session.mount('http://', adapter=self.get_adapter())
@@ -253,7 +279,7 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
         # Autodetect authentication type if necessary
         # pylint: disable=access-member-before-definition
         if self.config.auth_type is None:
-            name = self.credentials.username if self.credentials and self.credentials.username else 'DUMMY'
+            name = str(self.credentials) if self.credentials and str(self.credentials) else 'DUMMY'
             self.config.auth_type, version_hint = get_service_authtype(
                 service_endpoint=self.service_endpoint, versions=API_VERSIONS, name=name
             )

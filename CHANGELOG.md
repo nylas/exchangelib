@@ -3,6 +3,7 @@ Change Log
 
 HEAD
 ----
+-   Added support for OAuth 2.0 authentication
 
 
 2.0.1
