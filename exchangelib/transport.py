@@ -47,11 +47,11 @@ DEFAULT_HEADERS = {'Content-Type': 'text/xml; charset=%s' % DEFAULT_ENCODING, 'A
 
 
 def extra_headers(account):
+    """Generate extra HTTP headers
     """
-    Generate extra headers for impersonation requests. See
-    https://blogs.msdn.microsoft.com/webdav_101/2015/05/11/best-practices-ews-authentication-and-access-issues/
-    """
-    if account and account.access_type == IMPERSONATION:
+    if account:
+        # See
+        # https://blogs.msdn.microsoft.com/webdav_101/2015/05/11/best-practices-ews-authentication-and-access-issues/
         return {'X-AnchorMailbox': account.primary_smtp_address}
     return None
 
