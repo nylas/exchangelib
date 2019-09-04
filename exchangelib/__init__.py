@@ -4,7 +4,7 @@ from .account import Account
 from .attachments import FileAttachment, ItemAttachment
 from .autodiscover import discover
 from .configuration import Configuration
-from .credentials import DELEGATE, IMPERSONATION, Credentials
+from .credentials import DELEGATE, IMPERSONATION, Credentials, OAuth2Credentials
 from .ewsdatetime import EWSDate, EWSDateTime, EWSTimeZone, UTC, UTC_NOW
 from .extended_properties import ExtendedProperty
 from .folders import Folder, FolderCollection, SHALLOW, DEEP
@@ -14,7 +14,7 @@ from .properties import Body, HTMLBody, ItemId, Mailbox, Attendee, Room, RoomLis
 from .protocol import FaultTolerance, FailFast
 from .settings import OofSettings
 from .restriction import Q
-from .transport import BASIC, DIGEST, NTLM, GSSAPI, SSPI
+from .transport import BASIC, DIGEST, NTLM, GSSAPI, SSPI, OAUTH2
 from .version import Build, Version
 
 __version__ = '2.0.1'
@@ -25,7 +25,7 @@ __all__ = [
     'FileAttachment', 'ItemAttachment',
     'discover',
     'Configuration',
-    'DELEGATE', 'IMPERSONATION', 'Credentials',
+    'DELEGATE', 'IMPERSONATION', 'Credentials', 'OAuth2Credentials',
     'EWSDate', 'EWSDateTime', 'EWSTimeZone', 'UTC', 'UTC_NOW',
     'ExtendedProperty',
     'Folder', 'FolderCollection', 'SHALLOW', 'DEEP',
@@ -35,7 +35,7 @@ __all__ = [
     'FailFast', 'FaultTolerance',
     'OofSettings',
     'Q',
-    'BASIC', 'DIGEST', 'NTLM', 'GSSAPI', 'SSPI',
+    'BASIC', 'DIGEST', 'NTLM', 'GSSAPI', 'SSPI', 'OAUTH2',
     'Build', 'Version',
 ]
 

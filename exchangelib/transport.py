@@ -5,6 +5,7 @@ import logging
 
 import requests.auth
 import requests_ntlm
+import requests_oauthlib
 
 from .credentials import IMPERSONATION
 from .errors import UnauthorizedError, TransportError, RedirectError, RelativeRedirect
@@ -19,11 +20,13 @@ BASIC = 'basic'
 DIGEST = 'digest'
 GSSAPI = 'gssapi'
 SSPI = 'sspi'
+OAUTH2 = 'OAuth 2.0'
 
 AUTH_TYPE_MAP = {
     NTLM: requests_ntlm.HttpNtlmAuth,
     BASIC: requests.auth.HTTPBasicAuth,
     DIGEST: requests.auth.HTTPDigestAuth,
+    OAUTH2: requests_oauthlib.OAuth2,
     NOAUTH: None,
 }
 try:
@@ -44,11 +47,11 @@ DEFAULT_HEADERS = {'Content-Type': 'text/xml; charset=%s' % DEFAULT_ENCODING, 'A
 
 
 def extra_headers(account):
+    """Generate extra HTTP headers
     """
-    Generate extra headers for impersonation requests. See
-    https://blogs.msdn.microsoft.com/webdav_101/2015/05/11/best-practices-ews-authentication-and-access-issues/
-    """
-    if account and account.access_type == IMPERSONATION:
+    if account:
+        # See
+        # https://blogs.msdn.microsoft.com/webdav_101/2015/05/11/best-practices-ews-authentication-and-access-issues/
         return {'X-AnchorMailbox': account.primary_smtp_address}
     return None
 
@@ -80,7 +83,7 @@ def wrap(content, version, account=None):
     return xml_to_str(envelope, encoding=DEFAULT_ENCODING, xml_declaration=True)
 
 
-def get_auth_instance(credentials, auth_type):
+def get_auth_instance(auth_type, **kwargs):
     """
     Returns an *Auth instance suitable for the requests package
     """
@@ -91,16 +94,9 @@ def get_auth_instance(credentials, auth_type):
         # Kerberos auth relies on credentials supplied via a ticket available externally to this library
         return model()
     if auth_type == SSPI:
-        # SSPI auth does not require credentials
-        if credentials is None:
-            return model()
-        return model(username=credentials.username, password=credentials.password)
-    if not credentials:
-        raise ValueError('Auth type %r requires credentials' % auth_type)
-    username = credentials.username
-    if auth_type == NTLM and credentials.type == credentials.EMAIL:
-        username = '\\' + username
-    return model(username=username, password=credentials.password)
+        # SSPI auth does not require credentials, but can have it
+        return model(**kwargs)
+    return model(**kwargs)
 
 
 def get_autodiscover_authtype(service_endpoint, data):
