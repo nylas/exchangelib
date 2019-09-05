@@ -7,7 +7,7 @@ from six import text_type
 from ..errors import ErrorAccessDenied, ErrorFolderNotFound, ErrorNoPublicFolderReplicaAvailable, ErrorItemNotFound, \
     ErrorInvalidOperation
 from ..fields import PermissionSetField, EffectiveRightsField
-from ..version import EXCHANGE_2007_SP1, EXCHANGE_2010_SP1
+from ..version import EXCHANGE_2007_SP1, EXCHANGE_2010_SP1, EXCHANGE_2016
 from .collections import FolderCollection
 from .base import BaseFolder
 from .known_folders import MsgFolderRoot, NON_DELETEABLE_FOLDERS, WELLKNOWN_FOLDERS_IN_ROOT, \
@@ -26,7 +26,8 @@ class RootOfHierarchy(BaseFolder):
     TRAVERSAL_DEPTH = DEEP
 
     LOCAL_FIELDS = [
-        PermissionSetField('permission_set', field_uri='folder:PermissionSet', supported_from=EXCHANGE_2007_SP1),
+        PermissionSetField('permission_set', field_uri='folder:PermissionSet', supported_from=EXCHANGE_2007_SP1,
+                           deprecated_from=EXCHANGE_2016),
         EffectiveRightsField('effective_rights', field_uri='folder:EffectiveRights', is_read_only=True,
                              supported_from=EXCHANGE_2007_SP1),
     ]
