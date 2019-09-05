@@ -3,7 +3,7 @@ import logging
 from six import string_types
 
 from .fields import IntegerField, EnumField, EnumListField, DateField, DateTimeField, EWSElementField, \
-    WEEKDAY_NAMES, MONTHS, WEEK_NUMBERS, WEEKDAYS, EXTRA_WEEKDAY_OPTIONS
+    MONTHS, WEEK_NUMBERS, WEEKDAYS
 from .properties import EWSElement, IdChangeKeyMixIn
 
 log = logging.getLogger(__name__)
@@ -19,33 +19,6 @@ def _weekday_to_str(weekday):
 
 def _week_number_to_str(week_number):
     return WEEK_NUMBERS[week_number - 1] if isinstance(week_number, int) else week_number
-
-
-class ExtraWeekdaysField(EnumListField):
-    def __init__(self, *args, **kwargs):
-        kwargs['enum'] = WEEKDAYS
-        super(ExtraWeekdaysField, self).__init__(*args, **kwargs)
-
-    def clean(self, value, version=None):
-        # Pass EXTRA_WEEKDAY_OPTIONS as single string or integer value
-        if isinstance(value, string_types):
-            if value not in EXTRA_WEEKDAY_OPTIONS:
-                raise ValueError(
-                    "Single value '%s' on field '%s' must be one of %s" % (value, self.name, EXTRA_WEEKDAY_OPTIONS))
-            value = [self.enum.index(value) + 1]
-        elif isinstance(value, self.value_cls):
-            value = [value]
-        else:
-            value = list(value)  # Convert to something we can index
-            for i, v in enumerate(value):
-                if isinstance(v, string_types):
-                    if v not in WEEKDAY_NAMES:
-                        raise ValueError(
-                            "List value '%s' on field '%s' must be one of %s" % (v, self.name, WEEKDAY_NAMES))
-                    value[i] = self.enum.index(v) + 1
-                elif isinstance(v, self.value_cls) and not 1 <= v <= 7:
-                    raise ValueError("List value '%s' on field '%s' must be in range 1 -> 7" % (v, self.name))
-        return super(ExtraWeekdaysField, self).clean(value, version=version)
 
 
 class Pattern(EWSElement):
@@ -75,10 +48,10 @@ class RelativeYearlyPattern(Pattern):
     ELEMENT_NAME = 'RelativeYearlyRecurrence'
 
     FIELDS = [
-        # List of valid ISO 8601 weekdays, as list of numbers in range 1 -> 7 (1 being Monday). Alternatively, weekdays
-        # can be one of the DAY (or 8), WEEK_DAY (or 9) or WEEKEND_DAY (or 10) consts which is interpreted as the first
-        # day, weekday, or weekend day in the month, respectively.
-        ExtraWeekdaysField('weekdays', field_uri='t:DaysOfWeek', is_required=True),
+        # The weekday of the occurrence, as a valid ISO 8601 weekday number in range 1 -> 7 (1 being Monday).
+        # Alternatively, the weekday can be one of the DAY (or 8), WEEK_DAY (or 9) or WEEKEND_DAY (or 10) consts which
+        # is interpreted as the first day, weekday, or weekend day in the month, respectively.
+        EnumField('weekday', field_uri='t:DaysOfWeek', enum=WEEKDAYS, is_required=True),
         # Week number of the month, in range 1 -> 5. If 5 is specified, this assumes the last week of the month for
         # months that have only 4 weeks
         EnumField('week_number', field_uri='t:DayOfWeekIndex', enum=WEEK_NUMBERS, is_required=True),
@@ -89,8 +62,8 @@ class RelativeYearlyPattern(Pattern):
     __slots__ = tuple(f.name for f in FIELDS)
 
     def __str__(self):
-        return 'Occurs on weekdays %s in the %s week of %s' % (
-            ', '.join(_weekday_to_str(i) for i in self.weekdays),
+        return 'Occurs on weekday %s in the %s week of %s' % (
+            _weekday_to_str(self.weekday),
             _week_number_to_str(self.week_number),
             _month_to_str(self.month)
         )
@@ -121,10 +94,10 @@ class RelativeMonthlyPattern(Pattern):
     FIELDS = [
         # Interval, in months, in range 1 -> 99
         IntegerField('interval', field_uri='t:Interval', min=1, max=99, is_required=True),
-        # List of valid ISO 8601 weekdays, as list of numbers in range 1 -> 7 (1 being Monday). Alternatively, weekdays
-        # can be one of the DAY (or 8), WEEK_DAY (or 9) or WEEKEND_DAY (or 10) consts which is interpreted as the first
-        # day, weekday, or weekend day in the month, respectively.
-        ExtraWeekdaysField('weekdays', field_uri='t:DaysOfWeek', is_required=True),
+        # The weekday of the occurrence, as a valid ISO 8601 weekday number in range 1 -> 7 (1 being Monday).
+        # Alternatively, the weekday can be one of the DAY (or 8), WEEK_DAY (or 9) or WEEKEND_DAY (or 10) consts which
+        # is interpreted as the first day, weekday, or weekend day in the month, respectively.
+        EnumField('weekday', field_uri='t:DaysOfWeek', enum=WEEKDAYS, is_required=True),
         # Week number of the month, in range 1 -> 5. If 5 is specified, this assumes the last week of the month for
         # months that have only 4 weeks.
         EnumField('week_number', field_uri='t:DayOfWeekIndex', enum=WEEK_NUMBERS, is_required=True),
@@ -133,8 +106,8 @@ class RelativeMonthlyPattern(Pattern):
     __slots__ = tuple(f.name for f in FIELDS)
 
     def __str__(self):
-        return 'Occurs on weekdays %s in the %s week of every %s month(s)' % (
-            ', '.join(_weekday_to_str(i) for i in self.weekdays),
+        return 'Occurs on weekday %s in the %s week of every %s month(s)' % (
+            _weekday_to_str(self.weekday),
             _week_number_to_str(self.week_number),
             self.interval
         )

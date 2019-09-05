@@ -2,6 +2,7 @@ import datetime
 
 from ..errors import NaiveDateTimeNotAllowed
 from ..ewsdatetime import EWSDateTime
+from ..fields import WEEKDAY_NAMES
 from ..util import create_element, set_xml_value, xml_text_to_value, peek, TNS, MNS
 from ..version import EXCHANGE_2010
 from .common import EWSService
@@ -61,7 +62,6 @@ class GetServerTimeZones(EWSService):
 
     @staticmethod
     def _get_transitions_groups(timezonedef):
-        from ..recurrence import WEEKDAY_NAMES
         tz_transitions_groups = {}
         transitiongroups = timezonedef.find('{%s}TransitionsGroups' % TNS)
         if transitiongroups is not None:

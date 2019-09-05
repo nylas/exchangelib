@@ -73,7 +73,7 @@ from exchangelib.protocol import BaseProtocol, Protocol, NoVerifyHTTPAdapter, Fa
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.recurrence import Recurrence, AbsoluteYearlyPattern, RelativeYearlyPattern, AbsoluteMonthlyPattern, \
     RelativeMonthlyPattern, WeeklyPattern, DailyPattern, FirstOccurrence, LastOccurrence, Occurrence, \
-    NoEndPattern, EndDatePattern, NumberedPattern, ExtraWeekdaysField
+    NoEndPattern, EndDatePattern, NumberedPattern
 from exchangelib.restriction import Restriction, Q
 from exchangelib.settings import OofSettings
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, GetAttachment, ResolveNames, GetPersona, \
@@ -888,61 +888,6 @@ class FieldTest(TimedTestCase):
             field.clean(['d'])
         self.assertEqual(str(e.exception), "List value 'd' on field 'foo' must be one of ['a', 'b', 'c']")
 
-        # Test ExtraWeekdaysField. Normal weedays are passed as lists, extra options as strings
-        field = ExtraWeekdaysField('foo', field_uri='bar')
-        for val in (DAY, WEEK_DAY, WEEKEND_DAY, (MONDAY, WEDNESDAY), 3, 10, (5, 7)):
-            field.clean(val)
-        with self.assertRaises(ValueError) as e:
-            field.clean('foo')
-        if PY2:
-            self.assertEqual(
-                str(e.exception),
-                "Single value 'foo' on field 'foo' must be one of (u'Day', u'Weekday', u'WeekendDay')"
-            )
-        else:
-            self.assertEqual(
-                str(e.exception),
-                "Single value 'foo' on field 'foo' must be one of ('Day', 'Weekday', 'WeekendDay')"
-            )
-        with self.assertRaises(ValueError) as e:
-            field.clean(('foo', 'bar'))
-        if PY2:
-            self.assertEqual(
-                str(e.exception),
-                "List value 'foo' on field 'foo' must be one of (u'Monday', u'Tuesday', u'Wednesday', u'Thursday', "
-                "u'Friday', u'Saturday', u'Sunday')"
-            )
-        else:
-            self.assertEqual(
-                str(e.exception),
-                "List value 'foo' on field 'foo' must be one of ('Monday', 'Tuesday', 'Wednesday', 'Thursday', "
-                "'Friday', 'Saturday', 'Sunday')"
-            )
-        with self.assertRaises(ValueError) as e:
-            field.clean((3, 3))
-        self.assertEqual(
-            str(e.exception),
-            "List entries '[3, 3]' on field 'foo' must be unique"
-        )
-        with self.assertRaises(ValueError) as e:
-            field.clean(0)
-        self.assertEqual(
-            str(e.exception),
-            "Value 0 on field 'foo' must be greater than 1"
-        )
-        with self.assertRaises(ValueError) as e:
-            field.clean(11)
-        self.assertEqual(
-            str(e.exception),
-            "Value 11 on field 'foo' must be less than 10"
-        )
-        with self.assertRaises(ValueError) as e:
-            field.clean((1, 11))
-        self.assertEqual(
-            str(e.exception),
-            "List value '11' on field 'foo' must be in range 1 -> 7"
-        )
-
     def test_garbage_input(self):
         # Test that we can survive garbage input for common field types
         tz = EWSTimeZone.timezone('Europe/Copenhagen')
@@ -1085,12 +1030,12 @@ class RecurrenceTest(TimedTestCase):
     def test_magic(self):
         pattern = AbsoluteYearlyPattern(month=FEBRUARY, day_of_month=28)
         self.assertEqual(str(pattern), 'Occurs on day 28 of February')
-        pattern = RelativeYearlyPattern(month=AUGUST, week_number=SECOND, weekdays=[MONDAY, WEDNESDAY])
-        self.assertEqual(str(pattern), 'Occurs on weekdays Monday, Wednesday in the Second week of August')
+        pattern = RelativeYearlyPattern(month=AUGUST, week_number=SECOND, weekday=MONDAY)
+        self.assertEqual(str(pattern), 'Occurs on weekday Monday in the Second week of August')
         pattern = AbsoluteMonthlyPattern(interval=3, day_of_month=31)
         self.assertEqual(str(pattern), 'Occurs on day 31 of every 3 month(s)')
-        pattern = RelativeMonthlyPattern(interval=2, week_number=LAST, weekdays=[5, 7])
-        self.assertEqual(str(pattern), 'Occurs on weekdays Friday, Sunday in the Last week of every 2 month(s)')
+        pattern = RelativeMonthlyPattern(interval=2, week_number=LAST, weekday=5)
+        self.assertEqual(str(pattern), 'Occurs on weekday Friday in the Last week of every 2 month(s)')
         pattern = WeeklyPattern(interval=4, weekdays=WEEKEND_DAY, first_day_of_week=7)
         self.assertEqual(str(pattern),
                          'Occurs on weekdays WeekendDay of every 4 week(s) where the first day of the week is Sunday')
