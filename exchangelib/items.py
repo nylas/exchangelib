@@ -143,22 +143,22 @@ class BaseItem(RegisterMixIn):
     def __init__(self, **kwargs):
         # 'account' is optional but allows calling 'send()' and 'delete()'
         # 'folder' is optional but allows calling 'save()'. If 'folder' has an account, and 'account' is not set,
-        # we use folder.root.account.
-        from .folders import Folder
+        # we use folder.account.
+        from .folders import BaseFolder
         from .account import Account
         self.account = kwargs.pop('account', None)
         if self.account is not None and not isinstance(self.account, Account):
             raise ValueError("'account' %r must be an Account instance" % self.account)
         self.folder = kwargs.pop('folder', None)
         if self.folder is not None:
-            if not isinstance(self.folder, Folder):
+            if not isinstance(self.folder, BaseFolder):
                 raise ValueError("'folder' %r must be a Folder instance" % self.folder)
-            if self.folder.root.account is not None:
+            if self.folder.account is not None:
                 if self.account is not None:
                     # Make sure the account from kwargs matches the folder account
-                    if self.account != self.folder.root.account:
-                        raise ValueError("'account' does not match 'folder.root.account'")
-                self.account = self.folder.root.account
+                    if self.account != self.folder.account:
+                        raise ValueError("'account' does not match 'folder.account'")
+                self.account = self.folder.account
         super(BaseItem, self).__init__(**kwargs)
 
     @classmethod

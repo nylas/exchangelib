@@ -506,9 +506,9 @@ class Restriction(object):
             raise ValueError("'q' value %r must be a Q instance" % q)
         if q.is_empty():
             raise ValueError("Q object must not be empty")
-        from .folders import Folder
+        from .folders import BaseFolder
         for folder in folders:
-            if not isinstance(folder, Folder):
+            if not isinstance(folder, BaseFolder):
                 raise ValueError("'folder' value %r must be a Folder instance" % folder)
         if applies_to not in self.RESTRICTION_TYPES:
             raise ValueError("'applies_to' must be one of %s" % (self.RESTRICTION_TYPES,))

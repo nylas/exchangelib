@@ -6,9 +6,10 @@ from six import text_type
 
 from ..errors import ErrorAccessDenied, ErrorFolderNotFound, ErrorNoPublicFolderReplicaAvailable, ErrorItemNotFound, \
     ErrorInvalidOperation
+from ..fields import PermissionSetField, EffectiveRightsField
 from ..version import EXCHANGE_2007_SP1, EXCHANGE_2010_SP1
 from .collections import FolderCollection
-from .base import Folder
+from .base import BaseFolder
 from .known_folders import MsgFolderRoot, NON_DELETEABLE_FOLDERS, WELLKNOWN_FOLDERS_IN_ROOT, \
     WELLKNOWN_FOLDERS_IN_ARCHIVE_ROOT
 from .queryset import SingleFolderQuerySet, SHALLOW, DEEP
@@ -16,7 +17,7 @@ from .queryset import SingleFolderQuerySet, SHALLOW, DEEP
 log = logging.getLogger(__name__)
 
 
-class RootOfHierarchy(Folder):
+class RootOfHierarchy(BaseFolder):
     # A list of wellknown, or "distinguished", folders that are belong in this folder hierarchy. See
     # https://docs.microsoft.com/en-us/dotnet/api/microsoft.exchange.webservices.data.wellknownfoldername
     # and https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/distinguishedfolderid
@@ -24,16 +25,31 @@ class RootOfHierarchy(Folder):
     WELLKNOWN_FOLDERS = []
     TRAVERSAL_DEPTH = DEEP
 
-    __slots__ = ('account', '_subfolders')
+    LOCAL_FIELDS = [
+        PermissionSetField('permission_set', field_uri='folder:PermissionSet', supported_from=EXCHANGE_2007_SP1),
+        EffectiveRightsField('effective_rights', field_uri='folder:EffectiveRights', is_read_only=True,
+                             supported_from=EXCHANGE_2007_SP1),
+    ]
+    FIELDS = BaseFolder.FIELDS + LOCAL_FIELDS
+    __slots__ = tuple(f.name for f in LOCAL_FIELDS) + ('_account', '_subfolders')
 
     # A special folder that acts as the top of a folder hierarchy. Finds and caches subfolders at arbitrary depth.
     def __init__(self, **kwargs):
-        self.account = kwargs.pop('account', None)  # A pointer back to the account holding the folder hierarchy
-        if kwargs.pop('root', None):
-            raise ValueError("RootOfHierarchy folders do not have a root")
-        kwargs['root'] = self
+        self._account = kwargs.pop('account', None)  # A pointer back to the account holding the folder hierarchy
         super(RootOfHierarchy, self).__init__(**kwargs)
         self._subfolders = None  # See self._folders_map()
+
+    @property
+    def account(self):
+        return self._account
+
+    @property
+    def root(self):
+        return self
+
+    @property
+    def parent(self):
+        return None
 
     def refresh(self):
         self._subfolders = None
@@ -71,11 +87,7 @@ class RootOfHierarchy(Folder):
                 yield f
 
     @classmethod
-    def get_distinguished(cls, root):
-        raise NotImplementedError('Use get_distinguished_root() instead')
-
-    @classmethod
-    def get_distinguished_root(cls, account):
+    def get_distinguished(cls, account):
         """Gets the distinguished folder for this folder class"""
         if not cls.DISTINGUISHED_FOLDER_ID:
             raise ValueError('Class %s must have a DISTINGUISHED_FOLDER_ID value' % cls)
