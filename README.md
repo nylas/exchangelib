@@ -1188,6 +1188,31 @@ from exchangelib import CalendarItem
 print(CalendarItem.__doc__)
 ```
 
+
+# Tests
+
+The test suite is split into unit tests, and integration tests that require a real Exchange
+server. If you want to run the full test suite, you must provide setup parameters for
+a test account. Copy `settings.yml.sample` to `settings.yml` and change the default
+parameters. If a `settings.yml` is available, we will run the entire test suite. Otherwise,
+just the unit tests are run.
+
+*WARNING*: The test account should not contain valuable data. The tests try hard to no touch
+existing data in the account, but accidents happen.
+
+You can run either the entire test suite or individual tests.
+
+```bash
+# Full test suite
+python setup.py test
+
+# Single test class or test case
+python tests/__init__.py FolderTest.test_refresh
+# Or, if you don't want extreme levels of debug output:
+python tests/__init__.py FolderTest.test_refresh -q
+```
+
+
 # Notes
 
 Almost all item fields are supported. The remaining ones are tracked in
