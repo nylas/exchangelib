@@ -28,7 +28,6 @@ from .properties import FreeBusyViewOptions, MailboxData, TimeWindow, TimeZone
 from .services import GetServerTimeZones, GetRoomLists, GetRooms, ResolveNames, GetUserAvailability, \
     GetSearchableMailboxes, ExpandDL
 from .transport import get_auth_instance, get_service_authtype, NTLM, GSSAPI, SSPI, OAUTH2, DEFAULT_HEADERS
-from .util import split_url
 from .version import Version, API_VERSIONS
 
 log = logging.getLogger(__name__)
@@ -83,9 +82,9 @@ class BaseProtocol(object):
     def retry_policy(self):
         return self.config.retry_policy
 
-    @threaded_cached_property
+    @property
     def server(self):
-        return split_url(self.service_endpoint)[1]
+        return self.config.server
 
     def __del__(self):
         # pylint: disable=bare-except

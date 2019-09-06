@@ -8,6 +8,7 @@ from future.utils import python_2_unicode_compatible
 from .credentials import BaseCredentials
 from .protocol import Protocol, RetryPolicy, FailFast
 from .transport import AUTH_TYPE_MAP
+from .util import split_url
 from .version import Version
 
 log = logging.getLogger(__name__)
@@ -60,6 +61,10 @@ class Configuration(object):
         self.auth_type = auth_type
         self.version = version
         self.retry_policy = retry_policy
+
+    @threaded_cached_property
+    def server(self):
+        return split_url(self.service_endpoint)[1]
 
     @threaded_cached_property
     def protocol(self):
