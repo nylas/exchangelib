@@ -138,7 +138,7 @@ class FolderCollection(SearchableMixIn):
         :param offset: the offset relative to the first item in the item collection
         :return: a generator for the returned item IDs or items
         """
-        from .base import Folder
+        from .base import BaseFolder
         if shape not in SHAPE_CHOICES:
             raise ValueError("'shape' %s must be one of %s" % (shape, SHAPE_CHOICES))
         if depth not in ITEM_TRAVERSAL_CHOICES:
@@ -192,20 +192,20 @@ class FolderCollection(SearchableMixIn):
                 if isinstance(i, Exception):
                     yield i
                 else:
-                    yield Folder.item_model_from_tag(i.tag).from_xml(elem=i, account=self.account)
+                    yield BaseFolder.item_model_from_tag(i.tag).from_xml(elem=i, account=self.account)
 
     def get_folder_fields(self, is_complex=None):
-        from .base import Folder
+        from .base import BaseFolder
         additional_fields = set()
         for folder in self.folders:
-            if isinstance(folder, Folder):
+            if isinstance(folder, BaseFolder):
                 additional_fields.update(
                     FieldPath(field=f) for f in folder.supported_fields(version=self.account.version)
                     if is_complex is None or f.is_complex is is_complex
                 )
             else:
                 additional_fields.update(
-                    FieldPath(field=f) for f in Folder.supported_fields(version=self.account.version)
+                    FieldPath(field=f) for f in BaseFolder.supported_fields(version=self.account.version)
                     if is_complex is None or f.is_complex is is_complex
                 )
         return additional_fields

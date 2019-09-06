@@ -99,7 +99,7 @@ def resolve_field_path(field_path, folder, strict=True):
                 % (field_path, fieldname, field.value_cls.get_field_by_fieldname('label').default)
             )
         valid_labels = field.value_cls.get_field_by_fieldname('label').supported_choices(
-            version=folder.root.account.version
+            version=folder.account.version
         )
         if label and label not in valid_labels:
             raise ValueError(
@@ -118,7 +118,7 @@ def resolve_field_path(field_path, folder, strict=True):
                     subfield = field.value_cls.get_field_by_fieldname(subfieldname)
                 except ValueError:
                     fnames = ', '.join(f.name for f in field.value_cls.supported_fields(
-                        version=folder.root.account.version
+                        version=folder.account.version
                     ))
                     raise ValueError(
                         "Subfield '%s' on IndexedField path '%s' must be one of %s"
@@ -132,7 +132,7 @@ def resolve_field_path(field_path, folder, strict=True):
                     "IndexedField path '%s' must not specify subfield, e.g. just '%s__%s'"
                     % (field_path, fieldname, label)
                 )
-            subfield = field.value_cls.value_field(version=folder.root.account.version)
+            subfield = field.value_cls.value_field(version=folder.account.version)
     else:
         if label or subfieldname:
             raise ValueError(

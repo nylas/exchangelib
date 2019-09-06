@@ -4,6 +4,8 @@ Change Log
 HEAD
 ----
 -   Added support for OAuth 2.0 authentication
+-   Fixed a bug in `RelativeMonthlyPattern` and `RelativeYearlyPattern` where the `weekdays` field was thought to
+    be a list, but is in fact a single value. Renamed the field to `weekday` to reflect the change.
 
 
 2.0.1

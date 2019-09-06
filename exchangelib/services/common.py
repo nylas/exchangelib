@@ -550,11 +550,11 @@ def create_shape_element(tag, shape, additional_fields, version):
 
 
 def create_folder_ids_element(tag, folders, version):
-    from ..folders import Folder, FolderId, DistinguishedFolderId
+    from ..folders import BaseFolder, FolderId, DistinguishedFolderId
     folder_ids = create_element(tag)
     for folder in folders:
         log.debug('Collecting folder %s', folder)
-        if not isinstance(folder, (Folder, FolderId, DistinguishedFolderId)):
+        if not isinstance(folder, (BaseFolder, FolderId, DistinguishedFolderId)):
             folder = to_item_id(folder, FolderId)
         set_xml_value(folder_ids, folder, version=version)
     if not len(folder_ids):
@@ -585,7 +585,7 @@ def create_attachment_ids_element(items, version):
 
 
 def parse_folder_elem(elem, folder, account):
-    from ..folders import Folder, DistinguishedFolderId, RootOfHierarchy
+    from ..folders import BaseFolder, Folder, DistinguishedFolderId, RootOfHierarchy
     if isinstance(elem, Exception):
         return elem
     if isinstance(folder, RootOfHierarchy):
@@ -605,6 +605,6 @@ def parse_folder_elem(elem, folder, account):
         f = Folder.from_xml_with_root(elem=elem, root=account.root)
     if isinstance(folder, DistinguishedFolderId):
         f.is_distinguished = True
-    elif isinstance(folder, Folder) and folder.is_distinguished:
+    elif isinstance(folder, BaseFolder) and folder.is_distinguished:
         f.is_distinguished = True
     return f

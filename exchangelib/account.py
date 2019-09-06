@@ -20,7 +20,7 @@ from .folders import Folder, AdminAuditLogs, ArchiveDeletedItems, ArchiveInbox, 
     Directory, Drafts, Favorites, IMContactList, Inbox, Journal, JunkEmail, LocalFailures, MsgFolderRoot, MyContacts, \
     Notes, Outbox, PeopleConnect, PublicFoldersRoot, QuickContacts, RecipientCache, RecoverableItemsDeletions, \
     RecoverableItemsPurges, RecoverableItemsRoot, RecoverableItemsVersions, Root, SearchFolders, SentItems, \
-    ServerFailures, SyncIssues, Tasks, ToDoSearch, VoiceMail
+    ServerFailures, SyncIssues, Tasks, ToDoSearch, VoiceMail, BaseFolder
 from .items import Item, BulkCreateResult, HARD_DELETE, \
     AUTO_RESOLVE, SEND_TO_NONE, SAVE_ONLY, SEND_AND_SAVE_COPY, SEND_ONLY, ALL_OCCURRENCIES, \
     DELETE_TYPE_CHOICES, MESSAGE_DISPOSITION_CHOICES, CONFLICT_RESOLUTION_CHOICES, AFFECTED_TASK_OCCURRENCES_CHOICES, \
@@ -134,7 +134,7 @@ class Account(object):
 
     @threaded_cached_property
     def archive_root(self):
-        return ArchiveRoot.get_distinguished_root(account=self)
+        return ArchiveRoot.get_distinguished(account=self)
 
     @threaded_cached_property
     def calendar(self):
@@ -210,7 +210,7 @@ class Account(object):
 
     @threaded_cached_property
     def public_folders_root(self):
-        return PublicFoldersRoot.get_distinguished_root(account=self)
+        return PublicFoldersRoot.get_distinguished(account=self)
 
     @threaded_cached_property
     def quick_contacts(self):
@@ -238,7 +238,7 @@ class Account(object):
 
     @threaded_cached_property
     def root(self):
-        return Root.get_distinguished_root(account=self)
+        return Root.get_distinguished(account=self)
 
     @threaded_cached_property
     def search_folders(self):
@@ -368,9 +368,9 @@ class Account(object):
                 send_meeting_invitations, SEND_MEETING_INVITATIONS_CHOICES
             ))
         if folder is not None:
-            if not isinstance(folder, Folder):
+            if not isinstance(folder, BaseFolder):
                 raise ValueError("'folder' %r must be a Folder instance" % folder)
-            if not folder.root or folder.root.account != self:
+            if folder.account != self:
                 raise ValueError('"Folder must belong to this account')
         if message_disposition == SAVE_ONLY and folder is None:
             raise AttributeError("Folder must be supplied when in save-only mode")
@@ -513,6 +513,8 @@ class Account(object):
             raise AttributeError("'save_copy' must be True when 'copy_to_folder' is set")
         if save_copy and not copy_to_folder:
             copy_to_folder = self.sent  # 'Sent' is default EWS behaviour
+        if copy_to_folder and not isinstance(copy_to_folder, BaseFolder):
+            raise ValueError("'copy_to_folder' %r must be a Folder instance" % copy_to_folder)
         return list(
             self._consume_item_service(service_cls=SendItem, items=ids, chunk_size=chunk_size, kwargs=dict(
                 saved_item_folder=copy_to_folder,
@@ -527,7 +529,7 @@ class Account(object):
         :param chunk_size: The number of items to send to the server in a single request
         :return: Status for each send operation, in the same order as the input
         """
-        if not isinstance(to_folder, Folder):
+        if not isinstance(to_folder, BaseFolder):
             raise ValueError("'to_folder' %r must be a Folder instance" % to_folder)
         return list(
             i if isinstance(i, Exception) else Item.id_from_xml(i)
@@ -545,7 +547,7 @@ class Account(object):
         :return: The new IDs of the moved items, in the same order as the input. If 'to_folder' is a public folder or a
         folder in a different mailbox, an empty list is returned.
         """
-        if not isinstance(to_folder, Folder):
+        if not isinstance(to_folder, BaseFolder):
             raise ValueError("'to_folder' %r must be a Folder instance" % to_folder)
         return list(
             i if isinstance(i, Exception) else Item.id_from_xml(i)

@@ -28,7 +28,7 @@ class Calendar(Folder):
     __slots__ = tuple()
 
     def view(self, *args, **kwargs):
-        return FolderCollection(account=self.root.account, folders=[self]).view(*args, **kwargs)
+        return FolderCollection(account=self.account, folders=[self]).view(*args, **kwargs)
 
 
 class DeletedItems(Folder):

@@ -1,5 +1,5 @@
 from ..properties import FolderId, DistinguishedFolderId
-from .base import Folder
+from .base import BaseFolder, Folder
 from .collections import FolderCollection
 from .known_folders import AdminAuditLogs, AllContacts, AllItems, ArchiveDeletedItems, ArchiveInbox, \
     ArchiveMsgFolderRoot, ArchiveRecoverableItemsDeletions, ArchiveRecoverableItemsPurges, \
@@ -19,7 +19,7 @@ from .roots import Root, ArchiveRoot, PublicFoldersRoot, RootOfHierarchy
 __all__ = [
     'FolderId', 'DistinguishedFolderId',
     'FolderCollection',
-    'Folder',
+    'BaseFolder', 'Folder',
     'AdminAuditLogs', 'AllContacts', 'AllItems', 'ArchiveDeletedItems', 'ArchiveInbox', 'ArchiveMsgFolderRoot',
     'ArchiveRecoverableItemsDeletions', 'ArchiveRecoverableItemsPurges', 'ArchiveRecoverableItemsRoot',
     'ArchiveRecoverableItemsVersions', 'Audits', 'Calendar', 'CalendarLogging', 'CommonViews', 'Conflicts',
