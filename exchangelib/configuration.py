@@ -54,10 +54,10 @@ class Configuration(object):
         if not isinstance(retry_policy, RetryPolicy):
             raise ValueError("'retry_policy' %r must be a RetryPolicy instance" % retry_policy)
         self.credentials = credentials
-        self.server = server
-        self.service_endpoint = service_endpoint
         if server:
             self.service_endpoint = 'https://%s/EWS/Exchange.asmx' % server
+        else:
+            self.service_endpoint = service_endpoint
         self.auth_type = auth_type
         self.version = version
         self.retry_policy = retry_policy
