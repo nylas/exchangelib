@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 
 import logging
 
+from future.utils import python_2_unicode_compatible
 from six import text_type
 
 from ..errors import ErrorAccessDenied, ErrorFolderNotFound, ErrorNoPublicFolderReplicaAvailable, ErrorItemNotFound, \
@@ -17,6 +18,7 @@ from .queryset import SingleFolderQuerySet, SHALLOW, DEEP
 log = logging.getLogger(__name__)
 
 
+@python_2_unicode_compatible
 class RootOfHierarchy(BaseFolder):
     # A list of wellknown, or "distinguished", folders that are belong in this folder hierarchy. See
     # https://docs.microsoft.com/en-us/dotnet/api/microsoft.exchange.webservices.data.wellknownfoldername

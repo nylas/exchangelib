@@ -26,7 +26,6 @@ from .queryset import SingleFolderQuerySet, SHALLOW
 log = logging.getLogger(__name__)
 
 
-@python_2_unicode_compatible
 class BaseFolder(RegisterMixIn, SearchableMixIn):
     """
     MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/folder
