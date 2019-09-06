@@ -194,21 +194,29 @@ class FolderCollection(SearchableMixIn):
                 else:
                     yield BaseFolder.item_model_from_tag(i.tag).from_xml(elem=i, account=self.account)
 
-    def get_folder_fields(self, is_complex=None):
-        from .base import BaseFolder
-        additional_fields = set()
-        for folder in self.folders:
-            if isinstance(folder, BaseFolder):
-                additional_fields.update(
-                    FieldPath(field=f) for f in folder.supported_fields(version=self.account.version)
-                    if is_complex is None or f.is_complex is is_complex
-                )
+    def get_folder_fields(self, target_cls, is_complex=None):
+        return {
+            FieldPath(field=f) for f in target_cls.supported_fields(version=self.account.version)
+            if is_complex is None or f.is_complex is is_complex
+        }
+
+    def _get_target_cls(self):
+        # We may have root folders that don't support the same set of fields as normal folders. If there is a mix of
+        # both folder types in self.folders, raise an error so we don't risk losing some fields in the query.
+        from .base import Folder
+        from .roots import RootOfHierarchy
+        has_roots = False
+        has_non_roots = False
+        for f in self.folders:
+            if isinstance(f, RootOfHierarchy):
+                if has_non_roots:
+                    raise ValueError('Cannot call GetFolder on a mix of folder types: {}'.format(self.folders))
+                has_roots = True
             else:
-                additional_fields.update(
-                    FieldPath(field=f) for f in BaseFolder.supported_fields(version=self.account.version)
-                    if is_complex is None or f.is_complex is is_complex
-                )
-        return additional_fields
+                if has_roots:
+                    raise ValueError('Cannot call GetFolder on a mix of folder types: {}'.format(self.folders))
+                has_non_roots = True
+        return RootOfHierarchy if has_roots else Folder
 
     def resolve(self):
         # Looks up the folders or folder IDs in the collection and returns full Folder instances with all fields set.
@@ -220,7 +228,7 @@ class FolderCollection(SearchableMixIn):
             else:
                 resolveable_folders.append(f)
         # Fetch all properties for the remaining folders of folder IDs
-        additional_fields = self.get_folder_fields(is_complex=None)
+        additional_fields = self.get_folder_fields(target_cls=self._get_target_cls(), is_complex=None)
         for f in self.__class__(account=self.account, folders=resolveable_folders).get_folders(
                 additional_fields=additional_fields
         ):
@@ -229,7 +237,7 @@ class FolderCollection(SearchableMixIn):
     def find_folders(self, q=None, shape=ID_ONLY, depth=DEEP, additional_fields=None, page_size=None, max_items=None,
                      offset=0):
         # 'depth' controls whether to return direct children or recurse into sub-folders
-        from .base import Folder
+        from .base import BaseFolder, Folder
         if not self.account:
             raise ValueError('Folder must have an account')
         if q is None or q.is_empty():
@@ -244,8 +252,8 @@ class FolderCollection(SearchableMixIn):
             log.debug('Folder list is empty')
             return
         if additional_fields is None:
-            # Default to all non-complex properties
-            additional_fields = self.get_folder_fields(is_complex=False)
+            # Default to all non-complex properties. Subfolders will always be of class Folder
+            additional_fields = self.get_folder_fields(target_cls=Folder, is_complex=False)
         else:
             for f in additional_fields:
                 if f.field.is_complex:
@@ -253,7 +261,7 @@ class FolderCollection(SearchableMixIn):
 
         # Add required fields
         additional_fields.update(
-            (FieldPath(field=Folder.get_field_by_fieldname(f)) for f in self.REQUIRED_FOLDER_FIELDS)
+            (FieldPath(field=BaseFolder.get_field_by_fieldname(f)) for f in self.REQUIRED_FOLDER_FIELDS)
         )
 
         for f in FindFolder(account=self.account, folders=self.folders, chunk_size=page_size).call(
@@ -268,17 +276,17 @@ class FolderCollection(SearchableMixIn):
 
     def get_folders(self, additional_fields=None):
         # Expand folders with their full set of properties
-        from .base import Folder
+        from .base import BaseFolder
         if not self.folders:
             log.debug('Folder list is empty')
             return
         if additional_fields is None:
             # Default to all complex properties
-            additional_fields = self.get_folder_fields(is_complex=True)
+            additional_fields = self.get_folder_fields(target_cls=self._get_target_cls(), is_complex=True)
 
         # Add required fields
         additional_fields.update(
-            (FieldPath(field=Folder.get_field_by_fieldname(f)) for f in self.REQUIRED_FOLDER_FIELDS)
+            (FieldPath(field=BaseFolder.get_field_by_fieldname(f)) for f in self.REQUIRED_FOLDER_FIELDS)
         )
 
         for f in GetFolder(account=self.account).call(
