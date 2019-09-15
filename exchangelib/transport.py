@@ -128,18 +128,6 @@ def get_autodiscover_authtype(service_endpoint, data):
     return _get_auth_method_from_response(response=r)
 
 
-def get_docs_authtype(docs_url):
-    # Get auth type by tasting headers from the server. Don't do HEAD requests. It's too error prone.
-    log.debug('Getting docs auth type for %s', docs_url)
-    from .protocol import BaseProtocol
-    try:
-        with BaseProtocol.raw_session() as s:
-            r = s.get(url=docs_url, headers=DEFAULT_HEADERS.copy(), allow_redirects=False, timeout=BaseProtocol.TIMEOUT)
-    except CONNECTION_ERRORS as e:
-        raise TransportError(str(e))
-    return _get_auth_method_from_response(response=r)
-
-
 def get_service_authtype(service_endpoint, versions, name):
     # Get auth type by tasting headers from the server. Only do POST requests. HEAD is too error prone, and some servers
     # are set up to redirect to OWA on all requests except POST to /EWS/Exchange.asmx
