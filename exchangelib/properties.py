@@ -777,6 +777,23 @@ class CalendarView(EWSElement):
             raise ValueError("'start' must be before 'end'")
 
 
+class CalendarEventDetails(EWSElement):
+    # MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/calendareventdetails
+    ELEMENT_NAME = 'CalendarEventDetails'
+    FIELDS = [
+        CharField('id', field_uri='ID'),
+        CharField('subject', field_uri='Subject'),
+        CharField('location', field_uri='Location'),
+        BooleanField('is_meeting', field_uri='IsMeeting'),
+        BooleanField('is_recurring', field_uri='IsRecurring'),
+        BooleanField('is_exception', field_uri='IsException'),
+        BooleanField('is_reminder_set', field_uri='IsReminderSet'),
+        BooleanField('is_private', field_uri='IsPrivate'),
+    ]
+
+    __slots__ = tuple(f.name for f in FIELDS)
+
+
 class CalendarEvent(EWSElement):
     # MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/calendarevent
     ELEMENT_NAME = 'CalendarEvent'
@@ -784,7 +801,7 @@ class CalendarEvent(EWSElement):
         DateTimeField('start', field_uri='StartTime'),
         DateTimeField('end', field_uri='EndTime'),
         FreeBusyStatusField('busy_type', field_uri='BusyType', is_required=True, default='Busy'),
-        # CalendarEventDetails
+        EWSElementField('details', field_uri='CalendarEventDetails', value_cls=CalendarEventDetails),
     ]
 
     __slots__ = tuple(f.name for f in FIELDS)
