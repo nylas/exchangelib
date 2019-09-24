@@ -758,7 +758,7 @@ for item in a.inbox.all().order_by('-datetime_received')[:5]:
         item.move_to_trash()
 ```
 
-## Searching contacts
+## Contacts
 
 Fetching personas from a contact folder is supported using the same
 syntax as folders. Just start your query with `.people()`:
@@ -788,6 +788,27 @@ gmail_addresses = [e.email for c in
 all_addresses = [e.email for c in gal.all()
                  for e in c.email_addresses if not isinstance(c, DistributionList)]
 ```
+
+Contact items have `photo` and `notes` fields, but they are apparently unused. Instead, you can
+add a contact photo and notes like this:
+
+```python
+from exchangelib import Account, FileAttachment
+
+a = Account(...)
+contact = a.contacts.get(given_name='John')
+contact.body = 'This is a note'
+contact.save(update_fields=['body'])
+att = FileAttachment(
+    name='ContactPicture.jpg',
+    content_type='image/png',
+    is_inline=False,
+    is_contact_photo=True,
+    content=open('john_profile_picture.png', 'rb').read(),
+)
+contact.attach(att)
+```
+
 
 ## Extended properties
 
