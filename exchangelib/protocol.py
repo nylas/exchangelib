@@ -172,7 +172,7 @@ class BaseProtocol(object):
             if self.auth_type != OAUTH2:
                 raise ValueError('Auth type must be %r for credentials type OAuth2Credentials' % OAUTH2)
 
-            token_url = 'https://login.microsoftonline.com/%s/oauth2/v2.0/token' % {self.credentials.tenant_id}
+            token_url = 'https://login.microsoftonline.com/%s/oauth2/v2.0/token' % self.credentials.tenant_id
             scope = ['https://outlook.office365.com/.default']
             client = BackendApplicationClient(client_id=self.credentials.client_id)
             session = OAuth2Session(client=client)
