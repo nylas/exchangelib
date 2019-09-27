@@ -44,7 +44,7 @@ from exchangelib.errors import RelativeRedirect, ErrorItemNotFound, ErrorInvalid
     AutoDiscoverCircularRedirect, AutoDiscoverFailed, ErrorNonExistentMailbox, UnknownTimeZone, \
     ErrorNameResolutionNoResults, TransportError, RedirectError, CASError, RateLimitError, UnauthorizedError, \
     ErrorInvalidChangeKey, ErrorAccessDenied, \
-    ErrorFolderNotFound, ErrorInvalidRequest, SOAPError, ErrorInvalidServerVersion, NaiveDateTimeNotAllowed, \
+    ErrorFolderNotFound, MalformedResponseError, SOAPError, ErrorInvalidServerVersion, NaiveDateTimeNotAllowed, \
     AmbiguousTimeError, NonExistentTimeError, ErrorUnsupportedPathForQuery, \
     ErrorInvalidValueForProperty, ErrorPropertyUpdate, ErrorDeleteDistinguishedFolder, \
     ErrorNoPublicFolderReplicaAvailable, ErrorServerBusy, ErrorInvalidPropertySet, ErrorObjectTypeChanged, \
@@ -184,104 +184,73 @@ class VersionTest(TimedTestCase):
     @requests_mock.mock()  # Just to make sure we don't make any requests
     def test_from_response(self, m):
         # Test fallback to suggested api_version value when there is a version mismatch and response version is fishy
-        version = Version.from_response(
+        version = Version.from_soap_header(
             'Exchange2007',
-            b'''\
-<?xml version="1.0" ?>
-<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+            to_xml(b'''\
 <s:Header>
     <h:ServerVersionInfo
         MajorBuildNumber="845" MajorVersion="15" MinorBuildNumber="22" MinorVersion="1" Version="V2016_10_10"
         xmlns:h="http://schemas.microsoft.com/exchange/services/2006/types"/>
-</s:Header>
-</s:Envelope>'''
+</s:Header>''')
         )
         self.assertEqual(version.api_version, EXCHANGE_2007.api_version())
         self.assertEqual(version.api_version, 'Exchange2007')
         self.assertEqual(version.build, Build(15, 1, 845, 22))
 
         # Test that override the suggested version if the response version is not fishy
-        version = Version.from_response(
+        version = Version.from_soap_header(
             'Exchange2013',
-            b'''\
-<?xml version="1.0" ?>
-<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+            to_xml(b'''\
 <s:Header>
     <h:ServerVersionInfo
         MajorBuildNumber="845" MajorVersion="15" MinorBuildNumber="22" MinorVersion="1" Version="HELLO_FROM_EXCHANGELIB"
         xmlns:h="http://schemas.microsoft.com/exchange/services/2006/types"/>
-</s:Header>
-</s:Envelope>'''
+</s:Header>''')
         )
         self.assertEqual(version.api_version, 'HELLO_FROM_EXCHANGELIB')
 
         # Test that we override the suggested version with the version deduced from the build number if a version is not
         # present in the response
-        version = Version.from_response(
+        version = Version.from_soap_header(
             'Exchange2013',
-            b'''\
-<?xml version="1.0" ?>
-<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+            to_xml(b'''\
 <s:Header>
     <h:ServerVersionInfo
         MajorBuildNumber="845" MajorVersion="15" MinorBuildNumber="22" MinorVersion="1"
         xmlns:h="http://schemas.microsoft.com/exchange/services/2006/types"/>
-</s:Header>
-</s:Envelope>'''
+</s:Header>''')
         )
         self.assertEqual(version.api_version, 'Exchange2016')
 
         # Test that we use the version deduced from the build number when a version is not present in the response and
         # there was no suggested version.
-        version = Version.from_response(
+        version = Version.from_soap_header(
             None,
-            b'''\
-<?xml version="1.0" ?>
-<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+            to_xml(b'''\
 <s:Header>
     <h:ServerVersionInfo
         MajorBuildNumber="845" MajorVersion="15" MinorBuildNumber="22" MinorVersion="1"
         xmlns:h="http://schemas.microsoft.com/exchange/services/2006/types"/>
-</s:Header>
-</s:Envelope>'''
+</s:Header>''')
         )
         self.assertEqual(version.api_version, 'Exchange2016')
 
         # Test various parse failures
         with self.assertRaises(TransportError):
-            Version.from_response(
+            Version.from_soap_header(
                 'Exchange2013',
-                b'XXX'
-            )
-        with self.assertRaises(TransportError):
-            Version.from_response(
-                'Exchange2013',
-                b'''\
-<?xml version="1.0" ?>
-<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
-</s:Envelope>'''
-            )
-        with self.assertRaises(TransportError):
-            Version.from_response(
-                'Exchange2013',
-                b'''\
-<?xml version="1.0" ?>
-<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+                to_xml(b'''\
 <s:Header>
-</s:Header>
-</s:Envelope>'''
+</s:Header>''')
             )
         with self.assertRaises(TransportError):
-            Version.from_response(
+            Version.from_soap_header(
                 'Exchange2013',
-                b'''\
-<?xml version="1.0" ?>
-<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+                to_xml(b'''\
 <s:Header>
     <h:ServerVersionInfo MajorBuildNumber="845" MajorVersion="15" Version="V2016_10_10"
         xmlns:h="http://schemas.microsoft.com/exchange/services/2006/types"/>
-</s:Header>
-</s:Envelope>'''
+</s:Header>''')
             )
 
 
@@ -1724,8 +1693,9 @@ class CommonTest(EWSTest):
     </s:Fault>
   </s:Body>
 </s:Envelope>'''
+        header, body = ws._get_soap_parts(response=MockResponse(xml))
         with self.assertRaises(ErrorServerBusy) as cm:
-            ws._get_elements_in_response(response=ws._get_soap_payload(response=MockResponse(xml)))
+            ws._get_elements_in_response(response=ws._get_soap_messages(body=body))
         self.assertEqual(cm.exception.back_off, 297.749)
 
     def test_get_timezones(self):
@@ -1812,7 +1782,8 @@ class CommonTest(EWSTest):
         </m:GetRoomListsResponse>
     </s:Body>
 </s:Envelope>'''
-        res = ws._get_elements_in_response(response=ws._get_soap_payload(response=MockResponse(xml)))
+        header, body = ws._get_soap_parts(response=MockResponse(xml))
+        res = ws._get_elements_in_response(response=ws._get_soap_messages(body=body))
         self.assertSetEqual(
             {RoomList.from_xml(elem=elem, account=None).email_address for elem in res},
             {'roomlist1@example.com', 'roomlist2@example.com'}
@@ -1867,7 +1838,8 @@ class CommonTest(EWSTest):
         </m:GetRoomsResponse>
     </s:Body>
 </s:Envelope>'''
-        res = ws._get_elements_in_response(response=ws._get_soap_payload(response=MockResponse(xml)))
+        header, body = ws._get_soap_parts(response=MockResponse(xml))
+        res = ws._get_elements_in_response(response=ws._get_soap_messages(body=body))
         self.assertSetEqual(
             {Room.from_xml(elem=elem, account=None).email_address for elem in res},
             {'room1@example.com', 'room2@example.com'}
@@ -1950,7 +1922,8 @@ class CommonTest(EWSTest):
     </m:ResolveNamesResponse>
   </s:Body>
 </s:Envelope>'''
-        res = ws._get_elements_in_response(response=ws._get_soap_payload(response=MockResponse(xml)))
+        header, body = ws._get_soap_parts(response=MockResponse(xml))
+        res = ws._get_elements_in_response(response=ws._get_soap_messages(body=body))
         self.assertSetEqual(
             {Mailbox.from_xml(elem=elem.find(Mailbox.response_tag()), account=None).email_address for elem in res},
             {'anne@example.com', 'john@example.com'}
@@ -2301,22 +2274,25 @@ class CommonTest(EWSTest):
     </soap:Fault>
   </soap:Body>
 </soap:Envelope>"""
-        with self.assertRaises(SOAPError) as e:
-            ResolveNames._get_soap_payload(response=MockResponse(soap_xml.format(
+        header, body = ResolveNames._get_soap_parts(response=MockResponse(soap_xml.format(
                 faultcode='YYY', faultstring='AAA', responsecode='XXX', message='ZZZ'
             ).encode('utf-8')))
+        with self.assertRaises(SOAPError) as e:
+            ResolveNames._get_soap_messages(body=body)
         self.assertIn('AAA', e.exception.args[0])
         self.assertIn('YYY', e.exception.args[0])
         self.assertIn('ZZZ', e.exception.args[0])
-        with self.assertRaises(ErrorNonExistentMailbox) as e:
-            ResolveNames._get_soap_payload(response=MockResponse(soap_xml.format(
+        header, body = ResolveNames._get_soap_parts(response=MockResponse(soap_xml.format(
                 faultcode='ErrorNonExistentMailbox', faultstring='AAA', responsecode='XXX', message='ZZZ'
             ).encode('utf-8')))
-        self.assertIn('AAA', e.exception.args[0])
         with self.assertRaises(ErrorNonExistentMailbox) as e:
-            ResolveNames._get_soap_payload(response=MockResponse(soap_xml.format(
+            ResolveNames._get_soap_messages(body=body)
+        self.assertIn('AAA', e.exception.args[0])
+        header, body = ResolveNames._get_soap_parts(response=MockResponse(soap_xml.format(
                 faultcode='XXX', faultstring='AAA', responsecode='ErrorNonExistentMailbox', message='YYY'
             ).encode('utf-8')))
+        with self.assertRaises(ErrorNonExistentMailbox) as e:
+            ResolveNames._get_soap_messages(body=body)
         self.assertIn('YYY', e.exception.args[0])
 
         # Test bad XML (no body)
@@ -2329,8 +2305,8 @@ class CommonTest(EWSTest):
   </soap:Header>
   </soap:Body>
 </soap:Envelope>"""
-        with self.assertRaises(TransportError):
-            ResolveNames._get_soap_payload(response=MockResponse(soap_xml))
+        with self.assertRaises(MalformedResponseError):
+            ResolveNames._get_soap_parts(response=MockResponse(soap_xml))
 
         # Test bad XML (no fault)
         soap_xml = b"""\
@@ -2345,8 +2321,9 @@ class CommonTest(EWSTest):
     </soap:Fault>
   </soap:Body>
 </soap:Envelope>"""
+        header, body = ResolveNames._get_soap_parts(response=MockResponse(soap_xml))
         with self.assertRaises(TransportError):
-            ResolveNames._get_soap_payload(response=MockResponse(soap_xml))
+            ResolveNames._get_soap_messages(body=body)
 
     def test_element_container(self):
         svc = ResolveNames(self.account.protocol)
@@ -2363,7 +2340,8 @@ class CommonTest(EWSTest):
     </m:ResolveNamesResponse>
   </soap:Body>
 </soap:Envelope>"""
-        resp = svc._get_soap_payload(response=MockResponse(soap_xml))
+        header, body = svc._get_soap_parts(response=MockResponse(soap_xml))
+        resp = svc._get_soap_messages(body=body)
         with self.assertRaises(TransportError) as e:
             # Missing ResolutionSet elements
             list(svc._get_elements_in_response(response=resp))

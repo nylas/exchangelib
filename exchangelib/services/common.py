@@ -13,7 +13,7 @@ from ..errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired,
     ErrorInternalServerTransientError, ErrorNoRespondingCASInDestinationSite, ErrorImpersonationFailed, \
     ErrorMailboxMoveInProgress, ErrorAccessDenied, ErrorConnectionFailed, RateLimitError, ErrorServerBusy, \
     ErrorTooManyObjectsOpened, ErrorInvalidLicense, ErrorInvalidSchemaVersionForMailboxVersion, \
-    ErrorInvalidServerVersion, ErrorItemNotFound, ErrorADUnavailable, ResponseMessageError, ErrorInvalidChangeKey, \
+    ErrorInvalidServerVersion, ErrorItemNotFound, ErrorADUnavailable, ErrorInvalidChangeKey, \
     ErrorItemSave, ErrorInvalidIdMalformed, ErrorMessageSizeExceeded, UnauthorizedError, \
     ErrorCannotDeleteTaskOccurrence, ErrorMimeContentConversionFailed, ErrorRecurrenceHasNoOccurrence, \
     ErrorNoPublicFolderReplicaAvailable, MalformedResponseError, ErrorExceededConnectionCount, \
@@ -141,9 +141,17 @@ class EWSService(object):
                 # If we're streaming, we want to wait to release the session until we have consumed the stream.
                 self.protocol.release_session(session)
             try:
-                res = self._get_soap_payload(response=r, **parse_opts)
+                header, body = self._get_soap_parts(response=r, **parse_opts)
             except ParseError as e:
                 raise SOAPError('Bad SOAP response: %s' % e)
+            # The body may contain error messages from Exchange, but we still want to collect version info
+            if header is not None:
+                try:
+                    self._update_api_version(hint=hint, api_version=api_version, header=header, **parse_opts)
+                except TransportError as te:
+                    log.debug('Failed to update version info (%s)', te)
+            try:
+                res = self._get_soap_messages(body=body, **parse_opts)
             except (ErrorInvalidServerVersion, ErrorIncorrectSchemaVersion, ErrorInvalidRequest):
                 # The guessed server version is wrong. Try the next version
                 log.debug('API version %s was invalid', api_version)
@@ -178,15 +186,6 @@ class EWSService(object):
 
                 # Re-raise as an ErrorServerBusy with a default delay of 5 minutes
                 raise ErrorServerBusy(msg='Reraised from %s(%s)' % (e.__class__.__name__, e), back_off=300)
-            except ResponseMessageError as rme:
-                # We got an error message from Exchange, but we still want to get any new version info from the response
-                try:
-                    self._update_api_version(hint=hint, api_version=api_version, response=r)
-                except TransportError as te:
-                    log.debug('Failed to update version info (%s)', te)
-                raise rme
-            else:
-                self._update_api_version(hint=hint, api_version=api_version, response=r)
             finally:
                 if self.streaming:
                     # TODO: We shouldn't release the session yet if we still haven't fully consumed the stream. It seems
@@ -210,22 +209,19 @@ class EWSService(object):
         self.protocol.retry_policy.back_off(e.back_off)
         # We'll warn about this later if we actually need to sleep
 
-    def _update_api_version(self, hint, api_version, response):
-        if api_version == hint.api_version and hint.build is not None:
+    def _update_api_version(self, hint, api_version, header, **parse_opts):
+        from ..version import Version
+        head_version = Version.from_soap_header(requested_api_version=api_version, header=header)
+        if hint == head_version:
             # Nothing to do
             return
+        log.debug('Found new version (%s -> %s)', hint, head_version)
         # The api_version that worked was different than our hint, or we never got a build version. Set new
         # version for account.
-        from ..version import Version
-        if api_version != hint.api_version:
-            log.debug('Found new API version (%s -> %s)', hint.api_version, api_version)
-        else:
-            log.debug('Adding missing build number %s', api_version)
-        new_version = Version.from_response(requested_api_version=api_version, bytes_content=response.content)
         if isinstance(self, EWSAccountService):
-            self.account.version = new_version
+            self.account.version = head_version
         else:
-            self.protocol.config.version = new_version
+            self.protocol.config.version = head_version
 
     @classmethod
     def _response_tag(cls):
@@ -240,11 +236,19 @@ class EWSService(object):
         return '{%s}%sResponseMessage' % (MNS, cls.SERVICE_NAME)
 
     @classmethod
-    def _get_soap_payload(cls, response, **parse_opts):
+    def _get_soap_parts(cls, response, **parse_opts):
         root = to_xml(response.iter_content())
+        header = root.find('{%s}Header' % SOAPNS)
+        if header is None:
+            # This is normal when the response contains SOAP-level errors
+            log.debug('No header in XML response')
         body = root.find('{%s}Body' % SOAPNS)
         if body is None:
             raise MalformedResponseError('No Body element in SOAP response')
+        return header, body
+
+    @classmethod
+    def _get_soap_messages(cls, body, **parse_opts):
         response = body.find(cls._response_tag())
         if response is None:
             fault = body.find('{%s}Fault' % SOAPNS)

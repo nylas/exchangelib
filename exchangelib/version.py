@@ -9,7 +9,7 @@ from six import text_type
 
 from .errors import TransportError, ErrorInvalidSchemaVersionForMailboxVersion, ErrorInvalidServerVersion, \
     ErrorIncorrectSchemaVersion, ResponseMessageError
-from .util import PickleMixIn, to_xml, TNS, SOAPNS, ParseError
+from .util import PickleMixIn, xml_to_str, TNS
 
 log = logging.getLogger(__name__)
 
@@ -211,21 +211,14 @@ class Version(PickleMixIn):
         return re.match(r'V[0-9]{1,4}_.*', version)
 
     @classmethod
-    def from_response(cls, requested_api_version, bytes_content):
-        try:
-            header = to_xml(bytes_content).find('{%s}Header' % SOAPNS)
-            if header is None:
-                raise TransportError('No header in XML response (%r)' % bytes_content)
-        except ParseError:
-            raise TransportError('Unknown XML response (%r)' % bytes_content)
-
+    def from_soap_header(cls, requested_api_version, header):
         info = header.find('{%s}ServerVersionInfo' % TNS)
         if info is None:
-            raise TransportError('No ServerVersionInfo in response: %r' % bytes_content)
+            raise TransportError('No ServerVersionInfo in header: %r' % xml_to_str(header))
         try:
             build = Build.from_xml(elem=info)
         except ValueError:
-            raise TransportError('Bad ServerVersionInfo in response: %r' % bytes_content)
+            raise TransportError('Bad ServerVersionInfo in response: %r' % xml_to_str(header))
         # Not all Exchange servers send the Version element
         api_version_from_server = info.get('Version') or build.api_version()
         if api_version_from_server != requested_api_version:
@@ -240,7 +233,7 @@ class Version(PickleMixIn):
                 # response except 'V2_nn' or 'V201[5,6]_nn_mm' which is bogus
                 log.info('API version "%s" worked but server reports version "%s". Using "%s"', requested_api_version,
                          api_version_from_server, api_version_from_server)
-        return cls(build, api_version_from_server)
+        return cls(build=build, api_version=api_version_from_server)
 
     def __repr__(self):
         return self.__class__.__name__ + repr((self.build, self.api_version))
