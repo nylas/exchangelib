@@ -5,7 +5,7 @@ import logging
 import re
 
 from future.utils import python_2_unicode_compatible
-from six import text_type
+from six import text_type, string_types
 
 from .errors import TransportError, ErrorInvalidSchemaVersionForMailboxVersion, ErrorInvalidServerVersion, \
     ErrorIncorrectSchemaVersion, ResponseMessageError
@@ -183,7 +183,7 @@ class Version(PickleMixIn):
         if api_version is None:
             self.api_version = build.api_version()
         else:
-            if not isinstance(api_version, str):
+            if not isinstance(api_version, string_types):
                 raise ValueError("'api_version' must be a string")
             self.api_version = api_version
 
