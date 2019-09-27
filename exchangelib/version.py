@@ -75,6 +75,14 @@ class Build(PickleMixIn):
     __slots__ = ('major_version', 'minor_version', 'major_build', 'minor_build')
 
     def __init__(self, major_version, minor_version, major_build=0, minor_build=0):
+        if not isinstance(major_version, int):
+            raise ValueError("'major_version' must be an integer")
+        if not isinstance(minor_version, int):
+            raise ValueError("'minor_version' must be an integer")
+        if not isinstance(major_build, int):
+            raise ValueError("'major_build' must be an integer")
+        if not isinstance(minor_build, int):
+            raise ValueError("'minor_build' must be an integer")
         self.major_version = major_version
         self.minor_version = minor_version
         self.major_build = major_build
@@ -169,10 +177,15 @@ class Version(PickleMixIn):
     __slots__ = ('build', 'api_version')
 
     def __init__(self, build, api_version=None):
+        if not isinstance(build, (Build, type(None))):
+            raise ValueError("'build' must be a Build instance")
         self.build = build
-        self.api_version = api_version
-        if self.build is not None and self.api_version is None:
+        if api_version is None:
             self.api_version = build.api_version()
+        else:
+            if not isinstance(api_version, str):
+                raise ValueError("'api_version' must be a string")
+            self.api_version = api_version
 
     @property
     def fullname(self):
@@ -192,6 +205,7 @@ class Version(PickleMixIn):
         # The protocol doesn't have a version yet, so default to latest supported version if we don't have a hint.
         api_version = hint or API_VERSIONS[0]
         log.debug('Asking server for version info using API version %s', api_version)
+        # We don't know the build version yet. Hopefully, the server will report it in the SOAP header
         protocol.config.version = Version(build=None, api_version=api_version)
         # Use ResolveNames as a minimal request to the server to test if the version is correct. If not, ResolveNames
         # will try to guess the version automatically.
