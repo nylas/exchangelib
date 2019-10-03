@@ -10,6 +10,11 @@ HEAD
     and provides consistency. For all classes that have an ID, the ID can now be accessed
     using the `id` attribute. Backwards compatibility and deprecation warnings were added.
 
+1.11.5
+------
+
+-   Update to use six.urllib in util.py file to support Python2/3
+
 1.11.4
 ------
 

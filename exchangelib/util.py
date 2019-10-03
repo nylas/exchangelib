@@ -8,7 +8,7 @@ import logging
 import re
 import socket
 import time
-import urllib2
+from six.moves.urllib.request import parse_keqv_list, parse_http_list
 
 # Import _etree via defusedxml instead of directly from lxml.etree, to silence overly strict linters
 from defusedxml.lxml import parse, fromstring, tostring, GlobalParserTLS, RestrictedElement, _etree
@@ -625,12 +625,12 @@ def extract_oauth_error(www_authenticate_header):
         return None
 
     _, _, value = www_authenticate_header.partition('Bearer')
-    items = urllib2.parse_http_list(value)
+    items = parse_http_list(value)
 
     # Sometime Exchange returns elements which aren't key-values,
     # e.g: `Bearer Realm="",Negotiate,Basic Realm=""`
     filtered_items = [item for item in items if '=' in item]
-    filtered_options = urllib2.parse_keqv_list(filtered_items)
+    filtered_options = parse_keqv_list(filtered_items)
 
     if 'error' in filtered_options:
         return filtered_options['error']
