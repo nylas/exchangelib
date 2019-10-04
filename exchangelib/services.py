@@ -1001,7 +1001,7 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
         # Takes a list of (Item, fieldnames) tuples where 'Item' is a instance of a subclass of Item and 'fieldnames'
         # are the attribute names that were updated. Returns the XML for an UpdateItem call.
         # an UpdateItem request.
-        from .properties import ItemId
+        from .properties import ItemId, OccurrenceItemId
         if self.account.version.build >= EXCHANGE_2013_SP1:
             updateitem = create_element(
                 'm:%s' % self.SERVICE_NAME,
@@ -1023,7 +1023,10 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
                 raise ValueError('"fieldnames" must not be empty')
             itemchange = create_element('t:ItemChange')
             log.debug('Updating item %s values %s', item.id, fieldnames)
-            set_xml_value(itemchange, ItemId(item.id, item.changekey), version=self.account.version)
+            if getattr(item, 'occurrence_item_id', None):
+                set_xml_value(itemchange, item.occurrence_item_id, version=self.account.version)
+            else:
+                set_xml_value(itemchange, ItemId(item.id, item.changekey), version=self.account.version)
             updates = create_element('t:Updates')
             for elem in self._get_item_update_elems(item=item, fieldnames=fieldnames):
                 updates.append(elem)
@@ -1058,7 +1061,7 @@ class DeleteItem(EWSAccountService, EWSPooledMixIn):
     def get_payload(self, items, delete_type, send_meeting_cancellations, affected_task_occurrences,
                     suppress_read_receipts):
         # Takes a list of (id, changekey) tuples or Item objects and returns the XML for a DeleteItem request.
-        from .properties import ItemId
+        from .properties import ItemId, OccurrenceItemId
         if self.account.version.build >= EXCHANGE_2013_SP1:
             deleteitem = create_element(
                 'm:%s' % self.SERVICE_NAME,
@@ -1078,7 +1081,10 @@ class DeleteItem(EWSAccountService, EWSPooledMixIn):
         item_ids = create_element('m:ItemIds')
         for item in items:
             log.debug('Deleting item %s', item)
-            set_xml_value(item_ids, to_item_id(item, ItemId), version=self.account.version)
+            if getattr(item, 'occurrence_item_id', None):
+                set_xml_value(item_ids, item.occurrence_item_id, version=self.account.version)
+            else:
+                set_xml_value(item_ids, to_item_id(item, ItemId), version=self.account.version)
         if not len(item_ids):
             raise ValueError('"items" must not be empty')
         deleteitem.append(item_ids)

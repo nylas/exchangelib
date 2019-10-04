@@ -246,7 +246,7 @@ class Field(object):
 
     def __init__(self, name, is_required=False, is_required_after_save=False, is_read_only=False,
                  is_read_only_after_send=False, is_searchable=True, is_attribute=False, default=None,
-                 supported_from=None, deprecated_from=None):
+                 supported_from=None, deprecated_from=None, is_syncback_only=False):
         self.name = name
         self.default = default  # Default value if none is given
         self.is_required = is_required
@@ -271,6 +271,11 @@ class Field(object):
         if deprecated_from is not None and not isinstance(deprecated_from, Build):
             raise ValueError("'deprecated_from' %r must be a Build instance" % deprecated_from)
         self.deprecated_from = deprecated_from
+        # We use this property as part of determining which fields we can ask EWS for when fetching`
+        # data. If True, then we shouldn't request it while fetching data; this field should only be
+        # used when syncing data back to the provider. An example of this is OccurrenceItemId, which
+        # is used to identify the occurrence we want to update, but can't be requested when fetching.
+        self.is_syncback_only = is_syncback_only
 
     def clean(self, value, version=None):
         if not self.supports_version(version):
@@ -840,6 +845,18 @@ class ReferenceItemIdField(EWSElementField):
         from .properties import ReferenceItemId
         kwargs['value_cls'] = ReferenceItemId
         super(ReferenceItemIdField, self).__init__(*args, **kwargs)
+
+    def to_xml(self, value, version):
+        return value.to_xml(version=version)
+
+
+class OccurrenceItemIdField(EWSElementField):
+    is_complex = True
+
+    def __init__(self, *args, **kwargs):
+        from .properties import OccurrenceItemId
+        kwargs['value_cls'] = OccurrenceItemId
+        super(OccurrenceItemIdField, self).__init__(*args, **kwargs)
 
     def to_xml(self, value, version):
         return value.to_xml(version=version)
