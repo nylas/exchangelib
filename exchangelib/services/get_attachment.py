@@ -29,17 +29,33 @@ class GetAttachment(EWSAccountService):
         payload.append(attachment_ids)
         return payload
 
-    @classmethod
-    def _get_soap_payload(cls, response, **parse_opts):
+    def _update_api_version(self, hint, api_version, header, **parse_opts):
         if not parse_opts.get('stream_file_content', False):
-            return super(GetAttachment, cls)._get_soap_payload(response, **parse_opts)
+            return super(GetAttachment, self)._update_api_version(hint, api_version, header, **parse_opts)
 
+        # TODO: We're skipping this part because our streaming parser cannot parse the SOAP header
+        pass
+
+    @classmethod
+    def _get_soap_parts(cls, response, **parse_opts):
+        if not parse_opts.get('stream_file_content', False):
+            return super(GetAttachment, cls)._get_soap_parts(response, **parse_opts)
+
+        # Pass the response unaltered. We want to use our custom streaming parser
+        return None, response
+
+    @classmethod
+    def _get_soap_messages(cls, body, **parse_opts):
+        if not parse_opts.get('stream_file_content', False):
+            return super(GetAttachment, cls)._get_soap_messages(body, **parse_opts)
+
+        # 'body' is actually the raw response passed on by '_get_soap_parts'
         from ..attachments import FileAttachment
         parser = StreamingBase64Parser()
         field = FileAttachment.get_field_by_fieldname('_content')
         handler = StreamingContentHandler(parser=parser, ns=field.namespace, element_name=field.field_uri)
         parser.setContentHandler(handler)
-        return parser.parse(response)
+        return parser.parse(body)
 
     def stream_file_content(self, attachment_id):
         # The streaming XML parser can only stream content of one attachment
@@ -52,7 +68,8 @@ class GetAttachment(EWSAccountService):
             # Let the non-streaming SOAP parser parse the response and hook into the normal exception handling.
             # Wrap in DummyResponse because _get_soap_payload() expects an iter_content() method.
             response = DummyResponse(url=None, headers=None, request_headers=None, content=enf.data)
-            res = super(GetAttachment, self)._get_soap_payload(response=response)
+            header, body = super(GetAttachment, self)._get_soap_parts(response=response)
+            res = super(GetAttachment, self)._get_soap_messages(body=body)
             for e in self._get_elements_in_response(response=res):
                 if isinstance(e, Exception):
                     raise e

@@ -938,8 +938,13 @@ class Contact(Item):
         TextField('phonetic_last_name', field_uri='contacts:PhoneticLastName', supported_from=EXCHANGE_2013,
                   is_read_only=True),
         EmailAddressField('email_alias', field_uri='contacts:Alias', is_read_only=True),
+        # 'notes' is documented in MSDN but apparently unused. Writing to it raises ErrorInvalidPropertyRequest. OWA
+        # put entries into the 'notes' form field into the 'body' field.
         CharField('notes', field_uri='contacts:Notes', supported_from=EXCHANGE_2013, is_read_only=True),
-        # Placeholder for Photo
+        # 'photo' is documented in MSDN but apparently unused. Writing to it raises ErrorInvalidPropertyRequest. OWA
+        # adds photos as FileAttachments on the contact item (with 'is_contact_photo=True'), which automatically flips
+        # the 'has_picture' field.
+        Base64Field('photo', field_uri='contacts:Photo', is_read_only=True),
         # Placeholder for UserSMIMECertificate
         # Placeholder for MSExchangeCertificate
         TextField('directory_id', field_uri='contacts:DirectoryId', supported_from=EXCHANGE_2013, is_read_only=True),
