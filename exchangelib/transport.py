@@ -3,13 +3,15 @@ from __future__ import unicode_literals
 
 import logging
 
+from future.utils import raise_from
 import requests.auth
 import requests_ntlm
 import requests_oauthlib
 
 from .credentials import IMPERSONATION
 from .errors import UnauthorizedError, TransportError, RedirectError, RelativeRedirect
-from .util import create_element, add_xml_child, get_redirect_url, xml_to_str, ns_translation, CONNECTION_ERRORS
+from .util import create_element, add_xml_child, get_redirect_url, xml_to_str, ns_translation, CONNECTION_ERRORS, \
+    TLS_ERRORS
 
 log = logging.getLogger(__name__)
 
@@ -100,31 +102,17 @@ def get_auth_instance(auth_type, **kwargs):
 
 
 def get_autodiscover_authtype(service_endpoint, data):
-    # First issue a HEAD request to look for a location header. This is the autodiscover HTTP redirect method. If there
-    # was no redirect, continue trying a POST request with a valid payload.
+    # Get auth type by tasting headers from the server. Only do POST requests. HEAD is too error prone, and some servers
+    # are set up to redirect to OWA on all requests except POST to the autodiscover endpoint.
     log.debug('Getting autodiscover auth type for %s', service_endpoint)
     from .autodiscover import AutodiscoverProtocol
     with AutodiscoverProtocol.raw_session() as s:
         try:
-            r = s.head(url=service_endpoint, headers=DEFAULT_HEADERS.copy(), allow_redirects=False,
-                       timeout=AutodiscoverProtocol.TIMEOUT)
-        except CONNECTION_ERRORS as e:
-            raise TransportError(str(e))
-        if r.status_code in (301, 302):
-            try:
-                redirect_url = get_redirect_url(r, require_relative=True)
-                log.debug('Autodiscover HTTP redirect to %s', redirect_url)
-            except RelativeRedirect as e:
-                # We were redirected to a different domain or scheme. Raise RedirectError so higher-level code can
-                # try again on this new domain or scheme.
-                raise RedirectError(url=e.value)
-            # Some MS servers are masters of messing up HTTP, issuing 302 to an error page with zero content.
-            # Give this URL a chance with a POST request.
-        try:
             r = s.post(url=service_endpoint, headers=DEFAULT_HEADERS.copy(), data=data, allow_redirects=False,
                        timeout=AutodiscoverProtocol.TIMEOUT)
-        except CONNECTION_ERRORS as e:
-            raise TransportError(str(e))
+        except CONNECTION_ERRORS + TLS_ERRORS as e:
+            # Also handle TLS errors here. 'service_endpoint' could be any random server at this point.
+            raise_from(TransportError(str(e)), e)
     return _get_auth_method_from_response(response=r)
 
 
@@ -143,7 +131,8 @@ def get_service_authtype(service_endpoint, versions, name):
                 r = s.post(url=service_endpoint, headers=DEFAULT_HEADERS.copy(), data=data, allow_redirects=False,
                            timeout=BaseProtocol.TIMEOUT)
             except CONNECTION_ERRORS as e:
-                raise TransportError(str(e))
+                # Don't handle TLS errors. They should be fixed in OS or Python config, or by using NoVerifyHTTPAdapter
+                raise_from(TransportError(str(e)), e)
             try:
                 auth_type = _get_auth_method_from_response(response=r)
                 log.debug('Auth type is %s', auth_type)

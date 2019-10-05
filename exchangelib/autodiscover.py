@@ -36,7 +36,7 @@ from .errors import AutoDiscoverFailed, AutoDiscoverRedirect, AutoDiscoverCircul
 from .protocol import BaseProtocol, Protocol, RetryPolicy
 from .transport import DEFAULT_ENCODING, DEFAULT_HEADERS
 from .util import create_element, get_xml_attr, add_xml_child, to_xml, is_xml, post_ratelimited, xml_to_str, \
-    get_domain, CONNECTION_ERRORS, TLS_ERRORS
+    get_domain
 
 
 log = logging.getLogger(__name__)
@@ -393,10 +393,6 @@ def _get_auth_type(url, email):
     except TransportError as e:
         if isinstance(e, RedirectError):
             raise
-        raise_from(AutoDiscoverFailed('Error guessing auth type: %s' % e), None)
-    except TLS_ERRORS as e:
-        raise_from(AutoDiscoverFailed('Error guessing auth type: %s' % e), None)
-    except CONNECTION_ERRORS as e:
         raise_from(AutoDiscoverFailed('Error guessing auth type: %s' % e), None)
 
 
