@@ -1082,7 +1082,7 @@ class MeetingMessage(BaseMeetingItem):
     __slots__ = tuple()
 
 
-class MeetingResponse(Item):
+class MeetingResponse(BaseMeetingItem):
     """
     MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/meetingresponse
     """
@@ -1091,13 +1091,16 @@ class MeetingResponse(Item):
         MailboxField('received_by', field_uri='message:ReceivedBy', is_read_only=True),
         MailboxField('received_representing', field_uri='message:ReceivedRepresenting', is_read_only=True),
     ]
-    # Item fields, but only until the 'effective_rights' field
-    ITEM_FIELDS = []
-    for field in Item.FIELDS:
-        ITEM_FIELDS.append(field)
-        if field.name == 'effective_rights':
-            break
-    FIELDS = ITEM_FIELDS + LOCAL_FIELDS
+    # FIELDS on this element are shuffled compared to other elements
+    culture_idx = None
+    for i, field in enumerate(Item.FIELDS):
+        if field.name == 'culture':
+            culture_idx = i
+    effective_rights_idx = culture_idx + 1
+    FIELDS = Item.FIELDS[:culture_idx + 1] \
+             + BaseMeetingItem.LOCAL_FIELDS \
+             + Item.FIELDS[effective_rights_idx:effective_rights_idx + 1] \
+             + LOCAL_FIELDS
 
     __slots__ = tuple(f.name for f in LOCAL_FIELDS)
 
