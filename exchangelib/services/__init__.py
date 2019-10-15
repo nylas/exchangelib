@@ -10,6 +10,7 @@ Exchange EWS operations overview:
 """
 
 from .common import CHUNK_SIZE
+from .archive_item import ArchiveItem
 from .copy_item import CopyItem
 from .create_attachment import CreateAttachment
 from .create_folder import CreateFolder
@@ -44,6 +45,7 @@ from .upload_items import UploadItems
 
 __all__ = [
     'CHUNK_SIZE',
+    'ArchiveItem',
     'CopyItem',
     'CreateAttachment',
     'CreateFolder',
