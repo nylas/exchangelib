@@ -29,7 +29,7 @@ from .items import Item, BulkCreateResult, HARD_DELETE, \
 from .properties import Mailbox, SendingAs, FolderId, DistinguishedFolderId
 from .queryset import QuerySet
 from .services import ExportItems, UploadItems, GetItem, CreateItem, UpdateItem, DeleteItem, MoveItem, SendItem, \
-    CopyItem, GetUserOofSettings, SetUserOofSettings, GetMailTips, ArchiveItem
+    CopyItem, GetUserOofSettings, SetUserOofSettings, GetMailTips, ArchiveItem, GetDelegate
 from .settings import OofSettings
 from .util import get_domain, peek
 
@@ -620,6 +620,12 @@ class Account(object):
         if isinstance(res[0], Exception):
             raise res[0]
         return res[0]
+
+    @property
+    def delegates(self):
+        """Returns a list of DelegateUser objects representing the delegates that are set on this account
+        """
+        return list(GetDelegate(account=self).call(user_ids=None, include_permissions=True))
 
     def __str__(self):
         txt = '%s' % self.primary_smtp_address

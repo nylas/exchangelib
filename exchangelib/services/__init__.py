@@ -25,6 +25,7 @@ from .find_folder import FindFolder
 from .find_item import FindItem
 from .find_people import FindPeople
 from .get_attachment import GetAttachment
+from .get_delegate import GetDelegate
 from .get_folder import GetFolder
 from .get_item import GetItem
 from .get_mail_tips import GetMailTips
@@ -60,6 +61,7 @@ __all__ = [
     'FindItem',
     'FindPeople',
     'GetAttachment',
+    'GetDelegate',
     'GetFolder',
     'GetItem',
     'GetMailTips',
