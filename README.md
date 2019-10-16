@@ -1111,6 +1111,18 @@ print(a.mail_tips)
 ```
 
 
+## Delegate information
+An account can have delegates, which are other users that are allowed to access the account.
+Here's how to fetch information about those delegates, including which level of access they
+have to the account.
+```python
+from exchangelib import Account
+
+a = Account(...)
+print(a.delegates)
+```
+
+
 ## Export and upload
 
 Exchange supports backup and restore of folder contents using special

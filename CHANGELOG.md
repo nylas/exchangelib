@@ -7,6 +7,7 @@ HEAD
 -   Fixed a bug in `RelativeMonthlyPattern` and `RelativeYearlyPattern` where the `weekdays` field was thought to
     be a list, but is in fact a single value. Renamed the field to `weekday` to reflect the change.
 -   Added support for archiving items to the archive mailbox, if the account has one.
+-   Added support for getting delegate information on an Account, as `Account.delegates`.
 
 
 2.0.1
