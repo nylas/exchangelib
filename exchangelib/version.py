@@ -249,6 +249,15 @@ class Version(PickleMixIn):
                          api_version_from_server, api_version_from_server)
         return cls(build=build, api_version=api_version_from_server)
 
+    def __eq__(self, other):
+        if self.api_version != other.api_version:
+            return False
+        if self.build and not other.build:
+            return False
+        if other.build and not self.build:
+            return False
+        return self.build == other.build
+
     def __repr__(self):
         return self.__class__.__name__ + repr((self.build, self.api_version))
 
