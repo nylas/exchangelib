@@ -1024,6 +1024,8 @@ class DelegatePermissions(EWSElement):
                     choices=PERMISSION_LEVEL_CHOICES, default='None'),
     ]
 
+    __slots__ = tuple(f.name for f in FIELDS)
+
 
 class DelegateUser(EWSElement):
     # MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/delegateuser
@@ -1036,6 +1038,8 @@ class DelegateUser(EWSElement):
         BooleanField('receive_copies_of_meeting_messages', field_uri='ReceiveCopiesOfMeetingMessages', default=False),
         BooleanField('view_private_items', field_uri='ViewPrivateItems', default=False),
     ]
+
+    __slots__ = tuple(f.name for f in FIELDS)
 
 
 class SearchableMailbox(EWSElement):

@@ -614,7 +614,7 @@ class PropertiesTest(TimedTestCase):
                 for f in cls.FIELDS:
                     self.assertNotIn(f.name, field_names,
                                      'Field name %r is not unique on model %r' % (f.name, cls.__name__))
-                    self.assertIn(f.name, all_slots)
+                    self.assertIn(f.name, all_slots, 'Field name %s is not in __slots__ on model %s' % (f.name, cls.__name__))
                     field_names.add(f.name)
 
     def test_uid(self):

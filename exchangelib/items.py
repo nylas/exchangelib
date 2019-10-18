@@ -1110,9 +1110,9 @@ class MeetingResponse(BaseMeetingItem):
             culture_idx = i
     effective_rights_idx = culture_idx + 1
     FIELDS = Item.FIELDS[:culture_idx + 1] \
-             + BaseMeetingItem.LOCAL_FIELDS \
-             + Item.FIELDS[effective_rights_idx:effective_rights_idx + 1] \
-             + LOCAL_FIELDS
+        + BaseMeetingItem.LOCAL_FIELDS \
+        + Item.FIELDS[effective_rights_idx:effective_rights_idx + 1] \
+        + LOCAL_FIELDS
 
     __slots__ = tuple(f.name for f in LOCAL_FIELDS)
 
