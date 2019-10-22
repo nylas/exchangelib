@@ -503,33 +503,32 @@ class EWSPooledMixIn(EWSService):
         # list must be the same as the input id list, so the caller knows which status message belongs to which ID.
         # Yield results as they become available.
         results = []
-        n = 1
+        n = 0
         for chunk in chunkify(items, self.chunk_size):
-            log.debug('Starting %s._get_elements worker %s for %s items', self.__class__.__name__, n, len(chunk))
             n += 1
-            results.append(self.protocol.thread_pool.apply_async(
+            log.debug('Starting %s._get_elements worker %s for %s items', self.__class__.__name__, n, len(chunk))
+            results.append((n, self.protocol.thread_pool.apply_async(
                 lambda c: self._get_elements(payload=payload_func(c, **kwargs)),
                 (chunk,)
-            ))
+            )))
+
             # Results will be available before iteration has finished if 'items' is a slow generator. Return early
-            for i, r in enumerate(results, 1):
-                if r is None:
-                    continue
+            for idx in range(len(results)):
+                i, r = results[idx]
                 if not r.ready():
                     # First non-yielded result isn't ready yet. Yielding other ready results would mess up ordering
                     break
                 log.debug('%s._get_elements result %s is ready early', self.__class__.__name__, i)
                 for elem in r.get():
                     yield elem
-                results[i-1] = None
+                # Remove results object
+                del results[idx]
+
         # Yield remaining results in order, as they become available
-        for i, r in enumerate(results, 1):
-            if r is None:
-                log.debug('%s._get_elements result %s of %s already sent', self.__class__.__name__, i, len(results))
-                continue
-            log.debug('Waiting for %s._get_elements result %s of %s', self.__class__.__name__, i, len(results))
+        for i, r in results:
+            log.debug('Waiting for %s._get_elements result %s of %s', self.__class__.__name__, i, n)
             elems = r.get()
-            log.debug('%s._get_elements result %s of %s is ready', self.__class__.__name__, i, len(results))
+            log.debug('%s._get_elements result %s of %s is ready', self.__class__.__name__, i, n)
             for elem in elems:
                 yield elem
 
