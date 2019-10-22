@@ -438,6 +438,9 @@ class PagingEWSMixIn(EWSService):
                 )
             for (rootfolder, next_offset), paging_info in zip(parsed_pages, paging_infos):
                 paging_info['next_offset'] = next_offset
+                if isinstance(rootfolder, Exception):
+                    yield rootfolder
+                    continue
                 if rootfolder is not None:
                     container = rootfolder.find(self.element_container_name)
                     if container is None:
@@ -481,6 +484,8 @@ class PagingEWSMixIn(EWSService):
 
     def _get_page(self, message):
         rootfolder = self._get_element_container(message=message, name='{%s}RootFolder' % MNS)
+        if isinstance(rootfolder, Exception):
+            return rootfolder, None
         is_last_page = rootfolder.get('IncludesLastItemInRange').lower() in ('true', '0')
         offset = rootfolder.get('IndexedPagingOffset')
         if offset is None and not is_last_page:

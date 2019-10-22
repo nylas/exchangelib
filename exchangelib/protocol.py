@@ -350,10 +350,13 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
         return ThreadPool(processes=thread_poolsize)
 
     def close(self):
+        log.debug('Server %s: Closing thread pool', self.server)
         # Close the thread pool before closing the session pool to ensure all sessions are released.
         if "thread_pool" in self.__dict__:
-            self.thread_pool.close()
-            self.thread_pool.join()
+            # Calling thread_pool.join() in Python 3.8 will hang forever. This is seen when running a test case that
+            # uses the thread pool, e.g.: python tests/__init__.py MessagesTest.test_export_with_error
+            # I don't know yet why this is happening.
+            self.thread_pool.terminate()
             del self.__dict__["thread_pool"]
         super(Protocol, self).close()
 
