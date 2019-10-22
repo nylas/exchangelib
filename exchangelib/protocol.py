@@ -67,8 +67,16 @@ class BaseProtocol(object):
             raise AttributeError("'config.service_endpoint' must be set")
         self.config = config
         self._session_pool_size = self.SESSION_POOLSIZE
-        self._session_pool = None  # Consumers need to fill the session pool themselves
-        self._session_pool_lock = None
+
+        # Autodetect authentication type if necessary
+        if self.config.auth_type is None:
+            self.config.auth_type = self.get_auth_type()
+
+        # Try to behave nicely with the remote server. We want to keep the connection open between requests.
+        # We also want to re-use sessions, to avoid the NTLM auth handshake on every request. We must know the
+        # authentication method to create a session pool.
+        self._session_pool = self._create_session_pool()
+        self._session_pool_lock = Lock()
 
     @property
     def service_endpoint(self):
@@ -89,6 +97,19 @@ class BaseProtocol(object):
     @property
     def server(self):
         return self.config.server
+
+    def __getstate__(self):
+        # The session pool and lock cannot be pickled
+        state = self.__dict__.copy()
+        del state['_session_pool']
+        del state['_session_pool_lock']
+        return state
+
+    def __setstate__(self, state):
+        # Restore the session pool and lock
+        self.__dict__.update(state)
+        self._session_pool = self._create_session_pool()
+        self._session_pool_lock = Lock()
 
     def __del__(self):
         # pylint: disable=bare-except
@@ -116,6 +137,10 @@ class BaseProtocol(object):
             max_retries=0,
         )
 
+    def get_auth_type(self):
+        # Autodetect and return authentication type
+        raise NotImplementedError()
+
     @classmethod
     def get_useragent(cls):
         if not cls.USERAGENT:
@@ -123,6 +148,13 @@ class BaseProtocol(object):
             from exchangelib import __version__
             cls.USERAGENT = "exchangelib/%s (%s)" % (__version__, requests.utils.default_user_agent())
         return cls.USERAGENT
+
+    def _create_session_pool(self):
+        # Create a pool to reuse sessions containing connections to the server
+        session_pool = LifoQueue(maxsize=self._session_pool_size)
+        for _ in range(self._session_pool_size):
+            session_pool.put(self.create_session(), block=False)
+        return session_pool
 
     @property
     def session_pool_size(self):
@@ -180,6 +212,8 @@ class BaseProtocol(object):
         return self.create_session()
 
     def create_session(self):
+        if self.auth_type is None:
+            raise ValueError('Cannot create session without knowing the auth type')
         if isinstance(self.credentials, OAuth2Credentials):
             if self.auth_type != OAUTH2:
                 raise ValueError('Auth type must be %r for credentials type OAuth2Credentials' % OAUTH2)
@@ -286,37 +320,25 @@ class CachingProtocol(type):
 @python_2_unicode_compatible
 class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
     def __init__(self, *args, **kwargs):
+        self.version_hint = None
         super(Protocol, self).__init__(*args, **kwargs)
-
-        # Autodetect authentication type if necessary
-        # pylint: disable=access-member-before-definition
-        if self.config.auth_type is None:
-            name = str(self.credentials) if self.credentials and str(self.credentials) else 'DUMMY'
-            self.config.auth_type, version_hint = get_service_authtype(
-                service_endpoint=self.service_endpoint, versions=API_VERSIONS, name=name
-            )
-        else:
-            version_hint = None
-
-        # Try to behave nicely with the Exchange server. We want to keep the connection open between requests.
-        # We also want to re-use sessions, to avoid the NTLM auth handshake on every request.
-        self._session_pool = self._create_session_pool()
-        self._session_pool_lock = Lock()
 
         if not self.config.version:
             # Version.guess() needs auth objects and a working session pool
-            self.config.version = Version.guess(self, hint=version_hint)
+            self.config.version = Version.guess(self, hint=self.version_hint)
+
+    def get_auth_type(self):
+        # Autodetect authentication type. We also set version hint here.
+        name = str(self.credentials) if self.credentials and str(self.credentials) else 'DUMMY'
+        auth_type, version_hint = get_service_authtype(
+            service_endpoint=self.service_endpoint, versions=API_VERSIONS, name=name
+        )
+        self.version_hint = version_hint
+        return auth_type
 
     @property
     def version(self):
         return self.config.version
-
-    def _create_session_pool(self):
-        # Create a pool to reuse sessions containing connections to the server
-        session_pool = LifoQueue(maxsize=self._session_pool_size)
-        for _ in range(self._session_pool_size):
-            session_pool.put(self.create_session(), block=False)
-        return session_pool
 
     @threaded_cached_property
     def thread_pool(self):
@@ -450,21 +472,13 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
 
     def __getstate__(self):
         # The thread and session pools cannot be pickled
-        state = self.__dict__.copy()
+        state = super(Protocol, self).__getstate__()
         try:
             del state['thread_pool']
         except KeyError:
             # thread_pool is a cached property and may not exist
             pass
-        del state['_session_pool']
-        del state['_session_pool_lock']
         return state
-
-    def __setstate__(self, state):
-        # Restore the session pool. The thread pool is a property and will recreate itself
-        self.__dict__.update(state)
-        self._session_pool = self._create_session_pool()
-        self._session_pool_lock = Lock()
 
     def __str__(self):
         return '''\

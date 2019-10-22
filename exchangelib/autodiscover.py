@@ -24,7 +24,6 @@ import tempfile
 from threading import Lock
 
 import dns.resolver
-from future.moves.queue import LifoQueue
 from future.utils import raise_from, PY2, python_2_unicode_compatible
 from six import text_type
 
@@ -527,12 +526,6 @@ def _get_hostname_from_srv(hostname):
 class AutodiscoverProtocol(BaseProtocol):
     # Protocol which implements the bare essentials for autodiscover
     TIMEOUT = 10  # Seconds
-
-    def __init__(self, *args, **kwargs):
-        super(AutodiscoverProtocol, self).__init__(*args, **kwargs)
-        self._session_pool = LifoQueue(maxsize=self.SESSION_POOLSIZE)
-        for _ in range(self.SESSION_POOLSIZE):
-            self._session_pool.put(self.create_session(), block=False)
 
     def __str__(self):
         return '''\
