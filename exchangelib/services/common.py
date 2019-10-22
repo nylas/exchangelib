@@ -166,12 +166,16 @@ class EWSService(object):
             except ErrorExceededConnectionCount as e:
                 # ErrorExceededConnectionCount indicates that the connecting user has too many open TCP connections to
                 # the server. Decrease our session pool size.
-                try:
-                    self.protocol.decrease_poolsize()
-                    continue
-                except SessionPoolMinSizeReached:
-                    # We're already as low as we can go. Let the user handle this.
-                    raise e
+                if self.streaming:
+                    # In streaming mode, we haven't released the session yet, so we can't discard the session
+                    raise
+                else:
+                    try:
+                        self.protocol.decrease_poolsize()
+                        continue
+                    except SessionPoolMinSizeReached:
+                        # We're already as low as we can go. Let the user handle this.
+                        raise e
             except (ErrorTooManyObjectsOpened, ErrorTimeoutExpired) as e:
                 # ErrorTooManyObjectsOpened means there are too many connections to the Exchange database. This is very
                 # often a symptom of sending too many requests.
