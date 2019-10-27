@@ -7,9 +7,7 @@ from .collections import FolderCollection
 
 
 class Calendar(Folder):
-    """
-    An interface for the Exchange calendar
-    """
+    """An interface for the Exchange calendar"""
     DISTINGUISHED_FOLDER_ID = 'calendar'
     CONTAINER_CLASS = 'IPF.Appointment'
     supported_item_models = (CalendarItem,)

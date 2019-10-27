@@ -1168,7 +1168,7 @@ class PhoneNumberField(IndexedField):
 
 
 class PhysicalAddressField(IndexedField):
-    # MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/entry-physicaladdress
+    """MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/entry-physicaladdress"""
     is_list = True
 
     PARENT_ELEMENT_NAME = 'PhysicalAddresses'
