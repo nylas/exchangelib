@@ -1141,6 +1141,7 @@ a.upload((a.inbox, d) for d in data)  # Restore the items. Expects a list of (fo
 
 ```python
 from exchangelib import Account, DLMailbox
+from exchangelib.properties import AlternateId, EWS_ID, OWA_ID
 
 a = Account(...)
 
@@ -1166,6 +1167,12 @@ for mailbox in a.protocol.expand_dl(DLMailbox(email_address='distro@example.com'
 # Or just pass a string containing the SMTP address
 for mailbox in a.protocol.expand_dl('distro@example.com'):
     print(mailbox.email_address)
+
+# Convert item IDs from one format to another
+for converted_id in a.protocol.convert_ids([
+    AlternateId(id='AAA=', format=EWS_ID, mailbox=a.primary_smtp_address),
+], destination_format=OWA_ID):
+    print(converted_id)
 
 # Get searchable mailboxes. This method is only available to users who have been assigned
 # the Discovery Management RBAC role. (This feature works on Exchange 2013 onwards)
