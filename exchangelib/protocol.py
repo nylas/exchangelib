@@ -484,7 +484,7 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
         if destination_format not in ID_FORMATS:
             raise ValueError("'destination_format' %r must be one of %s" % (destination_format, ID_FORMATS))
         cls_map = {cls.response_tag(): cls for cls in (
-            AlternateId, AlternatePublicFolderItemId, AlternatePublicFolderItemId
+            AlternateId, AlternatePublicFolderId, AlternatePublicFolderItemId
         )}
         for i in ConvertId(protocol=self).call(items=ids, destination_format=destination_format):
             if isinstance(i, Exception):

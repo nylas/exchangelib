@@ -1175,6 +1175,8 @@ class AlternateId(EWSElement):
         BooleanField('is_archive', field_uri='IsArchive', is_required=False, is_attribute=True),
     ]
 
+    __slots__ = tuple(f.name for f in FIELDS)
+
     @classmethod
     def response_tag(cls):
         # This element is in TNS in the request and MNS in the response...
@@ -1190,6 +1192,8 @@ class AlternatePublicFolderId(EWSElement):
                     choices={Choice(c) for c in ID_FORMATS}),
     ]
 
+    __slots__ = tuple(f.name for f in FIELDS)
+
 
 class AlternatePublicFolderItemId(EWSElement):
     # MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/alternatepublicfolderitemid
@@ -1200,6 +1204,8 @@ class AlternatePublicFolderItemId(EWSElement):
                     choices={Choice(c) for c in ID_FORMATS}),
         CharField('item_id', field_uri='ItemId', is_required=True, is_attribute=True),
     ]
+
+    __slots__ = tuple(f.name for f in FIELDS)
 
 
 class IdChangeKeyMixIn(EWSElement):

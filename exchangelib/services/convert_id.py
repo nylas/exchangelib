@@ -45,8 +45,8 @@ class ConvertId(EWSPooledMixIn):
         # We may have other elements in here, e.g. 'ResponseCode'. Filter away those.
         from ..properties import AlternateId, AlternatePublicFolderId, AlternatePublicFolderItemId
         return container.findall(AlternateId.response_tag()) \
-               + container.findall(AlternatePublicFolderId.response_tag()) \
-               + container.findall(AlternatePublicFolderItemId.response_tag())
+            + container.findall(AlternatePublicFolderId.response_tag()) \
+            + container.findall(AlternatePublicFolderItemId.response_tag())
 
     def _get_element_container(self, message, response_message=None, name=None):
         # There is no element container
