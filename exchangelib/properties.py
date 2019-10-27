@@ -1165,7 +1165,7 @@ ID_FORMATS = (ENTRY_ID, EWS_ID, EWS_LEGACY_ID, HEX_ENTRY_ID, OWA_ID, STORE_ID)
 
 
 class AlternateId(EWSElement):
-    # MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/alternateid
+    """MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/alternateid"""
     ELEMENT_NAME = 'AlternateId'
     FIELDS = [
         CharField('id', field_uri='Id', is_required=True, is_attribute=True),
@@ -1184,7 +1184,7 @@ class AlternateId(EWSElement):
 
 
 class AlternatePublicFolderId(EWSElement):
-    # MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/alternatepublicfolderid
+    """MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/alternatepublicfolderid"""
     ELEMENT_NAME = 'AlternatePublicFolderId'
     FIELDS = [
         CharField('folder_id', field_uri='FolderId', is_required=True, is_attribute=True),
@@ -1196,7 +1196,9 @@ class AlternatePublicFolderId(EWSElement):
 
 
 class AlternatePublicFolderItemId(EWSElement):
-    # MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/alternatepublicfolderitemid
+    """MSDN:
+    https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/alternatepublicfolderitemid
+    """
     ELEMENT_NAME = 'AlternatePublicFolderItemId'
     FIELDS = [
         CharField('folder_id', field_uri='FolderId', is_required=True, is_attribute=True),
