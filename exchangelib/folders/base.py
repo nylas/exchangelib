@@ -422,10 +422,13 @@ class BaseFolder(RegisterMixIn, SearchableMixIn):
             # We don't know exactly what was deleted, so invalidate the entire folder cache to be safe
             self.root.clear_cache()
 
-    def wipe(self):
+    def wipe(self, page_size=None):
         # Recursively deletes all items in this folder, and all subfolders and their content. Attempts to protect
         # distinguished folders from being deleted. Use with caution!
         log.warning('Wiping %s', self)
+        delete_kwargs = {}
+        if page_size:
+            delete_kwargs['page_size'] = page_size
         has_distinguished_subfolders = any(f.is_distinguished for f in self.children)
         try:
             if has_distinguished_subfolders:
@@ -440,16 +443,16 @@ class BaseFolder(RegisterMixIn, SearchableMixIn):
             except (ErrorAccessDenied, ErrorCannotEmptyFolder):
                 log.warning('Not allowed to empty %s. Trying to delete items instead', self)
                 try:
-                    self.all().delete()
+                    self.all().delete(**delete_kwargs)
                 except (ErrorAccessDenied, ErrorCannotDeleteObject):
                     log.warning('Not allowed to delete items in %s', self)
         for f in self.children:
-            f.wipe()
+            f.wipe(page_size=page_size)
             # Remove non-distinguished children that are empty and have no subfolders
             if f.is_deleteable and not f.children:
                 log.warning('Deleting folder %s', f)
                 try:
-                    f.delete()
+                    f.delete(**delete_kwargs)
                 except ErrorDeleteDistinguishedFolder:
                     log.warning('Tried to delete a distinguished folder (%s)', f)
 
