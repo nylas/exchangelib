@@ -452,7 +452,7 @@ class BaseFolder(RegisterMixIn, SearchableMixIn):
             if f.is_deleteable and not f.children:
                 log.warning('Deleting folder %s', f)
                 try:
-                    f.delete(**delete_kwargs)
+                    f.delete()
                 except ErrorDeleteDistinguishedFolder:
                     log.warning('Tried to delete a distinguished folder (%s)', f)
 
