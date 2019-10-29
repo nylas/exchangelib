@@ -153,97 +153,103 @@ class UtilTest(EWSTest):
 
         protocol = self.account.protocol
         retry_policy = protocol.config.retry_policy
-        # Make sure we fail fast in error cases
-        protocol.config.retry_policy = FailFast()
+        renew_session = protocol.renew_session
 
         session = protocol.get_session()
+        try:
+            # Make sure we fail fast in error cases
+            protocol.config.retry_policy = FailFast()
 
-        # Test the straight, HTTP 200 path
-        session.post = mock_post(url, 200, {}, 'foo')
-        r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
-        self.assertEqual(r.content, b'foo')
+            # Test the straight, HTTP 200 path
+            session.post = mock_post(url, 200, {}, 'foo')
+            r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
+            self.assertEqual(r.content, b'foo')
 
-        # Test exceptions raises by the POST request
-        for err_cls in CONNECTION_ERRORS:
-            session.post = mock_session_exception(err_cls)
-            with self.assertRaises(err_cls):
+            # Test exceptions raises by the POST request
+            for err_cls in CONNECTION_ERRORS:
+                session.post = mock_session_exception(err_cls)
+                with self.assertRaises(err_cls):
+                    r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
+
+            # Test bad exit codes and headers
+            session.post = mock_post(url, 401, {})
+            with self.assertRaises(UnauthorizedError):
+                r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
+            session.post = mock_post(url, 999, {'connection': 'close'})
+            with self.assertRaises(TransportError):
+                r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
+            session.post = mock_post(url, 302, {'location': '/ews/genericerrorpage.htm?aspxerrorpath=/ews/exchange.asmx'})
+            with self.assertRaises(TransportError):
+                r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
+            session.post = mock_post(url, 503, {})
+            with self.assertRaises(TransportError):
                 r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
 
-        # Test bad exit codes and headers
-        session.post = mock_post(url, 401, {})
-        with self.assertRaises(UnauthorizedError):
-            r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
-        session.post = mock_post(url, 999, {'connection': 'close'})
-        with self.assertRaises(TransportError):
-            r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
-        session.post = mock_post(url, 302, {'location': '/ews/genericerrorpage.htm?aspxerrorpath=/ews/exchange.asmx'})
-        with self.assertRaises(TransportError):
-            r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
-        session.post = mock_post(url, 503, {})
-        with self.assertRaises(TransportError):
-            r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
+            # No redirect header
+            session.post = mock_post(url, 302, {})
+            with self.assertRaises(TransportError):
+                r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
+            # Redirect header to same location
+            session.post = mock_post(url, 302, {'location': url})
+            with self.assertRaises(TransportError):
+                r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
+            # Redirect header to relative location
+            session.post = mock_post(url, 302, {'location': url + '/foo'})
+            with self.assertRaises(RedirectError):
+                r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
+            # Redirect header to other location and allow_redirects=False
+            session.post = mock_post(url, 302, {'location': 'https://contoso.com'})
+            with self.assertRaises(TransportError):
+                r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
+            # Redirect header to other location and allow_redirects=True
+            import exchangelib.util
+            exchangelib.util.MAX_REDIRECTS = 0
+            session.post = mock_post(url, 302, {'location': 'https://contoso.com'})
+            with self.assertRaises(TransportError):
+                r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='',
+                                              allow_redirects=True)
 
-        # No redirect header
-        session.post = mock_post(url, 302, {})
-        with self.assertRaises(TransportError):
-            r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
-        # Redirect header to same location
-        session.post = mock_post(url, 302, {'location': url})
-        with self.assertRaises(TransportError):
-            r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
-        # Redirect header to relative location
-        session.post = mock_post(url, 302, {'location': url + '/foo'})
-        with self.assertRaises(RedirectError):
-            r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
-        # Redirect header to other location and allow_redirects=False
-        session.post = mock_post(url, 302, {'location': 'https://contoso.com'})
-        with self.assertRaises(TransportError):
-            r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
-        # Redirect header to other location and allow_redirects=True
-        import exchangelib.util
-        exchangelib.util.MAX_REDIRECTS = 0
-        session.post = mock_post(url, 302, {'location': 'https://contoso.com'})
-        with self.assertRaises(TransportError):
-            r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='',
-                                          allow_redirects=True)
+            # CAS error
+            session.post = mock_post(url, 999, {'X-CasErrorCode': 'AAARGH!'})
+            with self.assertRaises(CASError):
+                r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
 
-        # CAS error
-        session.post = mock_post(url, 999, {'X-CasErrorCode': 'AAARGH!'})
-        with self.assertRaises(CASError):
+            # Allow XML data in a non-HTTP 200 response
+            session.post = mock_post(url, 500, {}, '<?xml version="1.0" ?><foo></foo>')
             r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
+            self.assertEqual(r.content, b'<?xml version="1.0" ?><foo></foo>')
 
-        # Allow XML data in a non-HTTP 200 response
-        session.post = mock_post(url, 500, {}, '<?xml version="1.0" ?><foo></foo>')
-        r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
-        self.assertEqual(r.content, b'<?xml version="1.0" ?><foo></foo>')
+            # Bad status_code and bad text
+            session.post = mock_post(url, 999, {})
+            with self.assertRaises(TransportError):
+                r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
 
-        # Bad status_code and bad text
-        session.post = mock_post(url, 999, {})
-        with self.assertRaises(TransportError):
-            r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
+            # Rate limit exceeded
+            protocol.config.retry_policy = FaultTolerance(max_wait=1)
+            session.post = mock_post(url, 503, {'connection': 'close'})
 
-        # Rate limit exceeded
-        protocol.config.retry_policy = FaultTolerance(max_wait=1)
-        session.post = mock_post(url, 503, {'connection': 'close'})
-        protocol.renew_session = lambda s: s  # Return the same session so it's still mocked
-        with self.assertRaises(RateLimitError) as rle:
-            r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
-        self.assertEqual(
-            str(rle.exception),
-            'Max timeout reached (gave up after 10 seconds. URL https://example.com returned status code 503)'
-        )
-        self.assertEqual(rle.exception.url, url)
-        self.assertEqual(rle.exception.status_code, 503)
-        # Test something larger than the default wait, so we retry at least once
-        protocol.retry_policy.max_wait = 15
-        session.post = mock_post(url, 503, {'connection': 'close'})
-        with self.assertRaises(RateLimitError) as rle:
-            r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
-        self.assertEqual(
-            str(rle.exception),
-            'Max timeout reached (gave up after 20 seconds. URL https://example.com returned status code 503)'
-        )
-        self.assertEqual(rle.exception.url, url)
-        self.assertEqual(rle.exception.status_code, 503)
-        protocol.release_session(session)
-        protocol.config.retry_policy = retry_policy
+            protocol.renew_session = lambda s: s  # Return the same session so it's still mocked
+            with self.assertRaises(RateLimitError) as rle:
+                r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
+            self.assertEqual(
+                str(rle.exception),
+                'Max timeout reached (gave up after 10 seconds. URL https://example.com returned status code 503)'
+            )
+            self.assertEqual(rle.exception.url, url)
+            self.assertEqual(rle.exception.status_code, 503)
+            # Test something larger than the default wait, so we retry at least once
+            protocol.retry_policy.max_wait = 15
+            session.post = mock_post(url, 503, {'connection': 'close'})
+            with self.assertRaises(RateLimitError) as rle:
+                r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
+            self.assertEqual(
+                str(rle.exception),
+                'Max timeout reached (gave up after 20 seconds. URL https://example.com returned status code 503)'
+            )
+            self.assertEqual(rle.exception.url, url)
+            self.assertEqual(rle.exception.status_code, 503)
+        finally:
+            protocol.retire_session(session)  # We have patched the session, so discard it
+            # Restore patched attributes and functions
+            protocol.config.retry_policy = retry_policy
+            protocol.renew_session = renew_session
