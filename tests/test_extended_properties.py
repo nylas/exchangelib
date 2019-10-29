@@ -1,8 +1,10 @@
+# coding=utf-8
 from exchangelib import Message, Mailbox, CalendarItem
 from exchangelib.extended_properties import ExtendedProperty
 from exchangelib.folders import Inbox
 
-from . import BaseItemTest, get_random_int
+from .common import get_random_int
+from .test_items import BaseItemTest
 
 
 class ExtendedPropertyTest(BaseItemTest):

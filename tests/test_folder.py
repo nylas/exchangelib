@@ -1,3 +1,4 @@
+# coding=utf-8
 from exchangelib import Q, Message, ExtendedProperty
 from exchangelib.errors import ErrorDeleteDistinguishedFolder, ErrorObjectTypeChanged, DoesNotExist, \
     MultipleObjectsReturned
@@ -6,11 +7,11 @@ from exchangelib.folders import Calendar, DeletedItems, Drafts, Inbox, Outbox, S
     AllItems, ConversationSettings, Friends, RSSFeeds, Sharing, IMContactList, QuickContacts, Journal, Notes, \
     SyncIssues, MyContacts, ToDoSearch, FolderCollection, DistinguishedFolderId, Files, \
     DefaultFoldersChangeHistory, PassThroughSearchResults, SmsAndChatsSync, GraphAnalytics, Signal, \
-    PdpProfileV2Secured, VoiceMail, FolderQuerySet, SingleFolderQuerySet, RootOfHierarchy, SHALLOW
+    PdpProfileV2Secured, VoiceMail, FolderQuerySet, SingleFolderQuerySet, SHALLOW
 from exchangelib.properties import Mailbox, InvalidField
 from exchangelib.services import GetFolder
 
-from . import EWSTest, get_random_string
+from .common import EWSTest, get_random_string
 
 
 class FolderTest(EWSTest):

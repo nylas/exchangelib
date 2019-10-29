@@ -1,3 +1,4 @@
+# coding=utf-8
 import requests_mock
 
 from exchangelib import Version
@@ -5,7 +6,7 @@ from exchangelib.errors import TransportError
 from exchangelib.version import EXCHANGE_2007, Build
 from exchangelib.util import to_xml
 
-from . import TimedTestCase
+from .common import TimedTestCase
 
 
 class VersionTest(TimedTestCase):

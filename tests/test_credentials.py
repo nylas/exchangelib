@@ -1,6 +1,7 @@
+# coding=utf-8
 from exchangelib import Credentials
 
-from . import TimedTestCase
+from .common import TimedTestCase
 
 
 class CredentialsTest(TimedTestCase):

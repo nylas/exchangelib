@@ -1,9 +1,10 @@
+# coding=utf-8
 from exchangelib import EWSDateTime, EWSTimeZone, Q, Build
 from exchangelib.folders import Calendar
 from exchangelib.restriction import Restriction
 from exchangelib.util import xml_to_str
 
-from . import TimedTestCase
+from .common import TimedTestCase
 
 
 class RestrictionTest(TimedTestCase):

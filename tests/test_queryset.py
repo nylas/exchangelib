@@ -1,10 +1,11 @@
+# coding=utf-8
 from collections import namedtuple
 
 from exchangelib import FolderCollection, Q
 from exchangelib.folders import Inbox
 from exchangelib.queryset import QuerySet
 
-from . import TimedTestCase
+from .common import TimedTestCase
 
 
 class QuerySetTest(TimedTestCase):

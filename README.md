@@ -1268,9 +1268,9 @@ You can run either the entire test suite or individual tests.
 python setup.py test
 
 # Single test class or test case
-python tests/__init__.py FolderTest.test_refresh
-# Or, if you don't want extreme levels of debug output:
-python tests/__init__.py FolderTest.test_refresh -q
+python -m unittest -k FolderTest.test_refresh
+# Or, if you want extreme levels of debug output:
+python -m unittest -k FolderTest.test_refresh -v
 ```
 
 

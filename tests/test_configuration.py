@@ -1,3 +1,4 @@
+# coding=utf-8
 import datetime
 import math
 import time
@@ -7,7 +8,7 @@ import requests_mock
 from exchangelib import Configuration, Credentials, NTLM, FailFast, FaultTolerance, Version, Build
 from exchangelib.transport import AUTH_TYPE_MAP
 
-from . import TimedTestCase
+from .common import TimedTestCase
 
 
 class ConfigurationTest(TimedTestCase):

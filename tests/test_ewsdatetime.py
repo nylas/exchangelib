@@ -1,3 +1,4 @@
+# coding=utf-8
 import datetime
 
 import pytz
@@ -8,7 +9,7 @@ from exchangelib.errors import NonExistentTimeError, AmbiguousTimeError, Unknown
 from exchangelib.winzone import generate_map, CLDR_TO_MS_TIMEZONE_MAP, CLDR_WINZONE_URL
 from exchangelib.util import CONNECTION_ERRORS
 
-from . import TimedTestCase
+from .common import TimedTestCase
 
 
 class EWSDateTimeTest(TimedTestCase):

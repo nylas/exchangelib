@@ -1,3 +1,4 @@
+# coding=utf-8
 import io
 from itertools import chain
 import logging
@@ -12,7 +13,7 @@ from exchangelib.errors import RelativeRedirect, TransportError, RateLimitError,
 from exchangelib.util import chunkify, peek, get_redirect_url, get_domain, PrettyXmlHandler, to_xml, BOM_UTF8, \
     ParseError, post_ratelimited, CONNECTION_ERRORS
 
-from . import EWSTest, mock_post, mock_session_exception
+from .common import EWSTest, mock_post, mock_session_exception
 
 
 class UtilTest(EWSTest):

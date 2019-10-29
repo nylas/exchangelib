@@ -1,3 +1,4 @@
+# coding=utf-8
 from collections import namedtuple
 import pickle
 
@@ -10,7 +11,7 @@ from exchangelib.properties import DelegateUser, UserId, DelegatePermissions
 from exchangelib.protocol import Protocol
 from exchangelib.services import GetDelegate
 
-from . import EWSTest, MockResponse
+from .common import EWSTest, MockResponse
 
 
 class AccountTest(EWSTest):

@@ -1,3 +1,4 @@
+# coding=utf-8
 from collections import namedtuple
 from decimal import Decimal
 
@@ -13,7 +14,7 @@ from exchangelib.indexed_properties import SingleFieldIndexedElement
 from exchangelib.version import EXCHANGE_2007, EXCHANGE_2010, EXCHANGE_2013
 from exchangelib.util import to_xml, TNS
 
-from . import TimedTestCase
+from .common import TimedTestCase
 
 
 class FieldTest(TimedTestCase):

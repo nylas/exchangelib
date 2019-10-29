@@ -1,3 +1,4 @@
+# coding=utf-8
 from collections import namedtuple
 
 import requests
@@ -8,7 +9,7 @@ from exchangelib.errors import TransportError, RedirectError, UnauthorizedError
 from exchangelib.transport import wrap, _get_auth_method_from_response, BASIC, NOAUTH, NTLM, DIGEST
 from exchangelib.util import PrettyXmlHandler, create_element
 
-from . import TimedTestCase
+from .common import TimedTestCase
 
 
 class TransportTest(TimedTestCase):

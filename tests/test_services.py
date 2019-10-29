@@ -1,3 +1,4 @@
+# coding=utf-8
 import requests_mock
 
 from exchangelib.errors import ErrorServerBusy, ErrorNonExistentMailbox, TransportError, MalformedResponseError, \
@@ -6,7 +7,7 @@ from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, Res
 from exchangelib.util import create_element
 from exchangelib.version import EXCHANGE_2007, EXCHANGE_2010
 
-from . import EWSTest, mock_protocol, mock_version, mock_account, MockResponse, get_random_string
+from .common import EWSTest, mock_protocol, mock_version, mock_account, MockResponse, get_random_string
 
 
 class ServicesTest(EWSTest):

@@ -1,3 +1,4 @@
+# coding=utf-8
 import datetime
 import socket
 
@@ -14,7 +15,7 @@ from exchangelib.transport import NOAUTH
 from exchangelib.version import Build
 from exchangelib.winzone import CLDR_TO_MS_TIMEZONE_MAP
 
-from . import EWSTest, MockResponse, get_random_datetime_range
+from .common import EWSTest, MockResponse, get_random_datetime_range
 
 
 class ProtocolTest(EWSTest):

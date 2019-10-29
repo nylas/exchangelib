@@ -1,3 +1,4 @@
+# coding=utf-8
 from inspect import isclass
 from itertools import chain
 
@@ -10,7 +11,7 @@ from exchangelib.properties import InvalidField, InvalidFieldForVersion, EWSElem
 from exchangelib.util import to_xml, TNS
 from exchangelib.version import EXCHANGE_2010
 
-from . import TimedTestCase
+from .common import TimedTestCase
 
 
 class PropertiesTest(TimedTestCase):

@@ -1,3 +1,4 @@
+# coding=utf-8
 from exchangelib.attachments import FileAttachment, ItemAttachment, AttachmentId, Attachment
 from exchangelib.errors import ErrorItemNotFound, ErrorInvalidIdMalformed
 from exchangelib.folders import Inbox
@@ -5,7 +6,8 @@ from exchangelib.items import Item, Message
 from exchangelib.services import GetAttachment
 from exchangelib.util import chunkify, TNS
 
-from . import BaseItemTest, get_random_string
+from .test_items import BaseItemTest
+from .common import get_random_string
 
 
 class AttachmentsTest(BaseItemTest):

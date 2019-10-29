@@ -1,3 +1,4 @@
+# coding=utf-8
 import datetime
 from decimal import Decimal
 from email.mime.multipart import MIMEMultipart
@@ -13,15 +14,15 @@ from exchangelib.attachments import ItemAttachment
 from exchangelib.errors import ErrorItemNotFound, ErrorInvalidOperation, ErrorInvalidChangeKey, \
     ErrorUnsupportedPathForQuery, ErrorInvalidValueForProperty, ErrorPropertyUpdate, ErrorInvalidPropertySet, \
     ErrorInvalidIdMalformed
-from exchangelib.ewsdatetime import EWSDateTime, EWSDate, UTC, UTC_NOW
+from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.extended_properties import ExtendedProperty, ExternId
 from exchangelib.fields import TextField, BodyField, ExtendedPropertyField, FieldPath, CultureField, IdField, \
-    CharField, ChoiceField, MONDAY, WEDNESDAY
+    CharField, ChoiceField, AttachmentField, BooleanField, MONDAY, WEDNESDAY
 from exchangelib.folders import Calendar, Inbox, Tasks, Contacts, Folder, FolderCollection
 from exchangelib.indexed_properties import EmailAddress, PhysicalAddress, SingleFieldIndexedElement, \
     MultiFieldIndexedElement
 from exchangelib.items import Item, CalendarItem, Message, Contact, Task, DistributionList, Persona, BaseItem
-from exchangelib.properties import Mailbox, Member
+from exchangelib.properties import Mailbox, Member, Attendee
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.recurrence import Recurrence, WeeklyPattern, FirstOccurrence, LastOccurrence
 from exchangelib.restriction import Restriction, Q
@@ -29,8 +30,211 @@ from exchangelib.services import GetPersona
 from exchangelib.util import value_to_xml_text
 from exchangelib.version import Build, EXCHANGE_2007, EXCHANGE_2013
 
-from . import BaseItemTest, get_random_string, get_random_datetime_range, get_random_date, get_random_email, \
-    mock_version
+from .common import EWSTest, TimedTestCase, get_random_string, get_random_datetime_range, get_random_date, \
+    get_random_email, get_random_decimal, get_random_choice, mock_version
+
+
+class ItemTest(TimedTestCase):
+    def test_task_validation(self):
+        tz = EWSTimeZone.timezone('Europe/Copenhagen')
+        task = Task(due_date=tz.localize(EWSDateTime(2017, 1, 1)), start_date=tz.localize(EWSDateTime(2017, 2, 1)))
+        task.clean()
+        # We reset due date if it's before start date
+        self.assertEqual(task.due_date, tz.localize(EWSDateTime(2017, 2, 1)))
+        self.assertEqual(task.due_date, task.start_date)
+
+        task = Task(complete_date=tz.localize(EWSDateTime(2099, 1, 1)), status=Task.NOT_STARTED)
+        task.clean()
+        # We reset status if complete_date is set
+        self.assertEqual(task.status, Task.COMPLETED)
+        # We also reset complete date to now() if it's in the future
+        self.assertEqual(task.complete_date.date(), UTC_NOW().date())
+
+        task = Task(complete_date=tz.localize(EWSDateTime(2017, 1, 1)), start_date=tz.localize(EWSDateTime(2017, 2, 1)))
+        task.clean()
+        # We also reset complete date to start_date if it's before start_date
+        self.assertEqual(task.complete_date, task.start_date)
+
+        task = Task(percent_complete=Decimal('50.0'), status=Task.COMPLETED)
+        task.clean()
+        # We reset percent_complete to 100.0 if state is completed
+        self.assertEqual(task.percent_complete, Decimal(100))
+
+        task = Task(percent_complete=Decimal('50.0'), status=Task.NOT_STARTED)
+        task.clean()
+        # We reset percent_complete to 0.0 if state is not_started
+        self.assertEqual(task.percent_complete, Decimal(0))
+
+
+class BaseItemTest(EWSTest):
+    TEST_FOLDER = None
+    FOLDER_CLASS = None
+    ITEM_CLASS = None
+
+    @classmethod
+    def setUpClass(cls):
+        if cls is BaseItemTest:
+            raise unittest.SkipTest("Skip BaseItemTest, it's only for inheritance")
+        super(BaseItemTest, cls).setUpClass()
+
+    def setUp(self):
+        super(BaseItemTest, self).setUp()
+        self.test_folder = getattr(self.account, self.TEST_FOLDER)
+        self.assertEqual(type(self.test_folder), self.FOLDER_CLASS)
+        self.assertEqual(self.test_folder.DISTINGUISHED_FOLDER_ID, self.TEST_FOLDER)
+        self.test_folder.filter(categories__contains=self.categories).delete()
+
+    def tearDown(self):
+        self.test_folder.filter(categories__contains=self.categories).delete()
+        # Delete all delivery receipts
+        self.test_folder.filter(subject__startswith='Delivered: Subject: ').delete()
+        super(BaseItemTest, self).tearDown()
+
+    def get_random_insert_kwargs(self):
+        insert_kwargs = {}
+        for f in self.ITEM_CLASS.FIELDS:
+            if not f.supports_version(self.account.version):
+                # Cannot be used with this EWS version
+                continue
+            if self.ITEM_CLASS == CalendarItem and f in CalendarItem.timezone_fields():
+                # Timezone fields will (and must) be populated automatically from the timestamp
+                continue
+            if f.is_read_only:
+                # These cannot be created
+                continue
+            if f.name == 'mime_content':
+                # This needs special formatting. See separate test_mime_content() test
+                continue
+            if f.name == 'attachments':
+                # Testing attachments is heavy. Leave this to specific tests
+                insert_kwargs[f.name] = []
+                continue
+            if f.name == 'resources':
+                # The test server doesn't have any resources
+                insert_kwargs[f.name] = []
+                continue
+            if f.name == 'optional_attendees':
+                # 'optional_attendees' and 'required_attendees' are mutually exclusive
+                insert_kwargs[f.name] = None
+                continue
+            if f.name == 'start':
+                start = get_random_date()
+                insert_kwargs[f.name], insert_kwargs['end'] = \
+                    get_random_datetime_range(start_date=start, end_date=start, tz=self.account.default_timezone)
+                insert_kwargs['recurrence'] = self.random_val(self.ITEM_CLASS.get_field_by_fieldname('recurrence'))
+                insert_kwargs['recurrence'].boundary.start = insert_kwargs[f.name].date()
+                continue
+            if f.name == 'end':
+                continue
+            if f.name == 'recurrence':
+                continue
+            if f.name == 'due_date':
+                # start_date must be before due_date
+                insert_kwargs['start_date'], insert_kwargs[f.name] = \
+                    get_random_datetime_range(tz=self.account.default_timezone)
+                continue
+            if f.name == 'start_date':
+                continue
+            if f.name == 'status':
+                # Start with an incomplete task
+                status = get_random_choice(set(f.supported_choices(version=self.account.version)) - {Task.COMPLETED})
+                insert_kwargs[f.name] = status
+                if status == Task.NOT_STARTED:
+                    insert_kwargs['percent_complete'] = Decimal(0)
+                else:
+                    insert_kwargs['percent_complete'] = get_random_decimal(1, 99)
+                continue
+            if f.name == 'percent_complete':
+                continue
+            insert_kwargs[f.name] = self.random_val(f)
+        return insert_kwargs
+
+    def get_random_update_kwargs(self, item, insert_kwargs):
+        update_kwargs = {}
+        now = UTC_NOW()
+        for f in self.ITEM_CLASS.FIELDS:
+            if not f.supports_version(self.account.version):
+                # Cannot be used with this EWS version
+                continue
+            if self.ITEM_CLASS == CalendarItem and f in CalendarItem.timezone_fields():
+                # Timezone fields will (and must) be populated automatically from the timestamp
+                continue
+            if f.is_read_only:
+                # These cannot be changed
+                continue
+            if not item.is_draft and f.is_read_only_after_send:
+                # These cannot be changed when the item is no longer a draft
+                continue
+            if f.name == 'message_id' and f.is_read_only_after_send:
+                # Cannot be updated, regardless of draft status
+                continue
+            if f.name == 'attachments':
+                # Testing attachments is heavy. Leave this to specific tests
+                update_kwargs[f.name] = []
+                continue
+            if f.name == 'resources':
+                # The test server doesn't have any resources
+                update_kwargs[f.name] = []
+                continue
+            if isinstance(f, AttachmentField):
+                # Attachments are handled separately
+                continue
+            if f.name == 'start':
+                start = get_random_date(start_date=insert_kwargs['end'].date())
+                update_kwargs[f.name], update_kwargs['end'] = \
+                    get_random_datetime_range(start_date=start, end_date=start, tz=self.account.default_timezone)
+                update_kwargs['recurrence'] = self.random_val(self.ITEM_CLASS.get_field_by_fieldname('recurrence'))
+                update_kwargs['recurrence'].boundary.start = update_kwargs[f.name].date()
+                continue
+            if f.name == 'end':
+                continue
+            if f.name == 'recurrence':
+                continue
+            if f.name == 'due_date':
+                # start_date must be before due_date, and before complete_date which must be in the past
+                update_kwargs['start_date'], update_kwargs[f.name] = \
+                    get_random_datetime_range(end_date=now.date(), tz=self.account.default_timezone)
+                continue
+            if f.name == 'start_date':
+                continue
+            if f.name == 'status':
+                # Update task to a completed state. complete_date must be a date in the past, and < than start_date
+                update_kwargs[f.name] = Task.COMPLETED
+                update_kwargs['percent_complete'] = Decimal(100)
+                continue
+            if f.name == 'percent_complete':
+                continue
+            if f.name == 'reminder_is_set':
+                if self.ITEM_CLASS == Task:
+                    # Task type doesn't allow updating 'reminder_is_set' to True
+                    update_kwargs[f.name] = False
+                else:
+                    update_kwargs[f.name] = not insert_kwargs[f.name]
+                continue
+            if isinstance(f, BooleanField):
+                update_kwargs[f.name] = not insert_kwargs[f.name]
+                continue
+            if f.value_cls in (Mailbox, Attendee):
+                if insert_kwargs[f.name] is None:
+                    update_kwargs[f.name] = self.random_val(f)
+                else:
+                    update_kwargs[f.name] = None
+                continue
+            update_kwargs[f.name] = self.random_val(f)
+        if update_kwargs.get('is_all_day', False):
+            # For is_all_day items, EWS will remove the time part of start and end values
+            update_kwargs['start'] = update_kwargs['start'].replace(hour=0, minute=0, second=0, microsecond=0)
+            update_kwargs['end'] = \
+                update_kwargs['end'].replace(hour=0, minute=0, second=0, microsecond=0) + datetime.timedelta(days=1)
+        if self.ITEM_CLASS == CalendarItem:
+            # EWS always sets due date to 'start'
+            update_kwargs['reminder_due_by'] = update_kwargs['start']
+        return update_kwargs
+
+    def get_test_item(self, folder=None, categories=None):
+        item_kwargs = self.get_random_insert_kwargs()
+        item_kwargs['categories'] = categories or self.categories
+        return self.ITEM_CLASS(folder=folder or self.test_folder, **item_kwargs)
 
 
 class ItemQuerySetTest(BaseItemTest):

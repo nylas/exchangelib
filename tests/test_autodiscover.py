@@ -1,3 +1,4 @@
+# coding=utf-8
 from collections import namedtuple
 import glob
 import os
@@ -14,7 +15,7 @@ from exchangelib.errors import ErrorNonExistentMailbox, AutoDiscoverRedirect, Au
     AutoDiscoverFailed
 from exchangelib.protocol import BaseProtocol, NoVerifyHTTPAdapter
 
-from . import EWSTest
+from .common import EWSTest
 
 
 class AutodiscoverTest(EWSTest):
