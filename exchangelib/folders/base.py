@@ -461,7 +461,7 @@ class BaseFolder(RegisterMixIn, SearchableMixIn):
         Does a simple FindItem to test (read) access to the folder. Maybe the account doesn't exist, maybe the
         service user doesn't have access to the calendar. This will throw the most common errors.
         """
-        list(self.filter(subject='DUMMY').values_list('subject'))
+        self.all().exists()
         return True
 
     @classmethod
