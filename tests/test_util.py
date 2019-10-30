@@ -153,7 +153,6 @@ class UtilTest(EWSTest):
 
         protocol = self.account.protocol
         retry_policy = protocol.config.retry_policy
-        renew_session = protocol.renew_session
 
         session = protocol.get_session()
         try:
@@ -228,7 +227,8 @@ class UtilTest(EWSTest):
             protocol.config.retry_policy = FaultTolerance(max_wait=1)
             session.post = mock_post(url, 503, {'connection': 'close'})
 
-            protocol.renew_session = lambda s: s  # Return the same session so it's still mocked
+            # Mock renew_session to return the same session so the session object's 'post' method is still mocked
+            protocol.renew_session = lambda s: s
             with self.assertRaises(RateLimitError) as rle:
                 r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
             self.assertEqual(
@@ -252,4 +252,7 @@ class UtilTest(EWSTest):
             protocol.retire_session(session)  # We have patched the session, so discard it
             # Restore patched attributes and functions
             protocol.config.retry_policy = retry_policy
-            protocol.renew_session = renew_session
+            try:
+                delattr(protocol, 'renew_session')
+            except AttributeError:
+                pass
