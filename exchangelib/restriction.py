@@ -185,11 +185,11 @@ class Q(object):
         self.query_string = q.query_string
         self.children = q.children
 
-    def clean(self):
-        # Do some basic checks on the attributes, using a generic folder and no Exchange version restrictions. to_xml()
-        # does a really good job of validating. There's no reason to replicate much of that here.
+    def clean(self, version):
+        # Do some basic checks on the attributes, using a generic folder. to_xml() does a really good job of
+        # validating. There's no reason to replicate much of that here.
         from .folders import Folder
-        self.to_xml(folders=[Folder()], version=None, applies_to=Restriction.ITEMS)
+        self.to_xml(folders=[Folder()], version=version, applies_to=Restriction.ITEMS)
 
     @classmethod
     def _lookup_to_op(cls, lookup):
@@ -347,7 +347,7 @@ class Q(object):
             # This is a restriction on Folder fields
             folder.validate_field(field=field_path.field, version=version)
         else:
-            folder.validate_item_field(field=field_path.field)
+            folder.validate_item_field(field=field_path.field, version=version)
         if not field_path.field.is_searchable:
             raise ValueError("EWS does not support filtering on field '%s'" % field_path.field.name)
         if field_path.subfield and not field_path.subfield.is_searchable:
@@ -525,4 +525,4 @@ class Restriction(object):
         """
         Prints the XML syntax tree
         """
-        return xml_to_str(self.to_xml(version=None))
+        return xml_to_str(self.to_xml(version=self.folders[0].account.version))

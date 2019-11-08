@@ -19,7 +19,7 @@ from ..queryset import QuerySet, SearchableMixIn, DoesNotExist
 from ..restriction import Restriction
 from ..services import CreateFolder, UpdateFolder, DeleteFolder, EmptyFolder, FindPeople
 from ..util import TNS
-from ..version import EXCHANGE_2007_SP1, EXCHANGE_2010
+from ..version import Version, EXCHANGE_2007_SP1, EXCHANGE_2010
 from .collections import FolderCollection
 from .queryset import SingleFolderQuerySet, SHALLOW
 
@@ -180,7 +180,9 @@ class BaseFolder(RegisterMixIn, SearchableMixIn):
     @classmethod
     def supports_version(cls, version):
         # 'version' is a Version instance, for convenience by callers
-        if not cls.supported_from or not version:
+        if not isinstance(version, Version):
+            raise ValueError("'version' %r must be a Version instance" % version)
+        if not cls.supported_from:
             return True
         return version.build >= cls.supported_from
 
@@ -225,10 +227,10 @@ class BaseFolder(RegisterMixIn, SearchableMixIn):
             )
         return fields
 
-    def validate_item_field(self, field):
+    def validate_item_field(self, field, version):
         # Takes a fieldname, Field or FieldPath object pointing to an item field, and checks that it is valid
         # for the item types supported by this folder.
-        version = self.account.version if self.account else None
+
         # For each field, check if the field is valid for any of the item models supported by this folder
         for item_model in self.supported_item_models:
             try:
@@ -470,7 +472,9 @@ class BaseFolder(RegisterMixIn, SearchableMixIn):
         kwargs = dict(id=folder_id, changekey=changekey)
         # Check for 'DisplayName' element before collecting kwargs because because that clears the elements
         has_name_elem = elem.find(cls.get_field_by_fieldname('name').response_tag()) is not None
-        kwargs.update({f.name: f.from_xml(elem=elem, account=account) for f in cls.supported_fields()})
+        kwargs.update({
+            f.name: f.from_xml(elem=elem, account=account) for f in cls.FIELDS if f.name not in ('id', 'changekey')
+        })
         if has_name_elem and not kwargs['name']:
             # When we request the 'DisplayName' property, some folders may still be returned with an empty value.
             # Assign a default name to these folders.
@@ -490,10 +494,6 @@ class BaseFolder(RegisterMixIn, SearchableMixIn):
         if self.id:
             return FolderId(id=self.id, changekey=self.changekey).to_xml(version=version)
         return super(BaseFolder, self).to_xml(version=version)
-
-    @classmethod
-    def supported_fields(cls, version=None):
-        return tuple(f for f in cls.FIELDS if f.name not in ('id', 'changekey') and f.supports_version(version))
 
     @classmethod
     def resolve(cls, account, folder):

@@ -111,11 +111,11 @@ class FolderCollection(SearchableMixIn):
     def supported_item_models(self):
         return tuple(item_model for folder in self.folders for item_model in folder.supported_item_models)
 
-    def validate_item_field(self, field):
+    def validate_item_field(self, field, version):
         # For each field, check if the field is valid for any of the item models supported by this folder
         for item_model in self.supported_item_models:
             try:
-                item_model.validate_field(field=field, version=self.account.version)
+                item_model.validate_field(field=field, version=version)
                 break
             except InvalidField:
                 continue
@@ -150,7 +150,7 @@ class FolderCollection(SearchableMixIn):
             return
         if additional_fields:
             for f in additional_fields:
-                self.validate_item_field(field=f)
+                self.validate_item_field(field=f, version=self.account.version)
                 if f.field.is_complex:
                     raise ValueError("find_items() does not support field '%s'. Use fetch() instead" % f.field.name)
         if calendar_view is not None and not isinstance(calendar_view, CalendarView):

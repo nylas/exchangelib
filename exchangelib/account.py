@@ -592,7 +592,7 @@ class Account(object):
             }
         else:
             for field in only_fields:
-                validation_folder.validate_item_field(field=field)
+                validation_folder.validate_item_field(field=field, version=self.version)
             additional_fields = validation_folder.normalize_fields(fields=only_fields)
         # Always use IdOnly here, because AllProperties doesn't actually get *all* properties
         for i in self._consume_item_service(service_cls=GetItem, items=ids, chunk_size=chunk_size, kwargs=dict(
