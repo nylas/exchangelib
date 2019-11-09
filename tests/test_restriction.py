@@ -1,10 +1,11 @@
 # coding=utf-8
 from exchangelib import EWSDateTime, EWSTimeZone, Q, Build
-from exchangelib.folders import Calendar
+from exchangelib.folders import Calendar, Root
 from exchangelib.restriction import Restriction
 from exchangelib.util import xml_to_str
+from exchangelib.version import Version, EXCHANGE_2007
 
-from .common import TimedTestCase
+from .common import TimedTestCase, mock_account, mock_protocol
 
 
 class RestrictionTest(TimedTestCase):
@@ -12,6 +13,9 @@ class RestrictionTest(TimedTestCase):
         self.assertEqual(str(Q()), 'Q()')
 
     def test_q(self):
+        version = Version(build=EXCHANGE_2007)
+        account = mock_account(version=version, protocol=mock_protocol(version=version, service_endpoint='example.com'))
+        root = Root(account=account)
         tz = EWSTimeZone.timezone('Europe/Copenhagen')
         start = tz.localize(EWSDateTime(1950, 9, 26, 8, 0, 0))
         end = tz.localize(EWSDateTime(2050, 9, 26, 11, 0, 0))
@@ -43,24 +47,24 @@ class RestrictionTest(TimedTestCase):
     </t:And>
 </m:Restriction>'''
         q = Q(Q(categories__contains='FOO') | Q(categories__contains='BAR'), start__lt=end, end__gt=start)
-        r = Restriction(q, folders=[Calendar()], applies_to=Restriction.ITEMS)
+        r = Restriction(q, folders=[Calendar(root=root)], applies_to=Restriction.ITEMS)
         self.assertEqual(str(r), ''.join(l.lstrip() for l in result.split('\n')))
         # Test empty Q
         q = Q()
-        self.assertEqual(q.to_xml(folders=[Calendar()], version=None, applies_to=Restriction.ITEMS), None)
+        self.assertEqual(q.to_xml(folders=[Calendar()], version=version, applies_to=Restriction.ITEMS), None)
         with self.assertRaises(ValueError):
-            Restriction(q, folders=[Calendar()], applies_to=Restriction.ITEMS)
+            Restriction(q, folders=[Calendar(root=root)], applies_to=Restriction.ITEMS)
         # Test validation
         with self.assertRaises(ValueError):
             Q(datetime_created__range=(1,))  # Must have exactly 2 args
         with self.assertRaises(ValueError):
             Q(datetime_created__range=(1, 2, 3))  # Must have exactly 2 args
         with self.assertRaises(TypeError):
-            Q(datetime_created=Build(15, 1)).clean()  # Must be serializable
+            Q(datetime_created=Build(15, 1)).clean(version=Version(build=EXCHANGE_2007))  # Must be serializable
         with self.assertRaises(ValueError):
-            Q(datetime_created=EWSDateTime(2017, 1, 1)).clean()  # Must be tz-aware date
+            Q(datetime_created=EWSDateTime(2017, 1, 1)).clean(version=Version(build=EXCHANGE_2007))  # Must be tz-aware date
         with self.assertRaises(ValueError):
-            Q(categories__contains=[[1, 2], [3, 4]]).clean()  # Must be single value
+            Q(categories__contains=[[1, 2], [3, 4]]).clean(version=Version(build=EXCHANGE_2007))  # Must be single value
 
     def test_q_expr(self):
         self.assertEqual(Q().expr(), None)
@@ -84,6 +88,9 @@ class RestrictionTest(TimedTestCase):
         self.assertEqual(len(in_q.children), 3)
 
     def test_q_inversion(self):
+        version = Version(build=EXCHANGE_2007)
+        account = mock_account(version=version, protocol=mock_protocol(version=version, service_endpoint='example.com'))
+        root = Root(account=account)
         self.assertEqual((~Q(foo=5)).op, Q.NE)
         self.assertEqual((~Q(foo__not=5)).op, Q.EQ)
         self.assertEqual((~Q(foo__lt=5)).op, Q.GTE)
@@ -117,7 +124,7 @@ class RestrictionTest(TimedTestCase):
 </m:Restriction>'''
         q = ~(Q(subject='bar') | Q(subject='baz'))
         self.assertEqual(
-            xml_to_str(q.to_xml(folders=[Calendar()], version=None, applies_to=Restriction.ITEMS)),
+            xml_to_str(q.to_xml(folders=[Calendar(root=root)], version=version, applies_to=Restriction.ITEMS)),
             ''.join(l.lstrip() for l in result.split('\n'))
         )
 
@@ -128,4 +135,4 @@ class RestrictionTest(TimedTestCase):
     def test_q_failures(self):
         with self.assertRaises(ValueError):
             # Invalid value
-            Q(foo=None).clean()
+            Q(foo=None).clean(version=Version(build=EXCHANGE_2007))

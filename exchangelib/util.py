@@ -221,7 +221,7 @@ def set_xml_value(elem, value, version):
         elem.append(value.to_xml())
     elif isinstance(value, EWSElement):
         if not isinstance(version, Version):
-            raise ValueError("'version' %s must be a Version instance" % version)
+            raise ValueError("'version' %r must be a Version instance" % version)
         elem.append(value.to_xml(version=version))
     else:
         raise ValueError('Unsupported type %s for value %s on elem %s' % (type(value), value, elem))

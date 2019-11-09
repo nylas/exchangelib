@@ -9,7 +9,7 @@ from exchangelib.indexed_properties import PhysicalAddress
 from exchangelib.items import Item, BulkCreateResult
 from exchangelib.properties import InvalidField, InvalidFieldForVersion, EWSElement, MessageHeader
 from exchangelib.util import to_xml, TNS
-from exchangelib.version import EXCHANGE_2010
+from exchangelib.version import EXCHANGE_2010, EXCHANGE_2013
 
 from .common import TimedTestCase
 
@@ -107,7 +107,7 @@ class PropertiesTest(TimedTestCase):
         with self.assertRaises(InvalidField):
             Item.get_field_by_fieldname(fieldname='xxx')
 
-        Item.validate_field(field=test_field, version=None)
+        Item.validate_field(field=test_field, version=Version(build=EXCHANGE_2013))
         with self.assertRaises(InvalidFieldForVersion) as e:
             Item.validate_field(field=test_field, version=Version(build=EXCHANGE_2010))
         self.assertEqual(

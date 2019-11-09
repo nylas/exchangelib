@@ -13,7 +13,7 @@ from six import string_types
 from .errors import ErrorInvalidServerVersion
 from .ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, NaiveDateTimeNotAllowed, UnknownTimeZone
 from .util import create_element, get_xml_attrs, set_xml_value, value_to_xml_text, is_iterable, TNS
-from .version import Build, EXCHANGE_2013
+from .version import Build, Version, EXCHANGE_2013
 
 log = logging.getLogger(__name__)
 
@@ -285,7 +285,7 @@ class Field(object):
         self.deprecated_from = deprecated_from
 
     def clean(self, value, version=None):
-        if not self.supports_version(version):
+        if version and not self.supports_version(version):
             raise ErrorInvalidServerVersion("Field '%s' does not support EWS builds prior to %s (server has %s)" % (
                 self.name, self.supported_from, version))
         if value is None:
@@ -317,8 +317,8 @@ class Field(object):
 
     def supports_version(self, version):
         # 'version' is a Version instance, for convenience by callers
-        if not version:
-            return True
+        if not isinstance(version, Version):
+            raise ValueError("'version' %r must be a Version instance" % version)
         if self.supported_from and version.build < self.supported_from:
             return False
         if self.deprecated_from and version.build >= self.deprecated_from:
@@ -778,7 +778,9 @@ class Choice(object):
 
     def supports_version(self, version):
         # 'version' is a Version instance, for convenience by callers
-        if not self.supported_from or not version:
+        if not isinstance(version, Version):
+            raise ValueError("'version' %r must be a Version instance" % version)
+        if not self.supported_from:
             return True
         return version.build >= self.supported_from
 
@@ -792,17 +794,22 @@ class ChoiceField(CharField):
         value = super(ChoiceField, self).clean(value, version=version)
         if value is None:
             return None
-        for c in self.choices:
-            if c.value != value:
-                continue
-            if not c.supports_version(version):
-                raise ErrorInvalidServerVersion("Choice '%s' does not support EWS builds prior to %s (server has %s)"
-                                                % (self.name, self.supported_from, version))
-            return value
+        valid_choices = list(c.value for c in self.choices)
+        if version:
+            valid_choices_for_version = self.supported_choices(version=version)
+            if value in valid_choices_for_version:
+                return value
+            if value in valid_choices:
+                raise ErrorInvalidServerVersion("Choice '%s' only supports EWS builds from %s to %s (server has %s)" % (
+                    self.name, self.supported_from or '*', self.deprecated_from or '*', version))
+        else:
+            if value in valid_choices:
+                return value
         raise ValueError("Invalid choice '%s' for field '%s'. Valid choices are: %s" % (
-            value, self.name, ', '.join(self.supported_choices(version=version))))
+            value, self.name, ', '.join(valid_choices)
+        ))
 
-    def supported_choices(self, version=None):
+    def supported_choices(self, version):
         return list(c.value for c in self.choices if c.supports_version(version))
 
 

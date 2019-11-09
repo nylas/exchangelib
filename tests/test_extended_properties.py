@@ -22,7 +22,7 @@ class ExtendedPropertyTest(BaseItemTest):
         attr_name = 'dead_beef'
 
         # Before register
-        self.assertNotIn(attr_name, {f.name for f in self.ITEM_CLASS.supported_fields()})
+        self.assertNotIn(attr_name, {f.name for f in self.ITEM_CLASS.supported_fields(self.account.version)})
         with self.assertRaises(ValueError):
             self.ITEM_CLASS.deregister(attr_name)  # Not registered yet
         with self.assertRaises(ValueError):
@@ -32,7 +32,7 @@ class ExtendedPropertyTest(BaseItemTest):
         try:
             # After register
             self.assertEqual(TestProp.python_type(), int)
-            self.assertIn(attr_name, {f.name for f in self.ITEM_CLASS.supported_fields()})
+            self.assertIn(attr_name, {f.name for f in self.ITEM_CLASS.supported_fields(self.account.version)})
 
             # Test item creation, refresh, and update
             item = self.get_test_item(folder=self.test_folder)
@@ -54,7 +54,7 @@ class ExtendedPropertyTest(BaseItemTest):
                 self.ITEM_CLASS.register(attr_name='XXX', attr_cls=Mailbox)  # Not an extended property
         finally:
             self.ITEM_CLASS.deregister(attr_name=attr_name)
-        self.assertNotIn(attr_name, {f.name for f in self.ITEM_CLASS.supported_fields()})
+        self.assertNotIn(attr_name, {f.name for f in self.ITEM_CLASS.supported_fields(self.account.version)})
 
     def test_extended_property_arraytype(self):
         # Tests array type extended properties

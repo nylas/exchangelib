@@ -27,7 +27,8 @@ class ArchiveItem(EWSAccountService, EWSPooledMixIn):
             if isinstance(container_or_exc, (bool, Exception)):
                 yield container_or_exc
             else:
-                assert len(container_or_exc) == 0
+                if len(container_or_exc):
+                    raise ValueError('Unexpected container length: %s' % container_or_exc)
                 yield True
 
     def get_payload(self, items, to_folder):

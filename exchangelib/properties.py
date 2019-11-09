@@ -17,7 +17,7 @@ from .fields import SubField, TextField, EmailAddressField, ChoiceField, DateTim
     EWSElementListField, EnumListField, FreeBusyStatusField, UnknownEntriesField, MessageField, RecipientAddressField, \
     WEEKDAY_NAMES, FieldPath, Field
 from .util import get_xml_attr, create_element, set_xml_value, value_to_xml_text, MNS, TNS
-from .version import EXCHANGE_2013
+from .version import Version, EXCHANGE_2013
 
 log = logging.getLogger(__name__)
 
@@ -141,7 +141,7 @@ class EWSElement(object):
     def clean(self, version=None):
         # Validate attribute values using the field validator
         for f in self.FIELDS:
-            if not f.supports_version(version):
+            if version and not f.supports_version(version):
                 continue
             if isinstance(f, ExtendedPropertyField) and not hasattr(self, f.name):
                 # The extended field may have been registered after this item was created. Set default values.
@@ -212,7 +212,7 @@ class EWSElement(object):
         return tuple(f for f in cls.FIELDS if f.is_attribute)
 
     @classmethod
-    def supported_fields(cls, version=None):
+    def supported_fields(cls, version):
         """Return non-ID field names. If version is specified, only return the fields supported by this version"""
         return tuple(f for f in cls.FIELDS if not f.is_attribute and f.supports_version(version))
 
@@ -228,6 +228,8 @@ class EWSElement(object):
         """Takes a list of fieldnames, Field or FieldPath objects pointing to item fields, and checks that they are
         valid for the given version.
         """
+        if not isinstance(version, Version):
+            raise ValueError("'version' %r must be a Version instance" % version)
         # Allow both Field and FieldPath instances and string field paths as input
         if isinstance(field, string_types):
             field = cls.get_field_by_fieldname(fieldname=field)
@@ -1230,8 +1232,11 @@ class IdChangeKeyMixIn(EWSElement):
 
     @classmethod
     def from_xml(cls, elem, account):
+        # The ID and changekey are actually in an 'ItemId' child element
         item_id, changekey = cls.id_from_xml(elem)
-        kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.supported_fields()}
+        kwargs = {
+            f.name: f.from_xml(elem=elem, account=account) for f in cls.FIELDS if f.name not in ('id', 'changekey')
+        }
         cls._clear(elem)
         return cls(id=item_id, changekey=changekey, **kwargs)
 
