@@ -546,12 +546,16 @@ Here are some examples of using the API:
 
 ```python
 from datetime import timedelta
-from exchangelib import Account, EWSDateTime, FolderCollection, Q
+from exchangelib import Account, EWSDateTime, FolderCollection, Q, Message
 
 a = Account(...)
+
+# Not all fields on an item support searching. Here's the list of options for Message items
+print([f.name for f in Message.FIELDS if f.is_searchable])
+
 all_items = a.inbox.all()  # Get everything
 all_items_without_caching = a.inbox.all().iterator()  # Get everything, but don't cache
-# Chain multiple modifiers ro refine the query
+# Chain multiple modifiers to refine the query
 filtered_items = a.inbox.filter(subject__contains='foo').exclude(categories__icontains='bar')
 status_report = a.inbox.all().delete()  # Delete the items returned by the QuerySet
 start = a.default_timezone.localize(EWSDateTime(2017, 1, 1))
