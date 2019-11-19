@@ -349,6 +349,9 @@ class Item(BaseItem):
         """
         if not is_iterable(attachments, generators_allowed=True):
             attachments = [attachments]
+        if attachments is self.attachments:
+            # Don't remove from the same list we are iterating
+            attachments = list(attachments)
         for a in attachments:
             if a.parent_item is not self:
                 raise ValueError('Attachment does not belong to this item')
