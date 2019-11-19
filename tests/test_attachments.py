@@ -208,3 +208,18 @@ class AttachmentsTest(BaseItemTest):
             new_item.attachments[0].item.attachments[0].item.attachments[0].item.subject,
             attached_item_level_3.subject
         )
+
+    def test_detach_all(self):
+        # Make sure that we can detach all by passing item.attachments
+        item = self.get_test_item(folder=self.test_folder).save()
+        item.attach([FileAttachment(name='empty_file.txt', content=b'') for _ in range(6)])
+        self.assertEqual(len(item.attachments), 6)
+        item.detach(item.attachments)
+        self.assertEqual(len(item.attachments), 0)
+
+    def test_detach_with_refresh(self):
+        # Make sure that we can detach after refresh
+        item = self.get_test_item(folder=self.test_folder).save()
+        item.attach(FileAttachment(name='empty_file.txt', content=b''))
+        item.refresh()
+        item.detach(item.attachments)

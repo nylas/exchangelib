@@ -120,8 +120,9 @@ class Item(BaseItem):
         # pylint: disable=access-member-before-definition
         if self.attachments:
             for a in self.attachments:
-                if a.parent_item and a.parent_item is not self:
-                    raise ValueError("'parent_item' of attachment %s must point to this item" % a)
+                if a.parent_item:
+                    if a.parent_item is not self:
+                        raise ValueError("'parent_item' of attachment %s must point to this item" % a)
                 else:
                     a.parent_item = self
                 self.attach(self.attachments)
@@ -244,6 +245,10 @@ class Item(BaseItem):
             raise ValueError('Unexpected ID of fresh item')
         for f in self.FIELDS:
             setattr(self, f.name, getattr(fresh_item, f.name))
+        # 'parent_item' should point to 'self', not 'fresh_item'. That way, 'fresh_item' can be garbage collected.
+        for a in self.attachments:
+            a.parent_item = self
+        del fresh_item
 
     def copy(self, to_folder):
         if not self.account:
@@ -325,7 +330,7 @@ class Item(BaseItem):
     def attach(self, attachments):
         """Add an attachment, or a list of attachments, to this item. If the item has already been saved, the
         attachments will be created on the server immediately. If the item has not yet been saved, the attachments will
-        be created on the server the item is saved.
+        be created on the server when the item is saved.
 
         Adding attachments to an existing item will update the changekey of the item.
         """
