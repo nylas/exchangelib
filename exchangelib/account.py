@@ -619,3 +619,17 @@ class Account(object):
         if self.fullname:
             txt += ' (%s)' % self.fullname
         return txt
+
+class FreeBusyAccount(Account):
+    '''
+    The `FreeBusyAccount` class is necessary in order to fetch free-busy data via exchangelib.
+
+    `Protocol.get_free_busy_info` has an `accounts` parameter that needs to be type `Account`.
+    Those accounts don't have to be syncing with Nylas, and we don't need to run any authentication
+    on them. That's why `FreeBusyAccount` exists - this class extends from `Account` but should
+    never run any authentication logic.
+    '''
+    def __init__(self, primary_smtp_address):
+        # We are intentionally *not* calling the __init__ of it's super class,
+        # as to not run any authentication logic.
+        self.primary_smtp_address = primary_smtp_address
