@@ -256,6 +256,9 @@ class Item(BaseItem):
         if not self.id:
             raise ValueError('%s must have an ID' % self.__class__.__name__)
         res = self.account.bulk_copy(ids=[self], to_folder=to_folder)
+        if not res:
+            # Assume 'to_folder' is a public folder or a folder in a different mailbox
+            return
         if len(res) != 1:
             raise ValueError('Expected result length 1, but got %s' % res)
         if isinstance(res[0], Exception):
