@@ -12,7 +12,7 @@ from six import string_types
 
 from .errors import ErrorInvalidServerVersion
 from .ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, NaiveDateTimeNotAllowed, UnknownTimeZone
-from .util import create_element, get_xml_attrs, set_xml_value, value_to_xml_text, is_iterable, TNS
+from .util import create_element, get_xml_attrs, set_xml_value, value_to_xml_text, is_iterable, safe_b64decode, TNS
 from .version import Build, Version, EXCHANGE_2013
 
 log = logging.getLogger(__name__)
@@ -537,7 +537,7 @@ class Base64Field(FieldURIField):
         val = self._get_val_from_elem(elem)
         if val is not None:
             try:
-                return base64.b64decode(val)
+                return safe_b64decode(val)
             except (TypeError, binascii.Error):
                 log.warning("Cannot convert value '%s' on field '%s' to type %s", val, self.name, self.value_cls)
                 return None

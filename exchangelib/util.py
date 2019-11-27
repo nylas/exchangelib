@@ -289,6 +289,15 @@ def prepare_input_source(source):
     return source
 
 
+def safe_b64decode(data):
+    # Incoming base64-encoded data is not always padded to a multiple of 4. Python's parser is more strict and requires
+    # padding. Add padding if it's needed.
+    overflow = len(data) % 4
+    if overflow:
+        data += b'=' * (4 - overflow)
+    return b64decode(data)
+
+
 class StreamingBase64Parser(DefusedExpatParser):
     """A SAX parser that returns a generator of base64-decoded character content"""
     def __init__(self, *args, **kwargs):
@@ -313,6 +322,7 @@ class StreamingBase64Parser(DefusedExpatParser):
             for data in self.feed(buffer):
                 yield data
             buffer = file.read(self._bufsize)
+        # Any remaining data in self.buffer should be padding chars now
         self.buffer = None
         source.close()
         self.close()
@@ -332,7 +342,7 @@ class StreamingBase64Parser(DefusedExpatParser):
         remainder = ''
         for data in self.buffer:
             available = len(remainder) + len(data)
-            overflow = available % 4
+            overflow = available % 4  # Make sure we always decode a multiple of 4
             if remainder:
                 data = (remainder + data)
                 remainder = ''

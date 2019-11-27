@@ -9,7 +9,7 @@ from six import string_types
 from .ewsdatetime import EWSDateTime
 from .properties import EWSElement
 from .util import create_element, add_xml_child, get_xml_attrs, get_xml_attr, set_xml_value, value_to_xml_text, \
-    xml_text_to_value, is_iterable, TNS
+    xml_text_to_value, is_iterable, safe_b64decode, TNS
 
 log = logging.getLogger(__name__)
 
@@ -229,13 +229,13 @@ class ExtendedProperty(EWSElement):
         if cls.is_array_type():
             values = elem.find('{%s}Values' % TNS)
             if cls.is_binary_type():
-                return [base64.b64decode(val) for val in get_xml_attrs(values, '{%s}Value' % TNS)]
+                return [safe_b64decode(val) for val in get_xml_attrs(values, '{%s}Value' % TNS)]
             return [
                 xml_text_to_value(value=val, value_type=python_type)
                 for val in get_xml_attrs(values, '{%s}Value' % TNS)
             ]
         if cls.is_binary_type():
-            return base64.b64decode(get_xml_attr(elem, '{%s}Value' % TNS))
+            return safe_b64decode(get_xml_attr(elem, '{%s}Value' % TNS))
         extended_field_value = xml_text_to_value(value=get_xml_attr(elem, '{%s}Value' % TNS), value_type=python_type)
         if python_type == string_types[0] and not extended_field_value:
             # For string types, we want to return the empty string instead of None if the element was
