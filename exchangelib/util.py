@@ -294,7 +294,11 @@ def safe_b64decode(data):
     # padding. Add padding if it's needed.
     overflow = len(data) % 4
     if overflow:
-        data += b'=' * (4 - overflow)
+        if isinstance(data, string_types):
+            padding = '=' * (4 - overflow)
+        else:
+            padding = b'=' * (4 - overflow)
+        data += padding
     return b64decode(data)
 
 

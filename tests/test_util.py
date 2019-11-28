@@ -11,7 +11,7 @@ from exchangelib import FailFast, FaultTolerance
 from exchangelib.errors import RelativeRedirect, TransportError, RateLimitError, RedirectError, UnauthorizedError,\
     CASError
 from exchangelib.util import chunkify, peek, get_redirect_url, get_domain, PrettyXmlHandler, to_xml, BOM_UTF8, \
-    ParseError, post_ratelimited, CONNECTION_ERRORS
+    ParseError, post_ratelimited, safe_b64decode, CONNECTION_ERRORS
 
 from .common import EWSTest, mock_post, mock_session_exception
 
@@ -256,3 +256,13 @@ class UtilTest(EWSTest):
                 delattr(protocol, 'renew_session')
             except AttributeError:
                 pass
+
+    def test_safe_b64decode(self):
+        # Test correctly padded string
+        self.assertEqual(safe_b64decode('SGVsbG8gd29ybGQ='), b'Hello world')
+        # Test incorrectly padded string
+        self.assertEqual(safe_b64decode('SGVsbG8gd29ybGQ'), b'Hello world')
+        # Test binary data
+        self.assertEqual(safe_b64decode(b'SGVsbG8gd29ybGQ='), b'Hello world')
+        # Test incorrectly padded binary data
+        self.assertEqual(safe_b64decode(b'SGVsbG8gd29ybGQ'), b'Hello world')
