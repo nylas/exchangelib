@@ -13,7 +13,8 @@ from .fields import BooleanField, IntegerField, DecimalField, Base64Field, TextF
     PhysicalAddressField, ExtendedPropertyField, AttachmentField, RecurrenceField, MailboxField, MailboxListField, \
     AttendeesField, Choice, OccurrenceField, OccurrenceListField, MemberListField, EWSElementField, \
     EffectiveRightsField, TimeZoneField, CultureField, IdField, CharField, TextListField, EnumAsIntField, \
-    EmailAddressField, FreeBusyStatusField, ReferenceItemIdField, AssociatedCalendarItemIdField, OccurrenceItemIdField
+    EmailAddressField, FreeBusyStatusField, ReferenceItemIdField, AssociatedCalendarItemIdField, OccurrenceItemIdField, \
+    GenericDateField
 from .properties import EWSElement, ItemId, ConversationId, ParentFolderId, Attendee, ReferenceItemId, \
     AssociatedCalendarItemId, PersonaId
 from .recurrence import FirstOccurrence, LastOccurrence, Occurrence, DeletedOccurrence
@@ -520,8 +521,8 @@ class CalendarItem(Item):
     FIELDS = Item.FIELDS + [
         OccurrenceItemIdField('occurrence_item_id', field_uri='calendar:OccurrenceItemId', is_syncback_only=True),
         TextField('uid', field_uri='calendar:UID', is_required_after_save=True, is_searchable=False),
-        DateTimeField('start', field_uri='calendar:Start', is_required=True),
-        DateTimeField('end', field_uri='calendar:End', is_required=True),
+        GenericDateField('start', field_uri='calendar:Start', is_required=True),
+        GenericDateField('end', field_uri='calendar:End', is_required=True),
         DateTimeField('original_start', field_uri='calendar:OriginalStart', is_read_only=True),
         BooleanField('is_all_day', field_uri='calendar:IsAllDayEvent', is_required=True, default=False),
         FreeBusyStatusField('legacy_free_busy_status', field_uri='calendar:LegacyFreeBusyStatus', is_required=True,
@@ -579,12 +580,16 @@ class CalendarItem(Item):
         URIField('net_show_url', field_uri='calendar:NetShowUrl'),
     ]
 
+
     @classmethod
     def timezone_fields(cls):
         return [f for f in cls.FIELDS if isinstance(f, TimeZoneField)]
 
     def clean_timezone_fields(self, version):
         # pylint: disable=access-member-before-definition
+        if self.is_all_day is True:
+            # No timezones for all day events!
+            return
         # Sets proper values on the timezone fields if they are not already set
         if version.build < EXCHANGE_2010:
             if self._meeting_timezone is None and self.start is not None:
