@@ -294,6 +294,8 @@ class Field(object):
                 if hasattr(v, 'clean'):
                     v.clean(version=version)
         else:
+            if isinstance(self, GenericDateField):
+                return value
             if not isinstance(value, self.value_cls):
                 raise TypeError("Field '%s' value %r must be of type %s" % (self.name, value, self.value_cls))
             if hasattr(value, 'clean'):
@@ -529,6 +531,40 @@ class Base64Field(FieldURIField):
         return set_xml_value(field_elem, base64.b64encode(value).decode('ascii'), version=version)
 
 
+class GenericDateField(FieldURIField):
+    """
+    This class is a generic field to use when a field can be either a DateField or
+    a DateTimeField on a CalendarItem. Using this class allows either type to be used
+    and handles writing the appropriate XML based on whether the `is_all_day` field
+    on the CalendarItem is true, in which case it uses an EWSDate, else it uses an
+    EWSDateTime.
+    """
+    def from_xml(self, elem, account):
+        val = self._get_val_from_elem(elem)
+        is_all_day = elem.find('{%s}IsAllDayEvent' % TNS)
+        if val is not None:
+            if is_all_day is True:
+                try:
+                    return EWSDate.from_string(val)
+                except ValueError:
+                    log.warning("Cannot convert value '%s' on field '%s' to type %s", val, self.name, self.value_cls)
+                    return None
+            else:
+                try:
+                    return EWSDateTime.from_string(val)
+                except ValueError as e:
+                    if isinstance(e, NaiveDateTimeNotAllowed):
+                        # We encountered a naive datetime. Convert to timezone-aware datetime using the default
+                        # timezone of the account.
+                        local_dt = e.args[0]
+                        tz = account.default_timezone if account else UTC
+                        log.info('Found naive datetime %s on field %s. Assuming timezone %s', local_dt, self.name, tz)
+                        return tz.localize(local_dt)
+                    log.warning("Cannot convert value '%s' on field '%s' to type %s", val, self.name, self.value_cls)
+                    return None
+        return self.default
+
+
 class DateField(FieldURIField):
     value_cls = EWSDate
 
@@ -540,20 +576,6 @@ class DateField(FieldURIField):
             except ValueError:
                 log.warning("Cannot convert value '%s' on field '%s' to type %s", val, self.name, self.value_cls)
                 return None
-        return self.default
-
-
-class TimeField(FieldURIField):
-    value_cls = datetime.time
-
-    def from_xml(self, elem, account):
-        val = self._get_val_from_elem(elem)
-        if val is not None:
-            try:
-                # Assume an integer in minutes since midnight
-                return (datetime.datetime(2000, 1, 1) + datetime.timedelta(minutes=int(val))).time()
-            except ValueError:
-                pass
         return self.default
 
 
@@ -580,6 +602,20 @@ class DateTimeField(FieldURIField):
                     return tz.localize(local_dt)
                 log.warning("Cannot convert value '%s' on field '%s' to type %s", val, self.name, self.value_cls)
                 return None
+        return self.default
+
+
+class TimeField(FieldURIField):
+    value_cls = datetime.time
+
+    def from_xml(self, elem, account):
+        val = self._get_val_from_elem(elem)
+        if val is not None:
+            try:
+                # Assume an integer in minutes since midnight
+                return (datetime.datetime(2000, 1, 1) + datetime.timedelta(minutes=int(val))).time()
+            except ValueError:
+                pass
         return self.default
 
 
