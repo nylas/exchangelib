@@ -5,6 +5,11 @@ HEAD
 ----
 
 
+2.1.1
+-----
+-   Bugfix release.
+
+
 2.1.0
 -----
 -   Added support for OAuth 2.0 authentication
