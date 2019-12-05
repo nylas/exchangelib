@@ -518,16 +518,18 @@ class EWSPooledMixIn(EWSService):
             )))
 
             # Results will be available before iteration has finished if 'items' is a slow generator. Return early
-            for idx in range(len(results)):
-                i, r = results[idx]
+            while True:
+                if not results:
+                    break
+                i, r = results[0]
                 if not r.ready():
                     # First non-yielded result isn't ready yet. Yielding other ready results would mess up ordering
                     break
                 log.debug('%s._get_elements result %s is ready early', self.__class__.__name__, i)
                 for elem in r.get():
                     yield elem
-                # Remove results object
-                del results[idx]
+                # Results object has been processed. Remove from list.
+                del results[0]
 
         # Yield remaining results in order, as they become available
         for i, r in results:
