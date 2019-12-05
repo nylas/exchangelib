@@ -33,8 +33,7 @@ class GetAttachment(EWSAccountService):
         if not parse_opts.get('stream_file_content', False):
             return super(GetAttachment, self)._update_api_version(hint, api_version, header, **parse_opts)
 
-        # TODO: We're skipping this part because our streaming parser cannot parse the SOAP header
-        pass
+        # TODO: We're skipping this part in streaming mode because our streaming parser cannot parse the SOAP header
 
     @classmethod
     def _get_soap_parts(cls, response, **parse_opts):
@@ -68,7 +67,7 @@ class GetAttachment(EWSAccountService):
             # Let the non-streaming SOAP parser parse the response and hook into the normal exception handling.
             # Wrap in DummyResponse because _get_soap_payload() expects an iter_content() method.
             response = DummyResponse(url=None, headers=None, request_headers=None, content=enf.data)
-            header, body = super(GetAttachment, self)._get_soap_parts(response=response)
+            _, body = super(GetAttachment, self)._get_soap_parts(response=response)
             res = super(GetAttachment, self)._get_soap_messages(body=body)
             for e in self._get_elements_in_response(response=res):
                 if isinstance(e, Exception):
