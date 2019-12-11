@@ -34,6 +34,6 @@ jobs:
   include:
     - stage: wipe_test_account
       # Wipe contents of the test account after a complete build, to avoid account going over quota
-      script: python tests/__init__.py -q EWSTest.wipe_test_account
+      script: python scripts/wipe_test_acount.py
       python: "3.8"
       os: linux

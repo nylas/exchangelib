@@ -26,7 +26,7 @@ from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextFie
     MailboxListField, EWSElementField, CultureField, CharField, TextListField, PermissionSetField, MimeContentField
 from exchangelib.indexed_properties import EmailAddress, PhysicalAddress, PhoneNumber
 from exchangelib.properties import Attendee, Mailbox, PermissionSet, Permission, UserId
-from exchangelib.protocol import BaseProtocol, NoVerifyHTTPAdapter
+from exchangelib.protocol import BaseProtocol, NoVerifyHTTPAdapter, FaultTolerance
 from exchangelib.recurrence import Recurrence, DailyPattern
 
 if PY2:
@@ -35,6 +35,7 @@ if PY2:
 mock_account = namedtuple('mock_account', ('protocol', 'version'))
 mock_protocol = namedtuple('mock_protocol', ('version', 'service_endpoint'))
 mock_version = namedtuple('mock_version', ('build',))
+
 
 def mock_post(url, status_code, headers, text=''):
     req = namedtuple('request', ['headers'])(headers={})
@@ -100,7 +101,8 @@ class EWSTest(TimedTestCase):
         tz = EWSTimeZone.timezone('Europe/Copenhagen')
         config = Configuration(
             server=settings['server'],
-            credentials=Credentials(settings['username'], settings['password'])
+            credentials=Credentials(settings['username'], settings['password']),
+            retry_policy=FaultTolerance(max_wait=600),
         )
         cls.account = Account(primary_smtp_address=settings['account'], access_type=DELEGATE, config=config,
                               locale='da_DK', default_timezone=tz)
