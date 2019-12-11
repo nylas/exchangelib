@@ -420,8 +420,8 @@ class Item(RegisterMixIn):
     def _delete(self, delete_type, send_meeting_cancellations, affected_task_occurrences, suppress_read_receipts):
         if not self.account:
             raise ValueError('%s must have an account' % self.__class__.__name__)
-        if not self.id:
-            raise ValueError('%s must have an ID' % self.__class__.__name__)
+        if not self.id and not self.occurrence_item_id:
+            raise ValueError('%s must have an ID or occurrence item ID' % self.__class__.__name__)
         res = self.account.bulk_delete(
             ids=[self], delete_type=delete_type, send_meeting_cancellations=send_meeting_cancellations,
             affected_task_occurrences=affected_task_occurrences, suppress_read_receipts=suppress_read_receipts)
