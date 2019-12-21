@@ -14,8 +14,6 @@ calendar, mailbox, task, contact and distribution list items.
 [![image](https://secure.travis-ci.org/ecederstrand/exchangelib.png)](http://travis-ci.org/ecederstrand/exchangelib)
 [![image](https://coveralls.io/repos/github/ecederstrand/exchangelib/badge.svg?branch=master)](https://coveralls.io/github/ecederstrand/exchangelib?branch=master)
 
-[![image](https://liberapay.com/assets/widgets/donate.svg)](https://en.liberapay.com/ecederstrand)
-
 ## Teaser
 
 Here's a short example of how `exchangelib` works. Let's print the first
