@@ -99,10 +99,11 @@ class EWSTest(TimedTestCase):
 
         # Create an account shared by all tests
         tz = EWSTimeZone.timezone('Europe/Copenhagen')
+        cls.retry_policy = FaultTolerance(max_wait=600)
         config = Configuration(
             server=settings['server'],
             credentials=Credentials(settings['username'], settings['password']),
-            retry_policy=FaultTolerance(max_wait=600),
+            retry_policy=cls.retry_policy,
         )
         cls.account = Account(primary_smtp_address=settings['account'], access_type=DELEGATE, config=config,
                               locale='da_DK', default_timezone=tz)

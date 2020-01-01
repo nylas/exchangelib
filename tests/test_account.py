@@ -188,7 +188,7 @@ class AccountTest(EWSTest):
                 access_type=DELEGATE,
                 config=Configuration(
                     service_endpoint=self.account.protocol.service_endpoint,
-                    credentials=Credentials(self.account.protocol.credentials.username, 'WRONG_PASSWORD')
+                    credentials=Credentials(self.account.protocol.credentials.username, 'WRONG_PASSWORD'),
                 ),
                 autodiscover=False,
                 locale='da_DK',
