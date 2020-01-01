@@ -706,7 +706,7 @@ Response data: %(xml_response)s
                     xml_response='[STREAMING]' if stream else r.content,
                 )
             log.debug(log_msg, log_vals)
-            if _may_retry_on_error(r, protocol, wait):
+            if _may_retry_on_error(response=r, retry_policy=protocol.retry_policy, wait=wait):
                 log.info("Session %s thread %s: Connection error on URL %s (code %s). Cool down %s secs",
                          session.session_id, thread_id, r.url, r.status_code, wait)
                 time.sleep(wait)  # Increase delay for every retry
@@ -752,7 +752,7 @@ def _back_off_if_needed(back_off_until):
             time.sleep(sleep_secs)
 
 
-def _may_retry_on_error(response, protocol, wait):
+def _may_retry_on_error(response, retry_policy, wait):
     # The genericerrorpage.htm/internalerror.asp is ridiculous behaviour for random outages. Redirect to
     # '/internalsite/internalerror.asp' or '/internalsite/initparams.aspx' is caused by e.g. TLS certificate
     # f*ckups on the Exchange server.
@@ -764,9 +764,9 @@ def _may_retry_on_error(response, protocol, wait):
         if response.status_code not in (301, 302, 401, 503):
             # Don't retry if we didn't get a status code that we can hope to recover from
             return False
-        if protocol.retry_policy.fail_fast:
+        if retry_policy.fail_fast:
             return False
-        if wait > protocol.retry_policy.max_wait:
+        if wait > retry_policy.max_wait:
             # We lost patience. Session is cleaned up in outer loop
             raise RateLimitError(
                 'Max timeout reached', url=response.url, status_code=response.status_code, total_wait=wait)
