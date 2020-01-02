@@ -10,8 +10,8 @@ import requests_oauthlib
 
 from .credentials import IMPERSONATION
 from .errors import UnauthorizedError, TransportError, RedirectError, RelativeRedirect
-from .util import create_element, add_xml_child, get_redirect_url, xml_to_str, ns_translation, CONNECTION_ERRORS, \
-    TLS_ERRORS
+from .util import create_element, add_xml_child, get_redirect_url, xml_to_str, ns_translation, _may_retry_on_error, \
+    _back_off_if_needed, DummyResponse, CONNECTION_ERRORS, TLS_ERRORS
 
 log = logging.getLogger(__name__)
 
@@ -101,48 +101,100 @@ def get_auth_instance(auth_type, **kwargs):
     return model(**kwargs)
 
 
-def get_autodiscover_authtype(service_endpoint, data):
+def get_autodiscover_authtype(service_endpoint, retry_policy, data):
     # Get auth type by tasting headers from the server. Only do POST requests. HEAD is too error prone, and some servers
     # are set up to redirect to OWA on all requests except POST to the autodiscover endpoint.
-    log.debug('Getting autodiscover auth type for %s', service_endpoint)
     from .autodiscover import AutodiscoverProtocol
-    with AutodiscoverProtocol.raw_session() as s:
+    log.debug('Requesting %s from %s', data, service_endpoint)
+    retry = 0
+    wait = 10  # seconds
+    headers = DEFAULT_HEADERS.copy()
+    while True:
+        _back_off_if_needed(retry_policy.back_off_until)
+        log.debug('Trying to get autodiscover auth type for %s', service_endpoint)
+        with AutodiscoverProtocol.raw_session() as s:
+            try:
+                r = s.post(url=service_endpoint, headers=headers, data=data, allow_redirects=False,
+                           timeout=AutodiscoverProtocol.TIMEOUT)
+                break
+            except CONNECTION_ERRORS + TLS_ERRORS as e:
+                # Also handle TLS errors here. 'service_endpoint' could be any random server at this point.
+                r = DummyResponse(url=service_endpoint, headers={}, request_headers=headers)
+                if _may_retry_on_error(response=r, retry_policy=retry_policy, wait=wait):
+                    log.info("Connection error on URL %s (retry %s, error: %s). Cool down %s secs",
+                             service_endpoint, retry, e, wait)
+                    retry_policy.back_off(wait)
+                    wait *= 2
+                    retry += 1
+                    continue
+                else:
+                    raise_from(TransportError(str(e)), e)
+    if r.status_code in (301, 302):
         try:
-            r = s.post(url=service_endpoint, headers=DEFAULT_HEADERS.copy(), data=data, allow_redirects=False,
-                       timeout=AutodiscoverProtocol.TIMEOUT)
-        except CONNECTION_ERRORS + TLS_ERRORS as e:
-            # Also handle TLS errors here. 'service_endpoint' could be any random server at this point.
-            raise_from(TransportError(str(e)), e)
-    return _get_auth_method_from_response(response=r)
+            redirect_url = get_redirect_url(r, allow_relative=False)
+        except RelativeRedirect:
+            raise TransportError('Redirect to same host when trying to get auth method')
+        raise RedirectError(url=redirect_url)
+    if r.status_code not in (200, 401):
+        raise TransportError('Unexpected response: %s %s' % (r.status_code, r.reason))
+    return get_auth_method_from_response(response=r)
 
 
-def get_service_authtype(service_endpoint, versions, name):
+def get_service_authtype(service_endpoint, retry_policy, versions, name):
     # Get auth type by tasting headers from the server. Only do POST requests. HEAD is too error prone, and some servers
     # are set up to redirect to OWA on all requests except POST to /EWS/Exchange.asmx
-    log.debug('Getting service auth type for %s', service_endpoint)
+    #
     # We don't know the API version yet, but we need it to create a valid request because some Exchange servers only
     # respond when given a valid request. Try all known versions. Gross.
     from .protocol import BaseProtocol
-    with BaseProtocol.raw_session() as s:
-        for version in versions:
-            data = dummy_xml(version=version, name=name)
-            log.debug('Requesting %s from %s', data, service_endpoint)
+    retry = 0
+    wait = 10  # seconds
+    headers = DEFAULT_HEADERS.copy()
+    for version in versions:
+        data = dummy_xml(version=version, name=name)
+        log.debug('Requesting %s from %s', data, service_endpoint)
+        while True:
+            _back_off_if_needed(retry_policy.back_off_until)
+            log.debug('Trying to get service auth type for %s', service_endpoint)
+            with BaseProtocol.raw_session() as s:
+                try:
+                    r = s.post(url=service_endpoint, headers=headers, data=data, allow_redirects=False,
+                               timeout=BaseProtocol.TIMEOUT)
+                    break
+                except CONNECTION_ERRORS as e:
+                    # Don't handle TLS errors. They should be fixed in OS or Python, or by using NoVerifyHTTPAdapter.
+                    r = DummyResponse(url=service_endpoint, headers={}, request_headers=headers)
+                    if _may_retry_on_error(response=r, retry_policy=retry_policy, wait=wait):
+                        log.info("Connection error on URL %s (retry %s, error: %s). Cool down %s secs",
+                                 service_endpoint, retry, e, wait)
+                        retry_policy.back_off(wait)
+                        wait *= 2
+                        retry += 1
+                        continue
+                    else:
+                        raise_from(TransportError(str(e)), e)
+        if r.status_code in (301, 302):
+            # Some servers are set up to redirect to OWA on all requests except valid POST to EWS/Exchange.asmx
             try:
-                r = s.post(url=service_endpoint, headers=DEFAULT_HEADERS.copy(), data=data, allow_redirects=False,
-                           timeout=BaseProtocol.TIMEOUT)
-            except CONNECTION_ERRORS as e:
-                # Don't handle TLS errors. They should be fixed in OS or Python config, or by using NoVerifyHTTPAdapter
-                raise_from(TransportError(str(e)), e)
-            try:
-                auth_type = _get_auth_method_from_response(response=r)
-                log.debug('Auth type is %s', auth_type)
-                return auth_type, version
-            except TransportError:
+                redirect_url = get_redirect_url(r)
+                log.debug('Unexpected redirect to %s', redirect_url)
                 continue
+            except TransportError:
+                log.warning('Unexpected redirect response: %s', e.value)
+                continue
+        if r.status_code not in (200, 401):
+            log.debug('Unexpected response: %s %s', r.status_code, r.reason)
+            continue
+        try:
+            auth_type = get_auth_method_from_response(response=r)
+            log.debug('Auth type is %s', auth_type)
+            return auth_type, version
+        except UnauthorizedError:
+            continue
     raise TransportError('Failed to get auth type from service')
 
 
-def _get_auth_method_from_response(response):
+def get_auth_method_from_response(response):
     # First, get the auth method from headers. Then, test credentials. Don't handle redirects - burden is on caller.
     log.debug('Request headers: %s', response.request.headers)
     log.debug('Response headers: %s', response.headers)

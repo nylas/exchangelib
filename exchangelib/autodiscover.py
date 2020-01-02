@@ -305,11 +305,11 @@ def _try_autodiscover(hostname, credentials, email, auth_type, retry_policy):
                         raise_from(AutoDiscoverFailed('All steps in the autodiscover protocol failed'), None)
 
 
-def _get_auth_type_or_raise(url, email, hostname):
+def _get_auth_type_or_raise(url, email, hostname, retry_policy):
     # Returns the auth type of the URL. Raises any redirection errors. This tests host DNS, port availability, and TLS
     # validation (if applicable).
     try:
-        return _get_auth_type(url=url, email=email)
+        return _get_auth_type(url=url, email=email, retry_policy=retry_policy)
     except RedirectError as e:
         redirect_url, redirect_hostname, redirect_has_ssl = e.url, e.server, e.has_ssl
         log.debug('We were redirected to %s', redirect_url)
@@ -334,7 +334,7 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl, auth_type, ret
     url = '%s://%s/Autodiscover/Autodiscover.xml' % ('https' if has_ssl else 'http', hostname)
     log.info('Trying autodiscover on %s', url)
     if auth_type is None:
-        auth_type = _get_auth_type_or_raise(url=url, email=email, hostname=hostname)
+        auth_type = _get_auth_type_or_raise(url=url, email=email, hostname=hostname, retry_policy=retry_policy)
     autodiscover_protocol = AutodiscoverProtocol(config=Configuration(
         service_endpoint=url, credentials=credentials, auth_type=auth_type, retry_policy=retry_policy
     ))
@@ -386,10 +386,10 @@ def _get_payload(email):
     return xml_to_str(payload, encoding=DEFAULT_ENCODING, xml_declaration=True)
 
 
-def _get_auth_type(url, email):
+def _get_auth_type(url, email, retry_policy):
     try:
         data = _get_payload(email=email)
-        return transport.get_autodiscover_authtype(service_endpoint=url, data=data)
+        return transport.get_autodiscover_authtype(service_endpoint=url, retry_policy=retry_policy, data=data)
     except TransportError as e:
         if isinstance(e, RedirectError):
             raise
@@ -469,7 +469,7 @@ def _parse_response(bytes_content):
             protocol = protocols['EXCH']
         except KeyError:
             # Neither type was found. Give up
-            raise_from(AutoDiscoverFailed('Invalid AutoDiscover response: %s' % xml_to_str(autodiscover)), None)
+            raise AutoDiscoverFailed('Invalid AutoDiscover response: %s' % xml_to_str(autodiscover))
 
     ews_url = get_xml_attr(protocol, '{%s}EwsUrl' % RESPONSE_NS)
     if not ews_url:

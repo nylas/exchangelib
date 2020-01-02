@@ -331,7 +331,7 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
         # Autodetect authentication type. We also set version hint here.
         name = str(self.credentials) if self.credentials and str(self.credentials) else 'DUMMY'
         auth_type, version_hint = get_service_authtype(
-            service_endpoint=self.service_endpoint, versions=API_VERSIONS, name=name
+            service_endpoint=self.service_endpoint, retry_policy=self.retry_policy, versions=API_VERSIONS, name=name
         )
         self.version_hint = version_hint
         return auth_type

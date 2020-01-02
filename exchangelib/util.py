@@ -681,7 +681,10 @@ Response data: %(xml_response)s
     )
     try:
         while True:
-            _back_off_if_needed(protocol.retry_policy.back_off_until)
+            backed_off = _back_off_if_needed(protocol.retry_policy.back_off_until)
+            if backed_off:
+                # We may have slept for a long time. Renew the session.
+                session = protocol.renew_session(session)
             log.debug('Session %s thread %s: retry %s timeout %s POST\'ing to %s after %ss wait', session.session_id,
                       thread_id, retry, protocol.TIMEOUT, url, wait)
             d_start = time_func()
@@ -709,10 +712,9 @@ Response data: %(xml_response)s
             if _may_retry_on_error(response=r, retry_policy=protocol.retry_policy, wait=wait):
                 log.info("Session %s thread %s: Connection error on URL %s (code %s). Cool down %s secs",
                          session.session_id, thread_id, r.url, r.status_code, wait)
-                time.sleep(wait)  # Increase delay for every retry
+                protocol.retry_policy.back_off(wait)
                 retry += 1
-                wait *= 2
-                session = protocol.renew_session(session)
+                wait *= 2  # Increase delay for every retry
                 continue
             if r.status_code in (301, 302):
                 if stream:
@@ -750,9 +752,20 @@ def _back_off_if_needed(back_off_until):
         if sleep_secs > 0:
             log.warning('Server requested back off until %s. Sleeping %s seconds', back_off_until, sleep_secs)
             time.sleep(sleep_secs)
+            return True
+    return False
 
 
 def _may_retry_on_error(response, retry_policy, wait):
+    if response.status_code not in (301, 302, 401, 503):
+        # Don't retry if we didn't get a status code that we can hope to recover from
+        return False
+    if retry_policy.fail_fast:
+        return False
+    if wait > retry_policy.max_wait:
+        # We lost patience. Session is cleaned up in outer loop
+        raise RateLimitError(
+            'Max timeout reached', url=response.url, status_code=response.status_code, total_wait=wait)
     # The genericerrorpage.htm/internalerror.asp is ridiculous behaviour for random outages. Redirect to
     # '/internalsite/internalerror.asp' or '/internalsite/initparams.aspx' is caused by e.g. TLS certificate
     # f*ckups on the Exchange server.
@@ -761,15 +774,6 @@ def _may_retry_on_error(response, retry_policy, wait):
             or (response.status_code == 302 and response.headers.get('location', '').lower() ==
                 '/ews/genericerrorpage.htm?aspxerrorpath=/ews/exchange.asmx') \
             or (response.status_code == 503):
-        if response.status_code not in (301, 302, 401, 503):
-            # Don't retry if we didn't get a status code that we can hope to recover from
-            return False
-        if retry_policy.fail_fast:
-            return False
-        if wait > retry_policy.max_wait:
-            # We lost patience. Session is cleaned up in outer loop
-            raise RateLimitError(
-                'Max timeout reached', url=response.url, status_code=response.status_code, total_wait=wait)
         return True
     return False
 
