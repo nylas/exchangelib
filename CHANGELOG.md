@@ -3,6 +3,8 @@ Change Log
 
 HEAD
 ----
+-   Added support for specifying a separate retry policy for the autodiscover service endpoint
+    selection. Set via the `AutodiscoverProtocol.INITIAL_RETRY_POLICY` class variable.
 
 
 2.1.1
