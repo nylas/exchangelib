@@ -32,7 +32,7 @@ from .configuration import Configuration
 from .credentials import BaseCredentials
 from .errors import AutoDiscoverFailed, AutoDiscoverRedirect, AutoDiscoverCircularRedirect, TransportError, \
     RedirectError, ErrorNonExistentMailbox, UnauthorizedError
-from .protocol import BaseProtocol, Protocol, RetryPolicy
+from .protocol import BaseProtocol, Protocol, RetryPolicy, FailFast
 from .transport import DEFAULT_ENCODING, DEFAULT_HEADERS
 from .util import create_element, get_xml_attr, add_xml_child, to_xml, is_xml, post_ratelimited, xml_to_str, \
     get_domain
@@ -333,10 +333,17 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl, auth_type, ret
     # the new host.
     url = '%s://%s/Autodiscover/Autodiscover.xml' % ('https' if has_ssl else 'http', hostname)
     log.info('Trying autodiscover on %s', url)
+    if not is_valid_hostname(hostname):
+        # 'requests' is really bad at reporting that a hostname cannot be resolved. Let's check this separately.
+        raise_from(AutoDiscoverFailed('%r has no DNS entry' % hostname), None)
+    # We are connecting to an unknown server here. It's probable that servers in the autodiscover sequence are
+    # unresponsive or send any kind of ill-formed response. We shouldn't use a retry policy meant for a trusted
+    # endpoint here.
+    initial_retry_policy = AutodiscoverProtocol.INITIAL_RETRY_POLICY
     if auth_type is None:
-        auth_type = _get_auth_type_or_raise(url=url, email=email, hostname=hostname, retry_policy=retry_policy)
+        auth_type = _get_auth_type_or_raise(url=url, email=email, hostname=hostname, retry_policy=initial_retry_policy)
     autodiscover_protocol = AutodiscoverProtocol(config=Configuration(
-        service_endpoint=url, credentials=credentials, auth_type=auth_type, retry_policy=retry_policy
+        service_endpoint=url, credentials=credentials, auth_type=auth_type, retry_policy=initial_retry_policy
     ))
     r = _get_response(protocol=autodiscover_protocol, email=email)
     domain = get_domain(email)
@@ -478,6 +485,17 @@ def _parse_response(bytes_content):
     return ews_url, primary_smtp_address
 
 
+def is_valid_hostname(hostname):
+    log.debug('Checking is %s can be looked up in DNS', hostname)
+    resolver = dns.resolver.Resolver()
+    resolver.timeout = AutodiscoverProtocol.TIMEOUT
+    try:
+        resolver.query(hostname)
+    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer):
+        return False
+    return True
+
+
 def _get_canonical_name(hostname):
     log.debug('Attempting to get canonical name for %s', hostname)
     resolver = dns.resolver.Resolver()
@@ -527,6 +545,9 @@ def _get_hostname_from_srv(hostname):
 class AutodiscoverProtocol(BaseProtocol):
     """Protocol which implements the bare essentials for autodiscover"""
     TIMEOUT = 10  # Seconds
+    # When connecting to servers that may not be serving the correct endpoint, we should use a retry policy that does
+    # not leave us hanging for a long time on each step in the protocol.
+    INITIAL_RETRY_POLICY = FailFast()
 
     def __str__(self):
         return '''\

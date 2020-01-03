@@ -94,6 +94,7 @@ fails to install.
 ```python
 from exchangelib import DELEGATE, IMPERSONATION, Account, Credentials, OAuth2Credentials, \
     FaultTolerance, Configuration, NTLM, GSSAPI, SSPI, OAUTH2, Build, Version
+from exchangelib.autodiscover import AutodiscoverProtocol
 
 # Specify your credentials. Username is usually in WINDOMAIN\username format, where WINDOMAIN is
 # the name of the Windows Domain your username is connected to, but some servers also
@@ -154,6 +155,10 @@ config = Configuration(
 # This is configurable:
 config = Configuration(retry_policy=FaultTolerance(max_wait=3600), credentials=credentials)
 account = Account(primary_smtp_address='john@example.com', config=config)
+
+# Autodiscovery will also use this policy, but only for the final autodiscover endpoint.
+# Here's how to change the policy for connecting to autodiscover candidate servers:
+AutodiscoverProtocol.INITIAL_RETRY_POLICY = FaultTolerance(max_wait=30)
 
 # Kerberos and SSPI authentication are supported via the GSSAPI and SSPI auth types.
 config = Configuration(server='example.com', auth_type=GSSAPI)
