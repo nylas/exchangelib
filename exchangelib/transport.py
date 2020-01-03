@@ -186,7 +186,7 @@ def get_service_authtype(service_endpoint, retry_policy, versions, name):
                 redirect_url = get_redirect_url(r)
                 log.debug('Unexpected redirect to %s', redirect_url)
                 continue
-            except TransportError:
+            except TransportError as e:
                 log.warning('Unexpected redirect response: %s', e.value)
                 continue
         if r.status_code not in (200, 401):
