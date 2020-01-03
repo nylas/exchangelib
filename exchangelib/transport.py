@@ -108,6 +108,7 @@ def get_autodiscover_authtype(service_endpoint, retry_policy, data):
     log.debug('Requesting %s from %s', data, service_endpoint)
     retry = 0
     wait = 10  # seconds
+    total_wait = 0  # seconds
     headers = DEFAULT_HEADERS.copy()
     while True:
         _back_off_if_needed(retry_policy.back_off_until)
@@ -120,11 +121,11 @@ def get_autodiscover_authtype(service_endpoint, retry_policy, data):
             except CONNECTION_ERRORS + TLS_ERRORS as e:
                 # Also handle TLS errors here. 'service_endpoint' could be any random server at this point.
                 r = DummyResponse(url=service_endpoint, headers={}, request_headers=headers)
-                if _may_retry_on_error(response=r, retry_policy=retry_policy, wait=wait):
+                if _may_retry_on_error(response=r, retry_policy=retry_policy, wait=total_wait):
                     log.info("Connection error on URL %s (retry %s, error: %s). Cool down %s secs",
                              service_endpoint, retry, e, wait)
                     retry_policy.back_off(wait)
-                    wait *= 2
+                    total_wait += wait
                     retry += 1
                     continue
                 else:
@@ -149,6 +150,7 @@ def get_service_authtype(service_endpoint, retry_policy, versions, name):
     from .protocol import BaseProtocol
     retry = 0
     wait = 10  # seconds
+    total_wait = 0  # seconds
     headers = DEFAULT_HEADERS.copy()
     for version in versions:
         data = dummy_xml(version=version, name=name)
@@ -164,11 +166,11 @@ def get_service_authtype(service_endpoint, retry_policy, versions, name):
                 except CONNECTION_ERRORS as e:
                     # Don't handle TLS errors. They should be fixed in OS or Python, or by using NoVerifyHTTPAdapter.
                     r = DummyResponse(url=service_endpoint, headers={}, request_headers=headers)
-                    if _may_retry_on_error(response=r, retry_policy=retry_policy, wait=wait):
+                    if _may_retry_on_error(response=r, retry_policy=retry_policy, wait=total_wait):
                         log.info("Connection error on URL %s (retry %s, error: %s). Cool down %s secs",
                                  service_endpoint, retry, e, wait)
                         retry_policy.back_off(wait)
-                        wait *= 2
+                        total_wait += wait
                         retry += 1
                         continue
                     else:
