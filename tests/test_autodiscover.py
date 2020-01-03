@@ -13,12 +13,17 @@ from exchangelib import discover, Credentials, NTLM, FailFast, Configuration, Ac
 from exchangelib.autodiscover import close_connections, AutodiscoverProtocol
 from exchangelib.errors import ErrorNonExistentMailbox, AutoDiscoverRedirect, AutoDiscoverCircularRedirect, \
     AutoDiscoverFailed
-from exchangelib.protocol import BaseProtocol, NoVerifyHTTPAdapter
+from exchangelib.protocol import BaseProtocol, NoVerifyHTTPAdapter, FaultTolerance
 
 from .common import EWSTest
 
 
 class AutodiscoverTest(EWSTest):
+    @classmethod
+    def setUpClass(cls):
+        super(AutodiscoverTest, cls).setUpClass()
+        AutodiscoverProtocol.INITIAL_RETRY_POLICY = FaultTolerance(max_wait=30)
+
     def test_magic(self):
         # Just test we don't fail
         from exchangelib.autodiscover import _autodiscover_cache
@@ -169,18 +174,30 @@ class AutodiscoverTest(EWSTest):
     def test_autodiscover_from_account(self):
         from exchangelib.autodiscover import _autodiscover_cache
         _autodiscover_cache.clear()
-        account = Account(primary_smtp_address=self.account.primary_smtp_address,
-                          credentials=self.account.protocol.credentials,
-                          autodiscover=True, locale='da_DK')
+        account = Account(
+            primary_smtp_address=self.account.primary_smtp_address,
+            config=Configuration(
+                credentials=self.account.protocol.credentials,
+                retry_policy=self.retry_policy,
+            ),
+            autodiscover=True,
+            locale='da_DK',
+        )
         self.assertEqual(account.primary_smtp_address, self.account.primary_smtp_address)
         self.assertEqual(account.protocol.service_endpoint.lower(), self.account.protocol.service_endpoint.lower())
         self.assertEqual(account.protocol.version.build, self.account.protocol.version.build)
         # Make sure cache is full
         self.assertTrue((account.domain, self.account.protocol.credentials, True) in _autodiscover_cache)
         # Test that autodiscover works with a full cache
-        account = Account(primary_smtp_address=self.account.primary_smtp_address,
-                          credentials=self.account.protocol.credentials,
-                          autodiscover=True, locale='da_DK')
+        account = Account(
+            primary_smtp_address=self.account.primary_smtp_address,
+            config=Configuration(
+                credentials=self.account.protocol.credentials,
+                retry_policy=self.retry_policy,
+            ),
+            autodiscover=True,
+            locale='da_DK',
+        )
         self.assertEqual(account.primary_smtp_address, self.account.primary_smtp_address)
         # Test cache manipulation
         key = (account.domain, self.account.protocol.credentials, True)
