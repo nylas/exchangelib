@@ -104,6 +104,8 @@ def get_auth_instance(auth_type, **kwargs):
 def get_autodiscover_authtype(service_endpoint, retry_policy, data):
     # Get auth type by tasting headers from the server. Only do POST requests. HEAD is too error prone, and some servers
     # are set up to redirect to OWA on all requests except POST to the autodiscover endpoint.
+    #
+    # 'service_endpoint' could be any random server at this point, so we need to take adequate precautions.
     from .autodiscover import AutodiscoverProtocol
     log.debug('Requesting %s from %s', data, service_endpoint)
     retry = 0
@@ -118,8 +120,10 @@ def get_autodiscover_authtype(service_endpoint, retry_policy, data):
                 r = s.post(url=service_endpoint, headers=headers, data=data, allow_redirects=False,
                            timeout=AutodiscoverProtocol.TIMEOUT)
                 break
-            except CONNECTION_ERRORS + TLS_ERRORS as e:
-                # Also handle TLS errors here. 'service_endpoint' could be any random server at this point.
+            except TLS_ERRORS as e:
+                # Don't retry on TLS errors. They will most likely be persistent.
+                raise_from(TransportError(str(e)), e)
+            except CONNECTION_ERRORS as e:
                 r = DummyResponse(url=service_endpoint, headers={}, request_headers=headers)
                 if _may_retry_on_error(response=r, retry_policy=retry_policy, wait=total_wait):
                     log.info("Connection error on URL %s (retry %s, error: %s). Cool down %s secs",
