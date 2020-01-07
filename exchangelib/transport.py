@@ -111,8 +111,8 @@ def get_autodiscover_authtype(service_endpoint, retry_policy, data):
     log.debug('Requesting %s from %s', data, service_endpoint)
     retry = 0
     wait = 10  # seconds
-    headers = DEFAULT_HEADERS.copy()
     t_start = time.time()
+    headers = DEFAULT_HEADERS.copy()
     while True:
         _back_off_if_needed(retry_policy.back_off_until)
         log.debug('Trying to get autodiscover auth type for %s', service_endpoint)
@@ -180,15 +180,6 @@ def get_service_authtype(service_endpoint, retry_policy, versions, name):
                         continue
                     else:
                         raise_from(TransportError(str(e)), e)
-        if r.status_code in (301, 302):
-            # Some servers are set up to redirect to OWA on all requests except valid POST to EWS/Exchange.asmx
-            try:
-                redirect_url = get_redirect_url(r)
-                log.debug('Unexpected redirect to %s', redirect_url)
-                continue
-            except TransportError as e:
-                log.warning('Unexpected redirect response: %s', e.value)
-                continue
         if r.status_code not in (200, 401):
             log.debug('Unexpected response: %s %s', r.status_code, r.reason)
             continue
@@ -207,16 +198,6 @@ def get_auth_method_from_response(response):
     log.debug('Response headers: %s', response.headers)
     if response.status_code == 200:
         return NOAUTH
-    if response.status_code in (301, 302):
-        # Some servers are set up to redirect to OWA on all requests except POST to EWS/Exchange.asmx
-        try:
-            redirect_url = get_redirect_url(response, allow_relative=False)
-        except RelativeRedirect:
-            raise TransportError('Redirect to same host when trying to get auth method')
-        raise RedirectError(url=redirect_url)
-    if response.status_code != 401:
-        raise TransportError('Unexpected response: %s %s' % (response.status_code, response.reason))
-
     # Get auth type from headers
     for key, val in response.headers.items():
         if key.lower() == 'www-authenticate':
@@ -234,7 +215,7 @@ def get_auth_method_from_response(response):
                 return NTLM
             if 'basic' in vals:
                 return BASIC
-    raise UnauthorizedError('Got a 401, but no compatible auth type was reported by server')
+    raise UnauthorizedError('No compatible auth type was reported by server')
 
 
 def _tokenize(val):

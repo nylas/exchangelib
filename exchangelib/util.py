@@ -556,7 +556,7 @@ def get_domain(email):
 
 def split_url(url):
     parsed_url = urlparse(url)
-    # Use netloc instead og hostname since hostname is None if URL is relative
+    # Use netloc instead of hostname since hostname is None if URL is relative
     return parsed_url.scheme == 'https', parsed_url.netloc.lower(), parsed_url.path
 
 
