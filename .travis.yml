@@ -17,10 +17,11 @@ before_install:
   -in settings.yml.enc -out settings.yml -d
 
 install:
-# Only lxml master branch compiles with Python nightly
-- if [[ "$( python --version | grep '[a|b]' )" ]] ; then pip install cython && pip install git+https://github.com/lxml/lxml.git ; fi
-# Only PyYAML master branch compiles with Python nightly
-# - if [[ "$( python --version | grep '[a|b]' )" ]] ; then pip install git+https://github.com/yaml/pyyaml.git ; fi
+# Install master branches of Cython and Cython-built packages if we are testing on nightly since the C API of
+# CPython changes often and fixes for Python nightly are slow to reach released versions.
+- if [[ "$( python --version | grep '[a|b]' )" ]] ; then pip install git+https://github.com/cython/cython.git ; fi
+- if [[ "$( python --version | grep '[a|b]' )" ]] ; then pip install git+https://github.com/lxml/lxml.git ; fi
+- if [[ "$( python --version | grep '[a|b]' )" ]] ; then pip install git+https://github.com/yaml/pyyaml.git ; fi
 - pip install .
 # Install test dependencies manually since we're calling tests/__init__.py directly in the 'script' section
 - pip install PyYAML requests_mock psutil coverage coveralls flake8
