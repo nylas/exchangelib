@@ -5,7 +5,7 @@ import requests
 import requests_mock
 
 from exchangelib import DELEGATE, IMPERSONATION
-from exchangelib.errors import TransportError, RedirectError, UnauthorizedError
+from exchangelib.errors import UnauthorizedError
 from exchangelib.transport import wrap, get_auth_method_from_response, BASIC, NOAUTH, NTLM, DIGEST
 from exchangelib.util import PrettyXmlHandler, create_element
 
@@ -14,7 +14,7 @@ from .common import TimedTestCase
 
 class TransportTest(TimedTestCase):
     @requests_mock.mock()
-    def testget_auth_method_from_response(self, m):
+    def test_get_auth_method_from_response(self, m):
         url = 'http://example.com/noauth'
         m.get(url, status_code=200)
         r = requests.get(url)
@@ -23,19 +23,19 @@ class TransportTest(TimedTestCase):
         url = 'http://example.com/redirect'
         m.get(url, status_code=302, headers={'location': 'http://contoso.com'})
         r = requests.get(url, allow_redirects=False)
-        with self.assertRaises(RedirectError):
+        with self.assertRaises(UnauthorizedError):
             get_auth_method_from_response(r)  # Redirect to another host
 
         url = 'http://example.com/relativeredirect'
         m.get(url, status_code=302, headers={'location': 'http://example.com/'})
         r = requests.get(url, allow_redirects=False)
-        with self.assertRaises(TransportError):
+        with self.assertRaises(UnauthorizedError):
             get_auth_method_from_response(r)  # Redirect to same host
 
         url = 'http://example.com/internalerror'
         m.get(url, status_code=501)
         r = requests.get(url)
-        with self.assertRaises(TransportError):
+        with self.assertRaises(UnauthorizedError):
             get_auth_method_from_response(r)  # Non-401 status code
 
         url = 'http://example.com/no_auth_headers'
