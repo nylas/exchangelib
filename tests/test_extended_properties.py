@@ -137,6 +137,7 @@ class ExtendedPropertyTest(BaseItemTest):
 
     def test_extended_distinguished_property(self):
         if self.ITEM_CLASS == CalendarItem:
+            # MyMeeting is an extended prop version of the 'CalendarItem.uid' field. They don't work together.
             raise self.skipTest("This extendedproperty doesn't work on CalendarItems")
 
         class MyMeeting(ExtendedProperty):
@@ -149,9 +150,6 @@ class ExtendedPropertyTest(BaseItemTest):
         try:
             # Test item creation, refresh, and update
             item = self.get_test_item(folder=self.test_folder)
-            # MyMeeting is an extended prop version of the 'uid' field. We don't want 'uid' to overwrite that.
-            # overwriting each other.
-            item.uid = None
             prop_val = item.my_meeting
             self.assertTrue(isinstance(prop_val, bytes))
             item.save()
@@ -159,8 +157,6 @@ class ExtendedPropertyTest(BaseItemTest):
             self.assertEqual(prop_val, item.my_meeting, (prop_val, item.my_meeting))
             new_prop_val = self.random_val(self.ITEM_CLASS.get_field_by_fieldname(attr_name))
             item.my_meeting = new_prop_val
-            # MyMeeting is an extended prop version of the 'uid' field. We don't want 'uid' to overwrite that.
-            item.uid = None
             item.save()
             item = list(self.account.fetch(ids=[(item.id, item.changekey)]))[0]
             self.assertEqual(new_prop_val, item.my_meeting)

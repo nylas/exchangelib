@@ -333,11 +333,11 @@ class FolderTest(EWSTest):
             property_type = 'Integer'
 
         try:
-            Folder.register('size', FolderSize)
+            self.account.inbox.register('size', FolderSize)
             self.account.inbox.refresh()
             self.assertGreater(self.account.inbox.size, 0)
         finally:
-            Folder.deregister('size')
+            self.account.inbox.deregister('size')
 
     def test_create_update_empty_delete(self):
         f = Messages(parent=self.account.inbox, name=get_random_string(16))

@@ -122,8 +122,10 @@ class PropertiesTest(TimedTestCase):
     def test_add_field(self):
         field = TextField('foo', field_uri='bar')
         Item.add_field(field, insert_after='subject')
-        self.assertEqual(Item.get_field_by_fieldname('foo'), field)
-        Item.remove_field(field)
+        try:
+            self.assertEqual(Item.get_field_by_fieldname('foo'), field)
+        finally:
+            Item.remove_field(field)
 
     def test_itemid_equality(self):
         self.assertEqual(ItemId('X', 'Y'), ItemId('X', 'Y'))
@@ -166,3 +168,12 @@ class PropertiesTest(TimedTestCase):
         self.assertIsInstance(foo, HTMLBody)
         self.assertIsInstance(HTMLBody('%s') % 'foo', HTMLBody)
         self.assertIsInstance(HTMLBody('{}').format('foo'), HTMLBody)
+
+    def test_invalid_attribute(self):
+        # For a random EWSElement subclass, test that we cannot assign an unsupported attribute
+        item = ItemId(id='xxx', changekey='yyy')
+        with self.assertRaises(AttributeError) as e:
+            item.invalid_attr = 123
+        self.assertEqual(
+            e.exception.args[0], "'invalid_attr' is not a valid attribute. See ItemId.FIELDS for valid field names"
+        )

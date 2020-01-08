@@ -111,7 +111,6 @@ class EWSElement(object):
     _fields_lock = Lock()
 
     __slots__ = tuple()
-    __slots_keys = None
 
     def __init__(self, **kwargs):
         for f in self.FIELDS:
@@ -120,9 +119,17 @@ class EWSElement(object):
             raise AttributeError("%s are invalid kwargs for this class" % ', '.join("'%s'" % k for k in kwargs))
 
     @classmethod
+    def _set_slots_keys(cls, keys):
+        # We can't use a static class attribute name here because values from the parent class would be exposed in
+        # this class - or we would have to explicitly reset the attribute value for every subclass.
+        attr_name = '_%s_slots_cache' % {cls.__name__}
+        setattr(cls, attr_name, keys)
+
+    @classmethod
     def _slots_keys(cls):
         # Find __slots__ entries for this and all parent classes. Keep order, with parent slots first.
-        if cls.__slots_keys is None:
+        attr_name = '_%s_slots_cache' % {cls.__name__}
+        if not hasattr(cls, attr_name):
             seen = set()
             keys = []
             for c in reversed(getmro(cls)):
@@ -135,8 +142,15 @@ class EWSElement(object):
                         continue
                     keys.append(k)
                     seen.add(k)
-            cls.__slots_keys = tuple(keys)
-        return cls.__slots_keys
+            cls._set_slots_keys(tuple(keys))
+        return getattr(cls, attr_name)
+
+    def __setattr__(self, key, value):
+        # Avoid silently accepting spelling errors to field names that are not set via __init__
+        if not hasattr(self, key) and key not in self._slots_keys():
+            raise AttributeError('%r is not a valid attribute. See %s.FIELDS for valid field names' % (
+                key, self.__class__.__name__))
+        super(EWSElement, self).__setattr__(key, value)
 
     def clean(self, version=None):
         # Validate attribute values using the field validator
@@ -246,16 +260,18 @@ class EWSElement(object):
 
     @classmethod
     def add_field(cls, field, insert_after):
-        """Insert a new field at the preferred place in the tuple and invalidate the fieldname cache"""
+        """Insert a new field at the preferred place in the tuple and update the slots cache"""
         with cls._fields_lock:
             idx = tuple(f.name for f in cls.FIELDS).index(insert_after) + 1
             cls.FIELDS.insert(idx, field)
+            cls._set_slots_keys(cls._slots_keys() + (field.name,))
 
     @classmethod
     def remove_field(cls, field):
-        """Remove the given field and invalidate the fieldname cache"""
+        """Remove the given field and and update the slots cache"""
         with cls._fields_lock:
             cls.FIELDS.remove(field)
+            cls._set_slots_keys(tuple(k for k in cls._slots_keys() if k != field.name))
 
     def __eq__(self, other):
         return hash(self) == hash(other)
