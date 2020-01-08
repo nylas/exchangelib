@@ -30,7 +30,8 @@ class PropertiesTest(TimedTestCase):
                 for f in cls.FIELDS:
                     self.assertNotIn(f.name, field_names,
                                      'Field name %r is not unique on model %r' % (f.name, cls.__name__))
-                    self.assertIn(f.name, all_slots, 'Field name %s is not in __slots__ on model %s' % (f.name, cls.__name__))
+                    self.assertIn(f.name, all_slots,
+                                  'Field name %s is not in __slots__ on model %s' % (f.name, cls.__name__))
                     field_names.add(f.name)
                 # Finally, test that all models have a link to MSDN documentation
                 if issubclass(cls, Folder):
@@ -38,8 +39,8 @@ class PropertiesTest(TimedTestCase):
                     continue
                 self.assertIsNotNone(cls.__doc__, '%s is missing a docstring' % cls)
                 if cls in (DLMailbox, BulkCreateResult):
-                        # Some classes are just workarounds for other classes
-                        continue
+                    # Some classes are just workarounds for other classes
+                    continue
                 if cls.__doc__.startswith('Base class '):
                     # Base classes don't have an MSDN link
                     continue
@@ -55,7 +56,9 @@ class PropertiesTest(TimedTestCase):
         # Test translation of calendar UIDs. See #453
         self.assertEqual(
             UID('261cbc18-1f65-5a0a-bd11-23b1e224cc2f'),
-            b'\x04\x00\x00\x00\x82\x00\xe0\x00t\xc5\xb7\x10\x1a\x82\xe0\x08\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x001\x00\x00\x00vCal-Uid\x01\x00\x00\x00261cbc18-1f65-5a0a-bd11-23b1e224cc2f\x00'
+            b'\x04\x00\x00\x00\x82\x00\xe0\x00t\xc5\xb7\x10\x1a\x82\xe0\x08\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+            b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x001\x00\x00\x00vCal-Uid\x01\x00\x00\x00'
+            b'261cbc18-1f65-5a0a-bd11-23b1e224cc2f\x00'
         )
 
     def test_internet_message_headers(self):

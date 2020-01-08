@@ -58,7 +58,7 @@ class AutodiscoverTest(EWSTest):
                 email='XXX.' + self.account.primary_smtp_address,
                 credentials=self.account.protocol.credentials,
                 retry_policy=self.retry_policy,
-)
+            )
         with self.assertRaises(ErrorNonExistentMailbox):
             # Test that error is raised with a full cache
             discover(
@@ -136,6 +136,7 @@ class AutodiscoverTest(EWSTest):
 
         def _mock(*args, **kwargs):
             raise NotImplementedError()
+
         exchangelib.autodiscover._try_autodiscover = _mock
         discover(
             email=self.account.primary_smtp_address,
@@ -230,9 +231,10 @@ class AutodiscoverTest(EWSTest):
 
         # Test that we can survive being asked to lookup with another address
         def _mock2(*args, **kwargs):
-            email = kwargs['email']
-            if email == 'xxxxxx@%s' % self.account.domain:
-                raise ErrorNonExistentMailbox(email)
+            eml = kwargs['email']
+            if eml == 'xxxxxx@%s' % self.account.domain:
+                raise ErrorNonExistentMailbox(eml)
+
             raise AutoDiscoverRedirect(redirect_email='xxxxxx@'+self.account.domain)
         exchangelib.autodiscover._autodiscover_quick = _mock2
         with self.assertRaises(ErrorNonExistentMailbox):
@@ -245,6 +247,7 @@ class AutodiscoverTest(EWSTest):
         # Test that we catch circular redirects
         def _mock3(*args, **kwargs):
             raise AutoDiscoverRedirect(redirect_email=self.account.primary_smtp_address)
+
         exchangelib.autodiscover._autodiscover_quick = _mock3
         with self.assertRaises(AutoDiscoverCircularRedirect):
             discover(
@@ -256,8 +259,10 @@ class AutodiscoverTest(EWSTest):
 
         # Test that we catch circular redirects when cache is empty. This is a different code path
         _orig = exchangelib.autodiscover._try_autodiscover
+
         def _mock4(*args, **kwargs):
             raise AutoDiscoverRedirect(redirect_email=self.account.primary_smtp_address)
+
         exchangelib.autodiscover._try_autodiscover = _mock4
         exchangelib.autodiscover._autodiscover_cache.clear()
         with self.assertRaises(AutoDiscoverCircularRedirect):
@@ -270,10 +275,11 @@ class AutodiscoverTest(EWSTest):
 
         # Test that we can survive being asked to lookup with another address, when cache is empty
         def _mock5(*args, **kwargs):
-            email = kwargs['email']
-            if email == 'xxxxxx@%s' % self.account.domain:
-                raise ErrorNonExistentMailbox(email)
+            eml = kwargs['email']
+            if eml == 'xxxxxx@%s' % self.account.domain:
+                raise ErrorNonExistentMailbox(eml)
             raise AutoDiscoverRedirect(redirect_email='xxxxxx@'+self.account.domain)
+
         exchangelib.autodiscover._try_autodiscover = _mock5
         exchangelib.autodiscover._autodiscover_cache.clear()
         with self.assertRaises(ErrorNonExistentMailbox):
@@ -308,6 +314,7 @@ class AutodiscoverTest(EWSTest):
                         # Return a valid record
                         return '1 2 3 example.com.'
                 return [A()]
+
         dns.resolver.Resolver = _Mock1
         # Test a valid record
         self.assertEqual(_get_hostname_from_srv('example.com.'), 'example.com')
@@ -319,6 +326,7 @@ class AutodiscoverTest(EWSTest):
                         # Return malformed data
                         return 'XXXXXXX'
                 return [A()]
+
         dns.resolver.Resolver = _Mock2
         # Test an invalid record
         with self.assertRaises(AutoDiscoverFailed):

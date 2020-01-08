@@ -50,7 +50,7 @@ class EWSDateTimeTest(TimedTestCase):
         for k, v in EWSTimeZone.PYTZ_TO_MS_MAP.items():
             self.assertIsInstance(k, str)
             self.assertIsInstance(v, tuple)
-            self.assertEqual(len(v),2)
+            self.assertEqual(len(v), 2)
             self.assertIsInstance(v[0], str)
 
         # Test timezone unknown by pytz

@@ -168,7 +168,8 @@ class UtilTest(EWSTest):
             for err_cls in CONNECTION_ERRORS:
                 session.post = mock_session_exception(err_cls)
                 with self.assertRaises(err_cls):
-                    r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
+                    r, session = post_ratelimited(
+                        protocol=protocol, session=session, url='http://', headers=None, data='')
 
             # Test bad exit codes and headers
             session.post = mock_post(url, 401, {})
@@ -177,7 +178,8 @@ class UtilTest(EWSTest):
             session.post = mock_post(url, 999, {'connection': 'close'})
             with self.assertRaises(TransportError):
                 r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
-            session.post = mock_post(url, 302, {'location': '/ews/genericerrorpage.htm?aspxerrorpath=/ews/exchange.asmx'})
+            session.post = mock_post(url, 302,
+                                     {'location': '/ews/genericerrorpage.htm?aspxerrorpath=/ews/exchange.asmx'})
             with self.assertRaises(TransportError):
                 r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
             session.post = mock_post(url, 503, {})

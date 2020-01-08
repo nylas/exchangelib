@@ -48,7 +48,7 @@ class RestrictionTest(TimedTestCase):
 </m:Restriction>'''
         q = Q(Q(categories__contains='FOO') | Q(categories__contains='BAR'), start__lt=end, end__gt=start)
         r = Restriction(q, folders=[Calendar(root=root)], applies_to=Restriction.ITEMS)
-        self.assertEqual(str(r), ''.join(l.lstrip() for l in result.split('\n')))
+        self.assertEqual(str(r), ''.join(s.lstrip() for s in result.split('\n')))
         # Test empty Q
         q = Q()
         self.assertEqual(q.to_xml(folders=[Calendar()], version=version, applies_to=Restriction.ITEMS), None)
@@ -62,7 +62,7 @@ class RestrictionTest(TimedTestCase):
         with self.assertRaises(TypeError):
             Q(datetime_created=Build(15, 1)).clean(version=Version(build=EXCHANGE_2007))  # Must be serializable
         with self.assertRaises(ValueError):
-            Q(datetime_created=EWSDateTime(2017, 1, 1)).clean(version=Version(build=EXCHANGE_2007))  # Must be tz-aware date
+            Q(datetime_created=EWSDateTime(2017, 1, 1)).clean(version=Version(build=EXCHANGE_2007))  # Must be tz-aware
         with self.assertRaises(ValueError):
             Q(categories__contains=[[1, 2], [3, 4]]).clean(version=Version(build=EXCHANGE_2007))  # Must be single value
 
@@ -125,7 +125,7 @@ class RestrictionTest(TimedTestCase):
         q = ~(Q(subject='bar') | Q(subject='baz'))
         self.assertEqual(
             xml_to_str(q.to_xml(folders=[Calendar(root=root)], version=version, applies_to=Restriction.ITEMS)),
-            ''.join(l.lstrip() for l in result.split('\n'))
+            ''.join(s.lstrip() for s in result.split('\n'))
         )
 
     def test_q_boolean_ops(self):

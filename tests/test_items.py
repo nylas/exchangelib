@@ -30,7 +30,7 @@ from exchangelib.services import GetPersona
 from exchangelib.util import value_to_xml_text
 from exchangelib.version import Build, EXCHANGE_2007, EXCHANGE_2013
 
-from .common import EWSTest, TimedTestCase, get_random_string, get_random_datetime_range, get_random_date, \
+from .common import EWSTest, get_random_string, get_random_datetime_range, get_random_date, \
     get_random_email, get_random_decimal, get_random_choice, mock_version
 
 
@@ -1914,8 +1914,8 @@ class CommonItemTest(BaseItemTest):
             wipe2_ids = self.account.bulk_update([(item, ['extern_id']), ])
             self.assertEqual(len(wipe2_ids), 1)
             self.assertEqual(len(wipe2_ids[0]), 2, wipe2_ids)
-            self.assertEqual(insert_ids[0].id, wipe2_ids[0][0])  # ID should be the same
-            self.assertNotEqual(insert_ids[0].changekey, wipe2_ids[0][1])  # Changekey should change when item is updated
+            self.assertEqual(insert_ids[0].id, wipe2_ids[0][0])  # ID must be the same
+            self.assertNotEqual(insert_ids[0].changekey, wipe2_ids[0][1])  # Changekey must change when item is updated
             item = list(self.account.fetch(wipe2_ids))[0]
             self.assertEqual(item.extern_id, extern_id)
         finally:
@@ -2198,8 +2198,10 @@ class CalendarTest(CommonItemTest):
         # Update start, end and recurrence with timezoned datetimes. For some reason, EWS throws
         # 'ErrorOccurrenceTimeSpanTooBig' is we go back in time.
         start = get_random_date(start_date=item.start.date() + datetime.timedelta(days=1))
-        dt_start, dt_end = [dt.astimezone(self.account.default_timezone) for dt in
-                            get_random_datetime_range(start_date=start, end_date=start, tz=self.account.default_timezone)]
+        dt_start, dt_end = [
+            dt.astimezone(self.account.default_timezone) for dt in
+            get_random_datetime_range(start_date=start, end_date=start, tz=self.account.default_timezone)
+        ]
         item.start, item.end = dt_start, dt_end
         item.recurrence.boundary.start = dt_start.date()
         item.save()

@@ -1,5 +1,5 @@
 # coding=utf-8
-from exchangelib.attachments import FileAttachment, ItemAttachment, AttachmentId, Attachment
+from exchangelib.attachments import FileAttachment, ItemAttachment, AttachmentId
 from exchangelib.errors import ErrorItemNotFound, ErrorInvalidIdMalformed
 from exchangelib.folders import Inbox
 from exchangelib.items import Item, Message
@@ -146,7 +146,7 @@ class AttachmentsTest(BaseItemTest):
                 fp.read()
 
         # Try to stream a non-existent attachment
-        att.attachment_id.id=\
+        att.attachment_id.id = \
             'AAMkADQyYzZmYmUxLTJiYjItNDg2Ny1iMzNjLTIzYWE1NDgxNmZhNABGAAAAAADUebQDarW2Q7G2Ji8hKofPBwAl9iKCsfCfS' \
             'a9cmjh+JCrCAAPJcuhjAABioKiOUTCQRI6Q5sRzi0pJAAHnDV3CAAABEgAQAN0zlxDrzlxAteU+kt84qOM='
         with self.assertRaises(ErrorItemNotFound):

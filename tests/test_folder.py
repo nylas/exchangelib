@@ -315,7 +315,7 @@ class FolderTest(EWSTest):
 
         # Test parent ('..') syntax. Should not work
         with self.assertRaises(ValueError) as e:
-            self.account.root // 'Top of Information Store' // '..'
+            _ = self.account.root // 'Top of Information Store' // '..'
         self.assertEqual(e.exception.args[0], 'Cannot get parent without a folder cache')
         self.assertIsNone(self.account.root._subfolders)
 

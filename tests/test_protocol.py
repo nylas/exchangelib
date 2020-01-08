@@ -432,4 +432,3 @@ class ProtocolTest(EWSTest):
         self.assertEqual(len(ids), len(items))
         return_items = list(self.account.fetch(return_ids))
         self.bulk_delete(return_items)
-

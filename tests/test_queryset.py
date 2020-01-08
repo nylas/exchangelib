@@ -11,8 +11,8 @@ from .common import TimedTestCase
 class QuerySetTest(TimedTestCase):
     def test_magic(self):
         self.assertEqual(
-            str(QuerySet(
-                folder_collection=FolderCollection(account=None, folders=[Inbox(root='XXX', name='FooBox')]))
+            str(
+                QuerySet(folder_collection=FolderCollection(account=None, folders=[Inbox(root='XXX', name='FooBox')]))
             ),
             'QuerySet(q=Q(), folders=[Inbox (FooBox)])'
         )

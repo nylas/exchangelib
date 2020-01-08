@@ -20,7 +20,3 @@ class CredentialsTest(TimedTestCase):
         self.assertEqual(Credentials('a', 'b').type, Credentials.UPN)
         self.assertEqual(Credentials('a@example.com', 'b').type, Credentials.EMAIL)
         self.assertEqual(Credentials('a\\n', 'b').type, Credentials.DOMAIN)
-
-
-
-

@@ -98,5 +98,3 @@ class CommonTest(EWSTest):
                 # from_xml() does not support None input
                 with self.assertRaises(Exception):
                     v.from_xml(elem=None, account=None)
-
-

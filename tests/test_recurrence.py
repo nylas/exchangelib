@@ -1,6 +1,6 @@
 # coding=utf-8
 from exchangelib import EWSDate
-from exchangelib.fields import MONDAY, WEDNESDAY, FEBRUARY, AUGUST, SECOND, LAST, WEEKEND_DAY
+from exchangelib.fields import MONDAY, FEBRUARY, AUGUST, SECOND, LAST, WEEKEND_DAY
 from exchangelib.recurrence import Recurrence, AbsoluteYearlyPattern, RelativeYearlyPattern, AbsoluteMonthlyPattern, \
     RelativeMonthlyPattern, WeeklyPattern, DailyPattern, NoEndPattern, EndDatePattern, NumberedPattern
 
