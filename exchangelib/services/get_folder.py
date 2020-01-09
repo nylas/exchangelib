@@ -26,11 +26,14 @@ class GetFolder(EWSAccountService, EWSPooledMixIn):
         # We can't easily find the correct folder class from the returned XML. Instead, return objects with the same
         # class as the folder instance it was requested with.
         folders_list = list(folders)  # Convert to a list, in case 'folders' is a generator
-        for folder, elem in zip(folders_list, self._pool_requests(payload_func=self.get_payload, **dict(
-                items=folders,
+        for folder, elem in zip(folders_list, self._pool_requests(
+            payload_func=self.get_payload,
+            items=folders,
+            **dict(
                 additional_fields=additional_fields,
                 shape=shape,
-        ))):
+            )
+        )):
             yield parse_folder_elem(elem=elem, folder=folder, account=self.account)
 
     def get_payload(self, folders, additional_fields, shape):
