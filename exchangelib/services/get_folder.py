@@ -1,9 +1,10 @@
 from ..errors import ErrorFolderNotFound, ErrorNoPublicFolderReplicaAvailable, ErrorInvalidOperation
 from ..util import create_element, MNS
-from .common import EWSAccountService, parse_folder_elem, create_folder_ids_element, create_shape_element
+from .common import EWSAccountService, EWSPooledMixIn, parse_folder_elem, create_folder_ids_element,\
+    create_shape_element
 
 
-class GetFolder(EWSAccountService):
+class GetFolder(EWSAccountService, EWSPooledMixIn):
     """
     MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/getfolder
     """
@@ -25,10 +26,10 @@ class GetFolder(EWSAccountService):
         # We can't easily find the correct folder class from the returned XML. Instead, return objects with the same
         # class as the folder instance it was requested with.
         folders_list = list(folders)  # Convert to a list, in case 'folders' is a generator
-        for folder, elem in zip(folders_list, self._get_elements(payload=self.get_payload(
-            folders=folders,
-            additional_fields=additional_fields,
-            shape=shape,
+        for folder, elem in zip(folders_list, self._pool_requests(payload_func=self.get_payload, **dict(
+                items=folders,
+                additional_fields=additional_fields,
+                shape=shape,
         ))):
             yield parse_folder_elem(elem=elem, folder=folder, account=self.account)
 
