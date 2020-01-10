@@ -183,10 +183,10 @@ class ProtocolTest(EWSTest):
         roomlist = RoomList(email_address='my.roomlist@example.com')
         ws = GetRooms(self.account.protocol)
         with self.assertRaises(ErrorNameResolutionNoResults):
-            ws.call(roomlist=roomlist)
+            list(ws.call(roomlist=roomlist))
         # Test shortcut
         with self.assertRaises(ErrorNameResolutionNoResults):
-            self.account.protocol.get_rooms('my.roomlist@example.com')
+            list(self.account.protocol.get_rooms('my.roomlist@example.com'))
 
     def test_get_rooms_parsing(self):
         # Test static XML since server has no rooms

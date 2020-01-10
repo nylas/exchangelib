@@ -16,11 +16,11 @@ class ServicesTest(EWSTest):
         version = mock_version(build=EXCHANGE_2007)
         account = mock_account(version=version, protocol=mock_protocol(version=version, service_endpoint='example.com'))
         with self.assertRaises(NotImplementedError):
-            GetServerTimeZones(protocol=account.protocol).call()
+            list(GetServerTimeZones(protocol=account.protocol).call())
         with self.assertRaises(NotImplementedError):
-            GetRoomLists(protocol=account.protocol).call()
+            list(GetRoomLists(protocol=account.protocol).call())
         with self.assertRaises(NotImplementedError):
-            GetRooms(protocol=account.protocol).call('XXX')
+            list(GetRooms(protocol=account.protocol).call('XXX'))
 
     def test_error_server_busy(self):
         # Test that we can parse an ErrorServerBusy response

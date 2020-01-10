@@ -1,9 +1,9 @@
 from ..util import create_element, set_xml_value, MNS
 from ..version import EXCHANGE_2007_SP1
-from .common import EWSAccountService
+from .common import EWSAccountService, EWSPooledMixIn
 
 
-class GetDelegate(EWSAccountService):
+class GetDelegate(EWSAccountService, EWSPooledMixIn):
     """
     MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/getdelegate-operation
     """
@@ -14,12 +14,15 @@ class GetDelegate(EWSAccountService):
             raise NotImplementedError(
                 '%r is only supported for Exchange 2007 SP1 servers and later' % self.SERVICE_NAME)
         from ..properties import DLMailbox, DelegateUser  # The service expects a Mailbox element in the MNS namespace
-        elements = self._get_elements(payload=self.get_payload(
-            mailbox=DLMailbox(email_address=self.account.primary_smtp_address),
-            user_ids=user_ids,
-            include_permissions=include_permissions,
-        ))
-        for elem in elements:
+
+        for elem in self._pool_requests(
+            items=user_ids,
+            payload_func=self.get_payload,
+            **dict(
+                mailbox=DLMailbox(email_address=self.account.primary_smtp_address),
+                include_permissions=include_permissions,
+            )
+        ):
             if isinstance(elem, Exception):
                 raise elem
             yield DelegateUser.from_xml(elem=elem, account=self.account)

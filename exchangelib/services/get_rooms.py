@@ -14,8 +14,9 @@ class GetRooms(EWSService):
         from ..properties import Room
         if self.protocol.version.build < EXCHANGE_2010:
             raise NotImplementedError('%s is only supported for Exchange 2010 servers and later' % self.SERVICE_NAME)
-        elements = self._get_elements(payload=self.get_payload(roomlist=roomlist))
-        return [Room.from_xml(elem=elem, account=None) for elem in elements]
+
+        for elem in self._get_elements(payload=self.get_payload(roomlist=roomlist)):
+            yield Room.from_xml(elem=elem, account=None)
 
     def get_payload(self, roomlist):
         getrooms = create_element('m:%s' % self.SERVICE_NAME)
