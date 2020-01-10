@@ -361,6 +361,7 @@ class ForgivingParser(GlobalParserTLS):
     parser_config = {
         'resolve_entities': False,
         'recover': True,  # This setting is non-default
+        'huge_tree': True,  # This setting enables parsing huge attachments, mime_content and other large data
     }
 
 
