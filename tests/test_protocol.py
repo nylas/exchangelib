@@ -130,9 +130,9 @@ class ProtocolTest(EWSTest):
         # The test server is not guaranteed to have any room lists which makes this test less useful
         ws = GetRoomLists(self.account.protocol)
         roomlists = ws.call()
-        self.assertEqual(roomlists, [])
+        self.assertEqual(list(roomlists), [])
         # Test shortcut
-        self.assertEqual(self.account.protocol.get_roomlists(), [])
+        self.assertEqual(list(self.account.protocol.get_roomlists()), [])
 
     def test_get_roomlists_parsing(self):
         # Test static XML since server has no roomlists
