@@ -560,7 +560,6 @@ class Base64Field(FieldURIField):
 
 
 class MimeContentField(Base64Field):
-    """MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/mimecontent"""
     value_cls = string_types[0]
     default_encoding = 'utf-8'
 
@@ -677,10 +676,7 @@ class TextField(FieldURIField):
     is_complex = True
 
     def from_xml(self, elem, account):
-        if self.is_attribute:
-            val = elem.get(self.field_uri)
-        else:
-            val = self._get_val_from_elem(elem)
+        val = self._get_val_from_elem(elem)
         if val is not None:
             return val
         return self.default
@@ -1189,7 +1185,6 @@ class PhoneNumberField(IndexedField):
 
 
 class PhysicalAddressField(IndexedField):
-    """MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/entry-physicaladdress"""
     is_list = True
 
     PARENT_ELEMENT_NAME = 'PhysicalAddresses'

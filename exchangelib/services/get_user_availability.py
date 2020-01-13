@@ -4,9 +4,9 @@ from .common import EWSService
 
 class GetUserAvailability(EWSService):
     """
-     Get detailed availability information for a list of users
-     MSDN:
-     https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/getuseravailability-operation
+    Get detailed availability information for a list of users
+    MSDN:
+    https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/getuseravailability-operation
     """
     SERVICE_NAME = 'GetUserAvailability'
 
