@@ -215,8 +215,8 @@ account = Account(
 
 # A cache entry for a domain is removed automatically if autodiscovery fails for an email in that
 # domain. It's possible to clear the entire cache completely if you want:
-from exchangelib.autodiscover import _autodiscover_cache
-_autodiscover_cache.clear()
+from exchangelib.autodiscover import clear_cache
+clear_cache()
 ```
 
 ## Proxies and custom TLS validation

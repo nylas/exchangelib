@@ -17,6 +17,7 @@ import xml.sax.handler
 from defusedxml.lxml import parse, tostring, GlobalParserTLS, RestrictedElement, _etree
 from defusedxml.expatreader import DefusedExpatParser
 from defusedxml.sax import _InputSource
+import dns.resolver
 from future.backports.misc import get_ident
 from future.moves.urllib.parse import urlparse
 from future.utils import PY2
@@ -563,6 +564,17 @@ def split_url(url):
     parsed_url = urlparse(url)
     # Use netloc instead of hostname since hostname is None if URL is relative
     return parsed_url.scheme == 'https', parsed_url.netloc.lower(), parsed_url.path
+
+
+def is_valid_hostname(hostname, timeout):
+    log.debug('Checking if %s can be looked up in DNS', hostname)
+    resolver = dns.resolver.Resolver()
+    resolver.timeout = timeout
+    try:
+        resolver.query(hostname)
+    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer):
+        return False
+    return True
 
 
 def get_redirect_url(response, allow_relative=True, require_relative=False):

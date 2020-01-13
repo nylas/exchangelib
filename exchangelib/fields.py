@@ -1313,8 +1313,8 @@ class BuildField(CharField):
 class ProtocolListField(EWSElementListField):
     # There is not containing element for this field. Just multiple 'Protocol' elements on the 'Account' element.
     def __init__(self, *args, **kwargs):
-        from .autodiscover import ProtocolElement
-        kwargs['value_cls'] = ProtocolElement
+        from .autodiscover.properties import Protocol
+        kwargs['value_cls'] = Protocol
         super(ProtocolListField, self).__init__(*args, **kwargs)
 
     def from_xml(self, elem, account):
