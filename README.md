@@ -127,6 +127,9 @@ marys_account = Account(primary_smtp_address='mary@example.com', credentials=cre
 still_marys_account = Account(primary_smtp_address='alias_for_mary@example.com',
                               credentials=credentials, autodiscover=True, access_type=DELEGATE)
 
+# Full autodiscover data is availale on the Account object:
+my_account.ad_response
+
 # Set up a target account and do an autodiscover lookup to find the target EWS endpoint.
 account = Account(primary_smtp_address='john@example.com', credentials=credentials,
                   autodiscover=True, access_type=DELEGATE)

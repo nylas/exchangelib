@@ -39,12 +39,12 @@ class AutodiscoverTest(EWSTest):
             repr(protocol)
 
     def test_autodiscover(self):
-        primary_smtp_address, protocol = discover(
+        ad_response, protocol = discover(
             email=self.account.primary_smtp_address,
             credentials=self.account.protocol.credentials,
             retry_policy=self.retry_policy,
         )
-        self.assertEqual(primary_smtp_address, self.account.primary_smtp_address)
+        self.assertEqual(ad_response.autodiscover_smtp_address, self.account.primary_smtp_address)
         self.assertEqual(protocol.service_endpoint.lower(), self.account.protocol.service_endpoint.lower())
         self.assertEqual(protocol.version.build, self.account.protocol.version.build)
 
@@ -209,7 +209,7 @@ class AutodiscoverTest(EWSTest):
 
     def test_autodiscover_redirect(self):
         # Prime the cache
-        email, p = discover(
+        ad_response, p = discover(
             email=self.account.primary_smtp_address,
             credentials=self.account.protocol.credentials,
             retry_policy=self.retry_policy,
@@ -219,15 +219,16 @@ class AutodiscoverTest(EWSTest):
 
         # Test that we can get another address back than the address we're looking up
         def _mock1(*args, **kwargs):
-            return 'john@example.com', p
+            tmp = namedtuple('tmp', ('autodiscover_smtp_address',))
+            return tmp(autodiscover_smtp_address='john@example.com'), p
         exchangelib.autodiscover._autodiscover_quick = _mock1
-        test_email, p = discover(
+        ad_response, p = discover(
             email=self.account.primary_smtp_address,
             credentials=self.account.protocol.credentials,
             retry_policy=self.retry_policy,
         )
 
-        self.assertEqual(test_email, 'john@example.com')
+        self.assertEqual(ad_response.autodiscover_smtp_address, 'john@example.com')
 
         # Test that we can survive being asked to lookup with another address
         def _mock2(*args, **kwargs):
@@ -382,7 +383,7 @@ class AutodiscoverTest(EWSTest):
         </Account>
     </Response>
 </Autodiscover>'''
-        self.assertEqual(_parse_response(xml)[0], 'https://expr.example.com/EWS/Exchange.asmx')
+        self.assertEqual(_parse_response(xml).protocol.ews_url, 'https://expr.example.com/EWS/Exchange.asmx')
 
         # Select EXPR if EXPR is unavailable
         xml = b'''\
@@ -402,7 +403,7 @@ class AutodiscoverTest(EWSTest):
         </Account>
     </Response>
 </Autodiscover>'''
-        self.assertEqual(_parse_response(xml)[0], 'https://exch.example.com/EWS/Exchange.asmx')
+        self.assertEqual(_parse_response(xml).protocol.ews_url, 'https://exch.example.com/EWS/Exchange.asmx')
 
         # Fail if neither EXPR nor EXPR are unavailable
         xml = b'''\

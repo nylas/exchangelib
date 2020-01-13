@@ -345,9 +345,7 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl, auth_type, ret
     r = _get_response(protocol=autodiscover_protocol, email=email)
     domain = get_domain(email)
     try:
-        ews_url, primary_smtp_address = _parse_response(r.content)
-        if not primary_smtp_address:
-            primary_smtp_address = email
+        ad_response = _parse_response(r.content)
     except (ErrorNonExistentMailbox, AutoDiscoverRedirect):
         # These are both valid responses from an autodiscover server, showing that we have found the correct
         # server for the original domain. Fill cache before re-raising
@@ -362,20 +360,27 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl, auth_type, ret
     _autodiscover_cache[(domain, credentials)] = autodiscover_protocol
     # Autodiscover response contains an auth type, but we don't want to spend time here testing if it actually works.
     # Instead of forcing a possibly-wrong auth type, just let Protocol auto-detect the auth type.
-    return primary_smtp_address, Protocol(config=Configuration(
+    ews_url = ad_response.protocol.ews_url
+    if not ad_response.autodiscover_smtp_address:
+        # Autodiscover does not always return an email address. In that case, the requesting email should be used
+        ad_response.user.autodiscover_smtp_address = email
+
+    return ad_response, Protocol(config=Configuration(
         service_endpoint=ews_url, credentials=credentials, auth_type=None, retry_policy=retry_policy
     ))
 
 
 def _autodiscover_quick(credentials, email, protocol):
     r = _get_response(protocol=protocol, email=email)
-    ews_url, primary_smtp_address = _parse_response(r.content)
-    if not primary_smtp_address:
-        primary_smtp_address = email
-    log.debug('Autodiscover success: %s may connect to %s as primary email %s', email, ews_url, primary_smtp_address)
+    ad_response = _parse_response(r.content)
+    ews_url = ad_response.protocol.ews_url
+    log.debug('Autodiscover success: %s may connect to %s', email, ews_url)
     # Autodiscover response contains an auth type, but we don't want to spend time here testing if it actually works.
     # Instead of forcing a possibly-wrong auth type, just let Protocol auto-detect the auth type.
-    return primary_smtp_address, Protocol(config=Configuration(
+    if not ad_response.autodiscover_smtp_address:
+        # Autodiscover does not always return an email address. In that case, the requesting email should be used
+        ad_response.user.autodiscover_smtp_address = email
+    return ad_response, Protocol(config=Configuration(
         service_endpoint=ews_url, credentials=credentials, auth_type=None, retry_policy=protocol.retry_policy
     ))
 
@@ -426,27 +431,27 @@ def _get_response(protocol, email):
 
 
 def _parse_response(bytes_content):
-    # We could return lots more interesting things here
     try:
-        autodiscover = AutodiscoverElement.from_bytes(bytes_content=bytes_content)
+        ad = AutodiscoverElement.from_bytes(bytes_content=bytes_content)
     except ValueError as e:
         raise AutoDiscoverFailed(str(e))
-    if autodiscover.response is None:
+    if ad.response is None:
         try:
-            autodiscover.raise_errors()
+            ad.raise_errors()
         except ValueError as e:
             raise AutoDiscoverFailed(str(e))
-    if autodiscover.redirect_address:
+    ad_response = ad.response
+    if ad_response.redirect_address:
         # This is redirection to e.g. Office365
-        raise AutoDiscoverRedirect(autodiscover.redirect_address)
+        raise AutoDiscoverRedirect(ad_response.redirect_address)
     try:
-        ews_url = autodiscover.protocol.ews_url
+        ews_url = ad_response.protocol.ews_url
     except ValueError:
         raise AutoDiscoverFailed('No valid protocols in response: %s' % bytes_content)
     if not ews_url:
         raise ValueError("Required element 'EwsUrl' not found in response")
-    log.debug('Primary SMTP: %s, EWS endpoint: %s', autodiscover.autodiscover_smtp_address, ews_url)
-    return ews_url, autodiscover.autodiscover_smtp_address
+    log.debug('Primary SMTP: %s, EWS endpoint: %s', ad_response.autodiscover_smtp_address, ews_url)
+    return ad_response
 
 
 def is_valid_hostname(hostname):
@@ -723,6 +728,47 @@ class Response(AutodiscoverBase):
     ]
     __slots__ = tuple(f.name for f in FIELDS)
 
+    @property
+    def redirect_address(self):
+        try:
+            if self.account.action != Account.REDIRECT_ADDR:
+                return None
+            return self.account.redirect_address
+        except AttributeError:
+            return None
+
+    @property
+    def redirect_url(self):
+        try:
+            if self.account.action != Account.REDIRECT_URL:
+                return None
+            return self.account.redirect_url
+        except AttributeError:
+            return None
+
+    @property
+    def autodiscover_smtp_address(self):
+        # AutoDiscoverSMTPAddress might not be present in the XML. In this case, use the original email address.
+        try:
+            if self.account.action != Account.SETTINGS:
+                return None
+            return self.user.autodiscover_smtp_address
+        except AttributeError:
+            return None
+
+    @property
+    def protocol(self):
+        # There are three possible protocol types: EXCH, EXPR and WEB.
+        # EXPR is meant for EWS. See
+        # https://techcommunity.microsoft.com/t5/Exchange-Team-Blog/The-Autodiscover-Service-and-Outlook-Providers-how-does-this/ba-p/584403
+        # We allow fallback to EXCH if EXPR is not available, to support installations where EXPR is not available.
+        protocols = {p.type: p for p in self.account.protocols}
+        try:
+            return protocols.get('EXPR', protocols['EXCH'])
+        except KeyError:
+            # Neither type was found. Give up
+            raise ValueError('No valid protocols in response')
+
 
 class ErrorResponse(EWSElement):
     """MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/response-pox
@@ -765,47 +811,6 @@ class AutodiscoverElement(EWSElement):
         if root.tag != cls.response_tag():
             raise ValueError('Unknown root element in XML: %s' % bytes_content)
         return cls.from_xml(elem=root, account=None)
-
-    @property
-    def redirect_address(self):
-        try:
-            if self.response.account.action != Account.REDIRECT_ADDR:
-                return None
-            return self.response.account.redirect_address
-        except AttributeError:
-            return None
-
-    @property
-    def redirect_url(self):
-        try:
-            if self.response.account.action != Account.REDIRECT_URL:
-                return None
-            return self.response.account.redirect_url
-        except AttributeError:
-            return None
-
-    @property
-    def autodiscover_smtp_address(self):
-        # AutoDiscoverSMTPAddress might not be present in the XML. In this case, use the original email address.
-        try:
-            if self.response.account.action != Account.SETTINGS:
-                return None
-            return self.response.user.autodiscover_smtp_address
-        except AttributeError:
-            return None
-
-    @property
-    def protocol(self):
-        # There are three possible protocol types: EXCH, EXPR and WEB.
-        # EXPR is meant for EWS. See
-        # https://techcommunity.microsoft.com/t5/Exchange-Team-Blog/The-Autodiscover-Service-and-Outlook-Providers-how-does-this/ba-p/584403
-        # We allow fallback to EXCH if EXPR is not available, to support installations where EXPR is not available.
-        protocols = {p.type: p for p in self.response.account.protocols}
-        try:
-            return protocols.get('EXPR', protocols['EXCH'])
-        except KeyError:
-            # Neither type was found. Give up
-            raise ValueError('No valid protocols in response')
 
     def raise_errors(self):
         # Find an error message in the response and raise the relevant exception

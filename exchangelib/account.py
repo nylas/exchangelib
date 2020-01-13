@@ -56,7 +56,6 @@ class Account(object):
         """
         if '@' not in primary_smtp_address:
             raise ValueError("primary_smtp_address %r is not an email address" % primary_smtp_address)
-        self.primary_smtp_address = primary_smtp_address
         self.fullname = fullname
         # Assume delegate access if individual credentials are provided. Else, assume service user with impersonation
         self.access_type = access_type or (DELEGATE if credentials else IMPERSONATION)
@@ -88,12 +87,15 @@ class Account(object):
                     credentials = config.credentials
             else:
                 retry_policy, auth_type = None, None
-            self.primary_smtp_address, self.protocol = discover(
-                email=self.primary_smtp_address, credentials=credentials, auth_type=auth_type, retry_policy=retry_policy
+            self.ad_response, self.protocol = discover(
+                email=primary_smtp_address, credentials=credentials, auth_type=auth_type, retry_policy=retry_policy
             )
+            self.primary_smtp_address = self.ad_response.autodiscover_smtp_address
         else:
             if not config:
                 raise AttributeError('non-autodiscover requires a config')
+            self.primary_smtp_address = primary_smtp_address
+            self.ad_response = None
             self.protocol = config.protocol
         # We may need to override the default server version on a per-account basis because Microsoft may report one
         # server version up-front but delegate account requests to an older backend server.
