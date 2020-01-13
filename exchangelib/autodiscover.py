@@ -425,53 +425,28 @@ def _get_response(protocol, email):
     return r
 
 
-def _raise_response_errors(autodiscover):
-    # Find an error message in the response and raise the relevant exception
-    try:
-        errorcode = autodiscover.error_response.error.code
-        message = autodiscover.error_response.error.message
-        if message in ('The e-mail address cannot be found.', "The email address can't be found."):
-            raise ErrorNonExistentMailbox('The SMTP address has no mailbox associated with it')
-        raise AutoDiscoverFailed('Unknown error %s: %s' % (errorcode, message))
-    except AttributeError:
-        raise_from(AutoDiscoverFailed('Unknown autodiscover response: %s' % autodiscover), None)
-
-
 def _parse_response(bytes_content):
     # We could return lots more interesting things here
-    if not is_xml(bytes_content):
-        raise AutoDiscoverFailed('Autodiscover response is not XML: %s' % bytes_content)
-    root = to_xml(bytes_content).getroot()
-    if root.tag != AutodiscoverElement.response_tag():
-        raise AutoDiscoverFailed('Unknown autodiscover response: %s' % bytes_content)
-    autodiscover = AutodiscoverElement.from_xml(elem=root, account=None)
-    response = autodiscover.response
-    if response is None:
-        _raise_response_errors(autodiscover)
-    account = response.account
-    redirect_email = account.redirect_address
-    if account.action == Account.REDIRECT_ADDR and redirect_email:
-        # This is redirection to e.g. Office365
-        raise AutoDiscoverRedirect(redirect_email)
-    # AutoDiscoverSMTPAddress might not be present in the XML, so primary_smtp_address might be None. In this
-    # case, the original email address IS the primary address
-    primary_smtp_address = response.user.autodiscover_smtp_address
-    protocols = {p.type: p for p in account.protocols}
-    # There are three possible protocol types: EXCH, EXPR and WEB.
-    # EXPR is meant for EWS. See
-    # https://techcommunity.microsoft.com/t5/Exchange-Team-Blog/The-Autodiscover-Service-and-Outlook-Providers-how-does-this/ba-p/584403
-    # We allow fallback to EXCH if EXPR is not available to support installations where EXPR is not available.
     try:
-        protocol = protocols.get('EXPR', protocols['EXCH'])
-    except KeyError:
-        # Neither type was found. Give up
+        autodiscover = AutodiscoverElement.from_bytes(bytes_content=bytes_content)
+    except ValueError as e:
+        raise AutoDiscoverFailed(str(e))
+    if autodiscover.response is None:
+        try:
+            autodiscover.raise_errors()
+        except ValueError as e:
+            raise AutoDiscoverFailed(str(e))
+    if autodiscover.redirect_address:
+        # This is redirection to e.g. Office365
+        raise AutoDiscoverRedirect(autodiscover.redirect_address)
+    try:
+        ews_url = autodiscover.protocol.ews_url
+    except ValueError:
         raise AutoDiscoverFailed('No valid protocols in response: %s' % bytes_content)
-
-    ews_url = protocol.ews_url
     if not ews_url:
         raise ValueError("Required element 'EwsUrl' not found in response")
-    log.debug('Primary SMTP: %s, EWS endpoint: %s', primary_smtp_address, ews_url)
-    return ews_url, primary_smtp_address
+    log.debug('Primary SMTP: %s, EWS endpoint: %s', autodiscover.autodiscover_smtp_address, ews_url)
+    return ews_url, autodiscover.autodiscover_smtp_address
 
 
 def is_valid_hostname(hostname):
@@ -611,7 +586,7 @@ class SimpleProtocolElement(AutodiscoverBase):
 
 class IntExtBase(AutodiscoverBase):
     FIELDS = [
-        # TODO: 'OWAUrl' has an AuthenticationMethod enum-style XML attribute
+        # TODO: 'OWAUrl' also has an AuthenticationMethod enum-style XML attribute
         TextField('owa_url', field_uri='OWAUrl', namespace=RNS),
         EWSElementField('protocol', value_cls=SimpleProtocolElement),
     ]
@@ -775,3 +750,70 @@ class AutodiscoverElement(EWSElement):
     def _clear(elem):
         # Parent implementation also clears the parent, but this element doesn't have one.
         elem.clear()
+
+    @classmethod
+    def from_bytes(cls, bytes_content):
+        """An Autodiscover request and response example is available at:
+        https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/pox-autodiscover-response-for-exchange
+        """
+        if not is_xml(bytes_content):
+            raise ValueError('Response is not XML: %s' % bytes_content)
+        try:
+            root = to_xml(bytes_content).getroot()
+        except ParseError:
+            raise ValueError('Error parsing XML: %s' % bytes_content)
+        if root.tag != cls.response_tag():
+            raise ValueError('Unknown root element in XML: %s' % bytes_content)
+        return cls.from_xml(elem=root, account=None)
+
+    @property
+    def redirect_address(self):
+        try:
+            if self.response.account.action != Account.REDIRECT_ADDR:
+                return None
+            return self.response.account.redirect_address
+        except AttributeError:
+            return None
+
+    @property
+    def redirect_url(self):
+        try:
+            if self.response.account.action != Account.REDIRECT_URL:
+                return None
+            return self.response.account.redirect_url
+        except AttributeError:
+            return None
+
+    @property
+    def autodiscover_smtp_address(self):
+        # AutoDiscoverSMTPAddress might not be present in the XML. In this case, use the original email address.
+        try:
+            if self.response.account.action != Account.SETTINGS:
+                return None
+            return self.response.user.autodiscover_smtp_address
+        except AttributeError:
+            return None
+
+    @property
+    def protocol(self):
+        # There are three possible protocol types: EXCH, EXPR and WEB.
+        # EXPR is meant for EWS. See
+        # https://techcommunity.microsoft.com/t5/Exchange-Team-Blog/The-Autodiscover-Service-and-Outlook-Providers-how-does-this/ba-p/584403
+        # We allow fallback to EXCH if EXPR is not available, to support installations where EXPR is not available.
+        protocols = {p.type: p for p in self.response.account.protocols}
+        try:
+            return protocols.get('EXPR', protocols['EXCH'])
+        except KeyError:
+            # Neither type was found. Give up
+            raise ValueError('No valid protocols in response')
+
+    def raise_errors(self):
+        # Find an error message in the response and raise the relevant exception
+        try:
+            errorcode = self.error_response.error.code
+            message = self.error_response.error.message
+            if message in ('The e-mail address cannot be found.', "The email address can't be found."):
+                raise ErrorNonExistentMailbox('The SMTP address has no mailbox associated with it')
+            raise ValueError('Unknown error %s: %s' % (errorcode, message))
+        except AttributeError:
+            raise ValueError('Unknown autodiscover error response: %s' % self)
