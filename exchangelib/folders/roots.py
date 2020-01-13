@@ -7,8 +7,8 @@ from six import text_type
 
 from ..errors import ErrorAccessDenied, ErrorFolderNotFound, ErrorNoPublicFolderReplicaAvailable, ErrorItemNotFound, \
     ErrorInvalidOperation
-from ..fields import PermissionSetField, EffectiveRightsField
-from ..version import EXCHANGE_2007_SP1, EXCHANGE_2010_SP1, EXCHANGE_2016
+from ..fields import EffectiveRightsField
+from ..version import EXCHANGE_2007_SP1, EXCHANGE_2010_SP1
 from .collections import FolderCollection
 from .base import BaseFolder
 from .known_folders import MsgFolderRoot, NON_DELETEABLE_FOLDERS, WELLKNOWN_FOLDERS_IN_ROOT, \
@@ -30,8 +30,9 @@ class RootOfHierarchy(BaseFolder):
     TRAVERSAL_DEPTH = DEEP
 
     LOCAL_FIELDS = [
-        PermissionSetField('permission_set', field_uri='folder:PermissionSet', supported_from=EXCHANGE_2007_SP1,
-                           deprecated_from=EXCHANGE_2016),
+        # This folder type also has 'folder:PermissionSet' on some server versions, but requesting it sometimes causes
+        # 'ErrorAccessDenied', as reported by some users. Ignore it entirely for root folders - it's usefulness is
+        # deemed minimal at best.
         EffectiveRightsField('effective_rights', field_uri='folder:EffectiveRights', is_read_only=True,
                              supported_from=EXCHANGE_2007_SP1),
     ]

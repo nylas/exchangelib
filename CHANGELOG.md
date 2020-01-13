@@ -6,6 +6,7 @@ HEAD
 -   Added support for specifying a separate retry policy for the autodiscover service endpoint
     selection. Set via the `AutodiscoverProtocol.INITIAL_RETRY_POLICY` class variable.
 -   Support the authorization code OAuth 2.0 grant type (see issue #698)
+-   Removed the `RootOfHierarchy.permission_set` field. It was causing too many failures in the wild.
 
 
 2.1.1
