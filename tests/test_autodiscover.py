@@ -26,15 +26,15 @@ class AutodiscoverTest(EWSTest):
 
     def test_magic(self):
         # Just test we don't fail
-        from exchangelib.autodiscover.cache import _autodiscover_cache
+        from exchangelib.autodiscover.cache import autodiscover_cache
         discover(
             email=self.account.primary_smtp_address,
             credentials=self.account.protocol.credentials,
             retry_policy=self.retry_policy,
         )
-        str(_autodiscover_cache)
-        repr(_autodiscover_cache)
-        for protocol in _autodiscover_cache._protocols.values():
+        str(autodiscover_cache)
+        repr(autodiscover_cache)
+        for protocol in autodiscover_cache._protocols.values():
             str(protocol)
             repr(protocol)
 
@@ -50,8 +50,8 @@ class AutodiscoverTest(EWSTest):
 
     def test_autodiscover_failure(self):
         # Empty the cache
-        from exchangelib.autodiscover.cache import _autodiscover_cache
-        _autodiscover_cache.clear()
+        from exchangelib.autodiscover.cache import autodiscover_cache
+        autodiscover_cache.clear()
         with self.assertRaises(ErrorNonExistentMailbox):
             # Test that error is raised with an empty cache
             discover(
@@ -77,47 +77,47 @@ class AutodiscoverTest(EWSTest):
 
     def test_autodiscover_gc(self):
         # This is what Python garbage collection does
-        from exchangelib.autodiscover.cache import _autodiscover_cache
+        from exchangelib.autodiscover.cache import autodiscover_cache
         discover(
             email=self.account.primary_smtp_address,
             credentials=self.account.protocol.credentials,
             retry_policy=self.retry_policy,
         )
-        del _autodiscover_cache
+        del autodiscover_cache
 
     def test_autodiscover_direct_gc(self):
         # This is what Python garbage collection does
-        from exchangelib.autodiscover.cache import _autodiscover_cache
+        from exchangelib.autodiscover.cache import autodiscover_cache
         discover(
             email=self.account.primary_smtp_address,
             credentials=self.account.protocol.credentials,
             retry_policy=self.retry_policy,
         )
-        _autodiscover_cache.__del__()
+        autodiscover_cache.__del__()
 
     @requests_mock.mock(real_http=True)
-    def test_autodiscover_cache(self, m):
+    def testautodiscover_cache(self, m):
         # Empty the cache
-        from exchangelib.autodiscover.cache import _autodiscover_cache
-        _autodiscover_cache.clear()
+        from exchangelib.autodiscover.cache import autodiscover_cache
+        autodiscover_cache.clear()
         cache_key = (self.account.domain, self.account.protocol.credentials)
         # Not cached
-        self.assertNotIn(cache_key, _autodiscover_cache)
+        self.assertNotIn(cache_key, autodiscover_cache)
         discover(
             email=self.account.primary_smtp_address,
             credentials=self.account.protocol.credentials,
             retry_policy=self.retry_policy,
         )
         # Now it's cached
-        self.assertIn(cache_key, _autodiscover_cache)
+        self.assertIn(cache_key, autodiscover_cache)
         # Make sure the cache can be looked by value, not by id(). This is important for multi-threading/processing
         self.assertIn((
             self.account.primary_smtp_address.split('@')[1],
             Credentials(self.account.protocol.credentials.username, self.account.protocol.credentials.password),
             True
-        ), _autodiscover_cache)
+        ), autodiscover_cache)
         # Poison the cache. discover() must survive and rebuild the cache
-        _autodiscover_cache[cache_key] = AutodiscoverProtocol(config=Configuration(
+        autodiscover_cache[cache_key] = AutodiscoverProtocol(config=Configuration(
             service_endpoint='https://example.com/blackhole.asmx',
             credentials=Credentials('leet_user', 'cannaguess'),
             auth_type=NTLM,
@@ -129,7 +129,7 @@ class AutodiscoverTest(EWSTest):
             credentials=self.account.protocol.credentials,
             retry_policy=self.retry_policy,
         )
-        self.assertIn(cache_key, _autodiscover_cache)
+        self.assertIn(cache_key, autodiscover_cache)
 
         # Make sure that the cache is actually used on the second call to discover()
         _orig = exchangelib.autodiscover.legacy._try_autodiscover
@@ -145,7 +145,7 @@ class AutodiscoverTest(EWSTest):
         )
         # Fake that another thread added the cache entry into the persistent storage but we don't have it in our
         # in-memory cache. The cache should work anyway.
-        _autodiscover_cache._protocols.clear()
+        autodiscover_cache._protocols.clear()
         discover(
             email=self.account.primary_smtp_address,
             credentials=self.account.protocol.credentials,
@@ -153,28 +153,28 @@ class AutodiscoverTest(EWSTest):
         )
         exchangelib.autodiscover.legacy._try_autodiscover = _orig
         # Make sure we can delete cache entries even though we don't have it in our in-memory cache
-        _autodiscover_cache._protocols.clear()
-        del _autodiscover_cache[cache_key]
+        autodiscover_cache._protocols.clear()
+        del autodiscover_cache[cache_key]
         # This should also work if the cache does not contain the entry anymore
-        del _autodiscover_cache[cache_key]
+        del autodiscover_cache[cache_key]
 
-    def test_corrupt_autodiscover_cache(self):
+    def test_corruptautodiscover_cache(self):
         # Insert a fake Protocol instance into the cache
-        from exchangelib.autodiscover.cache import _autodiscover_cache
+        from exchangelib.autodiscover.cache import autodiscover_cache
         key = (2, 'foo', 4)
-        _autodiscover_cache[key] = namedtuple('P', ['service_endpoint', 'auth_type', 'retry_policy'])(1, 'bar', 'baz')
+        autodiscover_cache[key] = namedtuple('P', ['service_endpoint', 'auth_type', 'retry_policy'])(1, 'bar', 'baz')
         # Check that it exists. 'in' goes directly to the file
-        self.assertTrue(key in _autodiscover_cache)
+        self.assertTrue(key in autodiscover_cache)
         # Destroy the backing cache file(s)
-        for db_file in glob.glob(_autodiscover_cache._storage_file + '*'):
+        for db_file in glob.glob(autodiscover_cache._storage_file + '*'):
             with open(db_file, 'w') as f:
                 f.write('XXX')
         # Check that we can recover from a destroyed file and that the entry no longer exists
-        self.assertFalse(key in _autodiscover_cache)
+        self.assertFalse(key in autodiscover_cache)
 
     def test_autodiscover_from_account(self):
-        from exchangelib.autodiscover.cache import _autodiscover_cache
-        _autodiscover_cache.clear()
+        from exchangelib.autodiscover.cache import autodiscover_cache
+        autodiscover_cache.clear()
         account = Account(
             primary_smtp_address=self.account.primary_smtp_address,
             config=Configuration(
@@ -188,7 +188,7 @@ class AutodiscoverTest(EWSTest):
         self.assertEqual(account.protocol.service_endpoint.lower(), self.account.protocol.service_endpoint.lower())
         self.assertEqual(account.protocol.version.build, self.account.protocol.version.build)
         # Make sure cache is full
-        self.assertTrue((account.domain, self.account.protocol.credentials, True) in _autodiscover_cache)
+        self.assertTrue((account.domain, self.account.protocol.credentials, True) in autodiscover_cache)
         # Test that autodiscover works with a full cache
         account = Account(
             primary_smtp_address=self.account.primary_smtp_address,
@@ -202,10 +202,10 @@ class AutodiscoverTest(EWSTest):
         self.assertEqual(account.primary_smtp_address, self.account.primary_smtp_address)
         # Test cache manipulation
         key = (account.domain, self.account.protocol.credentials, True)
-        self.assertTrue(key in _autodiscover_cache)
-        del _autodiscover_cache[key]
-        self.assertFalse(key in _autodiscover_cache)
-        del _autodiscover_cache
+        self.assertTrue(key in autodiscover_cache)
+        del autodiscover_cache[key]
+        self.assertFalse(key in autodiscover_cache)
+        del autodiscover_cache
 
     def test_autodiscover_redirect(self):
         # Prime the cache

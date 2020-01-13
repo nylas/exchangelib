@@ -13,7 +13,7 @@ from ..errors import AutoDiscoverFailed, AutoDiscoverRedirect, AutoDiscoverCircu
 from ..protocol import Protocol, RetryPolicy
 from ..transport import DEFAULT_HEADERS
 from ..util import is_xml, post_ratelimited, get_domain, is_valid_hostname
-from .cache import _autodiscover_cache_lock, _autodiscover_cache
+from .cache import autodiscover_cache
 from .properties import Autodiscover
 from .protocol import AutodiscoverProtocol
 
@@ -36,12 +36,12 @@ def discover(email, credentials=None, auth_type=None, retry_policy=None):
     # should be safe.
     autodiscover_key = (domain, credentials)
     # Use lock to guard against multiple threads competing to cache information
-    log.debug('Waiting for _autodiscover_cache_lock')
-    with _autodiscover_cache_lock:
+    log.debug('Waiting for autodiscover_cache lock')
+    with autodiscover_cache:
         # Don't recurse while holding the lock!
-        log.debug('_autodiscover_cache_lock acquired')
-        if autodiscover_key in _autodiscover_cache:
-            protocol = _autodiscover_cache[autodiscover_key]
+        log.debug('autodiscover_cache lock acquired')
+        if autodiscover_key in autodiscover_cache:
+            protocol = autodiscover_cache[autodiscover_key]
             if not isinstance(protocol, AutodiscoverProtocol):
                 raise ValueError('Unexpected autodiscover cache contents: %s' % protocol)
             # Reset auth type and retry policy if we requested non-default values
@@ -55,7 +55,7 @@ def discover(email, credentials=None, auth_type=None, retry_policy=None):
                 return _autodiscover_quick(credentials=credentials, email=email, protocol=protocol)
             except AutoDiscoverFailed:
                 # Autodiscover no longer works with this domain. Clear cache and try again after releasing the lock
-                del _autodiscover_cache[autodiscover_key]
+                del autodiscover_cache[autodiscover_key]
             except AutoDiscoverRedirect as e:
                 log.debug('%s redirects to %s', email, e.redirect_email)
                 if email.lower() == e.redirect_email.lower():
@@ -64,7 +64,7 @@ def discover(email, credentials=None, auth_type=None, retry_policy=None):
                 email = e.redirect_email
         else:
             log.debug('Cache miss for domain %s credentials %s', domain, credentials)
-            log.debug('Cache contents: %s', _autodiscover_cache)
+            log.debug('Cache contents: %s', autodiscover_cache)
             try:
                 # This eventually fills the cache in _autodiscover_hostname
                 return _try_autodiscover(hostname=domain, credentials=credentials, email=email,
@@ -193,13 +193,13 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl, auth_type, ret
         # server for the original domain. Fill cache before re-raising
         log.debug('Adding cache entry for %s (hostname %s)', domain, hostname)
         # We have already acquired the cache lock at this point
-        _autodiscover_cache[(domain, credentials)] = autodiscover_protocol
+        autodiscover_cache[(domain, credentials)] = autodiscover_protocol
         raise
 
     # Cache the final hostname of the autodiscover service so we don't need to autodiscover the same domain again
     log.debug('Adding cache entry for %s (hostname %s, has_ssl %s)', domain, hostname, has_ssl)
     # We have already acquired the cache lock at this point
-    _autodiscover_cache[(domain, credentials)] = autodiscover_protocol
+    autodiscover_cache[(domain, credentials)] = autodiscover_protocol
     # Autodiscover response contains an auth type, but we don't want to spend time here testing if it actually works.
     # Instead of forcing a possibly-wrong auth type, just let Protocol auto-detect the auth type.
     ews_url = ad_response.protocol.ews_url

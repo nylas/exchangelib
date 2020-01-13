@@ -75,6 +75,7 @@ class AutodiscoverCache(object):
     """
     def __init__(self):
         self._protocols = {}  # Mapping from (domain, credentials) to AutodiscoverProtocol
+        self._lock = Lock()
 
     @property
     def _storage_file(self):
@@ -134,6 +135,12 @@ class AutodiscoverCache(object):
             del protocol
         self._protocols.clear()
 
+    def __enter__(self):
+        self._lock.__enter__()
+
+    def __exit__(self, *args, **kwargs):
+        self._lock.__exit__(*args, **kwargs)
+
     def __del__(self):
         # pylint: disable=bare-except
         try:
@@ -146,5 +153,4 @@ class AutodiscoverCache(object):
         return text_type(self._protocols)
 
 
-_autodiscover_cache_lock = Lock()
-_autodiscover_cache = AutodiscoverCache()
+autodiscover_cache = AutodiscoverCache()

@@ -12,21 +12,21 @@ https://docs.microsoft.com/en-us/exchange/client-developer/exchange-web-services
 WARNING: The autodiscover protocol is very complicated. If you have problems autodiscovering using this implementation,
 start by doing an official test at https://testconnectivity.microsoft.com
 """
-from .cache import AutodiscoverCache, _autodiscover_cache, _autodiscover_cache_lock
+from .cache import AutodiscoverCache, autodiscover_cache
 from .legacy import discover
 from .protocol import AutodiscoverProtocol
 
 
 def close_connections():
-    with _autodiscover_cache_lock:
-        _autodiscover_cache.close()
+    with autodiscover_cache:
+        autodiscover_cache.close()
 
 
 def clear_cache():
-    with _autodiscover_cache_lock:
-        _autodiscover_cache.clear()
+    with autodiscover_cache:
+        autodiscover_cache.clear()
 
 
 __all__ = [
-    'AutodiscoverCache', 'discover', 'AutodiscoverProtocol', 'close_connections', 'clear_cache'
+    'AutodiscoverCache', 'AutodiscoverProtocol', 'discover', 'close_connections', 'clear_cache'
 ]
