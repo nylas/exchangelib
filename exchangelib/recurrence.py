@@ -34,9 +34,9 @@ class AbsoluteYearlyPattern(Pattern):
     FIELDS = [
         # The day of month of an occurrence, in range 1 -> 31. If a particular month has less days than the day_of_month
         # value, the last day in the month is assumed
-        IntegerField('day_of_month', field_uri='t:DayOfMonth', min=1, max=31, is_required=True),
+        IntegerField('day_of_month', field_uri='DayOfMonth', min=1, max=31, is_required=True),
         # The month of the year, from 1 - 12
-        EnumField('month', field_uri='t:Month', enum=MONTHS, is_required=True),
+        EnumField('month', field_uri='Month', enum=MONTHS, is_required=True),
     ]
 
     __slots__ = tuple(f.name for f in FIELDS)
@@ -54,12 +54,12 @@ class RelativeYearlyPattern(Pattern):
         # The weekday of the occurrence, as a valid ISO 8601 weekday number in range 1 -> 7 (1 being Monday).
         # Alternatively, the weekday can be one of the DAY (or 8), WEEK_DAY (or 9) or WEEKEND_DAY (or 10) consts which
         # is interpreted as the first day, weekday, or weekend day in the month, respectively.
-        EnumField('weekday', field_uri='t:DaysOfWeek', enum=WEEKDAYS, is_required=True),
+        EnumField('weekday', field_uri='DaysOfWeek', enum=WEEKDAYS, is_required=True),
         # Week number of the month, in range 1 -> 5. If 5 is specified, this assumes the last week of the month for
         # months that have only 4 weeks
-        EnumField('week_number', field_uri='t:DayOfWeekIndex', enum=WEEK_NUMBERS, is_required=True),
+        EnumField('week_number', field_uri='DayOfWeekIndex', enum=WEEK_NUMBERS, is_required=True),
         # The month of the year, from 1 - 12
-        EnumField('month', field_uri='t:Month', enum=MONTHS, is_required=True),
+        EnumField('month', field_uri='Month', enum=MONTHS, is_required=True),
     ]
 
     __slots__ = tuple(f.name for f in FIELDS)
@@ -79,10 +79,10 @@ class AbsoluteMonthlyPattern(Pattern):
 
     FIELDS = [
         # Interval, in months, in range 1 -> 99
-        IntegerField('interval', field_uri='t:Interval', min=1, max=99, is_required=True),
+        IntegerField('interval', field_uri='Interval', min=1, max=99, is_required=True),
         # The day of month of an occurrence, in range 1 -> 31. If a particular month has less days than the day_of_month
         # value, the last day in the month is assumed
-        IntegerField('day_of_month', field_uri='t:DayOfMonth', min=1, max=31, is_required=True),
+        IntegerField('day_of_month', field_uri='DayOfMonth', min=1, max=31, is_required=True),
     ]
 
     __slots__ = tuple(f.name for f in FIELDS)
@@ -98,14 +98,14 @@ class RelativeMonthlyPattern(Pattern):
 
     FIELDS = [
         # Interval, in months, in range 1 -> 99
-        IntegerField('interval', field_uri='t:Interval', min=1, max=99, is_required=True),
+        IntegerField('interval', field_uri='Interval', min=1, max=99, is_required=True),
         # The weekday of the occurrence, as a valid ISO 8601 weekday number in range 1 -> 7 (1 being Monday).
         # Alternatively, the weekday can be one of the DAY (or 8), WEEK_DAY (or 9) or WEEKEND_DAY (or 10) consts which
         # is interpreted as the first day, weekday, or weekend day in the month, respectively.
-        EnumField('weekday', field_uri='t:DaysOfWeek', enum=WEEKDAYS, is_required=True),
+        EnumField('weekday', field_uri='DaysOfWeek', enum=WEEKDAYS, is_required=True),
         # Week number of the month, in range 1 -> 5. If 5 is specified, this assumes the last week of the month for
         # months that have only 4 weeks.
-        EnumField('week_number', field_uri='t:DayOfWeekIndex', enum=WEEK_NUMBERS, is_required=True),
+        EnumField('week_number', field_uri='DayOfWeekIndex', enum=WEEK_NUMBERS, is_required=True),
     ]
 
     __slots__ = tuple(f.name for f in FIELDS)
@@ -125,11 +125,11 @@ class WeeklyPattern(Pattern):
 
     FIELDS = [
         # Interval, in weeks, in range 1 -> 99
-        IntegerField('interval', field_uri='t:Interval', min=1, max=99, is_required=True),
+        IntegerField('interval', field_uri='Interval', min=1, max=99, is_required=True),
         # List of valid ISO 8601 weekdays, as list of numbers in range 1 -> 7 (1 being Monday)
-        EnumListField('weekdays', field_uri='t:DaysOfWeek', enum=WEEKDAYS, is_required=True),
+        EnumListField('weekdays', field_uri='DaysOfWeek', enum=WEEKDAYS, is_required=True),
         # The first day of the week. Defaults to Monday
-        EnumField('first_day_of_week', field_uri='t:FirstDayOfWeek', enum=WEEKDAYS, default=1, is_required=True),
+        EnumField('first_day_of_week', field_uri='FirstDayOfWeek', enum=WEEKDAYS, default=1, is_required=True),
     ]
 
     __slots__ = tuple(f.name for f in FIELDS)
@@ -153,7 +153,7 @@ class DailyPattern(Pattern):
 
     FIELDS = [
         # Interval, in days, in range 1 -> 999
-        IntegerField('interval', field_uri='t:Interval', min=1, max=999, is_required=True),
+        IntegerField('interval', field_uri='Interval', min=1, max=999, is_required=True),
     ]
 
     __slots__ = tuple(f.name for f in FIELDS)
@@ -174,7 +174,7 @@ class NoEndPattern(Boundary):
 
     FIELDS = [
         # Start date, as EWSDate
-        DateField('start', field_uri='t:StartDate', is_required=True),
+        DateField('start', field_uri='StartDate', is_required=True),
     ]
 
     __slots__ = tuple(f.name for f in FIELDS)
@@ -187,9 +187,9 @@ class EndDatePattern(Boundary):
 
     FIELDS = [
         # Start date, as EWSDate
-        DateField('start', field_uri='t:StartDate', is_required=True),
+        DateField('start', field_uri='StartDate', is_required=True),
         # End date, as EWSDate
-        DateField('end', field_uri='t:EndDate', is_required=True),
+        DateField('end', field_uri='EndDate', is_required=True),
     ]
 
     __slots__ = tuple(f.name for f in FIELDS)
@@ -201,9 +201,9 @@ class NumberedPattern(Boundary):
 
     FIELDS = [
         # Start date, as EWSDate
-        DateField('start', field_uri='t:StartDate', is_required=True),
+        DateField('start', field_uri='StartDate', is_required=True),
         # The number of occurrences in this pattern, in range 1 -> 999
-        IntegerField('number', field_uri='t:NumberOfOccurrences', min=1, max=999, is_required=True),
+        IntegerField('number', field_uri='NumberOfOccurrences', min=1, max=999, is_required=True),
     ]
 
     __slots__ = tuple(f.name for f in FIELDS)
@@ -215,11 +215,11 @@ class Occurrence(IdChangeKeyMixIn):
 
     LOCAL_FIELDS = [
         # The modified start time of the item, as EWSDateTime
-        DateTimeField('start', field_uri='t:Start'),
+        DateTimeField('start', field_uri='Start'),
         # The modified end time of the item, as EWSDateTime
-        DateTimeField('end', field_uri='t:End'),
+        DateTimeField('end', field_uri='End'),
         # The original start time of the item, as EWSDateTime
-        DateTimeField('original_start', field_uri='t:OriginalStart'),
+        DateTimeField('original_start', field_uri='OriginalStart'),
     ]
     FIELDS = IdChangeKeyMixIn.FIELDS + LOCAL_FIELDS
 
@@ -249,7 +249,7 @@ class DeletedOccurrence(EWSElement):
 
     FIELDS = [
         # The modified start time of the item, as EWSDateTime
-        DateTimeField('start', field_uri='t:Start'),
+        DateTimeField('start', field_uri='Start'),
     ]
 
     __slots__ = tuple(f.name for f in FIELDS)
