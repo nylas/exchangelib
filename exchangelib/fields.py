@@ -1300,14 +1300,13 @@ class BuildField(CharField):
         super(BuildField, self).__init__(*args, **kwargs)
         self.value_cls = Build
 
-    def from_xml(self, *args, **kwargs):
-        val = super(BuildField, self).from_xml(*args, **kwargs)
+    def from_xml(self, elem, account):
+        val = super(BuildField, self).from_xml(elem=elem, account=account)
         if val:
             try:
                 return self.value_cls.from_hex_string(val)
             except (TypeError, ValueError):
                 log.warning('Invalid server version string: %r', val)
-                pass
         return val
 
 
