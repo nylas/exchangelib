@@ -106,6 +106,24 @@ class Build(PickleMixIn):
             kwargs[k] = int(v)  # Also raises ValueError
         return cls(**kwargs)
 
+    @classmethod
+    def from_hex_string(cls, s):
+        """Parse a server version string as returned in an autodiscover response. The process is described here:
+        https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/serverversion-pox#example
+
+        The string is a hex string that, converted to a 32-bit binary, encodes the server version. The rules are:
+            * The first 4 bits contain the version number structure version. Can be ignored
+            * The next 6 bits contain the major version number
+            * The next 6 bits contain the minor version number
+            * The next bit contains a flag. Can be ignored
+            * The next 15 bits contain the major build number
+        """
+        bin_s = '{:032b}'.format(int(s, 16))  # Convert string to 32-bit binary string
+        major_version = int(bin_s[4:10], 2)
+        minor_version = int(bin_s[10:16], 2)
+        build_number = int(bin_s[17:32], 2)
+        return cls(major_version=major_version, minor_version=minor_version, major_build=build_number)
+
     def api_version(self):
         if EXCHANGE_2013_SP1 <= self < EXCHANGE_2016:
             return 'Exchange2013_SP1'

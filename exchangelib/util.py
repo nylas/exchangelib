@@ -63,6 +63,9 @@ SOAPNS = 'http://schemas.xmlsoap.org/soap/envelope/'
 MNS = 'http://schemas.microsoft.com/exchange/services/2006/messages'
 TNS = 'http://schemas.microsoft.com/exchange/services/2006/types'
 ENS = 'http://schemas.microsoft.com/exchange/services/2006/errors'
+AUTODISCOVER_BASE_NS = 'http://schemas.microsoft.com/exchange/autodiscover/responseschema/2006'
+AUTODISCOVER_REQUEST_NS = 'http://schemas.microsoft.com/exchange/autodiscover/outlook/requestschema/2006'
+AUTODISCOVER_RESPONSE_NS = 'http://schemas.microsoft.com/exchange/autodiscover/outlook/responseschema/2006a'
 
 ns_translation = OrderedDict([
     ('s', SOAPNS),

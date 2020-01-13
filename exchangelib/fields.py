@@ -1292,3 +1292,31 @@ class EffectiveRightsField(EWSElementField):
         from .properties import EffectiveRights
         kwargs['value_cls'] = EffectiveRights
         super(EffectiveRightsField, self).__init__(*args, **kwargs)
+
+
+class BuildField(CharField):
+    def __init__(self, *args, **kwargs):
+        from .version import Build
+        super(BuildField, self).__init__(*args, **kwargs)
+        self.value_cls = Build
+
+    def from_xml(self, *args, **kwargs):
+        val = super(BuildField, self).from_xml(*args, **kwargs)
+        if val:
+            try:
+                return self.value_cls.from_hex_string(val)
+            except (TypeError, ValueError):
+                log.warning('Invalid server version string: %r', val)
+                pass
+        return val
+
+
+class ProtocolListField(EWSElementListField):
+    # There is not containing element for this field. Just multiple 'Protocol' elements on the 'Account' element.
+    def __init__(self, *args, **kwargs):
+        from .autodiscover import ProtocolElement
+        kwargs['value_cls'] = ProtocolElement
+        super(ProtocolListField, self).__init__(*args, **kwargs)
+
+    def from_xml(self, elem, account):
+        return [self.value_cls.from_xml(elem=e, account=account) for e in elem.findall(self.value_cls.response_tag())]
