@@ -33,7 +33,6 @@ class BaseCredentials(object):
     __metaclass__ = abc.ABCMeta
 
     def __init__(self):
-        super(BaseCredentials, self).__init__()
         self._lock = RLock()
 
     @property
@@ -55,6 +54,29 @@ class BaseCredentials(object):
             + 'See class documentation on automatic refreshing, or subclass and implement refresh().'
         )
 
+    def __eq__(self, other):
+        for k in self.__dict__.keys():
+            if k == '_lock':
+                continue
+            if getattr(self, k) != getattr(other, k):
+                print('%r != %r' % (getattr(self, k), getattr(other, k)))
+                return False
+        return True
+
+    def __hash__(self):
+        return hash(tuple(getattr(self, k) for k in self.__dict__.keys()))
+
+    def __getstate__(self):
+        # The lock cannot be pickled
+        state = self.__dict__.copy()
+        del state['_lock']
+        return state
+
+    def __setstate__(self, state):
+        # Restore the lock
+        self.__dict__.update(state)
+        self._lock = RLock()
+
 
 @python_2_unicode_compatible
 class Credentials(BaseCredentials, PickleMixIn):
@@ -72,8 +94,6 @@ class Credentials(BaseCredentials, PickleMixIn):
     DOMAIN = 'domain'
     UPN = 'upn'
 
-    __slots__ = ('username', 'password', 'type')
-
     def __init__(self, username, password):
         super(Credentials, self).__init__()
         if username.count('@') == 1:
@@ -84,15 +104,6 @@ class Credentials(BaseCredentials, PickleMixIn):
             self.type = self.UPN
         self.username = username
         self.password = password
-
-    def __eq__(self, other):
-        for k in self.__slots__:
-            if getattr(self, k) != getattr(other, k):
-                return False
-        return True
-
-    def __hash__(self):
-        return hash((self.username, self.password))
 
     def __repr__(self):
         return self.__class__.__name__ + repr((self.username, '********'))
@@ -118,7 +129,6 @@ class OAuth2Credentials(BaseCredentials, PickleMixIn):
     :param client_secret: Secret associated with the OAuth application
     :param tenant_id: Microsoft tenant ID of the account to access
     """
-    __slots__ = ('client_id', 'client_secret', 'tenant_id')
 
     def __init__(self, client_id, client_secret, tenant_id):
         super(OAuth2Credentials, self).__init__()
@@ -146,15 +156,6 @@ class OAuth2Credentials(BaseCredentials, PickleMixIn):
         # being created, which could cause a race
         with self.lock:
             self.access_token = access_token
-
-    def __eq__(self, other):
-        for k in self.__slots__:
-            if getattr(self, k) != getattr(other, k):
-                return False
-        return True
-
-    def __hash__(self):
-        return hash((self.client_id, self.client_secret, self.tenant_id))
 
     def __repr__(self):
         return self.__class__.__name__ + repr((self.client_id, '********'))
@@ -193,28 +194,20 @@ class OAuth2AuthorizationCodeCredentials(OAuth2Credentials, PickleMixIn):
         exists and the application will handle refreshing by itself (or
         opts not to handle it), this parameter alone is sufficient.
     """
-    __slots__ = ('access_token', 'authorization_code')
 
     def __init__(self, client_id=None, client_secret=None, authorization_code=None, access_token=None):
         super(OAuth2AuthorizationCodeCredentials, self).__init__(client_id, client_secret, tenant_id=None)
-        self.access_token = access_token
         self.authorization_code = authorization_code
-
-    def __eq__(self, other):
-        for k in self.__slots__:
-            if getattr(self, k) != getattr(other, k):
-                return False
-        return True
-
-    def __hash__(self):
-        return hash((self.access_token['access_token'], self.authorization_code))
+        self.access_token = access_token
 
     def __repr__(self):
-        return self.__class__.__name__ + ' ' + str(self)
+        return self.__class__.__name__ + repr(
+            (self.client_id, '[client_secret]', '[authorization_code]', '[access_token]')
+        )
 
     def __str__(self):
         client_id = self.client_id
         credential = '[access_token]' if self.access_token is not None else \
-            ('[authorization code]' if self.authorization_code is not None else None)
+            ('[authorization_code]' if self.authorization_code is not None else None)
         description = ' '.join(filter(None, [client_id, credential]))
         return description or '[underspecified credentials]'

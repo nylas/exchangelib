@@ -93,14 +93,14 @@ class AccountTest(EWSTest):
         attachment = FileAttachment(name='pickle_me.txt', content=b'')
         try:
             for o in (
-                item,
-                attachment,
+                Credentials('XXX', 'YYY'),
+                FaultTolerance(max_wait=3600),
                 self.account.protocol,
+                attachment,
                 self.account.root,
                 self.account.inbox,
                 self.account,
-                Credentials('XXX', 'YYY'),
-                FaultTolerance(max_wait=3600),
+                item,
             ):
                 pickled_o = pickle.dumps(o)
                 unpickled_o = pickle.loads(pickled_o)
