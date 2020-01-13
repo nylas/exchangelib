@@ -711,7 +711,7 @@ class Account(AutodiscoverBase):
     SETTINGS = 'settings'
     ACTIONS = (REDIRECT_URL, REDIRECT_ADDR, SETTINGS)
     FIELDS = [
-        ChoiceField('type', field_uri='AccountType', namespace=RNS, choices={Choice('email'),}),
+        ChoiceField('type', field_uri='AccountType', namespace=RNS, choices={Choice('email')}),
         ChoiceField('action', field_uri='Action', namespace=RNS, choices={Choice(p) for p in ACTIONS}),
         BooleanField('microsoft_online', field_uri='MicrosoftOnline', namespace=RNS),
         TextField('redirect_url', field_uri='RedirectURL', namespace=RNS),
