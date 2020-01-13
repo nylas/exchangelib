@@ -105,6 +105,10 @@ class Credentials(BaseCredentials, PickleMixIn):
         self.username = username
         self.password = password
 
+    def refresh(self, session):
+        # Needed for PY2
+        pass
+
     def __repr__(self):
         return self.__class__.__name__ + repr((self.username, '********'))
 
