@@ -399,7 +399,7 @@ class BooleanField(FieldURIField):
                 return {
                     self.true_val: True,
                     self.false_val: False,
-                }[val]
+                }[val.lower()]
             except KeyError:
                 log.warning("Cannot convert value '%s' on field '%s' to type %s", val, self.name, self.value_cls)
                 return None

@@ -676,8 +676,8 @@ class Error(EWSElement):
     FIELDS = [
         TextField('id', field_uri='Id', namespace=AUTODISCOVER_BASE_NS, is_attribute=True),
         TextField('time', field_uri='Time', namespace=AUTODISCOVER_BASE_NS, is_attribute=True),
-        TextField('code', field_uri='ErrorCode', namespace=AUTODISCOVER_BASE_NS, is_required=True),
-        TextField('message', field_uri='Message', namespace=AUTODISCOVER_BASE_NS, is_required=True),
+        TextField('code', field_uri='ErrorCode', namespace=AUTODISCOVER_BASE_NS),
+        TextField('message', field_uri='Message', namespace=AUTODISCOVER_BASE_NS),
         TextField('debug_data', field_uri='DebugData', namespace=AUTODISCOVER_BASE_NS),
     ]
     __slots__ = tuple(f.name for f in FIELDS)
