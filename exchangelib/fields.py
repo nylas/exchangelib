@@ -387,18 +387,30 @@ class FieldURIField(Field):
 class BooleanField(FieldURIField):
     value_cls = bool
 
+    def __init__(self, *args, **kwargs):
+        self.true_val = kwargs.pop('true_val', 'true')
+        self.false_val = kwargs.pop('false_val', 'false')
+        super(BooleanField, self).__init__(*args, **kwargs)
+
     def from_xml(self, elem, account):
         val = self._get_val_from_elem(elem)
         if val is not None:
             try:
                 return {
-                    'true': True,
-                    'false': False,
+                    self.true_val: True,
+                    self.false_val: False,
                 }[val]
             except KeyError:
                 log.warning("Cannot convert value '%s' on field '%s' to type %s", val, self.name, self.value_cls)
                 return None
         return self.default
+
+
+class OnOffField(BooleanField):
+    def __init__(self, *args, **kwargs):
+        kwargs['true_val'] = 'on'
+        kwargs['false_val'] = 'off'
+        super(OnOffField, self).__init__(*args, **kwargs)
 
 
 class IntegerField(FieldURIField):
