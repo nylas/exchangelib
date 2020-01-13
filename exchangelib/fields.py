@@ -338,10 +338,9 @@ class Field(object):
 
 
 class FieldURIField(Field):
-    namespace = TNS
-
     def __init__(self, *args, **kwargs):
         self.field_uri = kwargs.pop('field_uri', None)
+        self.namespace = kwargs.pop('namespace', TNS)
         super(FieldURIField, self).__init__(*args, **kwargs)
         # See all valid FieldURI values at
         # https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/fielduri
@@ -860,6 +859,7 @@ class BodyField(TextField):
 class EWSElementField(FieldURIField):
     def __init__(self, *args, **kwargs):
         self.value_cls = kwargs.pop('value_cls')
+        kwargs['namespace'] = kwargs.get('namespace', self.value_cls.NAMESPACE)
         super(EWSElementField, self).__init__(*args, **kwargs)
 
     def from_xml(self, elem, account):
@@ -1141,9 +1141,8 @@ class IndexedField(EWSElementField):
         # Callers must call field_uri_xml() on the subfield
         raise NotImplementedError()
 
-    @classmethod
-    def response_tag(cls):
-        return '{%s}%s' % (cls.namespace, cls.PARENT_ELEMENT_NAME)
+    def response_tag(self):
+        return '{%s}%s' % (self.namespace, self.PARENT_ELEMENT_NAME)
 
     def __hash__(self):
         return hash(self.field_uri)
