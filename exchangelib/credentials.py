@@ -64,7 +64,7 @@ class BaseCredentials(object):
         return True
 
     def __hash__(self):
-        return hash(tuple(getattr(self, k) for k in self.__dict__.keys()))
+        return hash(tuple(getattr(self, k) for k in self.__dict__.keys() if k != '_lock'))
 
     def __getstate__(self):
         # The lock cannot be pickled
