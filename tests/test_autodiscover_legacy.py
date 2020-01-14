@@ -9,7 +9,7 @@ import dns
 import requests_mock
 
 import exchangelib.autodiscover.legacy
-from exchangelib import discover, Credentials, NTLM, FailFast, Configuration, Account
+from exchangelib import Credentials, NTLM, FailFast, Configuration, Account
 from exchangelib.autodiscover import close_connections, clear_cache, AutodiscoverProtocol
 from exchangelib.errors import ErrorNonExistentMailbox, AutoDiscoverRedirect, AutoDiscoverCircularRedirect, \
     AutoDiscoverFailed
@@ -18,16 +18,16 @@ from exchangelib.protocol import BaseProtocol, NoVerifyHTTPAdapter, FaultToleran
 from .common import EWSTest
 
 
-class AutodiscoverTest(EWSTest):
+class AutodiscoverLegacyTest(EWSTest):
     @classmethod
     def setUpClass(cls):
-        super(AutodiscoverTest, cls).setUpClass()
+        super(AutodiscoverLegacyTest, cls).setUpClass()
         AutodiscoverProtocol.INITIAL_RETRY_POLICY = FaultTolerance(max_wait=30)
 
     def test_magic(self):
         # Just test we don't fail
         from exchangelib.autodiscover.cache import autodiscover_cache
-        discover(
+        exchangelib.autodiscover.legacy.discover(
             email=self.account.primary_smtp_address,
             credentials=self.account.protocol.credentials,
             retry_policy=self.retry_policy,
@@ -39,7 +39,7 @@ class AutodiscoverTest(EWSTest):
             repr(protocol)
 
     def test_autodiscover(self):
-        ad_response, protocol = discover(
+        ad_response, protocol = exchangelib.autodiscover.legacy.discover(
             email=self.account.primary_smtp_address,
             credentials=self.account.protocol.credentials,
             retry_policy=self.retry_policy,
@@ -54,21 +54,21 @@ class AutodiscoverTest(EWSTest):
         autodiscover_cache.clear()
         with self.assertRaises(ErrorNonExistentMailbox):
             # Test that error is raised with an empty cache
-            discover(
+            exchangelib.autodiscover.legacy.discover(
                 email='XXX.' + self.account.primary_smtp_address,
                 credentials=self.account.protocol.credentials,
                 retry_policy=self.retry_policy,
             )
         with self.assertRaises(ErrorNonExistentMailbox):
             # Test that error is raised with a full cache
-            discover(
+            exchangelib.autodiscover.legacy.discover(
                 email='XXX.' + self.account.primary_smtp_address,
                 credentials=self.account.protocol.credentials,
                 retry_policy=self.retry_policy,
             )
 
     def test_close_autodiscover_connections(self):
-        discover(
+        exchangelib.autodiscover.legacy.discover(
             email=self.account.primary_smtp_address,
             credentials=self.account.protocol.credentials,
             retry_policy=self.retry_policy,
@@ -78,7 +78,7 @@ class AutodiscoverTest(EWSTest):
     def test_autodiscover_gc(self):
         # This is what Python garbage collection does
         from exchangelib.autodiscover.cache import autodiscover_cache
-        discover(
+        exchangelib.autodiscover.legacy.discover(
             email=self.account.primary_smtp_address,
             credentials=self.account.protocol.credentials,
             retry_policy=self.retry_policy,
@@ -88,7 +88,7 @@ class AutodiscoverTest(EWSTest):
     def test_autodiscover_direct_gc(self):
         # This is what Python garbage collection does
         from exchangelib.autodiscover.cache import autodiscover_cache
-        discover(
+        exchangelib.autodiscover.legacy.discover(
             email=self.account.primary_smtp_address,
             credentials=self.account.protocol.credentials,
             retry_policy=self.retry_policy,
@@ -103,7 +103,7 @@ class AutodiscoverTest(EWSTest):
         cache_key = (self.account.domain, self.account.protocol.credentials)
         # Not cached
         self.assertNotIn(cache_key, autodiscover_cache)
-        discover(
+        exchangelib.autodiscover.legacy.discover(
             email=self.account.primary_smtp_address,
             credentials=self.account.protocol.credentials,
             retry_policy=self.retry_policy,
@@ -124,7 +124,7 @@ class AutodiscoverTest(EWSTest):
             retry_policy=FailFast(),
         ))
         m.post('https://example.com/blackhole.asmx', status_code=404)
-        discover(
+        exchangelib.autodiscover.legacy.discover(
             email=self.account.primary_smtp_address,
             credentials=self.account.protocol.credentials,
             retry_policy=self.retry_policy,
@@ -138,7 +138,7 @@ class AutodiscoverTest(EWSTest):
             raise NotImplementedError()
 
         exchangelib.autodiscover.legacy._try_autodiscover = _mock
-        discover(
+        exchangelib.autodiscover.legacy.discover(
             email=self.account.primary_smtp_address,
             credentials=self.account.protocol.credentials,
             retry_policy=self.retry_policy,
@@ -146,7 +146,7 @@ class AutodiscoverTest(EWSTest):
         # Fake that another thread added the cache entry into the persistent storage but we don't have it in our
         # in-memory cache. The cache should work anyway.
         autodiscover_cache._protocols.clear()
-        discover(
+        exchangelib.autodiscover.legacy.discover(
             email=self.account.primary_smtp_address,
             credentials=self.account.protocol.credentials,
             retry_policy=self.retry_policy,
@@ -158,7 +158,7 @@ class AutodiscoverTest(EWSTest):
         # This should also work if the cache does not contain the entry anymore
         del autodiscover_cache[cache_key]
 
-    def test_corruptautodiscover_cache(self):
+    def test_corrupt_autodiscover_cache(self):
         # Insert a fake Protocol instance into the cache
         from exchangelib.autodiscover.cache import autodiscover_cache
         key = (2, 'foo', 4)
@@ -209,7 +209,7 @@ class AutodiscoverTest(EWSTest):
 
     def test_autodiscover_redirect(self):
         # Prime the cache
-        ad_response, p = discover(
+        ad_response, p = exchangelib.autodiscover.legacy.discover(
             email=self.account.primary_smtp_address,
             credentials=self.account.protocol.credentials,
             retry_policy=self.retry_policy,
@@ -222,7 +222,7 @@ class AutodiscoverTest(EWSTest):
             tmp = namedtuple('tmp', ('autodiscover_smtp_address',))
             return tmp(autodiscover_smtp_address='john@example.com'), p
         exchangelib.autodiscover.legacy._autodiscover_quick = _mock1
-        ad_response, p = discover(
+        ad_response, p = exchangelib.autodiscover.legacy.discover(
             email=self.account.primary_smtp_address,
             credentials=self.account.protocol.credentials,
             retry_policy=self.retry_policy,
@@ -239,7 +239,7 @@ class AutodiscoverTest(EWSTest):
             raise AutoDiscoverRedirect(redirect_email='xxxxxx@'+self.account.domain)
         exchangelib.autodiscover.legacy._autodiscover_quick = _mock2
         with self.assertRaises(ErrorNonExistentMailbox):
-            discover(
+            exchangelib.autodiscover.legacy.discover(
                 email=self.account.primary_smtp_address,
                 credentials=self.account.protocol.credentials,
                 retry_policy=self.retry_policy,
@@ -251,7 +251,7 @@ class AutodiscoverTest(EWSTest):
 
         exchangelib.autodiscover.legacy._autodiscover_quick = _mock3
         with self.assertRaises(AutoDiscoverCircularRedirect):
-            discover(
+            exchangelib.autodiscover.legacy.discover(
                 email=self.account.primary_smtp_address,
                 credentials=self.account.protocol.credentials,
                 retry_policy=self.retry_policy,
@@ -267,7 +267,7 @@ class AutodiscoverTest(EWSTest):
         exchangelib.autodiscover.legacy._try_autodiscover = _mock4
         clear_cache()
         with self.assertRaises(AutoDiscoverCircularRedirect):
-            discover(
+            exchangelib.autodiscover.legacy.discover(
                 email=self.account.primary_smtp_address,
                 credentials=self.account.protocol.credentials,
                 retry_policy=self.retry_policy,
@@ -284,7 +284,7 @@ class AutodiscoverTest(EWSTest):
         exchangelib.autodiscover.legacy._try_autodiscover = _mock5
         clear_cache()
         with self.assertRaises(ErrorNonExistentMailbox):
-            discover(
+            exchangelib.autodiscover.legacy.discover(
                 email=self.account.primary_smtp_address,
                 credentials=self.account.protocol.credentials,
                 retry_policy=self.retry_policy,
@@ -435,7 +435,7 @@ class AutodiscoverTest(EWSTest):
 
         # A normal discover should succeed
         clear_cache()
-        discover(
+        exchangelib.autodiscover.legacy.discover(
             email=self.account.primary_smtp_address,
             credentials=self.account.protocol.credentials,
             retry_policy=self.retry_policy,
@@ -475,7 +475,7 @@ r5p9FrBgavAw5bKO54C0oQKpN/5fta5l6Ws0
                 # Now discover should fail. TLS errors mean we exhaust all autodiscover attempts
                 with self.assertRaises(AutoDiscoverFailed):
                     clear_cache()
-                    discover(
+                    exchangelib.autodiscover.legacy.discover(
                         email=self.account.primary_smtp_address,
                         credentials=self.account.protocol.credentials,
                         retry_policy=self.retry_policy,
@@ -487,7 +487,7 @@ r5p9FrBgavAw5bKO54C0oQKpN/5fta5l6Ws0
                     # Make sure we can survive TLS validation errors when using the custom adapter
                     clear_cache()
                     BaseProtocol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
-                    discover(
+                    exchangelib.autodiscover.legacy.discover(
                         email=self.account.primary_smtp_address,
                         credentials=self.account.protocol.credentials,
                         retry_policy=self.retry_policy,
@@ -496,7 +496,7 @@ r5p9FrBgavAw5bKO54C0oQKpN/5fta5l6Ws0
                     # Test that the custom adapter also works when validation is OK again
                     del os.environ['REQUESTS_CA_BUNDLE']
                     clear_cache()
-                    discover(
+                    exchangelib.autodiscover.legacy.discover(
                         email=self.account.primary_smtp_address,
                         credentials=self.account.protocol.credentials,
                         retry_policy=self.retry_policy,
