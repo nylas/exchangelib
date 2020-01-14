@@ -150,6 +150,23 @@ class Protocol(AutodiscoverBase):
     ]
     __slots__ = tuple(f.name for f in FIELDS)
 
+    @property
+    def auth_type(self):
+        # Translates 'auth_package' value to our own 'auth_type' enum vals
+        from ..transport import NOAUTH, NTLM, BASIC, GSSAPI, SSPI
+        if not self.auth_required:
+            return NOAUTH
+        return {
+            # Missing in list are DIGEST and OAUTH2
+            'basic': BASIC,
+            'kerb': GSSAPI,
+            'kerbntlm': NTLM,  # Means client can chose between NTLM and GSSAPI
+            'ntlm': NTLM,
+            # 'certificate' is not supported by us
+            'negotiate': SSPI,  # Unsure about this one
+            'nego2': GSSAPI,
+            'anonymous': NOAUTH,  # Seen in some docs even though it's not mentioned in MSDN
+        }.get(self.auth_package.lower(), NTLM)  # Default to NTLM
 
 class Error(EWSElement):
     """MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/error-pox"""
