@@ -257,16 +257,16 @@ class Response(AutodiscoverBase):
 
     @property
     def protocol(self):
-        # There are three possible protocol types: EXCH, EXPR and WEB.
-        # EXPR is meant for EWS. See
-        # https://techcommunity.microsoft.com/t5/Exchange-Team-Blog/The-Autodiscover-Service-and-Outlook-Providers-how-does-this/ba-p/584403
+        # There are three possible protocol types: EXCH, EXPR and WEB. EXPR is meant for EWS. See
+        # https://techcommunity.microsoft.com/t5/blogs/blogarticleprintpage/blog-id/Exchange/article-id/16
         # We allow fallback to EXCH if EXPR is not available, to support installations where EXPR is not available.
         protocols = {p.type: p for p in self.account.protocols}
-        try:
-            return protocols.get('EXPR', protocols['EXCH'])
-        except KeyError:
-            # Neither type was found. Give up
-            raise ValueError('No valid protocols in response')
+        if 'EXPR' in protocols:
+            return protocols['EXPR']
+        if 'EXCH' in protocols:
+            return protocols['EXCH']
+        # Neither type was found. Give up
+        raise ValueError('No valid protocols in response: %s' % self.account.protocols)
 
 
 class ErrorResponse(EWSElement):
