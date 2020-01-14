@@ -8,7 +8,7 @@ import os
 import shelve
 import sys
 import tempfile
-from threading import Lock
+from threading import RLock
 
 from future.utils import PY2, python_2_unicode_compatible
 from six import text_type
@@ -75,7 +75,7 @@ class AutodiscoverCache(object):
     """
     def __init__(self):
         self._protocols = {}  # Mapping from (domain, credentials) to AutodiscoverProtocol
-        self._lock = Lock()
+        self._lock = RLock()
 
     @property
     def _storage_file(self):
