@@ -268,10 +268,7 @@ def _parse_response(bytes_content):
     except ValueError as e:
         raise AutoDiscoverFailed(str(e))
     if ad.response is None:
-        try:
-            ad.raise_errors()
-        except ValueError as e:
-            raise AutoDiscoverFailed(str(e))
+        ad.raise_errors()
     ad_response = ad.response
     if ad_response.redirect_address:
         # This is redirection to e.g. Office365

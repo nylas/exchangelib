@@ -1,6 +1,6 @@
 from __future__ import unicode_literals
 
-from ..errors import ErrorNonExistentMailbox
+from ..errors import ErrorNonExistentMailbox, AutoDiscoverFailed
 from ..fields import TextField, EmailAddressField, ChoiceField, Choice, EWSElementField, OnOffField, BooleanField, \
     IntegerField, BuildField, ProtocolListField
 from ..properties import EWSElement
@@ -301,9 +301,9 @@ class Autodiscover(EWSElement):
             message = self.error_response.error.message
             if message in ('The e-mail address cannot be found.', "The email address can't be found."):
                 raise ErrorNonExistentMailbox('The SMTP address has no mailbox associated with it')
-            raise ValueError('Unknown error %s: %s' % (errorcode, message))
+            raise AutoDiscoverFailed('Unknown error %s: %s' % (errorcode, message))
         except AttributeError:
-            raise ValueError('Unknown autodiscover error response: %s' % self)
+            raise AutoDiscoverFailed('Unknown autodiscover error response: %s' % self)
 
     @staticmethod
     def payload(email):
