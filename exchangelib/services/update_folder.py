@@ -23,6 +23,7 @@ class UpdateFolder(EWSAccountService):
     @staticmethod
     def _sort_fieldnames(folder_model, fieldnames):
         # Take a list of fieldnames and return the fields in the order they are mentioned in folder_model.FIELDS.
+        # Loop over FIELDS and not supported_fields(). Upstream should make sure not to update a non-supported field.
         for f in folder_model.FIELDS:
             if f.name in fieldnames:
                 yield f.name
