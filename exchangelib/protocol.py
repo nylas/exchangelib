@@ -396,10 +396,6 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
         self.version_hint = None
         super(Protocol, self).__init__(*args, **kwargs)
 
-        if not self.config.version:
-            # Version.guess() needs auth objects and a working session pool
-            self.config.version = Version.guess(self, hint=self.version_hint)
-
     def get_auth_type(self):
         # Autodetect authentication type. We also set version hint here.
         name = str(self.credentials) if self.credentials and str(self.credentials) else 'DUMMY'
@@ -411,6 +407,9 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
 
     @property
     def version(self):
+        if not self.config.version:
+            # Version.guess() needs auth objects and a working session pool
+            self.config.version = Version.guess(self, hint=self.version_hint)
         return self.config.version
 
     @threaded_cached_property
@@ -577,18 +576,18 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
         return state
 
     def __str__(self):
+        # Don't trigger version guessing here just for the sake of printing
+        if self.config.version:
+            fullname, api_version, build = self.version.fullname, self.version.api_version, self.version.build
+        else:
+            fullname, api_version, build = '[unknown]', '[unknown]', '[unknown]'
+
         return '''\
 EWS url: %s
 Product name: %s
 EWS API version: %s
 Build number: %s
-EWS auth: %s''' % (
-            self.service_endpoint,
-            self.version.fullname,
-            self.version.api_version,
-            self.version.build,
-            self.auth_type,
-        )
+EWS auth: %s''' % (self.service_endpoint, fullname, api_version, build, self.auth_type)
 
 
 class NoVerifyHTTPAdapter(requests.adapters.HTTPAdapter):
