@@ -87,6 +87,9 @@ class AutodiscoverCache(object):
             db.clear()
         self._protocols.clear()
 
+    def __len__(self):
+        return len(self._protocols)
+
     def __contains__(self, key):
         domain = key[0]
         with shelve_open_with_failover(self._storage_file) as db:
