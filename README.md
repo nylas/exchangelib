@@ -161,8 +161,13 @@ config = Configuration(retry_policy=FaultTolerance(max_wait=3600), credentials=c
 account = Account(primary_smtp_address='john@example.com', config=config)
 
 # Autodiscovery will also use this policy, but only for the final autodiscover endpoint.
-# Here's how to change the policy for connecting to autodiscover candidate servers:
-AutodiscoverProtocol.INITIAL_RETRY_POLICY = FaultTolerance(max_wait=30)
+# Here's how to change the policy for connecting to autodiscover candidate servers.
+# Old autodiscover implementation
+import exchangelib.autodiscover.legacy
+exchangelib.autodiscover.legacy.INITIAL_RETRY_POLICY = FaultTolerance(max_wait=30)
+# New autodiscover implementation
+from exchangelib.autodiscover import Autodiscovery
+Autodiscovery.INITIAL_RETRY_POLICY = FaultTolerance(max_wait=30)
 
 # Kerberos and SSPI authentication are supported via the GSSAPI and SSPI auth types.
 config = Configuration(server='example.com', auth_type=GSSAPI)

@@ -4,10 +4,15 @@ Change Log
 HEAD
 ----
 -   Added support for specifying a separate retry policy for the autodiscover service endpoint
-    selection. Set via the `AutodiscoverProtocol.INITIAL_RETRY_POLICY` class variable.
+    selection. Set via the `exchangelib.autodiscover.legacy.INITIAL_RETRY_POLICY` module variable
+    for the the old autodiscover implementation, and via the
+    `exchangelib.autodiscover.Autodiscovery.INITIAL_RETRY_POLICY` class variable for the new one.
 -   Support the authorization code OAuth 2.0 grant type (see issue #698)
 -   Removed the `RootOfHierarchy.permission_set` field. It was causing too many failures in the wild.
 -   The full autodiscover response containing all contents of the reponse is now available as `Account.ad_response`.
+-   Added a new Autodiscover implementation that is closer to the specification and easier to debug. To switch
+    to the new implementation, set the environment variable `EXCHANGELIB_AUTODISCOVER_VERSION=new`. The old
+    one is still the default if the variable is not set, or set to `EXCHANGELIB_AUTODISCOVER_VERSION=legacy`.
 
 
 2.1.1
