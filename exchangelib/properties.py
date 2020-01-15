@@ -119,13 +119,6 @@ class EWSElement(object):
             raise AttributeError("%s are invalid kwargs for this class" % ', '.join("'%s'" % k for k in kwargs))
 
     @classmethod
-    def _set_slots_keys(cls, keys):
-        # We can't use a static class attribute name here because values from the parent class would be exposed in
-        # this class - or we would have to explicitly reset the attribute value for every subclass.
-        attr_name = '_%s_slots_cache' % {cls.__name__}
-        setattr(cls, attr_name, keys)
-
-    @classmethod
     def _slots_keys(cls):
         # Find __slots__ entries for this and all parent classes. Keep order, with parent slots first.
         attr_name = '_%s_slots_cache' % {cls.__name__}
@@ -142,15 +135,23 @@ class EWSElement(object):
                         continue
                     keys.append(k)
                     seen.add(k)
-            cls._set_slots_keys(tuple(keys))
+            setattr(cls, attr_name, keys)
         return getattr(cls, attr_name)
 
     def __setattr__(self, key, value):
-        # Avoid silently accepting spelling errors to field names that are not set via __init__
-        if not hasattr(self, key) and key not in self._slots_keys():
-            raise AttributeError('%r is not a valid attribute. See %s.FIELDS for valid field names' % (
-                key, self.__class__.__name__))
-        super(EWSElement, self).__setattr__(key, value)
+        # Avoid silently accepting spelling errors to field names that are not set via __init__. We need to be able to
+        # set values for predefined and registered fields, whatever non-field attributes this class defines, and
+        # property setters.
+        for f in self.FIELDS:
+            if f.name == key:
+                return super(EWSElement, self).__setattr__(key, value)
+        if key in self._slots_keys():
+            return super(EWSElement, self).__setattr__(key, value)
+        if hasattr(self, key):
+            # Property setters
+            return super(EWSElement, self).__setattr__(key, value)
+        raise AttributeError('%r is not a valid attribute. See %s.FIELDS for valid field names' % (
+            key, self.__class__.__name__))
 
     def clean(self, version=None):
         # Validate attribute values using the field validator
@@ -263,15 +264,15 @@ class EWSElement(object):
         """Insert a new field at the preferred place in the tuple and update the slots cache"""
         with cls._fields_lock:
             idx = tuple(f.name for f in cls.FIELDS).index(insert_after) + 1
+            cls.FIELDS = cls.FIELDS.copy()
             cls.FIELDS.insert(idx, field)
-            cls._set_slots_keys(cls._slots_keys() + (field.name,))
 
     @classmethod
     def remove_field(cls, field):
         """Remove the given field and and update the slots cache"""
         with cls._fields_lock:
+            cls.FIELDS = cls.FIELDS.copy()
             cls.FIELDS.remove(field)
-            cls._set_slots_keys(tuple(k for k in cls._slots_keys() if k != field.name))
 
     def __eq__(self, other):
         return hash(self) == hash(other)
