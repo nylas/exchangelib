@@ -782,8 +782,10 @@ def _back_off_if_needed(back_off_until):
 def _may_retry_on_error(response, retry_policy, wait):
     if response.status_code not in (301, 302, 401, 503):
         # Don't retry if we didn't get a status code that we can hope to recover from
+        log.debug('No retry: wrong status code')
         return False
     if retry_policy.fail_fast:
+        log.debug('No retry: no fail-fast policy')
         return False
     if wait > retry_policy.max_wait:
         # We lost patience. Session is cleaned up in outer loop
@@ -797,6 +799,7 @@ def _may_retry_on_error(response, retry_policy, wait):
             or (response.status_code == 302 and response.headers.get('location', '').lower() ==
                 '/ews/genericerrorpage.htm?aspxerrorpath=/ews/exchange.asmx') \
             or (response.status_code == 503):
+        log.debug('Retry allowed: conditions met')
         return True
     return False
 
