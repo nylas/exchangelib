@@ -168,6 +168,7 @@ class Protocol(AutodiscoverBase):
             'anonymous': NOAUTH,  # Seen in some docs even though it's not mentioned in MSDN
         }.get(self.auth_package.lower(), NTLM)  # Default to NTLM
 
+
 class Error(EWSElement):
     """MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/error-pox"""
     ELEMENT_NAME = 'Error'
