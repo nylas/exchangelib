@@ -62,7 +62,6 @@ class BaseCredentials(object):
             if k == '_lock':
                 continue
             if getattr(self, k) != getattr(other, k):
-                print('%r != %r' % (getattr(self, k), getattr(other, k)))
                 return False
         return True
 
