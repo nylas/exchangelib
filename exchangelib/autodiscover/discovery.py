@@ -117,8 +117,6 @@ class Autodiscovery(object):
         return domain, self.credentials
 
     def _build_response(self, ad_response):
-        from .properties import Response
-        assert isinstance(ad_response, Response), ad_response
         ews_url = ad_response.protocol.ews_url
         if not ews_url:
             raise AutoDiscoverFailed("Response is missing an 'ews_url' value")
@@ -305,7 +303,6 @@ class Autodiscovery(object):
                 return True, ad
             except ValueError as e:
                 log.debug('Invalid response: %s', e)
-                pass
         return False, None
 
     def _step_1(self, hostname):
