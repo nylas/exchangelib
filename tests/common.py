@@ -94,9 +94,6 @@ class EWSTest(TimedTestCase):
             # Allow unverified TLS if requested in settings file
             BaseProtocol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
 
-        # Speed up tests a bit. We don't need to wait 10 seconds for every nonexisting server in the discover dance
-        AutodiscoverProtocol.TIMEOUT = 2
-
         # Create an account shared by all tests
         tz = EWSTimeZone.timezone('Europe/Copenhagen')
         cls.retry_policy = FaultTolerance(max_wait=600)
