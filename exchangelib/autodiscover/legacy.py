@@ -1,23 +1,28 @@
 from __future__ import unicode_literals
 
 import logging
+import time
 
 import dns.resolver
 from future.utils import raise_from
 
-from .. import transport
 from ..configuration import Configuration
 from ..credentials import BaseCredentials
 from ..errors import AutoDiscoverFailed, AutoDiscoverRedirect, AutoDiscoverCircularRedirect, TransportError, \
-    RedirectError, ErrorNonExistentMailbox, UnauthorizedError
-from ..protocol import Protocol, RetryPolicy
-from ..transport import DEFAULT_HEADERS
-from ..util import is_xml, post_ratelimited, get_domain, is_valid_hostname
+    RedirectError, ErrorNonExistentMailbox, UnauthorizedError, RelativeRedirect
+from ..protocol import Protocol, RetryPolicy, FailFast
+from ..transport import DEFAULT_HEADERS, get_auth_method_from_response
+from ..util import is_xml, post_ratelimited, get_domain, is_valid_hostname, _back_off_if_needed, _may_retry_on_error, \
+    get_redirect_url, DummyResponse, CONNECTION_ERRORS, TLS_ERRORS
 from .cache import autodiscover_cache
 from .properties import Autodiscover
 from .protocol import AutodiscoverProtocol
 
 log = logging.getLogger(__name__)
+
+# When connecting to servers that may not be serving the correct endpoint, we should use a retry policy that does
+# not leave us hanging for a long time on each step in the protocol.
+INITIAL_RETRY_POLICY = FailFast()
 
 
 def discover(email, credentials=None, auth_type=None, retry_policy=None):
@@ -178,11 +183,10 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl, auth_type, ret
     # We are connecting to an unknown server here. It's probable that servers in the autodiscover sequence are
     # unresponsive or send any kind of ill-formed response. We shouldn't use a retry policy meant for a trusted
     # endpoint here.
-    initial_retry_policy = AutodiscoverProtocol.INITIAL_RETRY_POLICY
     if auth_type is None:
-        auth_type = _get_auth_type_or_raise(url=url, email=email, hostname=hostname, retry_policy=initial_retry_policy)
+        auth_type = _get_auth_type_or_raise(url=url, email=email, hostname=hostname, retry_policy=INITIAL_RETRY_POLICY)
     autodiscover_protocol = AutodiscoverProtocol(config=Configuration(
-        service_endpoint=url, credentials=credentials, auth_type=auth_type, retry_policy=initial_retry_policy
+        service_endpoint=url, credentials=credentials, auth_type=auth_type, retry_policy=INITIAL_RETRY_POLICY
     ))
     r = _get_response(protocol=autodiscover_protocol, email=email)
     domain = get_domain(email)
@@ -230,7 +234,7 @@ def _autodiscover_quick(credentials, email, protocol):
 def _get_auth_type(url, email, retry_policy):
     try:
         data = Autodiscover.payload(email=email)
-        return transport.get_autodiscover_authtype(service_endpoint=url, retry_policy=retry_policy, data=data)
+        return get_autodiscover_authtype(service_endpoint=url, retry_policy=retry_policy, data=data)
     except TransportError as e:
         if isinstance(e, RedirectError):
             raise
@@ -326,3 +330,46 @@ def _get_hostname_from_srv(hostname):
         raise_from(AutoDiscoverFailed('No SRV record for %s' % hostname), None)
     except dns.resolver.NXDOMAIN:
         raise_from(AutoDiscoverFailed('Nonexistent domain %s' % hostname), None)
+
+
+def get_autodiscover_authtype(service_endpoint, retry_policy, data):
+    # Get auth type by tasting headers from the server. Only do POST requests. HEAD is too error prone, and some servers
+    # are set up to redirect to OWA on all requests except POST to the autodiscover endpoint.
+    #
+    # 'service_endpoint' could be any random server at this point, so we need to take adequate precautions.
+    log.debug('Requesting %s from %s', data, service_endpoint)
+    retry = 0
+    wait = 10  # seconds
+    t_start = time.time()
+    headers = DEFAULT_HEADERS.copy()
+    while True:
+        _back_off_if_needed(retry_policy.back_off_until)
+        log.debug('Trying to get autodiscover auth type for %s', service_endpoint)
+        with AutodiscoverProtocol.raw_session() as s:
+            try:
+                r = s.post(url=service_endpoint, headers=headers, data=data, allow_redirects=False,
+                           timeout=AutodiscoverProtocol.TIMEOUT)
+                break
+            except TLS_ERRORS as e:
+                # Don't retry on TLS errors. They will most likely be persistent.
+                raise_from(TransportError(str(e)), e)
+            except CONNECTION_ERRORS as e:
+                total_wait = time.time() - t_start
+                r = DummyResponse(url=service_endpoint, headers={}, request_headers=headers)
+                if _may_retry_on_error(response=r, retry_policy=retry_policy, wait=total_wait):
+                    log.info("Connection error on URL %s (retry %s, error: %s). Cool down %s secs",
+                             service_endpoint, retry, e, wait)
+                    retry_policy.back_off(wait)
+                    retry += 1
+                    continue
+                else:
+                    raise_from(TransportError(str(e)), e)
+    if r.status_code in (301, 302):
+        try:
+            redirect_url = get_redirect_url(r, allow_relative=False)
+        except RelativeRedirect:
+            raise TransportError('Redirect to same host when trying to get auth method')
+        raise RedirectError(url=redirect_url)
+    if r.status_code not in (200, 401):
+        raise TransportError('Unexpected response: %s %s' % (r.status_code, r.reason))
+    return get_auth_method_from_response(response=r)
