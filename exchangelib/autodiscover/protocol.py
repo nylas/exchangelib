@@ -1,3 +1,4 @@
+# coding=utf-8
 from future.utils import python_2_unicode_compatible
 
 from ..protocol import BaseProtocol

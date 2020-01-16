@@ -1,3 +1,4 @@
+# coding=utf-8
 from __future__ import unicode_literals
 
 from ..errors import ErrorNonExistentMailbox, AutoDiscoverFailed
