@@ -216,7 +216,7 @@ class FolderTest(EWSTest):
                 if field.is_read_only:
                     # count values may change during the test
                     continue
-                self.assertEqual(getattr(f, field.name), old_values[field.name], field.name)
+                self.assertEqual(getattr(f, field.name), old_values[field.name], (f, field.name))
 
         # Test refresh of root
         all_folders = sorted(f.name for f in self.account.root.walk())

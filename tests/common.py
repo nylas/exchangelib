@@ -15,7 +15,6 @@ from yaml import safe_load
 
 from exchangelib.account import Account
 from exchangelib.attachments import FileAttachment
-from exchangelib.autodiscover import AutodiscoverProtocol
 from exchangelib.configuration import Configuration
 from exchangelib.credentials import DELEGATE, Credentials
 from exchangelib.errors import UnknownTimeZone, AmbiguousTimeError, NonExistentTimeError
