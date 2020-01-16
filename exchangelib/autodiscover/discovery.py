@@ -106,9 +106,9 @@ class Autodiscovery(object):
 
     def clear(self):
         # This resets cached variables
-        self._urls_visited.clear()
+        self._urls_visited = []
         self._redirect_count = 0
-        self._email_redirects.clear()
+        self._email_redirects = []
 
     @property
     def _cache_key(self):
