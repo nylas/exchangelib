@@ -67,7 +67,7 @@ class QuerySet(SearchableMixIn):
         self.page_size = None
         self.max_items = None
         self.offset = 0
-        self.depth = None
+        self._depth = None
 
         self._cache = None
 
@@ -99,7 +99,7 @@ class QuerySet(SearchableMixIn):
         new_qs.page_size = self.page_size
         new_qs.max_items = self.max_items
         new_qs.offset = self.offset
-        new_qs.depth = self.depth
+        new_qs._depth = self._depth
         return new_qs
 
     @property
@@ -208,7 +208,7 @@ class QuerySet(SearchableMixIn):
             items = list(self.folder_collection)[0].find_people(
                 self.q,
                 shape=ID_ONLY,
-                depth=self.depth,
+                depth=self._depth,
                 additional_fields=additional_fields,
                 order_fields=order_fields,
                 page_size=self.page_size,
@@ -218,7 +218,7 @@ class QuerySet(SearchableMixIn):
         else:
             find_item_kwargs = dict(
                 shape=ID_ONLY,  # Always use IdOnly here, because AllProperties doesn't actually get *all* properties
-                depth=self.depth,
+                depth=self._depth,
                 additional_fields=additional_fields,
                 order_fields=order_fields,
                 calendar_view=self.calendar_view,
@@ -512,6 +512,14 @@ class QuerySet(SearchableMixIn):
         new_qs.only_fields = only_fields
         new_qs.return_format = self.FLAT if flat else self.VALUES_LIST
         return new_qs
+
+    def depth(self, depth):
+        """Specify the search depth (SHALLOW, ASSOCIATED or DEEP)
+        """
+        new_qs = self._copy_self()
+        new_qs._depth = depth
+        return new_qs
+
 
     ###########################
     #

@@ -23,7 +23,7 @@ class FolderQuerySet:
             raise ValueError("'folder_collection' %r must be a FolderCollection instance" % folder_collection)
         self.folder_collection = folder_collection
         self.only_fields = None
-        self.traversal_depth = None
+        self._depth = None
         self.q = None
 
     def _copy_cls(self):
@@ -34,7 +34,7 @@ class FolderQuerySet:
         """
         new_qs = self._copy_cls()
         new_qs.only_fields = self.only_fields
-        new_qs.traversal_depth = self.traversal_depth
+        new_qs._depth = self._depth
         new_qs.q = None if self.q is None else deepcopy(self.q)
         return new_qs
 
@@ -59,10 +59,8 @@ class FolderQuerySet:
     def depth(self, depth):
         """Specify the search depth (SHALLOW or DEEP)
         """
-        if depth not in FOLDER_TRAVERSAL_CHOICES:
-            raise ValueError("'depth' %s must be one of %s" % (depth, FOLDER_TRAVERSAL_CHOICES))
         new_qs = self._copy_self()
-        new_qs.traversal_depth = depth
+        new_qs._depth = depth
         return new_qs
 
     def get(self, *args, **kwargs):
@@ -101,8 +99,6 @@ class FolderQuerySet:
     def _query(self):
         from .base import Folder
         from .collections import FolderCollection
-        if self.traversal_depth is None:
-            self.traversal_depth = DEEP
         if self.only_fields is None:
             # Subfolders will always be of class Folder
             non_complex_fields = self.folder_collection.get_folder_fields(target_cls=Folder, is_complex=False)
@@ -113,9 +109,7 @@ class FolderQuerySet:
 
         # First, fetch all non-complex fields using FindFolder. We do this because some folders do not support
         # GetFolder but we still want to get as much information as possible.
-        folders = self.folder_collection.find_folders(
-            q=self.q, depth=self.traversal_depth, additional_fields=non_complex_fields
-        )
+        folders = self.folder_collection.find_folders(q=self.q, depth=self._depth, additional_fields=non_complex_fields)
         if not complex_fields:
             for f in folders:
                 yield f

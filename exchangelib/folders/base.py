@@ -7,7 +7,7 @@ from ..errors import ErrorAccessDenied, ErrorFolderNotFound, ErrorCannotEmptyFol
 from ..fields import IntegerField, CharField, FieldPath, EffectiveRightsField, PermissionSetField, EWSElementField, \
     Field
 from ..items import CalendarItem, RegisterMixIn, Persona, ITEM_CLASSES, ITEM_TRAVERSAL_CHOICES, SHAPE_CHOICES, \
-    ID_ONLY, DELETE_TYPE_CHOICES, HARD_DELETE
+    ID_ONLY, DELETE_TYPE_CHOICES, HARD_DELETE, SHALLOW as SHALLOW_ITEMS
 from ..properties import Mailbox, FolderId, ParentFolderId, InvalidField, DistinguishedFolderId
 from ..queryset import QuerySet, SearchableMixIn, DoesNotExist
 from ..restriction import Restriction
@@ -15,7 +15,7 @@ from ..services import CreateFolder, UpdateFolder, DeleteFolder, EmptyFolder, Fi
 from ..util import TNS
 from ..version import Version, EXCHANGE_2007_SP1, EXCHANGE_2010
 from .collections import FolderCollection
-from .queryset import SingleFolderQuerySet, SHALLOW
+from .queryset import SingleFolderQuerySet, SHALLOW as SHALLOW_FOLDERS, DEEP as DEEP_FOLDERS
 
 log = logging.getLogger(__name__)
 
@@ -35,6 +35,8 @@ class BaseFolder(RegisterMixIn, SearchableMixIn):
     supported_from = None
     # Whether this folder type is allowed with the GetFolder service
     get_folder_allowed = True
+    DEFAULT_FOLDER_TRAVERSAL_DEPTH = DEEP_FOLDERS
+    DEFAULT_ITEM_TRAVERSAL_DEPTH = SHALLOW_ITEMS
     LOCALIZED_NAMES = dict()  # A map of (str)locale: (tuple)localized_folder_names
     ITEM_MODEL_MAP = {cls.response_tag(): cls for cls in ITEM_CLASSES}
     ID_ELEMENT_CLS = FolderId
@@ -298,8 +300,8 @@ class BaseFolder(RegisterMixIn, SearchableMixIn):
             request_type=QuerySet.PERSONA,
         )
 
-    def find_people(self, q, shape=ID_ONLY, depth=SHALLOW, additional_fields=None, order_fields=None, page_size=None,
-                    max_items=None, offset=0):
+    def find_people(self, q, shape=ID_ONLY, depth=None, additional_fields=None, order_fields=None,
+                    page_size=None, max_items=None, offset=0):
         """
         Private method to call the FindPeople service
 
@@ -316,6 +318,8 @@ class BaseFolder(RegisterMixIn, SearchableMixIn):
         """
         if shape not in SHAPE_CHOICES:
             raise ValueError("'shape' %s must be one of %s" % (shape, SHAPE_CHOICES))
+        if depth is None:
+            depth = self.DEFAULT_ITEM_TRAVERSAL_DEPTH
         if depth not in ITEM_TRAVERSAL_CHOICES:
             raise ValueError("'depth' %s must be one of %s" % (depth, ITEM_TRAVERSAL_CHOICES))
         if additional_fields:
@@ -528,7 +532,7 @@ class BaseFolder(RegisterMixIn, SearchableMixIn):
 
         # Assume an exact match on the folder name in a shallow search will only return at most one folder
         try:
-            return SingleFolderQuerySet(account=self.account, folder=self).depth(SHALLOW).get(name=other)
+            return SingleFolderQuerySet(account=self.account, folder=self).depth(SHALLOW_FOLDERS).get(name=other)
         except DoesNotExist:
             raise ErrorFolderNotFound("No subfolder with name '%s'" % other)
 

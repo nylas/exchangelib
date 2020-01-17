@@ -8,7 +8,7 @@ from ..properties import CalendarView, InvalidField
 from ..queryset import QuerySet, SearchableMixIn
 from ..restriction import Restriction
 from ..services import FindFolder, GetFolder, FindItem
-from .queryset import SHALLOW, DEEP, FOLDER_TRAVERSAL_CHOICES
+from .queryset import FOLDER_TRAVERSAL_CHOICES
 
 log = logging.getLogger(__name__)
 
@@ -120,7 +120,7 @@ class FolderCollection(SearchableMixIn):
         else:
             raise InvalidField("%r is not a valid field on %s" % (field, self.supported_item_models))
 
-    def find_items(self, q, shape=ID_ONLY, depth=SHALLOW, additional_fields=None, order_fields=None,
+    def find_items(self, q, shape=ID_ONLY, depth=None, additional_fields=None, order_fields=None,
                    calendar_view=None, page_size=None, max_items=None, offset=0):
         """
         Private method to call the FindItem service
@@ -141,6 +141,8 @@ class FolderCollection(SearchableMixIn):
         from .base import BaseFolder
         if shape not in SHAPE_CHOICES:
             raise ValueError("'shape' %s must be one of %s" % (shape, SHAPE_CHOICES))
+        if depth is None:
+            depth = self._get_default_item_traversal_depth()
         if depth not in ITEM_TRAVERSAL_CHOICES:
             raise ValueError("'depth' %s must be one of %s" % (depth, ITEM_TRAVERSAL_CHOICES))
         if not self.folders:
@@ -218,6 +220,22 @@ class FolderCollection(SearchableMixIn):
                 has_non_roots = True
         return RootOfHierarchy if has_roots else Folder
 
+    def _get_default_item_traversal_depth(self):
+        # When searching folders, some folders require 'Shallow' and others 'Associated' traversal depth.
+        unique_depths = set(f.DEFAULT_ITEM_TRAVERSAL_DEPTH for f in self.folders)
+        if len(unique_depths) == 1:
+            return unique_depths.pop()
+        raise ValueError('Folders in this collection do not have a common ITEM_TRAVERSAL_DEPTH value. You need to set '
+                         'an explicit QuerySet.depth value')
+
+    def _get_default_folder_traversal_depth(self):
+        # When searching folders, some folders require 'Shallow' and others 'Deep' traversal depth.
+        unique_depths = set(f.DEFAULT_FOLDER_TRAVERSAL_DEPTH for f in self.folders)
+        if len(unique_depths) == 1:
+            return unique_depths.pop()
+        raise ValueError('Folders in this collection do not have a common ITEM_TRAVERSAL_DEPTH value. You need to set '
+                         'an explicit QuerySet.depth value')
+
     def resolve(self):
         # Looks up the folders or folder IDs in the collection and returns full Folder instances with all fields set.
         resolveable_folders = []
@@ -234,7 +252,7 @@ class FolderCollection(SearchableMixIn):
         ):
             yield f
 
-    def find_folders(self, q=None, shape=ID_ONLY, depth=DEEP, additional_fields=None, page_size=None, max_items=None,
+    def find_folders(self, q=None, shape=ID_ONLY, depth=None, additional_fields=None, page_size=None, max_items=None,
                      offset=0):
         # 'depth' controls whether to return direct children or recurse into sub-folders
         from .base import BaseFolder, Folder
@@ -246,6 +264,8 @@ class FolderCollection(SearchableMixIn):
             restriction = Restriction(q, folders=self.folders, applies_to=Restriction.FOLDERS)
         if shape not in SHAPE_CHOICES:
             raise ValueError("'shape' %s must be one of %s" % (shape, SHAPE_CHOICES))
+        if depth is None:
+            depth = self._get_default_folder_traversal_depth()
         if depth not in FOLDER_TRAVERSAL_CHOICES:
             raise ValueError("'depth' %s must be one of %s" % (depth, FOLDER_TRAVERSAL_CHOICES))
         if not self.folders:
