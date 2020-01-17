@@ -20,7 +20,8 @@ from exchangelib.fields import TextField, BodyField, ExtendedPropertyField, Fiel
 from exchangelib.folders import Calendar, Inbox, Tasks, Contacts, Folder, FolderCollection
 from exchangelib.indexed_properties import EmailAddress, PhysicalAddress, SingleFieldIndexedElement, \
     MultiFieldIndexedElement
-from exchangelib.items import Item, CalendarItem, Message, Contact, Task, DistributionList, Persona, BaseItem
+from exchangelib.items import Item, CalendarItem, Message, Contact, Task, DistributionList, Persona, BaseItem, \
+    SHALLOW, ASSOCIATED
 from exchangelib.properties import Mailbox, Member, Attendee
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
 from exchangelib.recurrence import Recurrence, WeeklyPattern, FirstOccurrence, LastOccurrence
@@ -597,6 +598,10 @@ class ItemQuerySetTest(BaseItemTest):
         qs.move(to_folder=to_folder)
         self.assertEqual(qs.count(), 0)
         self.assertEqual(to_folder_qs.count(), 1)
+
+    def test_depth(self):
+        self.assertGreaterEqual(self.test_folder.all().depth(ASSOCIATED).count(), 0)
+        self.assertGreaterEqual(self.test_folder.all().depth(SHALLOW).count(), 0)
 
 
 class ItemHelperTest(BaseItemTest):
