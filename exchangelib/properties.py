@@ -264,14 +264,18 @@ class EWSElement(object):
         """Insert a new field at the preferred place in the tuple and update the slots cache"""
         with cls._fields_lock:
             idx = tuple(f.name for f in cls.FIELDS).index(insert_after) + 1
-            cls.FIELDS = cls.FIELDS.copy()
+            # This class may not have its own FIELDS attribute. Make sure not to edit an attribute belonging to a parent
+            # class.
+            cls.FIELDS = list(cls.FIELDS)
             cls.FIELDS.insert(idx, field)
 
     @classmethod
     def remove_field(cls, field):
         """Remove the given field and and update the slots cache"""
         with cls._fields_lock:
-            cls.FIELDS = cls.FIELDS.copy()
+            # This class may not have its own FIELDS attribute. Make sure not to edit an attribute belonging to a parent
+            # class.
+            cls.FIELDS = list(cls.FIELDS)
             cls.FIELDS.remove(field)
 
     def __eq__(self, other):
