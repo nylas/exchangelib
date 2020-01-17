@@ -18,10 +18,10 @@ from .cache import AutodiscoverCache, autodiscover_cache
 from .discovery import Autodiscovery
 from .protocol import AutodiscoverProtocol
 
-if os.environ.get('EXCHANGELIB_AUTODISCOVER_VERSION', 'legacy') == 'legacy':
-    # Default to the legacy implementation
+if os.environ.get('EXCHANGELIB_AUTODISCOVER_VERSION') == 'legacy':
     from .legacy import discover
 else:
+    # Default to the new implementation
     from .discovery import discover
 
 
