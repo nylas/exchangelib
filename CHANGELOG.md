@@ -3,6 +3,10 @@ Change Log
 
 HEAD
 ----
+
+
+2.2.0
+-----
 -   Added support for specifying a separate retry policy for the autodiscover service endpoint
     selection. Set via the `exchangelib.autodiscover.legacy.INITIAL_RETRY_POLICY` module variable
     for the the old autodiscover implementation, and via the
