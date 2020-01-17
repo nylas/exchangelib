@@ -3,7 +3,14 @@ Change Log
 
 HEAD
 ----
+
+
+3.1.0
+-----
 -   Removed the legacy autodiscover implementation.
+-   Added `QuerySet.depth()` to configure item traversal of querysets. Default is `Shallow` except
+    for the `CommonViews` folder where default is `Associated`.
+-   Updating credentials on `Account.protocol` after getting an `UnauthorizedError` now works.
 
 
 3.0.0
