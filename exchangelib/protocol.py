@@ -33,7 +33,7 @@ def close_connections():
     CachingProtocol.clear_cache()
 
 
-class BaseProtocol(object):
+class BaseProtocol:
     """Base class for Protocol which implements the bare essentials"""
 
     # The maximum number of sessions (== TCP connections, see below) we will open to this service endpoint. Keep this
@@ -592,7 +592,7 @@ class NoVerifyHTTPAdapter(requests.adapters.HTTPAdapter):
         super(NoVerifyHTTPAdapter, self).cert_verify(conn=conn, url=url, verify=False, cert=cert)
 
 
-class RetryPolicy(object):
+class RetryPolicy:
     """Stores retry logic used when faced with errors from the server"""
     @property
     def fail_fast(self):

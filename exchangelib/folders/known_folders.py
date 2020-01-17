@@ -383,7 +383,7 @@ class VoiceMail(WellknownFolder):
     __slots__ = tuple()
 
 
-class NonDeleteableFolderMixin(object):
+class NonDeleteableFolderMixin:
     @property
     def is_deleteable(self):
         return False

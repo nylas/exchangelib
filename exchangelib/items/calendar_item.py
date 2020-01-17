@@ -25,7 +25,7 @@ RECURRING_MASTER = 'RecurringMaster'
 CALENDAR_ITEM_CHOICES = (SINGLE, OCCURRENCE, EXCEPTION, RECURRING_MASTER)
 
 
-class AcceptDeclineMixIn(object):
+class AcceptDeclineMixIn:
     def accept(self, **kwargs):
         return AcceptItem(
             account=self.account,

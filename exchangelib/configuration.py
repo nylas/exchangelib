@@ -11,7 +11,7 @@ from .version import Version
 log = logging.getLogger(__name__)
 
 
-class Configuration(object):
+class Configuration:
     """
     Assembles a connection protocol when autodiscover is not used.
 

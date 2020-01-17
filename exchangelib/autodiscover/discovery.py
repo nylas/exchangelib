@@ -28,7 +28,7 @@ def discover(email, credentials=None, auth_type=None, retry_policy=None):
 SrvRecord = namedtuple('SrvRecord', ('priority', 'weight', 'port', 'srv'))
 
 
-class Autodiscovery(object):
+class Autodiscovery:
     """For a description of the protocol implemented, see "Autodiscover for Exchange ActiveSync developers":
 
     https://docs.microsoft.com/en-us/previous-versions/office/developer/exchange-server-interoperability-guidance/hh352638%28v%3dexchg.140%29

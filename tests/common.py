@@ -46,7 +46,7 @@ def mock_session_exception(exc_cls):
     return raise_exc
 
 
-class MockResponse(object):
+class MockResponse:
     def __init__(self, c):
         self.c = c
 

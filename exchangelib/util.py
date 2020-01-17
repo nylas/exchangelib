@@ -514,12 +514,12 @@ class AnonymizingXmlHandler(PrettyXmlHandler):
         return root
 
 
-class DummyRequest(object):
+class DummyRequest:
     def __init__(self, headers):
         self.headers = headers
 
 
-class DummyResponse(object):
+class DummyResponse:
     def __init__(self, url, headers, request_headers, content=b'', status_code=503):
         self.status_code = status_code
         self.url = url

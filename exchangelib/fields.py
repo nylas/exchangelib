@@ -138,7 +138,7 @@ def resolve_field_path(field_path, folder, strict=True):
     return field, label, subfield
 
 
-class FieldPath(object):
+class FieldPath:
     """ Holds values needed to point to a single field. For indexed properties, we allow setting either field,
     field and label, or field, label and subfield. This allows pointing to either the full indexed property set, a
     property with a specific label, or a particular subfield field on that property. """
@@ -214,7 +214,7 @@ class FieldPath(object):
         return hash((self.field, self.label, self.subfield))
 
 
-class FieldOrder(object):
+class FieldOrder:
     """ Holds values needed to call server-side sorting on a single field path """
     def __init__(self, field_path, reverse=False):
         if not isinstance(field_path, FieldPath):
@@ -758,7 +758,7 @@ class CultureField(CharField):
     pass
 
 
-class Choice(object):
+class Choice:
     """Implements versioned choices for the ChoiceField field"""
     def __init__(self, value, supported_from=None):
         self.value = value

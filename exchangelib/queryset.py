@@ -13,7 +13,7 @@ from .version import EXCHANGE_2010
 log = logging.getLogger(__name__)
 
 
-class SearchableMixIn(object):
+class SearchableMixIn:
     """Implements a search API for inheritance"""
     def get(self, *args, **kwargs):
         raise NotImplementedError()

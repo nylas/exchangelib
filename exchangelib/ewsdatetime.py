@@ -198,7 +198,7 @@ class EWSDateTime(datetime.datetime):
         return EWSDate.from_date(d)  # We want to return EWSDate objects
 
 
-class EWSTimeZone(object):
+class EWSTimeZone:
     """
     Represents a timezone as expected by the EWS TimezoneContext / TimezoneDefinition XML element, and returned by
     services.GetServerTimeZones.

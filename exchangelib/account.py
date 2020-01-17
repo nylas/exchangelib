@@ -31,7 +31,7 @@ from .util import get_domain, peek
 log = getLogger(__name__)
 
 
-class Account(object):
+class Account:
     """Models an Exchange server user account. The primary key for an account is its PrimarySMTPAddress
     """
     def __init__(self, primary_smtp_address, fullname=None, access_type=None, autodiscover=False, credentials=None,

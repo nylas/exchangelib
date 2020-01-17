@@ -9,7 +9,7 @@ from .version import EXCHANGE_2010
 log = logging.getLogger(__name__)
 
 
-class Q(object):
+class Q:
     """A class with an API similar to Django Q objects. Used to implemnt advanced filtering logic."""
 
     # Connection types
@@ -486,7 +486,7 @@ class Q(object):
         return self.__class__.__name__ + repr(sorted_children)
 
 
-class Restriction(object):
+class Restriction:
     """
     Implements an EWS Restriction type.
 

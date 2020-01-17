@@ -14,7 +14,7 @@ FOLDER_TRAVERSAL_CHOICES = (SHALLOW, DEEP, SOFT_DELETED)
 log = logging.getLogger(__name__)
 
 
-class FolderQuerySet(object):
+class FolderQuerySet:
     """A QuerySet-like class for finding subfolders of a folder collection
     """
     def __init__(self, folder_collection):
