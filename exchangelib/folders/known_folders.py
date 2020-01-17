@@ -1,4 +1,3 @@
-# coding=utf-8
 from ..items import CalendarItem, Contact, Message, Task, DistributionList, MeetingRequest, MeetingResponse, \
     MeetingCancellation, ITEM_CLASSES
 from ..version import EXCHANGE_2010_SP1, EXCHANGE_2013, EXCHANGE_2013_SP1

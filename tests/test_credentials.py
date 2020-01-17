@@ -1,4 +1,3 @@
-# coding=utf-8
 from exchangelib import Credentials
 
 from .common import TimedTestCase

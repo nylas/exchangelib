@@ -1,4 +1,3 @@
-# coding=utf-8
 from exchangelib.attachments import FileAttachment, ItemAttachment, AttachmentId
 from exchangelib.errors import ErrorItemNotFound, ErrorInvalidIdMalformed
 from exchangelib.folders import Inbox

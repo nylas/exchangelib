@@ -1,4 +1,3 @@
-# coding=utf-8
 from exchangelib import Q, Message, ExtendedProperty
 from exchangelib.errors import ErrorDeleteDistinguishedFolder, ErrorObjectTypeChanged, DoesNotExist, \
     MultipleObjectsReturned

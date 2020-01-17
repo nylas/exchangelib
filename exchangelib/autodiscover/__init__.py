@@ -1,4 +1,3 @@
-# coding=utf-8
 """
 Autodiscover is a Microsoft method for automatically getting the endpoint of the Exchange server and other
 connection-related settings holding the email address using only the email address, and username and password of the

@@ -1,4 +1,3 @@
-# coding=utf-8
 from exchangelib.version import Build
 
 from .common import TimedTestCase

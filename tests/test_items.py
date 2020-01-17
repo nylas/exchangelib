@@ -1,4 +1,3 @@
-# coding=utf-8
 import datetime
 from decimal import Decimal
 from email.mime.multipart import MIMEMultipart

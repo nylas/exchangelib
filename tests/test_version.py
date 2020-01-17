@@ -1,4 +1,3 @@
-# coding=utf-8
 import requests_mock
 
 from exchangelib import Version

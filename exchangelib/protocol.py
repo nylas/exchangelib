@@ -1,4 +1,3 @@
-# coding=utf-8
 """
 A protocol is an endpoint for EWS service connections. It contains all necessary information to make HTTPS connections.
 

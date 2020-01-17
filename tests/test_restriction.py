@@ -1,4 +1,3 @@
-# coding=utf-8
 from exchangelib import EWSDateTime, EWSTimeZone, Q, Build
 from exchangelib.folders import Calendar, Root
 from exchangelib.restriction import Restriction

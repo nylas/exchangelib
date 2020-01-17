@@ -1,4 +1,3 @@
-# coding=utf-8
 from exchangelib import Message, Mailbox, CalendarItem
 from exchangelib.extended_properties import ExtendedProperty
 from exchangelib.folders import Inbox

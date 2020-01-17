@@ -1,4 +1,3 @@
-# coding=utf-8
 from collections import namedtuple
 import datetime
 from decimal import Decimal

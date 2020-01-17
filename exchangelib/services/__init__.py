@@ -1,4 +1,3 @@
-# coding=utf-8
 """
 Implement a selection of EWS services (operations).
 
