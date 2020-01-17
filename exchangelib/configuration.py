@@ -3,7 +3,7 @@ import logging
 from cached_property import threaded_cached_property
 
 from .credentials import BaseCredentials
-from .protocol import Protocol, RetryPolicy, FailFast
+from .protocol import RetryPolicy, FailFast
 from .transport import AUTH_TYPE_MAP
 from .util import split_url
 from .version import Version
@@ -61,11 +61,6 @@ class Configuration:
     @threaded_cached_property
     def server(self):
         return split_url(self.service_endpoint)[1]
-
-    @threaded_cached_property
-    def protocol(self):
-        # Set up a default protocol that non-autodiscover accounts can use
-        return Protocol(config=self)
 
     def __repr__(self):
         return self.__class__.__name__ + repr((self.protocol,))

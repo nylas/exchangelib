@@ -22,6 +22,7 @@ from .items import Item, BulkCreateResult, HARD_DELETE, \
     SEND_MEETING_INVITATIONS_CHOICES, SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES, \
     SEND_MEETING_CANCELLATIONS_CHOICES, ID_ONLY
 from .properties import Mailbox, SendingAs, FolderId, DistinguishedFolderId
+from .protocol import Protocol
 from .queryset import QuerySet
 from .services import ExportItems, UploadItems, GetItem, CreateItem, UpdateItem, DeleteItem, MoveItem, SendItem, \
     CopyItem, GetUserOofSettings, SetUserOofSettings, GetMailTips, ArchiveItem, GetDelegate
@@ -90,7 +91,7 @@ class Account:
                 raise AttributeError('non-autodiscover requires a config')
             self.primary_smtp_address = primary_smtp_address
             self.ad_response = None
-            self.protocol = config.protocol
+            self.protocol = Protocol(config=config)
         # We may need to override the default server version on a per-account basis because Microsoft may report one
         # server version up-front but delegate account requests to an older backend server.
         self.version = self.protocol.version
