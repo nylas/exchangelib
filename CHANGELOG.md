@@ -3,6 +3,7 @@ Change Log
 
 HEAD
 ----
+-   Removed the legacy autodiscover implementation.
 
 
 3.0.0

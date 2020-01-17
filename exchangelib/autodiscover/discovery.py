@@ -29,11 +29,19 @@ SrvRecord = namedtuple('SrvRecord', ('priority', 'weight', 'port', 'srv'))
 
 
 class Autodiscovery:
-    """For a description of the protocol implemented, see "Autodiscover for Exchange ActiveSync developers":
+    """Autodiscover is a Microsoft protocol for automatically getting the endpoint of the Exchange server and other
+    connection-related settings holding the email address using only the email address, and username and password of the
+    user.
+
+    For a description of the protocol implemented, see "Autodiscover for Exchange ActiveSync developers":
 
     https://docs.microsoft.com/en-us/previous-versions/office/developer/exchange-server-interoperability-guidance/hh352638%28v%3dexchg.140%29
 
     Descriptions of the steps from the article are provided in their respective methods in this class.
+
+    For a description of how to handle autodiscover error messages, see:
+
+    https://docs.microsoft.com/en-us/exchange/client-developer/exchange-web-services/handling-autodiscover-error-messages
 
     A tip from the article:
     The client can perform steps 1 through 4 in any order or in parallel to expedite the process, but it must wait for
@@ -42,6 +50,9 @@ class Autodiscovery:
 
     Another possibly newer resource which has not yet been attempted is "Outlook 2016 Implementation of Autodiscover":
     https://support.microsoft.com/en-us/help/3211279/outlook-2016-implementation-of-autodiscover
+
+    WARNING: The autodiscover protocol is very complicated. If you have problems autodiscovering using this
+    implementation, start by doing an official test at https://testconnectivity.microsoft.com
     """
 
     # When connecting to servers that may not be serving the correct endpoint, we should use a retry policy that does
@@ -441,7 +452,9 @@ class Autodiscovery:
         """If the client cannot contact the Autodiscover service, the client should ask the user for the Exchange server
         name and use it to construct an Exchange EWS URL. The client should try to use this URL for future requests.
         """
-        raise AutoDiscoverFailed('All steps in the autodiscover protocol failed for email %r' % self.email)
+        raise AutoDiscoverFailed(
+            'All steps in the autodiscover protocol failed for email %r. If you think this is an error, consider doing '
+            'an official test at https://testconnectivity.microsoft.com' % self.email)
 
 
 def _get_srv_records(hostname):
