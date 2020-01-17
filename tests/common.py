@@ -154,7 +154,7 @@ class EWSTest(TimedTestCase):
         if isinstance(field, TextField):
             return get_random_string(400)
         if isinstance(field, MimeContentField):
-            return get_random_string(400)
+            return get_random_bytes(400)
         if isinstance(field, Base64Field):
             return get_random_bytes(400)
         if isinstance(field, BooleanField):
