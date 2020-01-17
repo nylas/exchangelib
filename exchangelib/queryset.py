@@ -520,12 +520,12 @@ class QuerySet(SearchableMixIn):
         new_qs._depth = depth
         return new_qs
 
-
     ###########################
     #
     # Methods that end chaining
     #
     ###########################
+
     def iterator(self):
         """ Return the query result as an iterator, without caching the result """
         if self.q is None:

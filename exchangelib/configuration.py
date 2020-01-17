@@ -68,6 +68,6 @@ class Configuration:
         return split_url(self.service_endpoint)[1]
 
     def __repr__(self):
-        return self.__class__.__name__ + '(%s)' % ', '.join('%s=%s' %(k, repr(getattr(self, k))) for k in (
+        return self.__class__.__name__ + '(%s)' % ', '.join('%s=%r' % (k, getattr(self, k)) for k in (
             'credentials', 'service_endpoint', 'auth_type', 'version', 'retry_policy'
         ))

@@ -8,7 +8,7 @@ from .collections import FolderCollection
 from .base import BaseFolder
 from .known_folders import MsgFolderRoot, NON_DELETEABLE_FOLDERS, WELLKNOWN_FOLDERS_IN_ROOT, \
     WELLKNOWN_FOLDERS_IN_ARCHIVE_ROOT
-from .queryset import SingleFolderQuerySet, SHALLOW, DEEP
+from .queryset import SingleFolderQuerySet, SHALLOW
 
 log = logging.getLogger(__name__)
 
