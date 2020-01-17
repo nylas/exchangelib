@@ -18,19 +18,16 @@ from defusedxml.lxml import parse, tostring, GlobalParserTLS, RestrictedElement,
 from defusedxml.expatreader import DefusedExpatParser
 from defusedxml.sax import _InputSource
 import dns.resolver
-from future.utils import PY2
 import isodate
 from oauthlib.oauth2 import TokenExpiredError
 from pygments import highlight
 from pygments.lexers.html import XmlLexer
 from pygments.formatters.terminal import TerminalFormatter
 import requests.exceptions
-from six import text_type, string_types
 
 from .errors import TransportError, RateLimitError, RedirectError, RelativeRedirect, CASError, UnauthorizedError, \
     ErrorInvalidSchemaVersionForMailboxVersion
 
-time_func = time.time if PY2 else time.monotonic
 log = logging.getLogger(__name__)
 
 
@@ -43,16 +40,6 @@ class ElementNotFound(Exception):
     def __init__(self, msg, data):
         super(ElementNotFound, self).__init__(msg)
         self.data = data
-
-
-class PickleMixIn(object):
-    if PY2:
-        def __getstate__(self):
-            return {k: getattr(self, k) for k in self.__slots__}
-
-        def __setstate__(self, state):
-            for k in self.__slots__:
-                setattr(self, k, state.get(k))
 
 
 # Regex of UTF-8 control characters that are illegal in XML 1.0 (and XML 1.1)
@@ -86,7 +73,7 @@ def is_iterable(value, generators_allowed=False):
     :return: True or False
     """
     if generators_allowed:
-        if not isinstance(value, string_types + (bytes,)) and hasattr(value, '__iter__'):
+        if not isinstance(value, (bytes, str)) and hasattr(value, '__iter__'):
             return True
     else:
         if isinstance(value, (tuple, list, set)):
@@ -138,7 +125,7 @@ def xml_to_str(tree, encoding=None, xml_declaration=False):
         raise ValueError("'xml_declaration' is not supported when 'encoding' is None")
     if encoding:
         return tostring(tree, encoding=encoding, xml_declaration=True)
-    return tostring(tree, encoding=text_type, xml_declaration=False)
+    return tostring(tree, encoding=str, xml_declaration=False)
 
 
 def get_xml_attr(tree, name):
@@ -157,12 +144,12 @@ def value_to_xml_text(value):
     from .ewsdatetime import EWSTimeZone, EWSDateTime, EWSDate
     from .indexed_properties import PhoneNumber, EmailAddress
     from .properties import Mailbox, Attendee, ConversationId
-    if isinstance(value, string_types):
+    if isinstance(value, str):
         return safe_xml_value(value)
     if isinstance(value, bool):
         return '1' if value else '0'
     if isinstance(value, (int, Decimal)):
-        return text_type(value)
+        return str(value)
     if isinstance(value, datetime.time):
         return value.isoformat()
     if isinstance(value, EWSTimeZone):
@@ -193,7 +180,7 @@ def xml_text_to_value(value, value_type):
         Decimal: Decimal,
         datetime.timedelta: isodate.parse_duration,
         EWSDateTime: EWSDateTime.from_string,
-        string_types[0]: lambda v: v
+        str: lambda v: v
     }[value_type](value)
 
 
@@ -202,7 +189,7 @@ def set_xml_value(elem, value, version):
     from .fields import FieldPath, FieldOrder
     from .properties import EWSElement
     from .version import Version
-    if isinstance(value, string_types + (bool, bytes, int, Decimal, datetime.time, EWSDate, EWSDateTime)):
+    if isinstance(value, (str, bool, bytes, int, Decimal, datetime.time, EWSDate, EWSDateTime)):
         elem.text = value_to_xml_text(value)
     elif isinstance(value, RestrictedElement):
         elem.append(value)
@@ -216,7 +203,7 @@ def set_xml_value(elem, value, version):
                 elem.append(v.to_xml(version=version))
             elif isinstance(v, RestrictedElement):
                 elem.append(v)
-            elif isinstance(v, string_types):
+            elif isinstance(v, str):
                 add_xml_child(elem, 't:String', v)
             else:
                 raise ValueError('Unsupported type %s for list element %s on elem %s' % (type(v), v, elem))
@@ -232,7 +219,7 @@ def set_xml_value(elem, value, version):
 
 
 def safe_xml_value(value, replacement='?'):
-    return text_type(_ILLEGAL_XML_CHARS_RE.sub(replacement, value))
+    return _ILLEGAL_XML_CHARS_RE.sub(replacement, value)
 
 
 def create_element(name, attrs=None, nsmap=None):
@@ -297,7 +284,7 @@ def safe_b64decode(data):
     # padding. Add padding if it's needed.
     overflow = len(data) % 4
     if overflow:
-        if isinstance(data, string_types):
+        if isinstance(data, str):
             padding = '=' * (4 - overflow)
         else:
             padding = b'=' * (4 - overflow)
@@ -334,11 +321,8 @@ class StreamingBase64Parser(DefusedExpatParser):
         source.close()
         self.close()
         if not self.element_found:
-            if PY2:
-                data = b''.join(collected_data)
-            else:
-                data = bytes(collected_data)
-            raise ElementNotFound('The element to be streamed from was not found', data=data)
+            data = bytes(collected_data)
+            raise ElementNotFound('The element to be streamed from was not found', data=bytes(data))
 
     def feed(self, data, isFinal=0):
         # Like upstream, but yields the current content of the character buffer
@@ -435,15 +419,15 @@ def to_xml(bytes_content):
         if hasattr(e, 'position'):
             e.lineno, e.offset = e.position
         if not e.lineno:
-            raise ParseError(text_type(e), '<not from file>', e.lineno, e.offset)
+            raise ParseError(str(e), '<not from file>', e.lineno, e.offset)
         try:
             stream.seek(0)
             offending_line = stream.read().splitlines()[e.lineno - 1]
         except (IndexError, io.UnsupportedOperation):
-            raise ParseError(text_type(e), '<not from file>', e.lineno, e.offset)
+            raise ParseError(str(e), '<not from file>', e.lineno, e.offset)
         else:
             offending_excerpt = offending_line[max(0, e.offset - 20):e.offset + 20]
-            msg = '%s\nOffending text: [...]%s[...]' % (text_type(e), offending_excerpt)
+            msg = '%s\nOffending text: [...]%s[...]' % (str(e), offending_excerpt)
             raise ParseError(msg, e.lineno, e.offset)
     except TypeError:
         try:
@@ -500,10 +484,7 @@ class PrettyXmlHandler(logging.StreamHandler):
                 if not is_xml(value):
                     continue
                 try:
-                    if PY2:
-                        record.args[key] = self.highlight_xml(self.prettify_xml(value)).encode('utf-8')
-                    else:
-                        record.args[key] = self.highlight_xml(self.prettify_xml(value))
+                    record.args[key] = self.highlight_xml(self.prettify_xml(value))
                 except Exception as e:
                     # Something bad happened, but we don't want to crash the program just because logging failed
                     print('XML highlighting failed: %s' % e)
@@ -610,10 +591,7 @@ MAX_REDIRECTS = 5  # Define a max redirection count. We don't want to be sent in
 
 # A collection of error classes we want to handle as general connection errors
 CONNECTION_ERRORS = (requests.exceptions.ChunkedEncodingError, requests.exceptions.ConnectionError,
-                     requests.exceptions.Timeout, socket.timeout)
-if not PY2:
-    # Python2 does not have ConnectionResetError
-    CONNECTION_ERRORS += (ConnectionResetError,)  # noqa: F821
+                     requests.exceptions.Timeout, socket.timeout, ConnectionResetError)
 
 # A collection of error classes we want to handle as TLS verification errors
 TLS_ERRORS = (requests.exceptions.SSLError,)
@@ -699,7 +677,7 @@ Response data: %(xml_response)s
                 session = protocol.renew_session(session)
             log.debug('Session %s thread %s: retry %s timeout %s POST\'ing to %s after %ss wait', session.session_id,
                       thread_id, retry, protocol.TIMEOUT, url, wait)
-            d_start = time_func()
+            d_start = time.monotonic()
             # Always create a dummy response for logging purposes, in case we fail in the following
             r = DummyResponse(url=url, headers={}, request_headers=headers)
             try:
@@ -717,7 +695,7 @@ Response data: %(xml_response)s
                     wait=wait,
                     session_id=session.session_id,
                     url=str(r.url),
-                    response_time=time_func() - d_start,
+                    response_time=time.monotonic() - d_start,
                     status_code=r.status_code,
                     request_headers=r.request.headers,
                     response_headers=r.headers,
@@ -777,7 +755,7 @@ def _back_off_if_needed(back_off_until):
 def _may_retry_on_error(response, retry_policy, wait):
     if response.status_code not in (301, 302, 401, 503):
         # Don't retry if we didn't get a status code that we can hope to recover from
-        log.debug('No retry: wrong status code')
+        log.debug('No retry: wrong status code %s', response.status_code)
         return False
     if retry_policy.fail_fast:
         log.debug('No retry: no fail-fast policy')

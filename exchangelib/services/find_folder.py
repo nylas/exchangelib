@@ -1,7 +1,5 @@
 from collections import OrderedDict
 
-from six import text_type
-
 from ..util import create_element, set_xml_value, TNS
 from ..version import EXCHANGE_2010
 from .common import EWSFolderService, PagingEWSMixIn, create_shape_element
@@ -53,8 +51,8 @@ class FindFolder(EWSFolderService, PagingEWSMixIn):
             indexedpageviewitem = create_element(
                 'm:IndexedPageFolderView',
                 attrs=OrderedDict([
-                    ('MaxEntriesReturned', text_type(page_size)),
-                    ('Offset', text_type(offset)),
+                    ('MaxEntriesReturned', str(page_size)),
+                    ('Offset', str(offset)),
                     ('BasePoint', 'Beginning'),
                 ])
             )

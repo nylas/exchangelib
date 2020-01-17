@@ -2,7 +2,6 @@ from locale import getlocale
 from logging import getLogger
 
 from cached_property import threaded_cached_property
-from six import string_types
 
 from .autodiscover import discover
 from .configuration import Configuration
@@ -62,7 +61,7 @@ class Account(object):
             # getlocale() may throw ValueError if it fails to parse the system locale
             log.warning('Failed to get locale (%s)' % e)
             self.locale = None
-        if not isinstance(self.locale, string_types + (type(None),)):
+        if not isinstance(self.locale, (type(None), str)):
             raise ValueError("Expected 'locale' to be a string, got %r" % self.locale)
         try:
             self.default_timezone = default_timezone or EWSTimeZone.localzone()

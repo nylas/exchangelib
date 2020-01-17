@@ -4,7 +4,6 @@ import logging
 
 import requests
 import requests_mock
-from six import PY2
 
 from exchangelib import FailFast, FaultTolerance
 from exchangelib.errors import RelativeRedirect, TransportError, RateLimitError, RedirectError, UnauthorizedError,\
@@ -121,7 +120,7 @@ class UtilTest(EWSTest):
 
     def test_pretty_xml_handler(self):
         # Test that a normal, non-XML log record is passed through unchanged
-        stream = io.BytesIO() if PY2 else io.StringIO()
+        stream = io.StringIO()
         stream.isatty = lambda: True
         h = PrettyXmlHandler(stream=stream)
         self.assertTrue(h.is_tty())
@@ -133,7 +132,7 @@ class UtilTest(EWSTest):
         self.assertEqual(h.stream.read(), 'hello\n')
 
         # Test formatting of an XML record. It should contain newlines and color codes.
-        stream = io.BytesIO() if PY2 else io.StringIO()
+        stream = io.StringIO()
         stream.isatty = lambda: True
         h = PrettyXmlHandler(stream=stream)
         r = logging.LogRecord(

@@ -1,7 +1,5 @@
 import logging
 
-from six import string_types
-
 from .fields import IntegerField, EnumField, EnumListField, DateField, DateTimeField, EWSElementField, \
     MONTHS, WEEK_NUMBERS, WEEKDAYS
 from .properties import EWSElement, IdChangeKeyMixIn
@@ -135,7 +133,7 @@ class WeeklyPattern(Pattern):
     __slots__ = tuple(f.name for f in FIELDS)
 
     def __str__(self):
-        if isinstance(self.weekdays, string_types):
+        if isinstance(self.weekdays, str):
             weekdays = [self.weekdays]
         elif isinstance(self.weekdays, int):
             weekdays = [_weekday_to_str(self.weekdays)]

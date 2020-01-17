@@ -1,8 +1,6 @@
 from collections import OrderedDict
 import logging
 
-from six import text_type
-
 from ..errors import MalformedResponseError, ErrorServerBusy
 from ..util import create_element, set_xml_value, xml_to_str, MNS
 from .common import EWSAccountService, PagingEWSMixIn, create_shape_element
@@ -61,8 +59,8 @@ class FindPeople(EWSAccountService, PagingEWSMixIn):
         view_type = create_element(
             'm:IndexedPageItemView',
             attrs=OrderedDict([
-                ('MaxEntriesReturned', text_type(page_size)),
-                ('Offset', text_type(offset)),
+                ('MaxEntriesReturned', str(page_size)),
+                ('Offset', str(offset)),
                 ('BasePoint', 'Beginning'),
             ])
         )

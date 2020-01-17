@@ -5,7 +5,6 @@ import dateutil.parser
 import pytz
 import pytz.exceptions
 import tzlocal
-import six
 
 from .errors import NaiveDateTimeNotAllowed, UnknownTimeZone, AmbiguousTimeError, NonExistentTimeError
 from .winzone import PYTZ_TO_MS_TIMEZONE_MAP, MS_TIMEZONE_TO_PYTZ_MAP

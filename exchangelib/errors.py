@@ -4,8 +4,6 @@ Stores errors specific to this package, and mirrors all the possible errors that
 """
 from urllib.parse import urlparse
 
-from six import text_type
-
 import pytz.exceptions
 
 
@@ -25,7 +23,7 @@ class EWSError(Exception):
         self.value = value
 
     def __str__(self):
-        return text_type(self.value)
+        return str(self.value)
 
 
 # Warnings
@@ -46,7 +44,7 @@ class RateLimitError(TransportError):
         self.total_wait = total_wait
 
     def __str__(self):
-        return text_type(
+        return str(
             '{value} (gave up after {total_wait} seconds. URL {url} returned status code {status_code})'.format(
                 value=self.value, url=self.url, status_code=self.status_code, total_wait=self.total_wait)
         )
@@ -70,7 +68,7 @@ class RedirectError(TransportError):
         self.url = url
         self.server = parsed_url.hostname.lower()
         self.has_ssl = parsed_url.scheme == 'https'
-        super(RedirectError, self).__init__(text_type(self))
+        super(RedirectError, self).__init__(str(self))
 
     def __str__(self):
         return 'We were redirected to %s' % self.url
@@ -95,7 +93,7 @@ class AutoDiscoverCircularRedirect(AutoDiscoverError):
 class AutoDiscoverRedirect(AutoDiscoverError):
     def __init__(self, redirect_email):
         self.redirect_email = redirect_email
-        super(AutoDiscoverRedirect, self).__init__(text_type(self))
+        super(AutoDiscoverRedirect, self).__init__(str(self))
 
     def __str__(self):
         return 'AutoDiscover redirects to %s' % self.redirect_email
@@ -132,7 +130,7 @@ class CASError(EWSError):
     def __init__(self, cas_error, response):
         self.cas_error = cas_error
         self.response = response
-        super(CASError, self).__init__(text_type(self))
+        super(CASError, self).__init__(str(self))
 
     def __str__(self):
         return 'CAS error: %s' % self.cas_error

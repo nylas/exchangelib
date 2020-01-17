@@ -2,8 +2,6 @@ import base64
 from collections import OrderedDict
 import logging
 
-from six import string_types
-
 from .properties import InvalidField
 from .util import create_element, xml_to_str, value_to_xml_text, is_iterable
 from .version import EXCHANGE_2010
@@ -74,7 +72,7 @@ class Q(object):
 
         # Check for query string, or Q object containing query string, as the only argument
         if len(args) == 1 and not kwargs:
-            if isinstance(args[0], string_types):
+            if isinstance(args[0], str):
                 self.query_string = args[0]
                 return
             if isinstance(args[0], self.__class__) and args[0].query_string:

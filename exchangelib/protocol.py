@@ -15,10 +15,8 @@ from cached_property import threaded_cached_property
 import requests.adapters
 import requests.sessions
 import requests.utils
-from future.utils import with_metaclass
 from oauthlib.oauth2 import BackendApplicationClient, WebApplicationClient
 from requests_oauthlib import OAuth2Session
-from six import string_types
 
 from .credentials import OAuth2AuthorizationCodeCredentials, OAuth2Credentials
 from .errors import TransportError, SessionPoolMinSizeReached
@@ -387,7 +385,7 @@ class CachingProtocol(type):
         mcs._protocol_cache.clear()
 
 
-class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
+class Protocol(BaseProtocol, metaclass=CachingProtocol):
     def __init__(self, *args, **kwargs):
         self.version_hint = None
         super(Protocol, self).__init__(*args, **kwargs)
@@ -524,7 +522,7 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
         :return: List of Mailbox items that are members of the distribution list
         """
         from .properties import DLMailbox
-        if isinstance(distribution_list, string_types):
+        if isinstance(distribution_list, str):
             distribution_list = DLMailbox(email_address=distribution_list, mailbox_type='PublicDL')
         return list(ExpandDL(protocol=self).call(distribution_list=distribution_list))
 

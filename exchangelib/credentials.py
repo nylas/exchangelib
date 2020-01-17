@@ -8,8 +8,6 @@ import abc
 import logging
 from threading import RLock
 
-from .util import PickleMixIn
-
 log = logging.getLogger(__name__)
 
 IMPERSONATION = 'impersonation'
@@ -17,7 +15,7 @@ DELEGATE = 'delegate'
 ACCESS_TYPES = (IMPERSONATION, DELEGATE)
 
 
-class BaseCredentials(object):
+class BaseCredentials(metaclass=abc.ABCMeta):
     """
     Base for credential storage.
 
@@ -25,8 +23,6 @@ class BaseCredentials(object):
     OAuth, which expires tokens relatively frequently) and provides a
     lock for synchronizing access to the object around refreshes.
     """
-    __metaclass__ = abc.ABCMeta
-
     def __init__(self):
         self._lock = RLock()
 
@@ -75,7 +71,7 @@ class BaseCredentials(object):
         self._lock = RLock()
 
 
-class Credentials(BaseCredentials, PickleMixIn):
+class Credentials(BaseCredentials):
     """
     Keeps login info the way Exchange likes it.
 
@@ -102,7 +98,6 @@ class Credentials(BaseCredentials, PickleMixIn):
         self.password = password
 
     def refresh(self, session):
-        # Needed for PY2
         pass
 
     def __repr__(self):
@@ -112,7 +107,7 @@ class Credentials(BaseCredentials, PickleMixIn):
         return self.username
 
 
-class OAuth2Credentials(BaseCredentials, PickleMixIn):
+class OAuth2Credentials(BaseCredentials):
     """
     Login info for OAuth 2.0 client credentials authentication, as well
     as a base for other OAuth 2.0 grant types.
@@ -172,7 +167,7 @@ class OAuth2Credentials(BaseCredentials, PickleMixIn):
         return self.client_id
 
 
-class OAuth2AuthorizationCodeCredentials(OAuth2Credentials, PickleMixIn):
+class OAuth2AuthorizationCodeCredentials(OAuth2Credentials):
     """
     Login info for OAuth 2.0 authentication using the authorization code
     grant type. This can be used in one of several ways:

@@ -6,8 +6,6 @@ import datetime
 from decimal import Decimal, InvalidOperation
 import logging
 
-from six import string_types
-
 from .errors import ErrorInvalidServerVersion
 from .ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, NaiveDateTimeNotAllowed, UnknownTimeZone
 from .util import create_element, get_xml_attrs, set_xml_value, value_to_xml_text, is_iterable, safe_b64decode, TNS
@@ -68,7 +66,7 @@ def split_field_path(field_path):
         'phone_numbers__PrimaryPhone' -> ('phone_numbers', 'PrimaryPhone', None)
         'physical_addresses__Home__street' -> ('physical_addresses', 'Home', 'street')
     """
-    if not isinstance(field_path, string_types):
+    if not isinstance(field_path, str):
         raise ValueError("Field path %r must be a string" % field_path)
     search_parts = field_path.split('__')
     field = search_parts[0]
@@ -148,8 +146,8 @@ class FieldPath(object):
         # 'label' and 'subfield' are only used for IndexedField fields
         if not isinstance(field, (FieldURIField, ExtendedPropertyField)):
             raise ValueError("'field' %r must be an FieldURIField, of ExtendedPropertyField instance" % field)
-        if label and not isinstance(label, string_types):
-            raise ValueError("'label' %r must be a %s instance" % (label, string_types))
+        if label and not isinstance(label, str):
+            raise ValueError("'label' %r must be a %s instance" % (label, str))
         if subfield and not isinstance(subfield, SubField):
             raise ValueError("'subfield' %r must be a SubField instance" % subfield)
         self.field = field
@@ -239,11 +237,10 @@ class FieldOrder(object):
         return field_order
 
 
-class Field(object):
+class Field(metaclass=abc.ABCMeta):
     """
     Holds information related to an item field
     """
-    __metaclass__ = abc.ABCMeta
     value_cls = None
     is_list = False
     # Is the field a complex EWS type? Quoting the EWS FindItem docs:
@@ -468,7 +465,7 @@ class EnumField(IntegerField):
         if self.is_list:
             value = list(value)  # Convert to something we can index
             for i, v in enumerate(value):
-                if isinstance(v, string_types):
+                if isinstance(v, str):
                     if v not in self.enum:
                         raise ValueError(
                             "List value '%s' on field '%s' must be one of %s" % (v, self.name, self.enum))
@@ -478,7 +475,7 @@ class EnumField(IntegerField):
             if len(value) > len(set(value)):
                 raise ValueError("List entries '%s' on field '%s' must be unique" % (value, self.name))
         else:
-            if isinstance(value, string_types):
+            if isinstance(value, str):
                 if value not in self.enum:
                     raise ValueError(
                         "Value '%s' on field '%s' must be one of %s" % (value, self.name, self.enum))
@@ -487,7 +484,7 @@ class EnumField(IntegerField):
 
     def as_string(self, value):
         # Converts an integer in the enum to its equivalent string
-        if isinstance(value, string_types):
+        if isinstance(value, str):
             return value
         if self.is_list:
             return [self.enum[v - 1] for v in sorted(value)]
@@ -656,7 +653,7 @@ class TimeZoneField(FieldURIField):
 
 class TextField(FieldURIField):
     """A field that stores a string value with no length limit"""
-    value_cls = string_types[0]
+    value_cls = str
     is_complex = True
 
     def from_xml(self, elem, account):
@@ -938,7 +935,7 @@ class BaseEmailField(EWSElementField):
     is_complex = True  # FindItem only returns the name, not the email address
 
     def clean(self, value, version=None):
-        if isinstance(value, string_types):
+        if isinstance(value, str):
             value = self.value_cls(email_address=value)
         return super(BaseEmailField, self).clean(value, version=version)
 
@@ -989,7 +986,7 @@ class MailboxListField(EWSElementListField):
 
     def clean(self, value, version=None):
         if value is not None:
-            value = [self.value_cls(email_address=s) if isinstance(s, string_types) else s for s in value]
+            value = [self.value_cls(email_address=s) if isinstance(s, str) else s for s in value]
         return super(MailboxListField, self).clean(value, version=version)
 
 
@@ -1003,7 +1000,7 @@ class MemberListField(EWSElementListField):
         if value is not None:
             from .properties import Mailbox
             value = [
-                self.value_cls(mailbox=Mailbox(email_address=s)) if isinstance(s, string_types) else s for s in value
+                self.value_cls(mailbox=Mailbox(email_address=s)) if isinstance(s, str) else s for s in value
             ]
         return super(MemberListField, self).clean(value, version=version)
 
@@ -1018,7 +1015,7 @@ class AttendeesField(EWSElementListField):
         from .properties import Mailbox
         if value is not None:
             value = [self.value_cls(mailbox=Mailbox(email_address=s), response_type='Accept')
-                     if isinstance(s, string_types) else s for s in value]
+                     if isinstance(s, str) else s for s in value]
         return super(AttendeesField, self).clean(value, version=version)
 
 
@@ -1056,7 +1053,7 @@ class SubField(Field):
     namespace = TNS
 
     # A field to hold the value on an SingleFieldIndexedElement
-    value_cls = string_types[0]
+    value_cls = str
 
     def from_xml(self, elem, account):
         return elem.text
@@ -1080,7 +1077,7 @@ class SubField(Field):
 
 class EmailSubField(SubField):
     """A field to hold the value on an SingleFieldIndexedElement"""
-    value_cls = string_types[0]
+    value_cls = str
 
     def from_xml(self, elem, account):
         return elem.text or elem.get('Name')  # Sometimes elem.text is empty. Exchange saves the same in 'Name' attr
@@ -1088,7 +1085,7 @@ class EmailSubField(SubField):
 
 class NamedSubField(SubField):
     """A field to hold the value on an MultiFieldIndexedElement"""
-    value_cls = string_types[0]
+    value_cls = str
 
     def __init__(self, *args, **kwargs):
         self.field_uri = kwargs.pop('field_uri')

@@ -8,9 +8,6 @@ import sys
 import tempfile
 from threading import RLock
 
-from future.utils import PY2
-from six import text_type
-
 from ..configuration import Configuration
 from .protocol import AutodiscoverProtocol
 
@@ -50,8 +47,6 @@ def shelve_open_with_failover(filename):
             os.unlink(f)
         shelve_handle = shelve.open(filename)
     yield shelve_handle
-    if PY2:
-        shelve_handle.close()
 
 
 class AutodiscoverCache(object):
@@ -150,7 +145,7 @@ class AutodiscoverCache(object):
             pass
 
     def __str__(self):
-        return text_type(self._protocols)
+        return str(self._protocols)
 
 
 autodiscover_cache = AutodiscoverCache()

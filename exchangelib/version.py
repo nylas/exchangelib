@@ -1,11 +1,9 @@
 import logging
 import re
 
-from six import text_type, string_types
-
 from .errors import TransportError, ErrorInvalidSchemaVersionForMailboxVersion, ErrorInvalidServerVersion, \
     ErrorIncorrectSchemaVersion, ResponseMessageError
-from .util import PickleMixIn, xml_to_str, TNS
+from .util import xml_to_str, TNS
 
 log = logging.getLogger(__name__)
 
@@ -40,7 +38,7 @@ VERSIONS = {
 API_VERSIONS = sorted({v[0] for v in VERSIONS.values()}, reverse=True)
 
 
-class Build(PickleMixIn):
+class Build:
     """
     Holds methods for working with build numbers
     """
@@ -83,7 +81,7 @@ class Build(PickleMixIn):
         self.major_build = major_build
         self.minor_build = minor_build
         if major_version < 8:
-            raise ValueError("Exchange major versions below 8 don't support EWS (%s)" % text_type(self))
+            raise ValueError("Exchange major versions below 8 don't support EWS (%s)" % self)
 
     @classmethod
     def from_xml(cls, elem):
@@ -182,7 +180,7 @@ EXCHANGE_2019 = Build(15, 2)
 EXCHANGE_O365 = Build(15, 20)
 
 
-class Version(PickleMixIn):
+class Version:
     """
     Holds information about the server version
     """
@@ -195,7 +193,7 @@ class Version(PickleMixIn):
         if api_version is None:
             self.api_version = build.api_version()
         else:
-            if not isinstance(api_version, string_types):
+            if not isinstance(api_version, str):
                 raise ValueError("'api_version' must be a string")
             self.api_version = api_version
 

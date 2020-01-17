@@ -1,7 +1,5 @@
 import logging
 
-from six import text_type
-
 from ..errors import ErrorAccessDenied, ErrorFolderNotFound, ErrorNoPublicFolderReplicaAvailable, ErrorItemNotFound, \
     ErrorInvalidOperation
 from ..fields import EffectiveRightsField
@@ -249,7 +247,7 @@ class Root(RootOfHierarchy):
         if candidates:
             if len(candidates) > 1:
                 raise ValueError(
-                    'Multiple possible default %s folders: %s' % (folder_cls, [text_type(f.name) for f in candidates])
+                    'Multiple possible default %s folders: %s' % (folder_cls, [f.name for f in candidates])
                 )
             if candidates[0].is_distinguished:
                 log.debug('Found cached distinguished %s folder', folder_cls)

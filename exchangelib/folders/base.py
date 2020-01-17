@@ -2,9 +2,6 @@ from fnmatch import fnmatch
 import logging
 from operator import attrgetter
 
-from future.utils import PY2
-from six import string_types
-
 from ..errors import ErrorAccessDenied, ErrorFolderNotFound, ErrorCannotEmptyFolder, ErrorCannotDeleteObject, \
     ErrorDeleteDistinguishedFolder
 from ..fields import IntegerField, CharField, FieldPath, EffectiveRightsField, PermissionSetField, EWSElementField, \
@@ -245,7 +242,7 @@ class BaseFolder(RegisterMixIn, SearchableMixIn):
         has_start, has_end = False, False
         for i, field_path in enumerate(fields):
             # Allow both Field and FieldPath instances and string field paths as input
-            if isinstance(field_path, string_types):
+            if isinstance(field_path, str):
                 field_path = FieldPath.from_string(field_path=field_path, folder=self)
                 fields[i] = field_path
             elif isinstance(field_path, Field):
@@ -547,10 +544,6 @@ class BaseFolder(RegisterMixIn, SearchableMixIn):
             if c.name == other:
                 return c
         raise ErrorFolderNotFound("No subfolder with name '%s'" % other)
-
-    if PY2:
-        # Python 2 requires __div__
-        __div__ = __truediv__
 
     def __repr__(self):
         return self.__class__.__name__ + \

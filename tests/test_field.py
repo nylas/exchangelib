@@ -1,8 +1,6 @@
 from collections import namedtuple
 from decimal import Decimal
 
-from six import PY2
-
 from exchangelib import Version, EWSDateTime, EWSTimeZone, UTC
 from exchangelib.errors import ErrorInvalidServerVersion
 from exchangelib.extended_properties import ExternId
@@ -34,18 +32,12 @@ class FieldTest(TimedTestCase):
         field = CharListField('foo', field_uri='bar')
         with self.assertRaises(TypeError) as e:
             field.clean([1, 2, 3])  # List items must be correct type
-        if PY2:
-            self.assertEqual(str(e.exception), "Field 'foo' value 1 must be of type <type 'basestring'>")
-        else:
-            self.assertEqual(str(e.exception), "Field 'foo' value 1 must be of type <class 'str'>")
+        self.assertEqual(str(e.exception), "Field 'foo' value 1 must be of type <class 'str'>")
 
         field = CharField('foo', field_uri='bar')
         with self.assertRaises(TypeError) as e:
             field.clean(1)  # Value must be correct type
-        if PY2:
-            self.assertEqual(str(e.exception), "Field 'foo' value 1 must be of type <type 'basestring'>")
-        else:
-            self.assertEqual(str(e.exception), "Field 'foo' value 1 must be of type <class 'str'>")
+        self.assertEqual(str(e.exception), "Field 'foo' value 1 must be of type <class 'str'>")
         with self.assertRaises(ValueError) as e:
             field.clean('X' * 256)  # Value length must be within max_length
         self.assertEqual(
@@ -72,10 +64,7 @@ class FieldTest(TimedTestCase):
         self.assertEqual(str(e.exception), "'foo' is a required field")
         with self.assertRaises(TypeError) as e:
             field.clean(123)  # Correct type is required
-        if PY2:
-            self.assertEqual(str(e.exception), "'ExternId' value 123 must be an instance of <type 'basestring'>")
-        else:
-            self.assertEqual(str(e.exception), "'ExternId' value 123 must be an instance of <class 'str'>")
+        self.assertEqual(str(e.exception), "'ExternId' value 123 must be an instance of <class 'str'>")
         self.assertEqual(field.clean('XXX'), 'XXX')  # We can clean a simple value and keep it as a simple value
         self.assertEqual(field.clean(ExternId('XXX')), ExternId('XXX'))  # We can clean an ExternId instance as well
 
@@ -91,11 +80,7 @@ class FieldTest(TimedTestCase):
         self.assertEqual(str(e.exception), "'ExternIdArray' value 123 must be a list")
         with self.assertRaises(TypeError) as e:
             field.clean([123])  # Correct type is required
-        if PY2:
-            self.assertEqual(str(e.exception),
-                             "'ExternIdArray' value element 123 must be an instance of <type 'basestring'>")
-        else:
-            self.assertEqual(str(e.exception), "'ExternIdArray' value element 123 must be an instance of <class 'str'>")
+        self.assertEqual(str(e.exception), "'ExternIdArray' value element 123 must be an instance of <class 'str'>")
 
         # Test min/max on IntegerField
         field = IntegerField('foo', field_uri='bar', min=5, max=10)

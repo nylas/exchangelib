@@ -2,8 +2,6 @@ import base64
 import logging
 from decimal import Decimal
 
-from six import string_types
-
 from .ewsdatetime import EWSDateTime
 from .properties import EWSElement
 from .util import create_element, add_xml_child, get_xml_attrs, get_xml_attr, set_xml_value, value_to_xml_text, \
@@ -235,7 +233,7 @@ class ExtendedProperty(EWSElement):
         if cls.is_binary_type():
             return safe_b64decode(get_xml_attr(elem, '{%s}Value' % TNS))
         extended_field_value = xml_text_to_value(value=get_xml_attr(elem, '{%s}Value' % TNS), value_type=python_type)
-        if python_type == string_types[0] and not extended_field_value:
+        if python_type == str and not extended_field_value:
             # For string types, we want to return the empty string instead of None if the element was
             # actually found, but there was no XML value. For other types, it would be more problematic
             # to make that distinction, e.g. return False for bool, 0 for int, etc.
@@ -265,7 +263,7 @@ class ExtendedProperty(EWSElement):
 
     @classmethod
     def property_tag_as_int(cls):
-        if isinstance(cls.property_tag, string_types):
+        if isinstance(cls.property_tag, str):
             return int(cls.property_tag, base=16)
         return cls.property_tag
 
@@ -281,7 +279,7 @@ class ExtendedProperty(EWSElement):
             'ApplicationTime': Decimal,
             'Binary': bytes,
             'Boolean': bool,
-            'CLSID': string_types[0],
+            'CLSID': str,
             'Currency': int,
             'Double': Decimal,
             'Float': Decimal,
@@ -289,7 +287,7 @@ class ExtendedProperty(EWSElement):
             'Long': int,
             'Short': int,
             'SystemTime': EWSDateTime,
-            'String': string_types[0],
+            'String': str,
         }[base_type]
 
     @classmethod

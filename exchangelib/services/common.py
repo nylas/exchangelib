@@ -24,9 +24,7 @@ log = logging.getLogger(__name__)
 CHUNK_SIZE = 100  # A default chunk size for all services
 
 
-class EWSService(object):
-    __metaclass__ = abc.ABCMeta
-
+class EWSService(metaclass=abc.ABCMeta):
     SERVICE_NAME = None  # The name of the SOAP service
     element_container_name = None  # The name of the XML element wrapping the collection of returned items
     # Return exception instance instead of raising exceptions for the following errors when contained in an element

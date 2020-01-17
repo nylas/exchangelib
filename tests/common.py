@@ -9,7 +9,6 @@ import unittest
 import unittest.util
 
 import pytz
-from six import PY2
 from yaml import safe_load
 
 from exchangelib.account import Account
@@ -26,9 +25,6 @@ from exchangelib.indexed_properties import EmailAddress, PhysicalAddress, PhoneN
 from exchangelib.properties import Attendee, Mailbox, PermissionSet, Permission, UserId
 from exchangelib.protocol import BaseProtocol, NoVerifyHTTPAdapter, FaultTolerance
 from exchangelib.recurrence import Recurrence, DailyPattern
-
-if PY2:
-    FileNotFoundError = IOError
 
 mock_account = namedtuple('mock_account', ('protocol', 'version'))
 mock_protocol = namedtuple('mock_protocol', ('version', 'service_endpoint'))

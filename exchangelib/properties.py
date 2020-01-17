@@ -7,9 +7,6 @@ import logging
 import struct
 from threading import Lock
 
-from future.utils import PY2
-from six import text_type, string_types
-
 from .fields import SubField, TextField, EmailAddressField, ChoiceField, DateTimeField, EWSElementField, MailboxField, \
     Choice, BooleanField, IdField, ExtendedPropertyField, IntegerField, TimeField, EnumField, CharField, EmailField, \
     EWSElementListField, EnumListField, FreeBusyStatusField, UnknownEntriesField, MessageField, RecipientAddressField, \
@@ -28,7 +25,7 @@ class InvalidFieldForVersion(ValueError):
     pass
 
 
-class Body(text_type):
+class Body(str):
     """Helper to mark the 'body' field as a complex attribute.
 
     MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/body
@@ -98,10 +95,8 @@ class UID(bytes):
         return super(UID, cls).__new__(cls, codecs.decode(encoding, 'hex'))
 
 
-class EWSElement(object):
+class EWSElement(metaclass=abc.ABCMeta):
     """Base class for all XML element implementations"""
-    __metaclass__ = abc.ABCMeta
-
     ELEMENT_NAME = None  # The name of the XML tag
     FIELDS = []  # A list of attributes supported by this item class, ordered the same way as in EWS documentation
     NAMESPACE = TNS  # The XML tag namespace. Either TNS or MNS
@@ -244,7 +239,7 @@ class EWSElement(object):
         if not isinstance(version, Version):
             raise ValueError("'version' %r must be a Version instance" % version)
         # Allow both Field and FieldPath instances and string field paths as input
-        if isinstance(field, string_types):
+        if isinstance(field, str):
             field = cls.get_field_by_fieldname(fieldname=field)
         elif isinstance(field, FieldPath):
             field = field.field
@@ -283,26 +278,6 @@ class EWSElement(object):
         return hash(
             tuple(tuple(getattr(self, f.name) or ()) if f.is_list else getattr(self, f.name) for f in self.FIELDS)
         )
-
-    if PY2:
-        def __getstate__(self):
-            try:
-                state = self.__dict__.copy()
-            except AttributeError:
-                # This is a class where only __slots__ is defined
-                state = {}
-            state.update({k: getattr(self, k) for k in self._slots_keys()})
-            return state
-
-        def __setstate__(self, state):
-            try:
-                for k in self.__dict__.keys():
-                    setattr(self, k, state.get(k))
-            except AttributeError:
-                # This is a class where only __slots__ is defined
-                pass
-            for k in self._slots_keys():
-                setattr(self, k, state.get(k))
 
     def _field_vals(self):
         field_vals = []  # Keep sorting
