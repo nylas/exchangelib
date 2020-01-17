@@ -1,5 +1,3 @@
-from __future__ import unicode_literals
-
 from ..errors import ErrorNonExistentMailbox, AutoDiscoverFailed
 from ..fields import TextField, EmailAddressField, ChoiceField, Choice, EWSElementField, OnOffField, BooleanField, \
     IntegerField, BuildField, ProtocolListField

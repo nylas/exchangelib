@@ -1,5 +1,3 @@
-from __future__ import unicode_literals
-
 import logging
 
 from ..fields import BooleanField, Base64Field, TextField, MailboxField, MailboxListField, CharField

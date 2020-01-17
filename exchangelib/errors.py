@@ -2,8 +2,6 @@
 """
 Stores errors specific to this package, and mirrors all the possible errors that EWS can return.
 """
-from __future__ import unicode_literals
-
 from future.moves.urllib.parse import urlparse
 from future.utils import python_2_unicode_compatible
 from six import text_type

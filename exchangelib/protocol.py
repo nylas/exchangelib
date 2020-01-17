@@ -4,8 +4,6 @@ A protocol is an endpoint for EWS service connections. It contains all necessary
 Protocols should be accessed through an Account, and are either created from a default Configuration or autodiscovered
 when creating an Account.
 """
-from __future__ import unicode_literals
-
 import datetime
 import logging
 from multiprocessing.pool import ThreadPool

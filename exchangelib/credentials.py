@@ -4,8 +4,6 @@ login to a specific account. Impersonation is used mainly for service accounts t
 for ad-hoc access e.g. granted manually by the user.
 See http://blogs.msdn.com/b/exchangedev/archive/2009/06/15/exchange-impersonation-vs-delegate-access.aspx
 """
-from __future__ import unicode_literals
-
 import abc
 import logging
 from threading import RLock

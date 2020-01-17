@@ -1,5 +1,3 @@
-from __future__ import unicode_literals
-
 from base64 import b64decode
 from codecs import BOM_UTF8
 from collections import OrderedDict
@@ -657,10 +655,7 @@ def post_ratelimited(protocol, session, url, headers, data, allow_redirects=Fals
     wait = 10  # seconds
     retry = 0
     redirects = 0
-    # In Python 2, we want this to be a 'str' object so logging doesn't break (all formatting arguments are 'str').
-    # We activated 'unicode_literals' at the top of this file, so it would be a 'unicode' object unless we convert
-    # to 'str' explicitly. This is a no-op for Python 3.
-    log_msg = str('''\
+    log_msg = '''\
 Retry: %(retry)s
 Waited: %(wait)s
 Timeout: %(timeout)s
@@ -677,7 +672,7 @@ Request headers: %(request_headers)s
 Response headers: %(response_headers)s
 Request data: %(xml_request)s
 Response data: %(xml_response)s
-''')
+'''
     log_vals = dict(
         retry=retry,
         wait=wait,

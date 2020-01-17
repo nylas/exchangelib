@@ -1,5 +1,3 @@
-from __future__ import unicode_literals
-
 from fnmatch import fnmatch
 import logging
 from operator import attrgetter

@@ -1,5 +1,3 @@
-from __future__ import unicode_literals
-
 from .account import Account
 from .attachments import FileAttachment, ItemAttachment
 from .autodiscover import discover
