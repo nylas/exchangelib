@@ -67,6 +67,7 @@ class QuerySet(SearchableMixIn):
         self.page_size = None
         self.max_items = None
         self.offset = 0
+        self.depth = None
 
         self._cache = None
 
@@ -98,6 +99,7 @@ class QuerySet(SearchableMixIn):
         new_qs.page_size = self.page_size
         new_qs.max_items = self.max_items
         new_qs.offset = self.offset
+        new_qs.depth = self.depth
         return new_qs
 
     @property
@@ -168,7 +170,6 @@ class QuerySet(SearchableMixIn):
         }[return_format](items)
 
     def _query(self):
-        from .folders import SHALLOW
         from .items import Persona
         if self.only_fields is None:
             # We didn't restrict list of field paths. Get all fields from the server, including extended properties.
@@ -207,7 +208,7 @@ class QuerySet(SearchableMixIn):
             items = list(self.folder_collection)[0].find_people(
                 self.q,
                 shape=ID_ONLY,
-                depth=SHALLOW,
+                depth=self.depth,
                 additional_fields=additional_fields,
                 order_fields=order_fields,
                 page_size=self.page_size,
@@ -217,6 +218,7 @@ class QuerySet(SearchableMixIn):
         else:
             find_item_kwargs = dict(
                 shape=ID_ONLY,  # Always use IdOnly here, because AllProperties doesn't actually get *all* properties
+                depth=self.depth,
                 additional_fields=additional_fields,
                 order_fields=order_fields,
                 calendar_view=self.calendar_view,
