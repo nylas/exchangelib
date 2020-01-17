@@ -2524,7 +2524,7 @@ class MessagesTest(CommonItemTest):
         msg['Subject'] = subject
         body = 'MIME test mail'
         msg.attach(MIMEText(body, 'plain', _charset='utf-8'))
-        mime_content = msg.as_string()
+        mime_content = msg.as_bytes()
         item = self.ITEM_CLASS(
             folder=self.test_folder,
             to_recipients=[self.account.primary_smtp_address],
