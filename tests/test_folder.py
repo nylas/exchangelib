@@ -6,7 +6,7 @@ from exchangelib.folders import Calendar, DeletedItems, Drafts, Inbox, Outbox, S
     AllItems, ConversationSettings, Friends, RSSFeeds, Sharing, IMContactList, QuickContacts, Journal, Notes, \
     SyncIssues, MyContacts, ToDoSearch, FolderCollection, DistinguishedFolderId, Files, \
     DefaultFoldersChangeHistory, PassThroughSearchResults, SmsAndChatsSync, GraphAnalytics, Signal, \
-    PdpProfileV2Secured, VoiceMail, FolderQuerySet, SingleFolderQuerySet, SHALLOW
+    PdpProfileV2Secured, VoiceMail, FolderQuerySet, SingleFolderQuerySet, SHALLOW, RootOfHierarchy
 from exchangelib.properties import Mailbox, InvalidField
 from exchangelib.services import GetFolder
 
@@ -326,7 +326,7 @@ class FolderTest(EWSTest):
         self.assertIsNone(self.account.root._subfolders)
 
     def test_extended_properties(self):
-        # Extended properties also work with folders. Here's an example of getting the size (in bytes) of a folder:
+        # Test extended properties on folders and folder roots. This extended prop gets the size (in bytes) of a folder
         class FolderSize(ExtendedProperty):
             property_tag = 0x0e08
             property_type = 'Integer'
@@ -337,6 +337,19 @@ class FolderTest(EWSTest):
             self.assertGreater(self.account.inbox.size, 0)
         finally:
             Folder.deregister('size')
+
+        try:
+            RootOfHierarchy.register('size', FolderSize)
+            self.account.root.refresh()
+            self.assertGreater(self.account.root.size, 0)
+        finally:
+            RootOfHierarchy.deregister('size')
+
+        # Register is only allowed on Folder and RootOfHierarchy classes
+        with self.assertRaises(TypeError):
+            self.account.calendar.register(FolderSize)
+        with self.assertRaises(TypeError):
+            self.account.root.register(FolderSize)
 
     def test_create_update_empty_delete(self):
         f = Messages(parent=self.account.inbox, name=get_random_string(16))

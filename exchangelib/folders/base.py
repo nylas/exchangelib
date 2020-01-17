@@ -595,6 +595,18 @@ class Folder(BaseFolder):
         self._root = value
 
     @classmethod
+    def register(cls, *args, **kwargs):
+        if cls is not Folder:
+            raise TypeError('For folders, custom fields must be registered on the Folder class')
+        return super().register(*args, **kwargs)
+
+    @classmethod
+    def deregister(cls, *args, **kwargs):
+        if cls is not Folder:
+            raise TypeError('For folders, custom fields must be registered on the Folder class')
+        return super().deregister(*args, **kwargs)
+
+    @classmethod
     def get_distinguished(cls, root):
         """Gets the distinguished folder for this folder class"""
         try:

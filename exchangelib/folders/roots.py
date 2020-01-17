@@ -55,6 +55,18 @@ class RootOfHierarchy(BaseFolder):
         self._subfolders = None
         super().refresh()
 
+    @classmethod
+    def register(cls, *args, **kwargs):
+        if cls is not RootOfHierarchy:
+            raise TypeError('For folder roots, custom fields must be registered on the RootOfHierarchy class')
+        return super().register(*args, **kwargs)
+
+    @classmethod
+    def deregister(cls, *args, **kwargs):
+        if cls is not RootOfHierarchy:
+            raise TypeError('For folder roots, custom fields must be registered on the RootOfHierarchy class')
+        return super().deregister(*args, **kwargs)
+
     def get_folder(self, folder_id):
         return self._folders_map.get(folder_id, None)
 

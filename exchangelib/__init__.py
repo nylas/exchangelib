@@ -6,7 +6,7 @@ from .credentials import DELEGATE, IMPERSONATION, Credentials, OAuth2Credentials
     OAuth2AuthorizationCodeCredentials
 from .ewsdatetime import EWSDate, EWSDateTime, EWSTimeZone, UTC, UTC_NOW
 from .extended_properties import ExtendedProperty
-from .folders import Folder, FolderCollection, SHALLOW, DEEP
+from .folders import Folder, RootOfHierarchy, FolderCollection, SHALLOW, DEEP
 from .items import AcceptItem, TentativelyAcceptItem, DeclineItem, CalendarItem, CancelCalendarItem, Contact, \
     DistributionList, Message, PostItem, Task
 from .properties import Body, HTMLBody, ItemId, Mailbox, Attendee, Room, RoomList, UID, DLMailbox
@@ -27,7 +27,7 @@ __all__ = [
     'DELEGATE', 'IMPERSONATION', 'Credentials', 'OAuth2AuthorizationCodeCredentials', 'OAuth2Credentials',
     'EWSDate', 'EWSDateTime', 'EWSTimeZone', 'UTC', 'UTC_NOW',
     'ExtendedProperty',
-    'Folder', 'FolderCollection', 'SHALLOW', 'DEEP',
+    'Folder', 'RootOfHierarchy', 'FolderCollection', 'SHALLOW', 'DEEP',
     'AcceptItem', 'TentativelyAcceptItem', 'DeclineItem', 'CalendarItem', 'CancelCalendarItem', 'Contact',
     'DistributionList', 'Message', 'PostItem', 'Task',
     'ItemId', 'Mailbox', 'DLMailbox', 'Attendee', 'Room', 'RoomList', 'Body', 'HTMLBody', 'UID',

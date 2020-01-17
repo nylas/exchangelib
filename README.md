@@ -928,8 +928,12 @@ class VoteResponse(ExtendedProperty):
     property_id = 0x00008524
     property_type = 'String'
 
-# Extended properties also work with folders. Here's an example of getting the size (in bytes) of
-# a folder:
+# Extended properties also work with folders. For folders, it's only possible to register custom
+# fields on all folder types at once. This is because it's difficult to provide a consistent API
+# when some folders have custom fields and others don't. Custom fields must be registered on the
+# generic Folder or RootOfHierarchy folder classes.
+#
+# Here's an example of getting the size (in bytes) of a folder:
 class FolderSize(ExtendedProperty):
     property_tag = 0x0e08
     property_type = 'Integer'
