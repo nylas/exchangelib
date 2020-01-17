@@ -288,9 +288,9 @@ class EWSTimeZone(object):
             try:
                 res = getattr(super(EWSTimeZone, self), func)(dt, is_dst=is_dst)
             except pytz.exceptions.AmbiguousTimeError as exc:
-                six.raise_from(AmbiguousTimeError(str(dt)), exc)
+                raise AmbiguousTimeError(str(dt)) from exc
             except pytz.exceptions.NonExistentTimeError as exc:
-                six.raise_from(NonExistentTimeError(str(dt)), exc)
+                raise NonExistentTimeError(str(dt)) from exc
         else:
             res = getattr(super(EWSTimeZone, self), func)(dt)
         if not isinstance(res.tzinfo, EWSTimeZone):

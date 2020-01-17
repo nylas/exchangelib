@@ -2,7 +2,6 @@ import logging
 import time
 
 import dns.resolver
-from future.utils import raise_from
 
 from ..configuration import Configuration
 from ..credentials import BaseCredentials
@@ -62,7 +61,7 @@ def discover(email, credentials=None, auth_type=None, retry_policy=None):
             except AutoDiscoverRedirect as e:
                 log.debug('%s redirects to %s', email, e.redirect_email)
                 if email.lower() == e.redirect_email.lower():
-                    raise_from(AutoDiscoverCircularRedirect('Redirect to same email address: %s' % email), None)
+                    raise AutoDiscoverCircularRedirect('Redirect to same email address: %s' % email) from None
                 # Start over with the new email address after releasing the lock
                 email = e.redirect_email
         else:
@@ -74,7 +73,7 @@ def discover(email, credentials=None, auth_type=None, retry_policy=None):
                                          auth_type=auth_type, retry_policy=retry_policy)
             except AutoDiscoverRedirect as e:
                 if email.lower() == e.redirect_email.lower():
-                    raise_from(AutoDiscoverCircularRedirect('Redirect to same email address: %s' % email), None)
+                    raise AutoDiscoverCircularRedirect('Redirect to same email address: %s' % email) from None
                 log.debug('%s redirects to %s', email, e.redirect_email)
                 # Start over with the new email address after releasing the lock
                 email = e.redirect_email
@@ -92,9 +91,9 @@ def _try_autodiscover(hostname, credentials, email, auth_type, retry_policy):
                                       auth_type=auth_type, retry_policy=retry_policy)
     except RedirectError as e:
         if not e.has_ssl:
-            raise_from(AutoDiscoverFailed(
+            raise AutoDiscoverFailed(
                 '%s redirected us to %s but only HTTPS redirects allowed' % (hostname, e.url)
-            ), None)
+            ) from None
         log.info('%s redirected us to %s', hostname, e.server)
         return _try_autodiscover(hostname=e.server, credentials=credentials, email=email, auth_type=auth_type,
                                  retry_policy=retry_policy)
@@ -105,9 +104,9 @@ def _try_autodiscover(hostname, credentials, email, auth_type, retry_policy):
                                           has_ssl=True, auth_type=auth_type, retry_policy=retry_policy)
         except RedirectError as e:
             if not e.has_ssl:
-                raise_from(AutoDiscoverFailed(
+                raise AutoDiscoverFailed(
                     'autodiscover.%s redirected us to %s but only HTTPS redirects allowed' % (hostname, e.url)
-                ), None)
+                ) from None
             log.info('%s redirected us to %s', hostname, e.server)
             return _try_autodiscover(hostname=e.server, credentials=credentials, email=email,
                                      auth_type=auth_type, retry_policy=retry_policy)
@@ -119,9 +118,9 @@ def _try_autodiscover(hostname, credentials, email, auth_type, retry_policy):
                                               retry_policy=retry_policy)
             except RedirectError as e:
                 if not e.has_ssl:
-                    raise_from(AutoDiscoverFailed(
+                    raise AutoDiscoverFailed(
                         'autodiscover.%s redirected us to %s but only HTTPS redirects allowed' % (hostname, e.url)
-                    ), None)
+                    ) from None
                 log.info('autodiscover.%s redirected us to %s', hostname, e.server)
                 return _try_autodiscover(hostname=e.server, credentials=credentials, email=email,
                                          auth_type=auth_type, retry_policy=retry_policy)
@@ -144,7 +143,7 @@ def _try_autodiscover(hostname, credentials, email, auth_type, retry_policy):
                         return _try_autodiscover(hostname=hostname_from_dns, credentials=credentials, email=email,
                                                  auth_type=auth_type, retry_policy=retry_policy)
                     except AutoDiscoverFailed:
-                        raise_from(AutoDiscoverFailed('All steps in the autodiscover protocol failed'), None)
+                        raise AutoDiscoverFailed('All steps in the autodiscover protocol failed') from None
 
 
 def _get_auth_type_or_raise(url, email, hostname, retry_policy):
@@ -166,8 +165,8 @@ def _get_auth_type_or_raise(url, email, hostname, retry_policy):
             redirect_hostname = canonical_hostname
         if redirect_hostname == hostname:
             log.debug('We were redirected to the same host')
-            raise_from(AutoDiscoverFailed('We were redirected to the same host'), None)
-        raise_from(RedirectError(url='%s://%s' % ('https' if redirect_has_ssl else 'http', redirect_hostname)), None)
+            raise AutoDiscoverFailed('We were redirected to the same host') from None
+        raise RedirectError(url='%s://%s' % ('https' if redirect_has_ssl else 'http', redirect_hostname)) from None
 
 
 def _autodiscover_hostname(hostname, credentials, email, has_ssl, auth_type, retry_policy):
@@ -177,7 +176,7 @@ def _autodiscover_hostname(hostname, credentials, email, has_ssl, auth_type, ret
     log.info('Trying autodiscover on %s', url)
     if not is_valid_hostname(hostname, timeout=AutodiscoverProtocol.TIMEOUT):
         # 'requests' is really bad at reporting that a hostname cannot be resolved. Let's check this separately.
-        raise_from(AutoDiscoverFailed('%r has no DNS entry' % hostname), None)
+        raise AutoDiscoverFailed('%r has no DNS entry' % hostname) from None
     # We are connecting to an unknown server here. It's probable that servers in the autodiscover sequence are
     # unresponsive or send any kind of ill-formed response. We shouldn't use a retry policy meant for a trusted
     # endpoint here.
@@ -236,7 +235,7 @@ def _get_auth_type(url, email, retry_policy):
     except TransportError as e:
         if isinstance(e, RedirectError):
             raise
-        raise_from(AutoDiscoverFailed('Error guessing auth type: %s' % e), None)
+        raise AutoDiscoverFailed('Error guessing auth type: %s' % e) from None
 
 
 def _get_response(protocol, email):
@@ -254,9 +253,7 @@ def _get_response(protocol, email):
         raise
     except (TransportError, UnauthorizedError):
         log.debug('No access to %s using %s', protocol.service_endpoint, protocol.auth_type)
-        raise_from(
-            AutoDiscoverFailed('No access to %s using %s' % (protocol.service_endpoint, protocol.auth_type)), None
-        )
+        raise AutoDiscoverFailed('No access to %s using %s' % (protocol.service_endpoint, protocol.auth_type)) from None
     if not is_xml(r.content):
         # This is normal - e.g. a greedy webserver serving custom HTTP 404's as 200 OK
         log.debug('URL %s: This is not XML: %r', protocol.service_endpoint, r.content[:1000])
@@ -319,15 +316,13 @@ def _get_hostname_from_srv(hostname):
                 svr = vals[3]
                 return svr
             except (ValueError, IndexError):
-                raise_from(
-                    AutoDiscoverFailed('Incompatible SRV record for %s (%s)' % (hostname, rdata.to_text())), None
-                )
+                raise AutoDiscoverFailed('Incompatible SRV record for %s (%s)' % (hostname, rdata.to_text())) from None
     except dns.resolver.NoNameservers:
-        raise_from(AutoDiscoverFailed('No name servers for %s' % hostname), None)
+        raise AutoDiscoverFailed('No name servers for %s' % hostname) from None
     except dns.resolver.NoAnswer:
-        raise_from(AutoDiscoverFailed('No SRV record for %s' % hostname), None)
+        raise AutoDiscoverFailed('No SRV record for %s' % hostname) from None
     except dns.resolver.NXDOMAIN:
-        raise_from(AutoDiscoverFailed('Nonexistent domain %s' % hostname), None)
+        raise AutoDiscoverFailed('Nonexistent domain %s' % hostname) from None
 
 
 def get_autodiscover_authtype(service_endpoint, retry_policy, data):
@@ -350,7 +345,7 @@ def get_autodiscover_authtype(service_endpoint, retry_policy, data):
                 break
             except TLS_ERRORS as e:
                 # Don't retry on TLS errors. They will most likely be persistent.
-                raise_from(TransportError(str(e)), e)
+                raise TransportError(str(e)) from e
             except CONNECTION_ERRORS as e:
                 total_wait = time.time() - t_start
                 r = DummyResponse(url=service_endpoint, headers={}, request_headers=headers)
@@ -361,7 +356,7 @@ def get_autodiscover_authtype(service_endpoint, retry_policy, data):
                     retry += 1
                     continue
                 else:
-                    raise_from(TransportError(str(e)), e)
+                    raise TransportError(str(e)) from e
     if r.status_code in (301, 302):
         try:
             redirect_url = get_redirect_url(r, allow_relative=False)

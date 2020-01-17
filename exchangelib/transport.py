@@ -1,7 +1,6 @@
 import logging
 import time
 
-from future.utils import raise_from
 import requests.auth
 import requests_ntlm
 import requests_oauthlib
@@ -132,7 +131,7 @@ def get_service_authtype(service_endpoint, retry_policy, versions, name):
                         retry += 1
                         continue
                     else:
-                        raise_from(TransportError(str(e)), e)
+                        raise TransportError(str(e)) from e
         if r.status_code not in (200, 401):
             log.debug('Unexpected response: %s %s', r.status_code, r.reason)
             continue

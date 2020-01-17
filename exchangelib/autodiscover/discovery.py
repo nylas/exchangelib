@@ -1,9 +1,9 @@
 from collections import namedtuple
 import logging
 import time
+from urllib.parse import urlparse
 
 import dns.resolver
-from future.moves.urllib.parse import urlparse
 
 from ..configuration import Configuration
 from ..errors import AutoDiscoverFailed, AutoDiscoverCircularRedirect, TransportError, RedirectError, UnauthorizedError

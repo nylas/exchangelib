@@ -9,6 +9,7 @@ import logging
 import re
 import socket
 import time
+from urllib.parse import urlparse
 import xml.sax.handler
 
 # Import _etree via defusedxml instead of directly from lxml.etree, to silence overly strict linters
@@ -17,7 +18,6 @@ from defusedxml.expatreader import DefusedExpatParser
 from defusedxml.sax import _InputSource
 import dns.resolver
 from future.backports.misc import get_ident
-from future.moves.urllib.parse import urlparse
 from future.utils import PY2
 import isodate
 from oauthlib.oauth2 import TokenExpiredError

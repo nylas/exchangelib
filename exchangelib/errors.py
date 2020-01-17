@@ -2,7 +2,8 @@
 """
 Stores errors specific to this package, and mirrors all the possible errors that EWS can return.
 """
-from future.moves.urllib.parse import urlparse
+from urllib.parse import urlparse
+
 from six import text_type
 
 import pytz.exceptions
