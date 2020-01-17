@@ -21,7 +21,7 @@ class RootOfHierarchy(BaseFolder):
     # and https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/distinguishedfolderid
     # 'RootOfHierarchy' subclasses must not be in this list.
     WELLKNOWN_FOLDERS = []
-    TRAVERSAL_DEPTH = DEEP
+    FOLDER_TRAVERSAL_DEPTH = DEEP
 
     LOCAL_FIELDS = [
         # This folder type also has 'folder:PermissionSet' on some server versions, but requesting it sometimes causes
@@ -169,7 +169,7 @@ class RootOfHierarchy(BaseFolder):
             if isinstance(f, Exception):
                 raise f
             folders_map[f.id] = f
-        for f in SingleFolderQuerySet(account=self.account, folder=self).depth(self.TRAVERSAL_DEPTH).all():
+        for f in SingleFolderQuerySet(account=self.account, folder=self).depth(self.FOLDER_TRAVERSAL_DEPTH).all():
             if isinstance(f, ErrorAccessDenied):
                 # We may not have FindFolder access, or GetFolder access, either to this folder or at all
                 continue
@@ -272,7 +272,7 @@ class Root(RootOfHierarchy):
 class PublicFoldersRoot(RootOfHierarchy):
     """The root of the public folders hierarchy. Not available on all mailboxes"""
     DISTINGUISHED_FOLDER_ID = 'publicfoldersroot'
-    TRAVERSAL_DEPTH = SHALLOW
+    FOLDER_TRAVERSAL_DEPTH = SHALLOW
     supported_from = EXCHANGE_2007_SP1
     __slots__ = tuple()
 
@@ -294,7 +294,9 @@ class PublicFoldersRoot(RootOfHierarchy):
 
         children_map = {}
         try:
-            for f in SingleFolderQuerySet(account=self.account, folder=folder).depth(depth=self.TRAVERSAL_DEPTH).all():
+            for f in SingleFolderQuerySet(account=self.account, folder=folder).depth(
+                    depth=self.FOLDER_TRAVERSAL_DEPTH
+            ).all():
                 if isinstance(f, Exception):
                     raise f
                 children_map[f.id] = f
