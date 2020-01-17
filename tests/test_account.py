@@ -175,18 +175,7 @@ class AccountTest(EWSTest):
             ]
         )
 
-    def test_failed_login(self):
-        with self.assertRaises(UnauthorizedError):
-            Account(
-                primary_smtp_address=self.account.primary_smtp_address,
-                access_type=DELEGATE,
-                config=Configuration(
-                    service_endpoint=self.account.protocol.service_endpoint,
-                    credentials=Credentials(self.account.protocol.credentials.username, 'WRONG_PASSWORD'),
-                ),
-                autodiscover=False,
-                locale='da_DK',
-            )
+    def test_failed_login_via_autodiscover(self):
         with self.assertRaises(AutoDiscoverFailed):
             Account(
                 primary_smtp_address=self.account.primary_smtp_address,
@@ -196,7 +185,7 @@ class AccountTest(EWSTest):
                 locale='da_DK',
             )
 
-    def test_credentials_update_after_login_failure(self):
+    def test_login_failure_and_credentials_update(self):
         # Create an account that does not need to create any connections
         account = Account(
             primary_smtp_address=self.account.primary_smtp_address,
