@@ -85,6 +85,15 @@ class BaseProtocol:
     def credentials(self):
         return self.config.credentials
 
+    @credentials.setter
+    def credentials(self, value):
+        # We are updating credentials, but that doesn't automatically propagate to the session objects. The simplest
+        # solution is to just kill the session pool and rebuild it.
+        self.config._credentials = value
+        with self._session_pool_lock:
+            self.close()
+            self._session_pool = self._create_session_pool()
+
     @property
     def retry_policy(self):
         return self.config.retry_policy

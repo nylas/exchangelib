@@ -49,7 +49,7 @@ class Configuration:
             raise ValueError("'version' %r must be a Version instance" % version)
         if not isinstance(retry_policy, RetryPolicy):
             raise ValueError("'retry_policy' %r must be a RetryPolicy instance" % retry_policy)
-        self.credentials = credentials
+        self._credentials = credentials
         if server:
             self.service_endpoint = 'https://%s/EWS/Exchange.asmx' % server
         else:
@@ -58,9 +58,16 @@ class Configuration:
         self.version = version
         self.retry_policy = retry_policy
 
+    @property
+    def credentials(self):
+        # Do not update credentials from this class. Instead, do it from Protocol
+        return self._credentials
+
     @threaded_cached_property
     def server(self):
         return split_url(self.service_endpoint)[1]
 
     def __repr__(self):
-        return self.__class__.__name__ + repr((self.protocol,))
+        return self.__class__.__name__ + '(%s)' % ', '.join('%s=%s' %(k, repr(getattr(self, k))) for k in (
+            'credentials', 'service_endpoint', 'auth_type', 'version', 'retry_policy'
+        ))

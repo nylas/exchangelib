@@ -195,3 +195,27 @@ class AccountTest(EWSTest):
                 autodiscover=True,
                 locale='da_DK',
             )
+
+    def test_credentials_update_after_login_failure(self):
+        # Create an account that does not need to create any connections
+        account = Account(
+            primary_smtp_address=self.account.primary_smtp_address,
+            access_type=DELEGATE,
+            config=Configuration(
+                service_endpoint=self.account.protocol.service_endpoint,
+                credentials=Credentials(self.account.protocol.credentials.username, 'WRONG_PASSWORD'),
+                version=self.account.version,
+                auth_type=self.account.protocol.auth_type,
+            ),
+            autodiscover=False,
+            locale='da_DK',
+        )
+        # Should fail when credentials are wrong
+        with self.assertRaises(UnauthorizedError):
+            account.root.refresh()
+        # Cannot update from Configuration object
+        with self.assertRaises(AttributeError):
+            account.protocol.config.credentials = self.account.protocol.credentials
+        # Should succeed after credentials update
+        account.protocol.credentials = self.account.protocol.credentials
+        account.root.refresh()
