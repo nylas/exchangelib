@@ -17,7 +17,7 @@ class DeleteAttachment(EWSAccountService):
         # DeleteAttachment returns RootItemIds directly beneath DeleteAttachmentResponseMessage. Collect the elements
         # and make our own fake container.
         from ..properties import RootItemId
-        res = super(DeleteAttachment, self)._get_element_container(
+        res = super()._get_element_container(
             message=message, response_message=response_message, name=name
         )
         if not res:

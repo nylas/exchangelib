@@ -42,10 +42,10 @@ class BaseItemTest(EWSTest):
     def setUpClass(cls):
         if cls is BaseItemTest:
             raise unittest.SkipTest("Skip BaseItemTest, it's only for inheritance")
-        super(BaseItemTest, cls).setUpClass()
+        super().setUpClass()
 
     def setUp(self):
-        super(BaseItemTest, self).setUp()
+        super().setUp()
         self.test_folder = getattr(self.account, self.TEST_FOLDER)
         self.assertEqual(type(self.test_folder), self.FOLDER_CLASS)
         self.assertEqual(self.test_folder.DISTINGUISHED_FOLDER_ID, self.TEST_FOLDER)
@@ -55,7 +55,7 @@ class BaseItemTest(EWSTest):
         self.test_folder.filter(categories__contains=self.categories).delete()
         # Delete all delivery receipts
         self.test_folder.filter(subject__startswith='Delivered: Subject: ').delete()
-        super(BaseItemTest, self).tearDown()
+        super().tearDown()
 
     def get_random_insert_kwargs(self):
         insert_kwargs = {}
@@ -827,7 +827,7 @@ class CommonItemTest(BaseItemTest):
     def setUpClass(cls):
         if cls is CommonItemTest:
             raise unittest.SkipTest("Skip CommonItemTest, it's only for inheritance")
-        super(CommonItemTest, cls).setUpClass()
+        super().setUpClass()
 
     def test_field_names(self):
         # Test that fieldnames don't clash with Python keywords

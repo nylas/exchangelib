@@ -85,11 +85,11 @@ class BaseItem(RegisterMixIn):
                     if self.account != self.folder.account:
                         raise ValueError("'account' does not match 'folder.account'")
                 self.account = self.folder.account
-        super(BaseItem, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
     @classmethod
     def from_xml(cls, elem, account):
-        item = super(BaseItem, cls).from_xml(elem=elem, account=account)
+        item = super().from_xml(elem=elem, account=account)
         item.account = account
         return item
 
@@ -119,7 +119,7 @@ class BaseReplyItem(EWSElement):
         self.account = kwargs.pop('account', None)
         if self.account is not None and not isinstance(self.account, Account):
             raise ValueError("'account' %r must be an Account instance" % self.account)
-        super(BaseReplyItem, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
     def send(self, save_copy=True, copy_to_folder=None):
         if not self.account:

@@ -21,7 +21,7 @@ from .common import EWSTest
 
 class AutodiscoverTest(EWSTest):
     def setUp(self):
-        super(AutodiscoverTest, self).setUp()
+        super().setUp()
 
         # Enable retries, to make tests more robust
         Autodiscovery.INITIAL_RETRY_POLICY = FaultTolerance(max_wait=30)

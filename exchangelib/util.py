@@ -38,7 +38,7 @@ class ParseError(_etree.ParseError):
 
 class ElementNotFound(Exception):
     def __init__(self, msg, data):
-        super(ElementNotFound, self).__init__(msg)
+        super().__init__(msg)
         self.data = data
 
 
@@ -364,7 +364,7 @@ class BytesGeneratorIO(io.RawIOBase):
         self._bytes_generator = bytes_generator
         self._next = bytearray()
         self._tell = 0
-        super(BytesGeneratorIO, self).__init__()
+        super().__init__()
 
     def readable(self):
         return not self.closed
@@ -400,7 +400,7 @@ class BytesGeneratorIO(io.RawIOBase):
     def close(self):
         if not self.closed:
             self._bytes_generator.close()
-        super(BytesGeneratorIO, self).close()
+        super().close()
 
 
 def to_xml(bytes_content):
@@ -488,7 +488,7 @@ class PrettyXmlHandler(logging.StreamHandler):
                 except Exception as e:
                     # Something bad happened, but we don't want to crash the program just because logging failed
                     print('XML highlighting failed: %s' % e)
-        return super(PrettyXmlHandler, self).emit(record)
+        return super().emit(record)
 
     def is_tty(self):
         # Check if we're outputting to a terminal
@@ -502,7 +502,7 @@ class AnonymizingXmlHandler(PrettyXmlHandler):
     """A steaming log handler that prettifies and anonymizes log statements containing XML when output is a terminal"""
     def __init__(self, forbidden_strings, *args, **kwargs):
         self.forbidden_strings = forbidden_strings
-        super(AnonymizingXmlHandler, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def parse_bytes(self, xml_bytes):
         root = parse(io.BytesIO(xml_bytes))

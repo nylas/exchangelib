@@ -36,7 +36,7 @@ class RootOfHierarchy(BaseFolder):
     # A special folder that acts as the top of a folder hierarchy. Finds and caches subfolders at arbitrary depth.
     def __init__(self, **kwargs):
         self._account = kwargs.pop('account', None)  # A pointer back to the account holding the folder hierarchy
-        super(RootOfHierarchy, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self._subfolders = None  # See self._folders_map()
 
     @property
@@ -53,7 +53,7 @@ class RootOfHierarchy(BaseFolder):
 
     def refresh(self):
         self._subfolders = None
-        super(RootOfHierarchy, self).refresh()
+        super().refresh()
 
     def get_folder(self, folder_id):
         return self._folders_map.get(folder_id, None)
@@ -208,7 +208,7 @@ class Root(RootOfHierarchy):
 
     def get_default_folder(self, folder_cls):
         try:
-            return super(Root, self).get_default_folder(folder_cls)
+            return super().get_default_folder(folder_cls)
         except ErrorFolderNotFound:
             pass
 
@@ -269,7 +269,7 @@ class PublicFoldersRoot(RootOfHierarchy):
         # subfolders. To traverse public folders at arbitrary depth, we need to get child folders on demand.
 
         # Let's check if this folder already has any cached children. If so, assume we can just return those.
-        children = list(super(PublicFoldersRoot, self).get_children(folder=folder))
+        children = list(super().get_children(folder=folder))
         if children:
             # Return a generator like our parent does
             for f in children:
@@ -294,7 +294,7 @@ class PublicFoldersRoot(RootOfHierarchy):
         self._subfolders.update(children_map)
 
         # Child folders have been cached now. Try super().get_children() again.
-        for f in super(PublicFoldersRoot, self).get_children(folder=folder):
+        for f in super().get_children(folder=folder):
             yield f
 
 

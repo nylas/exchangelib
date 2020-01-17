@@ -52,7 +52,7 @@ class Task(Item):
 
     def clean(self, version=None):
         # pylint: disable=access-member-before-definition
-        super(Task, self).clean(version=version)
+        super().clean(version=version)
         if self.due_date and self.start_date and self.due_date < self.start_date:
             log.warning("'due_date' must be greater than 'start_date' (%s vs %s). Resetting 'due_date'",
                         self.due_date, self.start_date)

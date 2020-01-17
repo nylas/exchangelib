@@ -100,7 +100,7 @@ class EWSTest(TimedTestCase):
                               locale='da_DK', default_timezone=tz)
 
     def setUp(self):
-        super(EWSTest, self).setUp()
+        super().setUp()
         # Create a random category for each test to avoid crosstalk
         self.categories = [get_random_string(length=16, spaces=False, special=False)]
 

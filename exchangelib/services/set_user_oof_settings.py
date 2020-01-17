@@ -24,6 +24,6 @@ class SetUserOofSettings(EWSAccountService):
 
     def _get_element_container(self, message, response_message=None, name=None):
         response_message = message.find('{%s}ResponseMessage' % MNS)
-        return super(SetUserOofSettings, self)._get_element_container(
+        return super()._get_element_container(
             message=message, response_message=response_message, name=name
         )

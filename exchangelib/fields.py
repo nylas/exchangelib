@@ -336,7 +336,7 @@ class FieldURIField(Field):
     def __init__(self, *args, **kwargs):
         self.field_uri = kwargs.pop('field_uri', None)
         self.namespace = kwargs.pop('namespace', TNS)
-        super(FieldURIField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         # See all valid FieldURI values at
         # https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/fielduri
         # The field_uri has a prefix when the FieldURI points to an Item field.
@@ -385,7 +385,7 @@ class BooleanField(FieldURIField):
     def __init__(self, *args, **kwargs):
         self.true_val = kwargs.pop('true_val', 'true')
         self.false_val = kwargs.pop('false_val', 'false')
-        super(BooleanField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def from_xml(self, elem, account):
         val = self._get_val_from_elem(elem)
@@ -405,7 +405,7 @@ class OnOffField(BooleanField):
     def __init__(self, *args, **kwargs):
         kwargs['true_val'] = 'on'
         kwargs['false_val'] = 'off'
-        super(OnOffField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
 
 class IntegerField(FieldURIField):
@@ -414,10 +414,10 @@ class IntegerField(FieldURIField):
     def __init__(self, *args, **kwargs):
         self.min = kwargs.pop('min', None)
         self.max = kwargs.pop('max', None)
-        super(IntegerField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def clean(self, value, version=None):
-        value = super(IntegerField, self).clean(value, version=version)
+        value = super().clean(value, version=version)
         if value is not None:
             if self.is_list:
                 for v in value:
@@ -459,7 +459,7 @@ class EnumField(IntegerField):
             raise AttributeError("EnumField does not support the 'max' attribute")
         kwargs['min'] = kwargs.pop('min', 1)
         kwargs['max'] = kwargs['min'] + len(self.enum) - 1
-        super(EnumField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def clean(self, value, version=None):
         if self.is_list:
@@ -480,7 +480,7 @@ class EnumField(IntegerField):
                     raise ValueError(
                         "Value '%s' on field '%s' must be one of %s" % (value, self.name, self.enum))
                 value = self.enum.index(value) + 1
-        return super(EnumField, self).clean(value, version=version)
+        return super().clean(value, version=version)
 
     def as_string(self, value):
         # Converts an integer in the enum to its equivalent string
@@ -537,7 +537,7 @@ class Base64Field(FieldURIField):
     def __init__(self, *args, **kwargs):
         if 'is_searchable' not in kwargs:
             kwargs['is_searchable'] = False
-        super(Base64Field, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def from_xml(self, elem, account):
         val = self._get_val_from_elem(elem)
@@ -599,7 +599,7 @@ class DateTimeField(FieldURIField):
     def clean(self, value, version=None):
         if value is not None and isinstance(value, self.value_cls) and not value.tzinfo:
             raise ValueError("Value '%s' on field '%s' must be timezone aware" % (value, self.name))
-        return super(DateTimeField, self).clean(value, version=version)
+        return super().clean(value, version=version)
 
     def from_xml(self, elem, account):
         val = self._get_val_from_elem(elem)
@@ -701,10 +701,10 @@ class CharField(TextField):
         if not 1 <= self.max_length <= 255:
             # A field supporting messages longer than 255 chars should be TextField
             raise ValueError("'max_length' must be in the range 1-255")
-        super(CharField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def clean(self, value, version=None):
-        value = super(CharField, self).clean(value, version=version)
+        value = super().clean(value, version=version)
         if value is not None:
             if self.is_list:
                 for v in value:
@@ -722,7 +722,7 @@ class IdField(CharField):
     https://docs.microsoft.com/en-us/exchange/client-developer/exchange-web-services/ews-identifiers-in-exchange
     """
     def __init__(self, *args, **kwargs):
-        super(IdField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.max_length = 512  # This is above the normal 255 limit, but this is actually an attribute, not a field
         self.is_searchable = False
         self.is_attribute = True
@@ -776,10 +776,10 @@ class Choice:
 class ChoiceField(CharField):
     def __init__(self, *args, **kwargs):
         self.choices = kwargs.pop('choices')
-        super(ChoiceField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def clean(self, value, version=None):
-        value = super(ChoiceField, self).clean(value, version=version)
+        value = super().clean(value, version=version)
         if value is None:
             return None
         valid_choices = list(c.value for c in self.choices)
@@ -808,19 +808,19 @@ FREE_BUSY_CHOICES = [Choice('Free'), Choice('Tentative'), Choice('Busy'), Choice
 class FreeBusyStatusField(ChoiceField):
     def __init__(self, *args, **kwargs):
         kwargs['choices'] = set(FREE_BUSY_CHOICES)
-        super(FreeBusyStatusField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
 
 class BodyField(TextField):
     def __init__(self, *args, **kwargs):
         from .properties import Body
         self.value_cls = Body
-        super(BodyField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def clean(self, value, version=None):
         if value is not None and not isinstance(value, self.value_cls):
             value = self.value_cls(value)
-        return super(BodyField, self).clean(value, version=version)
+        return super().clean(value, version=version)
 
     def from_xml(self, elem, account):
         from .properties import Body, HTMLBody
@@ -849,7 +849,7 @@ class EWSElementField(FieldURIField):
     def __init__(self, *args, **kwargs):
         self.value_cls = kwargs.pop('value_cls')
         kwargs['namespace'] = kwargs.get('namespace', self.value_cls.NAMESPACE)
-        super(EWSElementField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def from_xml(self, elem, account):
         if self.is_list:
@@ -884,7 +884,7 @@ class AssociatedCalendarItemIdField(EWSElementField):
     def __init__(self, *args, **kwargs):
         from .properties import AssociatedCalendarItemId
         kwargs['value_cls'] = AssociatedCalendarItemId
-        super(AssociatedCalendarItemIdField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def to_xml(self, value, version):
         return value.to_xml(version=version)
@@ -896,7 +896,7 @@ class RecurrenceField(EWSElementField):
     def __init__(self, *args, **kwargs):
         from .recurrence import Recurrence
         kwargs['value_cls'] = Recurrence
-        super(RecurrenceField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def to_xml(self, value, version):
         return value.to_xml(version=version)
@@ -908,7 +908,7 @@ class ReferenceItemIdField(EWSElementField):
     def __init__(self, *args, **kwargs):
         from .properties import ReferenceItemId
         kwargs['value_cls'] = ReferenceItemId
-        super(ReferenceItemIdField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def to_xml(self, value, version):
         return value.to_xml(version=version)
@@ -926,7 +926,7 @@ class MessageHeaderField(EWSElementListField):
     def __init__(self, *args, **kwargs):
         from .properties import MessageHeader
         kwargs['value_cls'] = MessageHeader
-        super(MessageHeaderField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
 
 class BaseEmailField(EWSElementField):
@@ -937,7 +937,7 @@ class BaseEmailField(EWSElementField):
     def clean(self, value, version=None):
         if isinstance(value, str):
             value = self.value_cls(email_address=value)
-        return super(BaseEmailField, self).clean(value, version=version)
+        return super().clean(value, version=version)
 
     def from_xml(self, elem, account):
         if self.field_uri is None:
@@ -961,40 +961,40 @@ class EmailField(BaseEmailField):
     def __init__(self, *args, **kwargs):
         from .properties import Email
         kwargs['value_cls'] = Email
-        super(EmailField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
 
 class RecipientAddressField(BaseEmailField):
     def __init__(self, *args, **kwargs):
         from .properties import RecipientAddress
         kwargs['value_cls'] = RecipientAddress
-        super(RecipientAddressField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
 
 class MailboxField(BaseEmailField):
     def __init__(self, *args, **kwargs):
         from .properties import Mailbox
         kwargs['value_cls'] = Mailbox
-        super(MailboxField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
 
 class MailboxListField(EWSElementListField):
     def __init__(self, *args, **kwargs):
         from .properties import Mailbox
         kwargs['value_cls'] = Mailbox
-        super(MailboxListField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def clean(self, value, version=None):
         if value is not None:
             value = [self.value_cls(email_address=s) if isinstance(s, str) else s for s in value]
-        return super(MailboxListField, self).clean(value, version=version)
+        return super().clean(value, version=version)
 
 
 class MemberListField(EWSElementListField):
     def __init__(self, *args, **kwargs):
         from .properties import Member
         kwargs['value_cls'] = Member
-        super(MemberListField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def clean(self, value, version=None):
         if value is not None:
@@ -1002,28 +1002,28 @@ class MemberListField(EWSElementListField):
             value = [
                 self.value_cls(mailbox=Mailbox(email_address=s)) if isinstance(s, str) else s for s in value
             ]
-        return super(MemberListField, self).clean(value, version=version)
+        return super().clean(value, version=version)
 
 
 class AttendeesField(EWSElementListField):
     def __init__(self, *args, **kwargs):
         from .properties import Attendee
         kwargs['value_cls'] = Attendee
-        super(AttendeesField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def clean(self, value, version=None):
         from .properties import Mailbox
         if value is not None:
             value = [self.value_cls(mailbox=Mailbox(email_address=s), response_type='Accept')
                      if isinstance(s, str) else s for s in value]
-        return super(AttendeesField, self).clean(value, version=version)
+        return super().clean(value, version=version)
 
 
 class AttachmentField(EWSElementListField):
     def __init__(self, *args, **kwargs):
         from .attachments import Attachment
         kwargs['value_cls'] = Attachment
-        super(AttachmentField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def from_xml(self, elem, account):
         from .attachments import FileAttachment, ItemAttachment
@@ -1042,7 +1042,7 @@ class AttachmentField(EWSElementListField):
 class LabelField(ChoiceField):
     """A field to hold the label on an IndexedElement"""
     def __init__(self, *args, **kwargs):
-        super(LabelField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.is_attribute = True
 
     def from_xml(self, elem, account):
@@ -1091,7 +1091,7 @@ class NamedSubField(SubField):
         self.field_uri = kwargs.pop('field_uri')
         if ':' in self.field_uri:
             raise ValueError("'field_uri' value must not contain a colon")
-        super(NamedSubField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def from_xml(self, elem, account):
         field_elem = elem.find(self.response_tag())
@@ -1145,7 +1145,7 @@ class EmailAddressesField(IndexedField):
     def __init__(self, *args, **kwargs):
         from .indexed_properties import EmailAddress
         kwargs['value_cls'] = EmailAddress
-        super(EmailAddressesField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def field_uri_xml(self):
         raise NotImplementedError()
@@ -1159,7 +1159,7 @@ class PhoneNumberField(IndexedField):
     def __init__(self, *args, **kwargs):
         from .indexed_properties import PhoneNumber
         kwargs['value_cls'] = PhoneNumber
-        super(PhoneNumberField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def field_uri_xml(self):
         raise NotImplementedError()
@@ -1173,7 +1173,7 @@ class PhysicalAddressField(IndexedField):
     def __init__(self, *args, **kwargs):
         from .indexed_properties import PhysicalAddress
         kwargs['value_cls'] = PhysicalAddress
-        super(PhysicalAddressField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def field_uri_xml(self):
         raise NotImplementedError()
@@ -1182,7 +1182,7 @@ class PhysicalAddressField(IndexedField):
 class ExtendedPropertyField(Field):
     def __init__(self, *args, **kwargs):
         self.value_cls = kwargs.pop('value_cls')
-        super(ExtendedPropertyField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def clean(self, value, version=None):
         if value is None:
@@ -1265,24 +1265,24 @@ class PermissionSetField(EWSElementField):
     def __init__(self, *args, **kwargs):
         from .properties import PermissionSet
         kwargs['value_cls'] = PermissionSet
-        super(PermissionSetField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
 
 class EffectiveRightsField(EWSElementField):
     def __init__(self, *args, **kwargs):
         from .properties import EffectiveRights
         kwargs['value_cls'] = EffectiveRights
-        super(EffectiveRightsField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
 
 class BuildField(CharField):
     def __init__(self, *args, **kwargs):
         from .version import Build
-        super(BuildField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.value_cls = Build
 
     def from_xml(self, elem, account):
-        val = super(BuildField, self).from_xml(elem=elem, account=account)
+        val = super().from_xml(elem=elem, account=account)
         if val:
             try:
                 return self.value_cls.from_hex_string(val)
@@ -1296,7 +1296,7 @@ class ProtocolListField(EWSElementListField):
     def __init__(self, *args, **kwargs):
         from .autodiscover.properties import Protocol
         kwargs['value_cls'] = Protocol
-        super(ProtocolListField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def from_xml(self, elem, account):
         return [self.value_cls.from_xml(elem=e, account=account) for e in elem.findall(self.value_cls.response_tag())]

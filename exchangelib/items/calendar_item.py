@@ -138,7 +138,7 @@ class CalendarItem(Item, AcceptDeclineMixIn):
 
     def clean(self, version=None):
         # pylint: disable=access-member-before-definition
-        super(CalendarItem, self).clean(version=version)
+        super().clean(version=version)
         if self.start and self.end and self.end < self.start:
             raise ValueError("'end' must be greater than 'start' (%s -> %s)" % (self.start, self.end))
         if version:
@@ -152,7 +152,7 @@ class CalendarItem(Item, AcceptDeclineMixIn):
         ).send()
 
     def _update_fieldnames(self):
-        update_fields = super(CalendarItem, self)._update_fieldnames()
+        update_fields = super()._update_fieldnames()
         if self.type == OCCURRENCE:
             # Some CalendarItem fields cannot be updated when the item is an occurrence. The values are empty when we
             # receive them so would have been updated because they are set to None.

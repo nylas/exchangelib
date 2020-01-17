@@ -189,7 +189,7 @@ class MyCredentials(OAuth2AuthorizationCodeCredentials):
     def on_token_auto_refreshed(self, access_token):
         store_it_somewhere(access_token)
         # Let the object update its internal state!
-        super(MyCredentials, self).on_token_auto_refreshed(access_token)
+        super().on_token_auto_refreshed(access_token)
 
 # For applications that use the authorization code flow and rely on an external
 # provider to refresh access tokens (and thus are unable to provide a client ID
@@ -245,7 +245,7 @@ class RootCAAdapter(requests.adapters.HTTPAdapter):
             'example.com': '/path/to/example.com.crt',
             'mail.internal': '/path/to/mail.internal.crt',
         }[urlparse(url).hostname]
-        super(RootCAAdapter, self).cert_verify(conn=conn, url=url, verify=cert_file, cert=cert)
+        super().cert_verify(conn=conn, url=url, verify=cert_file, cert=cert)
 
 # Tell exchangelib to use this adapter class instead of the default
 BaseProtocol.HTTP_ADAPTER_CLS = RootCAAdapter
@@ -263,7 +263,7 @@ class ProxyAdapter(requests.adapters.HTTPAdapter):
             'http': 'http://10.0.0.1:1243',
             'https': 'http://10.0.0.1:4321',
         }
-        return super(ProxyAdapter, self).send(*args, **kwargs)
+        return super().send(*args, **kwargs)
 
 # Tell exchangelib to use this adapter class instead of the default
 BaseProtocol.HTTP_ADAPTER_CLS = ProxyAdapter

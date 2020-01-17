@@ -56,7 +56,7 @@ class BaseFolder(RegisterMixIn, SearchableMixIn):
 
     def __init__(self, **kwargs):
         self.is_distinguished = kwargs.pop('is_distinguished', False)
-        super(BaseFolder, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
     @property
     def account(self):
@@ -76,7 +76,7 @@ class BaseFolder(RegisterMixIn, SearchableMixIn):
 
     def clean(self, version=None):
         # pylint: disable=access-member-before-definition
-        super(BaseFolder, self).clean(version=version)
+        super().clean(version=version)
         # Set a default folder class for new folders. A folder class cannot be changed after saving.
         if self.id is None and self.folder_class is None:
             self.folder_class = self.CONTAINER_CLASS
@@ -487,7 +487,7 @@ class BaseFolder(RegisterMixIn, SearchableMixIn):
             return DistinguishedFolderId(id=self.DISTINGUISHED_FOLDER_ID).to_xml(version=version)
         if self.id:
             return FolderId(id=self.id, changekey=self.changekey).to_xml(version=version)
-        return super(BaseFolder, self).to_xml(version=version)
+        return super().to_xml(version=version)
 
     @classmethod
     def resolve(cls, account, folder):
@@ -578,7 +578,7 @@ class Folder(BaseFolder):
                 if parent.id != kwargs['parent_folder_id']:
                     raise ValueError("'parent_folder_id' must match 'parent' ID")
             kwargs['parent_folder_id'] = ParentFolderId(id=parent.id, changekey=parent.changekey)
-        super(Folder, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
     @property
     def account(self):
@@ -627,7 +627,7 @@ class Folder(BaseFolder):
     def clean(self, version=None):
         # pylint: disable=access-member-before-definition
         from .roots import RootOfHierarchy
-        super(Folder, self).clean(version=version)
+        super().clean(version=version)
         if self.root and not isinstance(self.root, RootOfHierarchy):
             raise ValueError("'root' %r must be a RootOfHierarchy instance" % self.root)
 

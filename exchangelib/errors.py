@@ -19,7 +19,7 @@ class EWSError(Exception):
     """Global error type within this module.
     """
     def __init__(self, value):
-        super(EWSError, self).__init__(value)
+        super().__init__(value)
         self.value = value
 
     def __str__(self):
@@ -38,7 +38,7 @@ class TransportError(EWSError):
 
 class RateLimitError(TransportError):
     def __init__(self, value, url, status_code, total_wait):
-        super(RateLimitError, self).__init__(value)
+        super().__init__(value)
         self.url = url
         self.status_code = status_code
         self.total_wait = total_wait
@@ -68,7 +68,7 @@ class RedirectError(TransportError):
         self.url = url
         self.server = parsed_url.hostname.lower()
         self.has_ssl = parsed_url.scheme == 'https'
-        super(RedirectError, self).__init__(str(self))
+        super().__init__(str(self))
 
     def __str__(self):
         return 'We were redirected to %s' % self.url
@@ -93,7 +93,7 @@ class AutoDiscoverCircularRedirect(AutoDiscoverError):
 class AutoDiscoverRedirect(AutoDiscoverError):
     def __init__(self, redirect_email):
         self.redirect_email = redirect_email
-        super(AutoDiscoverRedirect, self).__init__(str(self))
+        super().__init__(str(self))
 
     def __str__(self):
         return 'AutoDiscover redirects to %s' % self.redirect_email
@@ -130,7 +130,7 @@ class CASError(EWSError):
     def __init__(self, cas_error, response):
         self.cas_error = cas_error
         self.response = response
-        super(CASError, self).__init__(str(self))
+        super().__init__(str(self))
 
     def __str__(self):
         return 'CAS error: %s' % self.cas_error
@@ -481,7 +481,7 @@ class ErrorSentTaskRequestUpdate(ResponseMessageError): pass
 class ErrorServerBusy(ResponseMessageError):
     def __init__(self, *args, **kwargs):
         self.back_off = kwargs.pop('back_off', None)  # Requested back off value in seconds
-        super(ErrorServerBusy, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
 
 class ErrorServiceDiscoveryFailed(ResponseMessageError): pass

@@ -79,4 +79,4 @@ class PhysicalAddress(MultiFieldIndexedElement):
         # pylint: disable=access-member-before-definition
         if isinstance(self.zipcode, int):
             self.zipcode = str(self.zipcode)
-        super(PhysicalAddress, self).clean(version=version)
+        super().clean(version=version)

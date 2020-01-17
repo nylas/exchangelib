@@ -47,7 +47,7 @@ class Attachment(EWSElement):
 
     def __init__(self, **kwargs):
         self.parent_item = kwargs.pop('parent_item', None)
-        super(Attachment, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
     def clean(self, version=None):
         from .items import Item
@@ -56,7 +56,7 @@ class Attachment(EWSElement):
         # pylint: disable=access-member-before-definition
         if self.content_type is None and self.name is not None:
             self.content_type = mimetypes.guess_type(self.name)[0] or 'application/octet-stream'
-        super(Attachment, self).clean(version=version)
+        super().clean(version=version)
 
     def attach(self):
         # Adds this attachment to an item and updates the changekey of the parent item
@@ -133,7 +133,7 @@ class FileAttachment(Attachment):
 
     def __init__(self, **kwargs):
         kwargs['_content'] = kwargs.pop('content', None)
-        super(FileAttachment, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self._fp = None
 
     @property
@@ -179,7 +179,7 @@ class FileAttachment(Attachment):
 
     def to_xml(self, version):
         self._content = self.content  # Make sure content is available, to avoid ErrorRequiredPropertyMissing
-        return super(FileAttachment, self).to_xml(version=version)
+        return super().to_xml(version=version)
 
     def __getstate__(self):
         # The fp does not need to be pickled
@@ -208,7 +208,7 @@ class ItemAttachment(Attachment):
 
     def __init__(self, **kwargs):
         kwargs['_item'] = kwargs.pop('item', None)
-        super(ItemAttachment, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
     @property
     def item(self):
@@ -252,7 +252,7 @@ class ItemAttachment(Attachment):
 class FileAttachmentIO(BytesIO):
     def __init__(self, *args, **kwargs):
         self._attachment = kwargs.pop('attachment')
-        super(FileAttachmentIO, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def __enter__(self):
         self._stream = GetAttachment(account=self._attachment.parent_item.account).stream_file_content(

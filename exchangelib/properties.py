@@ -34,15 +34,15 @@ class Body(str):
 
     def __add__(self, other):
         # Make sure Body('') + 'foo' returns a Body type
-        return self.__class__(super(Body, self).__add__(other))
+        return self.__class__(super().__add__(other))
 
     def __mod__(self, other):
         # Make sure Body('%s') % 'foo' returns a Body type
-        return self.__class__(super(Body, self).__mod__(other))
+        return self.__class__(super().__mod__(other))
 
     def format(self, *args, **kwargs):
         # Make sure Body('{}').format('foo') returns a Body type
-        return self.__class__(super(Body, self).format(*args, **kwargs))
+        return self.__class__(super().format(*args, **kwargs))
 
 
 class HTMLBody(Body):
@@ -92,7 +92,7 @@ class UID(bytes):
         encoding = b''.join([
             cls._HEADER, cls._EXCEPTION_REPLACEMENT_TIME, cls._CREATION_TIME, cls._RESERVED, length, payload
         ])
-        return super(UID, cls).__new__(cls, codecs.decode(encoding, 'hex'))
+        return super().__new__(cls, codecs.decode(encoding, 'hex'))
 
 
 class EWSElement(metaclass=abc.ABCMeta):
@@ -137,12 +137,12 @@ class EWSElement(metaclass=abc.ABCMeta):
         # property setters.
         for f in self.FIELDS:
             if f.name == key:
-                return super(EWSElement, self).__setattr__(key, value)
+                return super().__setattr__(key, value)
         if key in self._slots_keys():
-            return super(EWSElement, self).__setattr__(key, value)
+            return super().__setattr__(key, value)
         if hasattr(self, key):
             # Property setters
-            return super(EWSElement, self).__setattr__(key, value)
+            return super().__setattr__(key, value)
         raise AttributeError('%r is not a valid attribute. See %s.FIELDS for valid field names' % (
             key, self.__class__.__name__))
 
@@ -331,7 +331,7 @@ class ItemId(EWSElement):
         if not kwargs:
             # Allow to set attributes without keyword
             kwargs = dict(zip(self._slots_keys(), args))
-        super(ItemId, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
 
 class ParentItemId(ItemId):
@@ -430,7 +430,7 @@ class Mailbox(EWSElement):
     __slots__ = tuple(f.name for f in FIELDS)
 
     def clean(self, version=None):
-        super(Mailbox, self).clean(version=version)
+        super().clean(version=version)
         if not self.email_address and not self.item_id:
             # See "Remarks" section of
             # https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/mailbox
@@ -535,7 +535,7 @@ class DistinguishedFolderId(ItemId):
 
     def clean(self, version=None):
         from .folders import PublicFoldersRoot
-        super(DistinguishedFolderId, self).clean(version=version)
+        super().clean(version=version)
         if self.id == PublicFoldersRoot.DISTINGUISHED_FOLDER_ID:
             # Avoid "ErrorInvalidOperation: It is not valid to specify a mailbox with the public folder root" from EWS
             self.mailbox = None
@@ -603,7 +603,7 @@ class TimeZoneTransition(EWSElement):
 
     @classmethod
     def from_xml(cls, elem, account):
-        res = super(TimeZoneTransition, cls).from_xml(elem, account)
+        res = super().from_xml(elem, account)
         # Some parts of EWS use '5' to mean 'last occurrence in month', others use '-1'. Let's settle on '5' because
         # only '5' is accepted in requests.
         if res.occurrence == -1:
@@ -612,7 +612,7 @@ class TimeZoneTransition(EWSElement):
 
     def clean(self, version=None):
         # pylint: disable=access-member-before-definition
-        super(TimeZoneTransition, self).clean(version=version)
+        super().clean(version=version)
         if self.occurrence == -1:
             # See from_xml()
             self.occurrence = 5
@@ -779,7 +779,7 @@ class CalendarView(EWSElement):
     __slots__ = tuple(f.name for f in FIELDS)
 
     def clean(self, version=None):
-        super(CalendarView, self).clean(version=version)
+        super().clean(version=version)
         if self.end < self.start:
             raise ValueError("'start' must be before 'end'")
 
@@ -1237,10 +1237,10 @@ class IdChangeKeyMixIn(EWSElement):
     def __eq__(self, other):
         if isinstance(other, tuple):
             return hash((self.id, self.changekey)) == hash(other)
-        return super(IdChangeKeyMixIn, self).__eq__(other)
+        return super().__eq__(other)
 
     def __hash__(self):
         # If we have an ID and changekey, use that as key. Else return a hash of all attributes
         if self.id:
             return hash((self.id, self.changekey))
-        return super(IdChangeKeyMixIn, self).__hash__()
+        return super().__hash__()

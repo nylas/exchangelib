@@ -390,7 +390,7 @@ class EWSAccountService(EWSService):
     def __init__(self, *args, **kwargs):
         self.account = kwargs.pop('account')
         kwargs['protocol'] = self.account.protocol
-        super(EWSAccountService, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
 
 class EWSFolderService(EWSAccountService):
@@ -399,7 +399,7 @@ class EWSFolderService(EWSAccountService):
         self.folders = kwargs.pop('folders')
         if not self.folders:
             raise ValueError('"folders" must not be empty')
-        super(EWSFolderService, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
 
 class PagingEWSMixIn(EWSService):

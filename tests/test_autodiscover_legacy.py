@@ -20,7 +20,7 @@ from .common import EWSTest
 class AutodiscoverLegacyTest(EWSTest):
     @classmethod
     def setUpClass(cls):
-        super(AutodiscoverLegacyTest, cls).setUpClass()
+        super().setUpClass()
         exchangelib.autodiscover.legacy.INITIAL_RETRY_POLICY = FaultTolerance(max_wait=30)
 
     def test_magic(self):

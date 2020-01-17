@@ -87,7 +87,7 @@ class Credentials(BaseCredentials):
     UPN = 'upn'
 
     def __init__(self, username, password):
-        super(Credentials, self).__init__()
+        super().__init__()
         if username.count('@') == 1:
             self.type = self.EMAIL
         elif username.count('\\') == 1:
@@ -125,7 +125,7 @@ class OAuth2Credentials(BaseCredentials):
     """
 
     def __init__(self, client_id, client_secret, tenant_id):
-        super(OAuth2Credentials, self).__init__()
+        super().__init__()
         self.client_id = client_id
         self.client_secret = client_secret
         self.tenant_id = tenant_id
@@ -198,7 +198,7 @@ class OAuth2AuthorizationCodeCredentials(OAuth2Credentials):
     """
 
     def __init__(self, client_id=None, client_secret=None, authorization_code=None, access_token=None):
-        super(OAuth2AuthorizationCodeCredentials, self).__init__(client_id, client_secret, tenant_id=None)
+        super().__init__(client_id, client_secret, tenant_id=None)
         self.authorization_code = authorization_code
         self.access_token = access_token
 

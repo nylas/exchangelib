@@ -112,7 +112,7 @@ class Item(BaseItem):
     INSERT_AFTER_FIELD = 'has_attachments'
 
     def __init__(self, **kwargs):
-        super(Item, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         # pylint: disable=access-member-before-definition
         if self.attachments:
             for a in self.attachments:
@@ -401,7 +401,7 @@ class BulkCreateResult(BaseItem):
     __slots__ = tuple(f.name for f in LOCAL_FIELDS)
 
     def __init__(self, **kwargs):
-        super(BulkCreateResult, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         # pylint: disable=access-member-before-definition
         if self.attachments is None:
             self.attachments = []

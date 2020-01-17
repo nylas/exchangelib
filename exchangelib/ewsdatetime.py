@@ -26,7 +26,7 @@ class EWSDate(datetime.date):
         return self.isoformat()
 
     def __add__(self, other):
-        dt = super(EWSDate, self).__add__(other)
+        dt = super().__add__(other)
         if isinstance(dt, self.__class__):
             return dt
         return self.from_date(dt)  # We want to return EWSDate objects
@@ -35,7 +35,7 @@ class EWSDate(datetime.date):
         return self + other
 
     def __sub__(self, other):
-        dt = super(EWSDate, self).__sub__(other)
+        dt = super().__sub__(other)
         if isinstance(dt, datetime.timedelta):
             return dt
         if isinstance(dt, self.__class__):
@@ -47,7 +47,7 @@ class EWSDate(datetime.date):
 
     @classmethod
     def fromordinal(cls, n):
-        dt = super(EWSDate, cls).fromordinal(n)
+        dt = super().fromordinal(n)
         if isinstance(dt, cls):
             return dt
         return cls.from_date(dt)  # We want to return EWSDate objects
@@ -94,7 +94,7 @@ class EWSDateTime(datetime.datetime):
         # support requires copy-pasting lots of code from datetime.datetime.
         if not isinstance(kwargs.get('tzinfo'), (EWSTimeZone, type(None))):
             raise ValueError('tzinfo must be an EWSTimeZone instance')
-        return super(EWSDateTime, cls).__new__(cls, *args, **kwargs)
+        return super().__new__(cls, *args, **kwargs)
 
     def ewsformat(self):
         """
@@ -121,13 +121,13 @@ class EWSDateTime(datetime.datetime):
         return cls(d.year, d.month, d.day, d.hour, d.minute, d.second, d.microsecond, tzinfo=tz)
 
     def astimezone(self, tz=None):
-        t = super(EWSDateTime, self).astimezone(tz=tz)
+        t = super().astimezone(tz=tz)
         if isinstance(t, self.__class__):
             return t
         return self.from_datetime(t)  # We want to return EWSDateTime objects
 
     def __add__(self, other):
-        t = super(EWSDateTime, self).__add__(other)
+        t = super().__add__(other)
         if isinstance(t, self.__class__):
             return t
         return self.from_datetime(t)  # We want to return EWSDateTime objects
@@ -136,7 +136,7 @@ class EWSDateTime(datetime.datetime):
         return self + other
 
     def __sub__(self, other):
-        t = super(EWSDateTime, self).__sub__(other)
+        t = super().__sub__(other)
         if isinstance(t, datetime.timedelta):
             return t
         if isinstance(t, self.__class__):
@@ -151,11 +151,11 @@ class EWSDateTime(datetime.datetime):
         # Parses several common datetime formats and returns timezone-aware EWSDateTime objects
         if date_string.endswith('Z'):
             # UTC datetime
-            naive_dt = super(EWSDateTime, cls).strptime(date_string, '%Y-%m-%dT%H:%M:%SZ')
+            naive_dt = super().strptime(date_string, '%Y-%m-%dT%H:%M:%SZ')
             return UTC.localize(naive_dt)
         if len(date_string) == 19:
             # This is probably a naive datetime. Don't allow this, but signal caller with an appropriate error
-            local_dt = super(EWSDateTime, cls).strptime(date_string, '%Y-%m-%dT%H:%M:%S')
+            local_dt = super().strptime(date_string, '%Y-%m-%dT%H:%M:%S')
             raise NaiveDateTimeNotAllowed(local_dt)
         # This is probably a datetime value with timezone information. This comes in the form '+/-HH:MM' but the Python
         # strptime '%z' directive cannot yet handle full ISO8601 formatted timezone information (see
@@ -165,34 +165,34 @@ class EWSDateTime(datetime.datetime):
 
     @classmethod
     def fromtimestamp(cls, t, tz=None):
-        dt = super(EWSDateTime, cls).fromtimestamp(t, tz=tz)
+        dt = super().fromtimestamp(t, tz=tz)
         if isinstance(dt, cls):
             return dt
         return cls.from_datetime(dt)  # We want to return EWSDateTime objects
 
     @classmethod
     def utcfromtimestamp(cls, t):
-        dt = super(EWSDateTime, cls).utcfromtimestamp(t)
+        dt = super().utcfromtimestamp(t)
         if isinstance(dt, cls):
             return dt
         return cls.from_datetime(dt)  # We want to return EWSDateTime objects
 
     @classmethod
     def now(cls, tz=None):
-        t = super(EWSDateTime, cls).now(tz=tz)
+        t = super().now(tz=tz)
         if isinstance(t, cls):
             return t
         return cls.from_datetime(t)  # We want to return EWSDateTime objects
 
     @classmethod
     def utcnow(cls):
-        t = super(EWSDateTime, cls).utcnow()
+        t = super().utcnow()
         if isinstance(t, cls):
             return t
         return cls.from_datetime(t)  # We want to return EWSDateTime objects
 
     def date(self):
-        d = super(EWSDateTime, self).date()
+        d = super().date()
         if isinstance(d, EWSDate):
             return d
         return EWSDate.from_date(d)  # We want to return EWSDate objects
@@ -217,7 +217,7 @@ class EWSTimeZone:
 
     def __hash__(self):
         # We're shuffling around with base classes in from_pytz(). Make sure we have __hash__() implementation.
-        return super(EWSTimeZone, self).__hash__()
+        return super().__hash__()
 
     @classmethod
     def from_ms_id(cls, ms_id):
@@ -297,7 +297,7 @@ class EWSTimeZone:
         return res
 
     def fromutc(self, dt):
-        t = super(EWSTimeZone, self).fromutc(dt)
+        t = super().fromutc(dt)
         if isinstance(t, EWSDateTime):
             return t
         return EWSDateTime.from_datetime(t)  # We want to return EWSDateTime objects

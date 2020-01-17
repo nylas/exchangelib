@@ -156,7 +156,7 @@ class SingleFolderQuerySet(FolderQuerySet):
     def __init__(self, account, folder):
         from .collections import FolderCollection
         folder_collection = FolderCollection(account=account, folders=[folder])
-        super(SingleFolderQuerySet, self).__init__(folder_collection=folder_collection)
+        super().__init__(folder_collection=folder_collection)
 
     def _copy_cls(self):
         return self.__class__(account=self.folder_collection.account, folder=self.folder_collection.folders[0])

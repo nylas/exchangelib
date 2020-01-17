@@ -286,7 +286,7 @@ class Recurrence(EWSElement):
                 kwargs['boundary'] = NumberedPattern(start=start, number=number)
             else:
                 raise ValueError("Unsupported 'start', 'end', 'number' combination")
-        super(Recurrence, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
     @classmethod
     def from_xml(cls, elem, account):

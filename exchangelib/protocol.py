@@ -365,7 +365,7 @@ class CachingProtocol(type):
                 return protocol
             log.debug("Protocol __call__ cache miss. Adding key '%s'", str(_protocol_cache_key))
             try:
-                protocol = super(CachingProtocol, cls).__call__(*args, **kwargs)
+                protocol = super().__call__(*args, **kwargs)
             except TransportError as e:
                 # This can happen if, for example, autodiscover supplies us with a bogus EWS endpoint
                 log.warning('Failed to create cached protocol with key %s: %s', _protocol_cache_key, e)
@@ -388,7 +388,7 @@ class CachingProtocol(type):
 class Protocol(BaseProtocol, metaclass=CachingProtocol):
     def __init__(self, *args, **kwargs):
         self.version_hint = None
-        super(Protocol, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def get_auth_type(self):
         # Autodetect authentication type. We also set version hint here.
@@ -424,7 +424,7 @@ class Protocol(BaseProtocol, metaclass=CachingProtocol):
             # I don't know yet why this is happening.
             self.thread_pool.terminate()
             del self.__dict__["thread_pool"]
-        super(Protocol, self).close()
+        super().close()
 
     def get_timezones(self, timezones=None, return_full_timezone_data=False):
         """ Get timezone definitions from the server
@@ -561,7 +561,7 @@ class Protocol(BaseProtocol, metaclass=CachingProtocol):
 
     def __getstate__(self):
         # The thread and session pools cannot be pickled
-        state = super(Protocol, self).__getstate__()
+        state = super().__getstate__()
         try:
             del state['thread_pool']
         except KeyError:
@@ -589,7 +589,7 @@ class NoVerifyHTTPAdapter(requests.adapters.HTTPAdapter):
     def cert_verify(self, conn, url, verify, cert):
         # pylint: disable=unused-argument
         # We're overiding a method so we have to keep the signature
-        super(NoVerifyHTTPAdapter, self).cert_verify(conn=conn, url=url, verify=False, cert=cert)
+        super().cert_verify(conn=conn, url=url, verify=False, cert=cert)
 
 
 class RetryPolicy:

@@ -26,7 +26,7 @@ class OofSettings(EWSElement):
     __slots__ = tuple(f.name for f in FIELDS)
 
     def clean(self, version=None):
-        super(OofSettings, self).clean(version=version)
+        super().clean(version=version)
         if self.state == self.SCHEDULED:
             if not self.start or not self.end:
                 raise ValueError("'start' and 'end' must be set when state is '%s'" % self.SCHEDULED)
