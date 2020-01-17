@@ -8,6 +8,7 @@ import itertools
 import logging
 import re
 import socket
+from threading import get_ident
 import time
 from urllib.parse import urlparse
 import xml.sax.handler
@@ -17,7 +18,6 @@ from defusedxml.lxml import parse, tostring, GlobalParserTLS, RestrictedElement,
 from defusedxml.expatreader import DefusedExpatParser
 from defusedxml.sax import _InputSource
 import dns.resolver
-from future.backports.misc import get_ident
 from future.utils import PY2
 import isodate
 from oauthlib.oauth2 import TokenExpiredError

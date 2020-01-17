@@ -9,13 +9,13 @@ import logging
 from multiprocessing.pool import ThreadPool
 import os
 from threading import Lock
+from queue import LifoQueue, Empty, Full
 
 from cached_property import threaded_cached_property
 import requests.adapters
 import requests.sessions
 import requests.utils
 from future.utils import with_metaclass
-from future.moves.queue import LifoQueue, Empty, Full
 from oauthlib.oauth2 import BackendApplicationClient, WebApplicationClient
 from requests_oauthlib import OAuth2Session
 from six import string_types
