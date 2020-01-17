@@ -560,24 +560,10 @@ class Base64Field(FieldURIField):
 
 
 class MimeContentField(Base64Field):
-    value_cls = string_types[0]
-    default_encoding = 'utf-8'
-
-    def from_xml(self, elem, account):
-        val = super(MimeContentField, self).from_xml(elem=elem, account=account)
-        if val is None or val == self.default:
-            # Return default values unaltered
-            return val
-
-        charset = elem.find(self.response_tag()).get('CharacterSet').lower() or self.default_encoding
-        try:
-            return val.decode(charset)
-        except UnicodeDecodeError:
-            log.warning("Cannot decode value '%s' on field '%s' to charset %s", val, self.name, self.value_cls)
-            return None
-
-    def to_xml(self, value, version):
-        return super(MimeContentField, self).to_xml(value=value.encode(self.default_encoding), version=version)
+    # This element has an optional 'CharacterSet' attribute, but it specifies the encoding of the base64-encoded
+    # string (which doesn't make sense since base64 encoded strings are always ASCII). We ignore it here because
+    # the decoded data could be in some other encoding, specified in the "Content-Type:" header.
+    pass
 
 
 class DateField(FieldURIField):

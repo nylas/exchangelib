@@ -13,6 +13,8 @@ HEAD
 -   Added a new Autodiscover implementation that is closer to the specification and easier to debug. To switch
     to the new implementation, set the environment variable `EXCHANGELIB_AUTODISCOVER_VERSION=new`. The old
     one is still the default if the variable is not set, or set to `EXCHANGELIB_AUTODISCOVER_VERSION=legacy`.
+-   The `Item.mime_content` field was switched back from a string type to a `bytes` type. It turns out trying
+    to decode the data was an error (see issue #709).
 
 
 2.1.1
