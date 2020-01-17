@@ -5,6 +5,7 @@ HEAD
 ----
 -   The new Autodiscover implementation added in 2.2.0 is now default. To switch back to the old
     implementation, set the environment variable `EXCHANGELIB_AUTODISCOVER_VERSION=legacy`.
+-   Removed support for Python 2
 
 
 2.2.0

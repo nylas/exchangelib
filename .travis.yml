@@ -4,7 +4,6 @@ os: linux
 dist: bionic
 sudo: true
 python:
-- "2.7"
 - "3.5"
 - "3.6"
 - "3.7"
