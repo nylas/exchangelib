@@ -72,10 +72,10 @@ class Autodiscovery:
         self.retry_policy = retry_policy  # The retry policy that the resulting protocol instance should have
         self._urls_visited = []  # Collects HTTP and Autodiscover redirects
         self._redirect_count = 0
-        self._email_redirects = []  # Collects Autodiscover email redirects
+        self._emails_visited = []  # Collects Autodiscover email redirects
 
     def discover(self):
-        domain = get_domain(self.email)
+        self._emails_visited.append(self.email)
 
         # Check the autodiscover cache to see if we already know the autodiscover service endpoint for this email
         # domain. Use a lock to guard against multiple threads competing to cache information.
@@ -83,6 +83,7 @@ class Autodiscovery:
         with autodiscover_cache:
             log.debug('autodiscover_cache lock acquired')
             cache_key = self._cache_key
+            domain = get_domain(self.email)
             if cache_key in autodiscover_cache:
                 ad_protocol = autodiscover_cache[cache_key]
                 log.debug('Cache hit for key %s: %s', cache_key, ad_protocol.service_endpoint)
@@ -100,9 +101,8 @@ class Autodiscovery:
         log.debug('Released autodiscover_cache_lock')
         if ad_response.redirect_address:
             log.debug('Got a redirect address: %s', ad_response.redirect_address)
-            if ad_response.redirect_address.lower() in self._email_redirects:
+            if ad_response.redirect_address.lower() in self._emails_visited:
                 raise AutoDiscoverCircularRedirect('We were redirected to an email address we have already seen')
-            self._email_redirects.append(ad_response.redirect_address.lower())
 
             # Start over, but with the new email address
             self.email = ad_response.redirect_address
@@ -116,7 +116,7 @@ class Autodiscovery:
         # This resets cached variables
         self._urls_visited = []
         self._redirect_count = 0
-        self._email_redirects = []
+        self._emails_visited = []
 
     @property
     def _cache_key(self):
