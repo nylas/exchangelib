@@ -259,9 +259,13 @@ class Autodiscovery:
             r, session = post_ratelimited(protocol=protocol, session=session, url=protocol.service_endpoint,
                                           headers=headers, data=data, allow_redirects=False)
             protocol.release_session(session)
+        except UnauthorizedError as e:
+            # It's entirely possible for the endpoint to ask for login. We should continue if login fails because this
+            # isn't necessarily the right endpoint to use.
+            raise TransportError(str(e))
         except RedirectError as e:
-            r = DummyResponse(url=protocol.service_endpoint, headers={'location': e.url}, request_headers=None)
-            r.status_code = 302
+            r = DummyResponse(url=protocol.service_endpoint, headers={'location': e.url}, request_headers=None,
+                              status_code=302)
         return r
 
     def _attempt_response(self, url):
