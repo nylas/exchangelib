@@ -1,7 +1,6 @@
 import logging
 
 from cached_property import threaded_cached_property
-from future.utils import python_2_unicode_compatible
 
 from .credentials import BaseCredentials
 from .protocol import Protocol, RetryPolicy, FailFast
@@ -12,7 +11,6 @@ from .version import Version
 log = logging.getLogger(__name__)
 
 
-@python_2_unicode_compatible
 class Configuration(object):
     """
     Assembles a connection protocol when autodiscover is not used.

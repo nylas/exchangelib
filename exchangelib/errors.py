@@ -3,7 +3,6 @@
 Stores errors specific to this package, and mirrors all the possible errors that EWS can return.
 """
 from future.moves.urllib.parse import urlparse
-from future.utils import python_2_unicode_compatible
 from six import text_type
 
 import pytz.exceptions
@@ -17,7 +16,6 @@ class DoesNotExist(Exception):
     pass
 
 
-@python_2_unicode_compatible
 class EWSError(Exception):
     """Global error type within this module.
     """
@@ -65,7 +63,6 @@ class UnauthorizedError(EWSError):
     pass
 
 
-@python_2_unicode_compatible
 class RedirectError(TransportError):
     def __init__(self, url):
         parsed_url = urlparse(url)
@@ -94,7 +91,6 @@ class AutoDiscoverCircularRedirect(AutoDiscoverError):
     pass
 
 
-@python_2_unicode_compatible
 class AutoDiscoverRedirect(AutoDiscoverError):
     def __init__(self, redirect_email):
         self.redirect_email = redirect_email
@@ -128,7 +124,6 @@ class ResponseMessageError(TransportError):
     pass
 
 
-@python_2_unicode_compatible
 class CASError(EWSError):
     """EWS will sometimes return an error message in an 'X-CasErrorCode' custom HTTP header in an HTTP 500 error code.
     This exception is for those cases. The caller may want to do something with the original response, so store that.

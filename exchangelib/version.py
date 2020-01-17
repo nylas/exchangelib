@@ -1,7 +1,6 @@
 import logging
 import re
 
-from future.utils import python_2_unicode_compatible
 from six import text_type, string_types
 
 from .errors import TransportError, ErrorInvalidSchemaVersionForMailboxVersion, ErrorInvalidServerVersion, \
@@ -41,7 +40,6 @@ VERSIONS = {
 API_VERSIONS = sorted({v[0] for v in VERSIONS.values()}, reverse=True)
 
 
-@python_2_unicode_compatible
 class Build(PickleMixIn):
     """
     Holds methods for working with build numbers
@@ -184,7 +182,6 @@ EXCHANGE_2019 = Build(15, 2)
 EXCHANGE_O365 = Build(15, 20)
 
 
-@python_2_unicode_compatible
 class Version(PickleMixIn):
     """
     Holds information about the server version

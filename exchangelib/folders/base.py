@@ -2,7 +2,7 @@ from fnmatch import fnmatch
 import logging
 from operator import attrgetter
 
-from future.utils import python_2_unicode_compatible, PY2
+from future.utils import PY2
 from six import string_types
 
 from ..errors import ErrorAccessDenied, ErrorFolderNotFound, ErrorCannotEmptyFolder, ErrorCannotDeleteObject, \
@@ -561,7 +561,6 @@ class BaseFolder(RegisterMixIn, SearchableMixIn):
         return '%s (%s)' % (self.__class__.__name__, self.name)
 
 
-@python_2_unicode_compatible
 class Folder(BaseFolder):
     """MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/folder"""
     LOCAL_FIELDS = [

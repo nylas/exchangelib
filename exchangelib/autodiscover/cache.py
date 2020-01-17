@@ -8,7 +8,7 @@ import sys
 import tempfile
 from threading import RLock
 
-from future.utils import PY2, python_2_unicode_compatible
+from future.utils import PY2
 from six import text_type
 
 from ..configuration import Configuration
@@ -54,7 +54,6 @@ def shelve_open_with_failover(filename):
         shelve_handle.close()
 
 
-@python_2_unicode_compatible
 class AutodiscoverCache(object):
     """Stores the translation from (email domain, credentials) -> AutodiscoverProtocol object so we can re-use TCP
     connections to an autodiscover server within the same process. Also persists the email domain -> (autodiscover

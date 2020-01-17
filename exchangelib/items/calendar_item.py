@@ -1,7 +1,5 @@
 import logging
 
-from future.utils import python_2_unicode_compatible
-
 from ..fields import BooleanField, IntegerField, TextField, ChoiceField, URIField, BodyField, DateTimeField, \
     MessageHeaderField, AttachmentField, RecurrenceField, MailboxField, AttendeesField, Choice, OccurrenceField, \
     OccurrenceListField, TimeZoneField, CharField, EnumAsIntField, FreeBusyStatusField, ReferenceItemIdField, \
@@ -27,7 +25,6 @@ RECURRING_MASTER = 'RecurringMaster'
 CALENDAR_ITEM_CHOICES = (SINGLE, OCCURRENCE, EXCEPTION, RECURRING_MASTER)
 
 
-@python_2_unicode_compatible
 class AcceptDeclineMixIn(object):
     def accept(self, **kwargs):
         return AcceptItem(
@@ -51,7 +48,6 @@ class AcceptDeclineMixIn(object):
         ).send()
 
 
-@python_2_unicode_compatible
 class CalendarItem(Item, AcceptDeclineMixIn):
     """
     MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/calendaritem

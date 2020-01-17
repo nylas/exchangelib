@@ -2,8 +2,6 @@ from copy import deepcopy
 from itertools import islice
 import logging
 
-from future.utils import python_2_unicode_compatible
-
 from .errors import MultipleObjectsReturned, DoesNotExist
 from .items import CalendarItem, ID_ONLY
 from .fields import FieldPath, FieldOrder
@@ -36,7 +34,6 @@ class SearchableMixIn(object):
         raise NotImplementedError()
 
 
-@python_2_unicode_compatible
 class QuerySet(SearchableMixIn):
     """
     A Django QuerySet-like class for querying items. Defers queries until the QuerySet is consumed. Supports chaining to

@@ -2,7 +2,6 @@ import base64
 from collections import OrderedDict
 import logging
 
-from future.utils import python_2_unicode_compatible
 from six import string_types
 
 from .properties import InvalidField
@@ -12,7 +11,6 @@ from .version import EXCHANGE_2010
 log = logging.getLogger(__name__)
 
 
-@python_2_unicode_compatible
 class Q(object):
     """A class with an API similar to Django Q objects. Used to implemnt advanced filtering logic."""
 
@@ -490,7 +488,6 @@ class Q(object):
         return self.__class__.__name__ + repr(sorted_children)
 
 
-@python_2_unicode_compatible
 class Restriction(object):
     """
     Implements an EWS Restriction type.

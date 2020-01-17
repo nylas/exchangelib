@@ -14,7 +14,7 @@ from cached_property import threaded_cached_property
 import requests.adapters
 import requests.sessions
 import requests.utils
-from future.utils import with_metaclass, python_2_unicode_compatible
+from future.utils import with_metaclass
 from future.moves.queue import LifoQueue, Empty, Full
 from oauthlib.oauth2 import BackendApplicationClient, WebApplicationClient
 from requests_oauthlib import OAuth2Session
@@ -387,7 +387,6 @@ class CachingProtocol(type):
         mcs._protocol_cache.clear()
 
 
-@python_2_unicode_compatible
 class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
     def __init__(self, *args, **kwargs):
         self.version_hint = None

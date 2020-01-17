@@ -1,6 +1,5 @@
 import logging
 
-from future.utils import python_2_unicode_compatible
 from six import text_type
 
 from ..errors import ErrorAccessDenied, ErrorFolderNotFound, ErrorNoPublicFolderReplicaAvailable, ErrorItemNotFound, \
@@ -16,7 +15,6 @@ from .queryset import SingleFolderQuerySet, SHALLOW, DEEP
 log = logging.getLogger(__name__)
 
 
-@python_2_unicode_compatible
 class RootOfHierarchy(BaseFolder):
     """Base class for folders that implement the root of a folder hierarchy"""
 

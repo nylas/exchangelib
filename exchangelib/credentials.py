@@ -8,8 +8,6 @@ import abc
 import logging
 from threading import RLock
 
-from future.utils import python_2_unicode_compatible
-
 from .util import PickleMixIn
 
 log = logging.getLogger(__name__)
@@ -77,7 +75,6 @@ class BaseCredentials(object):
         self._lock = RLock()
 
 
-@python_2_unicode_compatible
 class Credentials(BaseCredentials, PickleMixIn):
     """
     Keeps login info the way Exchange likes it.
@@ -115,7 +112,6 @@ class Credentials(BaseCredentials, PickleMixIn):
         return self.username
 
 
-@python_2_unicode_compatible
 class OAuth2Credentials(BaseCredentials, PickleMixIn):
     """
     Login info for OAuth 2.0 client credentials authentication, as well
@@ -176,7 +172,6 @@ class OAuth2Credentials(BaseCredentials, PickleMixIn):
         return self.client_id
 
 
-@python_2_unicode_compatible
 class OAuth2AuthorizationCodeCredentials(OAuth2Credentials, PickleMixIn):
     """
     Login info for OAuth 2.0 authentication using the authorization code

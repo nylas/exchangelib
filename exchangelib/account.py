@@ -2,7 +2,6 @@ from locale import getlocale
 from logging import getLogger
 
 from cached_property import threaded_cached_property
-from future.utils import python_2_unicode_compatible
 from six import string_types
 
 from .autodiscover import discover
@@ -33,7 +32,6 @@ from .util import get_domain, peek
 log = getLogger(__name__)
 
 
-@python_2_unicode_compatible
 class Account(object):
     """Models an Exchange server user account. The primary key for an account is its PrimarySMTPAddress
     """

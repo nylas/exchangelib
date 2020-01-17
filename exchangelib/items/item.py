@@ -1,7 +1,5 @@
 import logging
 
-from future.utils import python_2_unicode_compatible
-
 from ..fields import BooleanField, IntegerField, TextField, CharListField, ChoiceField, URIField, BodyField, \
     DateTimeField, MessageHeaderField, AttachmentField, Choice, EWSElementField, EffectiveRightsField, CultureField, \
     CharField, MimeContentField
@@ -393,7 +391,6 @@ class Item(BaseItem):
         ).send()
 
 
-@python_2_unicode_compatible
 class BulkCreateResult(BaseItem):
     """A dummy class to store return values from a CreateItem service call"""
     LOCAL_FIELDS = [
