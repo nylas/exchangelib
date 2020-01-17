@@ -15,7 +15,7 @@ class AttachmentsTest(BaseItemTest):
     ITEM_CLASS = Message
 
     def test_attachment_failure(self):
-        att1 = FileAttachment(name='my_file_1.txt', content=u'Hello from unicode æøå'.encode('utf-8'))
+        att1 = FileAttachment(name='my_file_1.txt', content='Hello from unicode æøå'.encode('utf-8'))
         att1.attachment_id = 'XXX'
         with self.assertRaises(ValueError):
             att1.attach()  # Cannot have an attachment ID
@@ -38,7 +38,7 @@ class AttachmentsTest(BaseItemTest):
         att1.attachment_id = None
 
     def test_attachment_properties(self):
-        binary_file_content = u'Hello from unicode æøå'.encode('utf-8')
+        binary_file_content = 'Hello from unicode æøå'.encode('utf-8')
         att1 = FileAttachment(name='my_file_1.txt', content=binary_file_content)
         self.assertIn("name='my_file_1.txt'", str(att1))
         att1.content = binary_file_content  # Test property setter
@@ -65,7 +65,7 @@ class AttachmentsTest(BaseItemTest):
         item = self.get_test_item(folder=self.test_folder)
 
         # Test __init__(attachments=...) and attach() on new item
-        binary_file_content = u'Hello from unicode æøå'.encode('utf-8')
+        binary_file_content = 'Hello from unicode æøå'.encode('utf-8')
         att1 = FileAttachment(name='my_file_1.txt', content=binary_file_content)
         self.assertEqual(len(item.attachments), 0)
         item.attach(att1)

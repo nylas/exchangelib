@@ -12,15 +12,15 @@ class Calendar(Folder):
     supported_item_models = (CalendarItem,)
 
     LOCALIZED_NAMES = {
-        'da_DK': (u'Kalender',),
-        'de_DE': (u'Kalender',),
-        'en_US': (u'Calendar',),
-        'es_ES': (u'Calendario',),
-        'fr_CA': (u'Calendrier',),
-        'nl_NL': (u'Agenda',),
-        'ru_RU': (u'Календарь',),
-        'sv_SE': (u'Kalender',),
-        'zh_CN': (u'日历',),
+        'da_DK': ('Kalender',),
+        'de_DE': ('Kalender',),
+        'en_US': ('Calendar',),
+        'es_ES': ('Calendario',),
+        'fr_CA': ('Calendrier',),
+        'nl_NL': ('Agenda',),
+        'ru_RU': ('Календарь',),
+        'sv_SE': ('Kalender',),
+        'zh_CN': ('日历',),
     }
     __slots__ = tuple()
 
@@ -34,15 +34,15 @@ class DeletedItems(Folder):
     supported_item_models = ITEM_CLASSES
 
     LOCALIZED_NAMES = {
-        'da_DK': (u'Slettet post',),
-        'de_DE': (u'Gelöschte Elemente',),
-        'en_US': (u'Deleted Items',),
-        'es_ES': (u'Elementos eliminados',),
-        'fr_CA': (u'Éléments supprimés',),
-        'nl_NL': (u'Verwijderde items',),
-        'ru_RU': (u'Удаленные',),
-        'sv_SE': (u'Borttaget',),
-        'zh_CN': (u'已删除邮件',),
+        'da_DK': ('Slettet post',),
+        'de_DE': ('Gelöschte Elemente',),
+        'en_US': ('Deleted Items',),
+        'es_ES': ('Elementos eliminados',),
+        'fr_CA': ('Éléments supprimés',),
+        'nl_NL': ('Verwijderde items',),
+        'ru_RU': ('Удаленные',),
+        'sv_SE': ('Borttaget',),
+        'zh_CN': ('已删除邮件',),
     }
     __slots__ = tuple()
 
@@ -57,15 +57,15 @@ class Drafts(Messages):
     DISTINGUISHED_FOLDER_ID = 'drafts'
 
     LOCALIZED_NAMES = {
-        'da_DK': (u'Kladder',),
-        'de_DE': (u'Entwürfe',),
-        'en_US': (u'Drafts',),
-        'es_ES': (u'Borradores',),
-        'fr_CA': (u'Brouillons',),
-        'nl_NL': (u'Concepten',),
-        'ru_RU': (u'Черновики',),
-        'sv_SE': (u'Utkast',),
-        'zh_CN': (u'草稿',),
+        'da_DK': ('Kladder',),
+        'de_DE': ('Entwürfe',),
+        'en_US': ('Drafts',),
+        'es_ES': ('Borradores',),
+        'fr_CA': ('Brouillons',),
+        'nl_NL': ('Concepten',),
+        'ru_RU': ('Черновики',),
+        'sv_SE': ('Utkast',),
+        'zh_CN': ('草稿',),
     }
     __slots__ = tuple()
 
@@ -74,15 +74,15 @@ class Inbox(Messages):
     DISTINGUISHED_FOLDER_ID = 'inbox'
 
     LOCALIZED_NAMES = {
-        'da_DK': (u'Indbakke',),
-        'de_DE': (u'Posteingang',),
-        'en_US': (u'Inbox',),
-        'es_ES': (u'Bandeja de entrada',),
-        'fr_CA': (u'Boîte de réception',),
-        'nl_NL': (u'Postvak IN',),
-        'ru_RU': (u'Входящие',),
-        'sv_SE': (u'Inkorgen',),
-        'zh_CN': (u'收件箱',),
+        'da_DK': ('Indbakke',),
+        'de_DE': ('Posteingang',),
+        'en_US': ('Inbox',),
+        'es_ES': ('Bandeja de entrada',),
+        'fr_CA': ('Boîte de réception',),
+        'nl_NL': ('Postvak IN',),
+        'ru_RU': ('Входящие',),
+        'sv_SE': ('Inkorgen',),
+        'zh_CN': ('收件箱',),
     }
     __slots__ = tuple()
 
@@ -91,15 +91,15 @@ class Outbox(Messages):
     DISTINGUISHED_FOLDER_ID = 'outbox'
 
     LOCALIZED_NAMES = {
-        'da_DK': (u'Udbakke',),
-        'de_DE': (u'Postausgang',),
-        'en_US': (u'Outbox',),
-        'es_ES': (u'Bandeja de salida',),
+        'da_DK': ('Udbakke',),
+        'de_DE': ('Postausgang',),
+        'en_US': ('Outbox',),
+        'es_ES': ('Bandeja de salida',),
         'fr_CA': (u"Boîte d'envoi",),
-        'nl_NL': (u'Postvak UIT',),
-        'ru_RU': (u'Исходящие',),
-        'sv_SE': (u'Utkorgen',),
-        'zh_CN': (u'发件箱',),
+        'nl_NL': ('Postvak UIT',),
+        'ru_RU': ('Исходящие',),
+        'sv_SE': ('Utkorgen',),
+        'zh_CN': ('发件箱',),
     }
     __slots__ = tuple()
 
@@ -108,15 +108,15 @@ class SentItems(Messages):
     DISTINGUISHED_FOLDER_ID = 'sentitems'
 
     LOCALIZED_NAMES = {
-        'da_DK': (u'Sendt post',),
-        'de_DE': (u'Gesendete Elemente',),
-        'en_US': (u'Sent Items',),
-        'es_ES': (u'Elementos enviados',),
-        'fr_CA': (u'Éléments envoyés',),
-        'nl_NL': (u'Verzonden items',),
-        'ru_RU': (u'Отправленные',),
-        'sv_SE': (u'Skickat',),
-        'zh_CN': (u'已发送邮件',),
+        'da_DK': ('Sendt post',),
+        'de_DE': ('Gesendete Elemente',),
+        'en_US': ('Sent Items',),
+        'es_ES': ('Elementos enviados',),
+        'fr_CA': ('Éléments envoyés',),
+        'nl_NL': ('Verzonden items',),
+        'ru_RU': ('Отправленные',),
+        'sv_SE': ('Skickat',),
+        'zh_CN': ('已发送邮件',),
     }
     __slots__ = tuple()
 
@@ -125,15 +125,15 @@ class JunkEmail(Messages):
     DISTINGUISHED_FOLDER_ID = 'junkemail'
 
     LOCALIZED_NAMES = {
-        'da_DK': (u'Uønsket e-mail',),
-        'de_DE': (u'Junk-E-Mail',),
-        'en_US': (u'Junk E-mail',),
-        'es_ES': (u'Correo no deseado',),
-        'fr_CA': (u'Courrier indésirables',),
-        'nl_NL': (u'Ongewenste e-mail',),
-        'ru_RU': (u'Нежелательная почта',),
-        'sv_SE': (u'Skräppost',),
-        'zh_CN': (u'垃圾邮件',),
+        'da_DK': ('Uønsket e-mail',),
+        'de_DE': ('Junk-E-Mail',),
+        'en_US': ('Junk E-mail',),
+        'es_ES': ('Correo no deseado',),
+        'fr_CA': ('Courrier indésirables',),
+        'nl_NL': ('Ongewenste e-mail',),
+        'ru_RU': ('Нежелательная почта',),
+        'sv_SE': ('Skräppost',),
+        'zh_CN': ('垃圾邮件',),
     }
     __slots__ = tuple()
 
@@ -144,15 +144,15 @@ class Tasks(Folder):
     supported_item_models = (Task,)
 
     LOCALIZED_NAMES = {
-        'da_DK': (u'Opgaver',),
-        'de_DE': (u'Aufgaben',),
-        'en_US': (u'Tasks',),
-        'es_ES': (u'Tareas',),
-        'fr_CA': (u'Tâches',),
-        'nl_NL': (u'Taken',),
-        'ru_RU': (u'Задачи',),
-        'sv_SE': (u'Uppgifter',),
-        'zh_CN': (u'任务',),
+        'da_DK': ('Opgaver',),
+        'de_DE': ('Aufgaben',),
+        'en_US': ('Tasks',),
+        'es_ES': ('Tareas',),
+        'fr_CA': ('Tâches',),
+        'nl_NL': ('Taken',),
+        'ru_RU': ('Задачи',),
+        'sv_SE': ('Uppgifter',),
+        'zh_CN': ('任务',),
     }
     __slots__ = tuple()
 
@@ -163,15 +163,15 @@ class Contacts(Folder):
     supported_item_models = (Contact, DistributionList)
 
     LOCALIZED_NAMES = {
-        'da_DK': (u'Kontaktpersoner',),
-        'de_DE': (u'Kontakte',),
-        'en_US': (u'Contacts',),
-        'es_ES': (u'Contactos',),
-        'fr_CA': (u'Contacts',),
-        'nl_NL': (u'Contactpersonen',),
-        'ru_RU': (u'Контакты',),
-        'sv_SE': (u'Kontakter',),
-        'zh_CN': (u'联系人',),
+        'da_DK': ('Kontaktpersoner',),
+        'de_DE': ('Kontakte',),
+        'en_US': ('Contacts',),
+        'es_ES': ('Contactos',),
+        'fr_CA': ('Contacts',),
+        'nl_NL': ('Contactpersonen',),
+        'ru_RU': ('Контакты',),
+        'sv_SE': ('Kontakter',),
+        'zh_CN': ('联系人',),
     }
     __slots__ = tuple()
 
@@ -278,7 +278,7 @@ class MsgFolderRoot(WellknownFolder):
     """Also known as the 'Top of Information Store' folder"""
     DISTINGUISHED_FOLDER_ID = 'msgfolderroot'
     LOCALIZED_NAMES = {
-        'zh_CN': (u'信息存储顶部',),
+        'zh_CN': ('信息存储顶部',),
     }
     __slots__ = tuple()
 
@@ -294,7 +294,7 @@ class Notes(WellknownFolder):
     CONTAINER_CLASS = 'IPF.StickyNote'
     DISTINGUISHED_FOLDER_ID = 'notes'
     LOCALIZED_NAMES = {
-        'da_DK': (u'Noter',),
+        'da_DK': ('Noter',),
     }
     __slots__ = tuple()
 
@@ -369,7 +369,7 @@ class ToDoSearch(WellknownFolder):
     supported_from = EXCHANGE_2013
 
     LOCALIZED_NAMES = {
-        None: (u'To-Do Search',),
+        None: ('To-Do Search',),
     }
     __slots__ = tuple()
 
@@ -378,7 +378,7 @@ class VoiceMail(WellknownFolder):
     DISTINGUISHED_FOLDER_ID = 'voicemail'
     CONTAINER_CLASS = 'IPF.Note.Microsoft.Voicemail'
     LOCALIZED_NAMES = {
-        None: (u'Voice Mail',),
+        None: ('Voice Mail',),
     }
     __slots__ = tuple()
 
@@ -393,7 +393,7 @@ class AllContacts(NonDeleteableFolderMixin, Contacts):
     CONTAINER_CLASS = 'IPF.Note'
 
     LOCALIZED_NAMES = {
-        None: (u'AllContacts',),
+        None: ('AllContacts',),
     }
     __slots__ = tuple()
 
@@ -402,14 +402,14 @@ class AllItems(NonDeleteableFolderMixin, Folder):
     CONTAINER_CLASS = 'IPF'
 
     LOCALIZED_NAMES = {
-        None: (u'AllItems',),
+        None: ('AllItems',),
     }
     __slots__ = tuple()
 
 
 class Audits(NonDeleteableFolderMixin, Folder):
     LOCALIZED_NAMES = {
-        None: (u'Audits',),
+        None: ('Audits',),
     }
     get_folder_allowed = False
     __slots__ = tuple()
@@ -417,14 +417,14 @@ class Audits(NonDeleteableFolderMixin, Folder):
 
 class CalendarLogging(NonDeleteableFolderMixin, Folder):
     LOCALIZED_NAMES = {
-        None: (u'Calendar Logging',),
+        None: ('Calendar Logging',),
     }
     __slots__ = tuple()
 
 
 class CommonViews(NonDeleteableFolderMixin, Folder):
     LOCALIZED_NAMES = {
-        None: (u'Common Views',),
+        None: ('Common Views',),
     }
     __slots__ = tuple()
 
@@ -432,7 +432,7 @@ class CommonViews(NonDeleteableFolderMixin, Folder):
 class ConversationSettings(NonDeleteableFolderMixin, Folder):
     CONTAINER_CLASS = 'IPF.Configuration'
     LOCALIZED_NAMES = {
-        'da_DK': (u'Indstillinger for samtalehandlinger',),
+        'da_DK': ('Indstillinger for samtalehandlinger',),
     }
     __slots__ = tuple()
 
@@ -440,21 +440,21 @@ class ConversationSettings(NonDeleteableFolderMixin, Folder):
 class DefaultFoldersChangeHistory(NonDeleteableFolderMixin, Folder):
     CONTAINER_CLASS = 'IPM.DefaultFolderHistoryItem'
     LOCALIZED_NAMES = {
-        None: (u'DefaultFoldersChangeHistory',),
+        None: ('DefaultFoldersChangeHistory',),
     }
     __slots__ = tuple()
 
 
 class DeferredAction(NonDeleteableFolderMixin, Folder):
     LOCALIZED_NAMES = {
-        None: (u'Deferred Action',),
+        None: ('Deferred Action',),
     }
     __slots__ = tuple()
 
 
 class ExchangeSyncData(NonDeleteableFolderMixin, Folder):
     LOCALIZED_NAMES = {
-        None: (u'ExchangeSyncData',),
+        None: ('ExchangeSyncData',),
     }
     __slots__ = tuple()
 
@@ -463,14 +463,14 @@ class Files(NonDeleteableFolderMixin, Folder):
     CONTAINER_CLASS = 'IPF.Files'
 
     LOCALIZED_NAMES = {
-        'da_DK': (u'Filer',),
+        'da_DK': ('Filer',),
     }
     __slots__ = tuple()
 
 
 class FreebusyData(NonDeleteableFolderMixin, Folder):
     LOCALIZED_NAMES = {
-        None: (u'Freebusy Data',),
+        None: ('Freebusy Data',),
     }
     __slots__ = tuple()
 
@@ -479,7 +479,7 @@ class Friends(NonDeleteableFolderMixin, Contacts):
     CONTAINER_CLASS = 'IPF.Note'
 
     LOCALIZED_NAMES = {
-        'de_DE': (u'Bekannte',),
+        'de_DE': ('Bekannte',),
     }
     __slots__ = tuple()
 
@@ -497,21 +497,21 @@ class GALContacts(NonDeleteableFolderMixin, Contacts):
 class GraphAnalytics(NonDeleteableFolderMixin, Folder):
     CONTAINER_CLASS = 'IPF.StoreItem.GraphAnalytics'
     LOCALIZED_NAMES = {
-        None: (u'GraphAnalytics',),
+        None: ('GraphAnalytics',),
     }
     __slots__ = tuple()
 
 
 class Location(NonDeleteableFolderMixin, Folder):
     LOCALIZED_NAMES = {
-        None: (u'Location',),
+        None: ('Location',),
     }
     __slots__ = tuple()
 
 
 class MailboxAssociations(NonDeleteableFolderMixin, Folder):
     LOCALIZED_NAMES = {
-        None: (u'MailboxAssociations',),
+        None: ('MailboxAssociations',),
     }
     __slots__ = tuple()
 
@@ -519,7 +519,7 @@ class MailboxAssociations(NonDeleteableFolderMixin, Folder):
 class MyContactsExtended(NonDeleteableFolderMixin, Contacts):
     CONTAINER_CLASS = 'IPF.Note'
     LOCALIZED_NAMES = {
-        None: (u'MyContactsExtended',),
+        None: ('MyContactsExtended',),
     }
     __slots__ = tuple()
 
@@ -527,7 +527,7 @@ class MyContactsExtended(NonDeleteableFolderMixin, Contacts):
 class ParkedMessages(NonDeleteableFolderMixin, Folder):
     CONTAINER_CLASS = None
     LOCALIZED_NAMES = {
-        None: (u'ParkedMessages',),
+        None: ('ParkedMessages',),
     }
     __slots__ = tuple()
 
@@ -535,7 +535,7 @@ class ParkedMessages(NonDeleteableFolderMixin, Folder):
 class PassThroughSearchResults(NonDeleteableFolderMixin, Folder):
     CONTAINER_CLASS = 'IPF.StoreItem.PassThroughSearchResults'
     LOCALIZED_NAMES = {
-        None: (u'Pass-Through Search Results',),
+        None: ('Pass-Through Search Results',),
     }
     __slots__ = tuple()
 
@@ -543,7 +543,7 @@ class PassThroughSearchResults(NonDeleteableFolderMixin, Folder):
 class PdpProfileV2Secured(NonDeleteableFolderMixin, Folder):
     CONTAINER_CLASS = 'IPF.StoreItem.PdpProfileSecured'
     LOCALIZED_NAMES = {
-        None: (u'PdpProfileV2Secured',),
+        None: ('PdpProfileV2Secured',),
     }
     __slots__ = tuple()
 
@@ -551,7 +551,7 @@ class PdpProfileV2Secured(NonDeleteableFolderMixin, Folder):
 class Reminders(NonDeleteableFolderMixin, Folder):
     CONTAINER_CLASS = 'Outlook.Reminder'
     LOCALIZED_NAMES = {
-        'da_DK': (u'Påmindelser',),
+        'da_DK': ('Påmindelser',),
     }
     __slots__ = tuple()
 
@@ -559,14 +559,14 @@ class Reminders(NonDeleteableFolderMixin, Folder):
 class RSSFeeds(NonDeleteableFolderMixin, Folder):
     CONTAINER_CLASS = 'IPF.Note.OutlookHomepage'
     LOCALIZED_NAMES = {
-        None: (u'RSS Feeds',),
+        None: ('RSS Feeds',),
     }
     __slots__ = tuple()
 
 
 class Schedule(NonDeleteableFolderMixin, Folder):
     LOCALIZED_NAMES = {
-        None: (u'Schedule',),
+        None: ('Schedule',),
     }
     __slots__ = tuple()
 
@@ -574,14 +574,14 @@ class Schedule(NonDeleteableFolderMixin, Folder):
 class Sharing(NonDeleteableFolderMixin, Folder):
     CONTAINER_CLASS = 'IPF.Note'
     LOCALIZED_NAMES = {
-        None: (u'Sharing',),
+        None: ('Sharing',),
     }
     __slots__ = tuple()
 
 
 class Shortcuts(NonDeleteableFolderMixin, Folder):
     LOCALIZED_NAMES = {
-        None: (u'Shortcuts',),
+        None: ('Shortcuts',),
     }
     __slots__ = tuple()
 
@@ -589,7 +589,7 @@ class Shortcuts(NonDeleteableFolderMixin, Folder):
 class Signal(NonDeleteableFolderMixin, Folder):
     CONTAINER_CLASS = 'IPF.StoreItem.Signal'
     LOCALIZED_NAMES = {
-        None: (u'Signal',),
+        None: ('Signal',),
     }
     __slots__ = tuple()
 
@@ -597,21 +597,21 @@ class Signal(NonDeleteableFolderMixin, Folder):
 class SmsAndChatsSync(NonDeleteableFolderMixin, Folder):
     CONTAINER_CLASS = 'IPF.SmsAndChatsSync'
     LOCALIZED_NAMES = {
-        None: (u'SmsAndChatsSync',),
+        None: ('SmsAndChatsSync',),
     }
     __slots__ = tuple()
 
 
 class SpoolerQueue(NonDeleteableFolderMixin, Folder):
     LOCALIZED_NAMES = {
-        None: (u'Spooler Queue',),
+        None: ('Spooler Queue',),
     }
     __slots__ = tuple()
 
 
 class System(NonDeleteableFolderMixin, Folder):
     LOCALIZED_NAMES = {
-        None: (u'System',),
+        None: ('System',),
     }
     get_folder_allowed = False
     __slots__ = tuple()
@@ -619,21 +619,21 @@ class System(NonDeleteableFolderMixin, Folder):
 
 class TemporarySaves(NonDeleteableFolderMixin, Folder):
     LOCALIZED_NAMES = {
-        None: (u'TemporarySaves',),
+        None: ('TemporarySaves',),
     }
     __slots__ = tuple()
 
 
 class Views(NonDeleteableFolderMixin, Folder):
     LOCALIZED_NAMES = {
-        None: (u'Views',),
+        None: ('Views',),
     }
     __slots__ = tuple()
 
 
 class WorkingSet(NonDeleteableFolderMixin, Folder):
     LOCALIZED_NAMES = {
-        None: (u'Working Set',),
+        None: ('Working Set',),
     }
     __slots__ = tuple()
 
