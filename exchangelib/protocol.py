@@ -573,14 +573,20 @@ class Protocol(BaseProtocol, metaclass=CachingProtocol):
                 yield id_cls.from_xml(i, account=None)
 
     def __getstate__(self):
-        # The thread and session pools cannot be pickled
+        # The lock and thread pool cannot be pickled
         state = super().__getstate__()
+        del state['_version_lock']
         try:
             del state['thread_pool']
         except KeyError:
             # thread_pool is a cached property and may not exist
             pass
         return state
+
+    def __setstate__(self, state):
+        # Restore the lock. The thread pool is a cached property and will be recreated automatically.
+        self.__dict__.update(state)
+        self._version_lock = Lock()
 
     def __str__(self):
         # Don't trigger version guessing here just for the sake of printing
