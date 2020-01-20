@@ -683,6 +683,9 @@ Response data: %(xml_response)s
             try:
                 r = session.post(url=url, headers=headers, data=data, allow_redirects=False, timeout=protocol.TIMEOUT,
                                  stream=stream)
+            except TLS_ERRORS as e:
+                # Don't retry on TLS errors. They will most likely be persistent.
+                raise TransportError(str(e))
             except CONNECTION_ERRORS as e:
                 log.debug('Session %s thread %s: connection error POST\'ing to %s', session.session_id, thread_id, url)
                 r = DummyResponse(url=url, headers={'TimeoutException': e}, request_headers=headers)
