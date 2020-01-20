@@ -440,7 +440,9 @@ class Mailbox(EWSElement):
         # Exchange may add 'mailbox_type' and 'name' on insert. We're satisfied if the item_id or email address matches.
         if self.item_id:
             return hash(self.item_id)
-        return hash(self.email_address.lower())
+        if self.email_address:
+            return hash(self.email_address.lower())
+        return super().__hash__()
 
 
 class DLMailbox(Mailbox):
@@ -485,7 +487,9 @@ class AvailabilityMailbox(EWSElement):
 
     def __hash__(self):
         # Exchange may add 'name' on insert. We're satisfied if the email address matches.
-        return hash(self.email_address.lower())
+        if self.email_address:
+            return hash(self.email_address.lower())
+        return super().__hash__()
 
     @classmethod
     def from_mailbox(cls, mailbox):
@@ -515,10 +519,6 @@ class MailboxData(EWSElement):
     ]
 
     __slots__ = tuple(f.name for f in FIELDS)
-
-    def __hash__(self):
-        # Exchange may add 'name' on insert. We're satisfied if the email address matches.
-        return hash((self.email.email_address.lower(), self.attendee_type, self.exclude_conflicts))
 
 
 class DistinguishedFolderId(ItemId):
