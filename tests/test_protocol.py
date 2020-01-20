@@ -1,14 +1,18 @@
 import datetime
+import os
 import socket
+import tempfile
+import warnings
 
 import psutil
 import requests_mock
 
 from exchangelib import Version, NTLM, FailFast, Credentials, Configuration, OofSettings, EWSTimeZone, EWSDateTime, \
     EWSDate, Mailbox, DLMailbox, UTC, CalendarItem
-from exchangelib.errors import SessionPoolMinSizeReached, ErrorNameResolutionNoResults, ErrorAccessDenied
+from exchangelib.errors import SessionPoolMinSizeReached, ErrorNameResolutionNoResults, ErrorAccessDenied, \
+    TransportError
 from exchangelib.properties import TimeZone, RoomList, FreeBusyView, Room, AlternateId, ID_FORMATS, EWS_ID
-from exchangelib.protocol import Protocol
+from exchangelib.protocol import Protocol, BaseProtocol, NoVerifyHTTPAdapter
 from exchangelib.services import GetServerTimeZones, GetRoomLists, GetRooms, ResolveNames
 from exchangelib.transport import NOAUTH
 from exchangelib.version import Build
@@ -431,3 +435,68 @@ class ProtocolTest(EWSTest):
         self.assertEqual(len(ids), len(items))
         return_items = list(self.account.fetch(return_ids))
         self.bulk_delete(return_items)
+
+    def test_disable_ssl_verification(self):
+        # Test that we can make requests when SSL verification is turned off. I don't know how to mock TLS responses
+        if not self.verify_ssl:
+            # We can only run this test if we haven't already disabled TLS
+            raise self.skipTest('TLS verification already disabled')
+
+        default_adapter_cls = BaseProtocol.HTTP_ADAPTER_CLS
+
+        # Just test that we can query
+        self.account.root.all().exists()
+
+        # Smash TLS verification using an untrusted certificate
+        with tempfile.NamedTemporaryFile() as f:
+            f.write(b'''\
+ -----BEGIN CERTIFICATE-----
+MIIENzCCAx+gAwIBAgIJAOYfYfw7NCOcMA0GCSqGSIb3DQEBBQUAMIGxMQswCQYD
+VQQGEwJVUzERMA8GA1UECAwITWFyeWxhbmQxFDASBgNVBAcMC0ZvcmVzdCBIaWxs
+MScwJQYDVQQKDB5UaGUgQXBhY2hlIFNvZnR3YXJlIEZvdW5kYXRpb24xFjAUBgNV
+BAsMDUFwYWNoZSBUaHJpZnQxEjAQBgNVBAMMCWxvY2FsaG9zdDEkMCIGCSqGSIb3
+DQEJARYVZGV2QHRocmlmdC5hcGFjaGUub3JnMB4XDTE0MDQwNzE4NTgwMFoXDTIy
+MDYyNDE4NTgwMFowgbExCzAJBgNVBAYTAlVTMREwDwYDVQQIDAhNYXJ5bGFuZDEU
+MBIGA1UEBwwLRm9yZXN0IEhpbGwxJzAlBgNVBAoMHlRoZSBBcGFjaGUgU29mdHdh
+cmUgRm91bmRhdGlvbjEWMBQGA1UECwwNQXBhY2hlIFRocmlmdDESMBAGA1UEAwwJ
+bG9jYWxob3N0MSQwIgYJKoZIhvcNAQkBFhVkZXZAdGhyaWZ0LmFwYWNoZS5vcmcw
+ggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCqE9TE9wEXp5LRtLQVDSGQ
+GV78+7ZtP/I/ZaJ6Q6ZGlfxDFvZjFF73seNhAvlKlYm/jflIHYLnNOCySN8I2Xw6
+L9MbC+jvwkEKfQo4eDoxZnOZjNF5J1/lZtBeOowMkhhzBMH1Rds351/HjKNg6ZKg
+2Cldd0j7HbDtEixOLgLbPRpBcaYrLrNMasf3Hal+x8/b8ue28x93HSQBGmZmMIUw
+AinEu/fNP4lLGl/0kZb76TnyRpYSPYojtS6CnkH+QLYnsRREXJYwD1Xku62LipkX
+wCkRTnZ5nUsDMX6FPKgjQFQCWDXG/N096+PRUQAChhrXsJ+gF3NqWtDmtrhVQF4n
+AgMBAAGjUDBOMB0GA1UdDgQWBBQo8v0wzQPx3EEexJPGlxPK1PpgKjAfBgNVHSME
+GDAWgBQo8v0wzQPx3EEexJPGlxPK1PpgKjAMBgNVHRMEBTADAQH/MA0GCSqGSIb3
+DQEBBQUAA4IBAQBGFRiJslcX0aJkwZpzTwSUdgcfKbpvNEbCNtVohfQVTI4a/oN5
+U+yqDZJg3vOaOuiAZqyHcIlZ8qyesCgRN314Tl4/JQ++CW8mKj1meTgo5YFxcZYm
+T9vsI3C+Nzn84DINgI9mx6yktIt3QOKZRDpzyPkUzxsyJ8J427DaimDrjTR+fTwD
+1Dh09xeeMnSa5zeV1HEDyJTqCXutLetwQ/IyfmMBhIx+nvB5f67pz/m+Dv6V0r3I
+p4HCcdnDUDGJbfqtoqsAATQQWO+WWuswB6mOhDbvPTxhRpZq6AkgWqv4S+u3M2GO
+r5p9FrBgavAw5bKO54C0oQKpN/5fta5l6Ws0
+-----END CERTIFICATE-----''')
+            try:
+                os.environ['REQUESTS_CA_BUNDLE'] = f.name
+
+                # Setting the credentials is just an easy way of resetting the session pool. This will let requests
+                # pick up the new environment variable. Now the request should fail
+                self.account.protocol.credentials = self.account.protocol.credentials
+                with self.assertRaises(TransportError):
+                    self.account.root.all().exists()
+
+                # Disable insecure TLS warnings
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    # Make sure we can handle TLS validation errors when using the custom adapter
+                    BaseProtocol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
+                    self.account.protocol.credentials = self.account.protocol.credentials
+                    self.account.root.all().exists()
+
+                    # Test that the custom adapter also works when validation is OK again
+                    del os.environ['REQUESTS_CA_BUNDLE']
+                    self.account.protocol.credentials = self.account.protocol.credentials
+                    self.account.root.all().exists()
+            finally:
+                # Reset environment
+                os.environ.pop('REQUESTS_CA_BUNDLE', None)  # May already have been deleted
+                BaseProtocol.HTTP_ADAPTER_CLS = default_adapter_cls
