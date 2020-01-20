@@ -8,6 +8,7 @@ import warnings
 import dns
 import requests_mock
 
+from exchangelib import DELEGATE
 import exchangelib.autodiscover.discovery
 from exchangelib import Credentials, NTLM, FailFast, Configuration, Account
 from exchangelib.autodiscover import close_connections, clear_cache, autodiscover_cache, AutodiscoverProtocol, \
@@ -121,6 +122,16 @@ class AutodiscoverTest(EWSTest):
                 email='XXX.' + self.account.primary_smtp_address,
                 credentials=self.account.protocol.credentials,
                 retry_policy=self.retry_policy,
+            )
+
+    def test_failed_login_via_account(self):
+        with self.assertRaises(AutoDiscoverFailed):
+            Account(
+                primary_smtp_address=self.account.primary_smtp_address,
+                access_type=DELEGATE,
+                credentials=Credentials(self.account.protocol.credentials.username, 'WRONG_PASSWORD'),
+                autodiscover=True,
+                locale='da_DK',
             )
 
     @requests_mock.mock(real_http=False)  # Just make sure we don't issue any real HTTP here

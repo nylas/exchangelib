@@ -2,7 +2,7 @@ from collections import namedtuple
 import pickle
 
 from exchangelib import Account, Credentials, FaultTolerance, Message, FileAttachment, DELEGATE, Configuration
-from exchangelib.errors import ErrorAccessDenied, ErrorFolderNotFound, AutoDiscoverFailed, UnauthorizedError
+from exchangelib.errors import ErrorAccessDenied, ErrorFolderNotFound, UnauthorizedError
 from exchangelib.folders import Calendar
 from exchangelib.properties import DelegateUser, UserId, DelegatePermissions
 from exchangelib.protocol import Protocol
@@ -174,16 +174,6 @@ class AccountTest(EWSTest):
                 )
             ]
         )
-
-    def test_failed_login_via_autodiscover(self):
-        with self.assertRaises(AutoDiscoverFailed):
-            Account(
-                primary_smtp_address=self.account.primary_smtp_address,
-                access_type=DELEGATE,
-                credentials=Credentials(self.account.protocol.credentials.username, 'WRONG_PASSWORD'),
-                autodiscover=True,
-                locale='da_DK',
-            )
 
     def test_login_failure_and_credentials_update(self):
         # Create an account that does not need to create any connections
