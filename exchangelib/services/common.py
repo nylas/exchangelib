@@ -113,11 +113,12 @@ class EWSService(metaclass=abc.ABCMeta):
         from ..version import API_VERSIONS
         if isinstance(self, EWSAccountService):
             account = self.account
-            hint = self.account.version
+            version_hint = self.account.version
         else:
             account = None
-            hint = self.protocol.version
-        api_versions = [hint.api_version] + [v for v in API_VERSIONS if v != hint.api_version]
+            # We may be here due to version guessing in Protocol.version, so we can't use the Protocol.version property
+            version_hint = self.protocol.config.version
+        api_versions = [version_hint.api_version] + [v for v in API_VERSIONS if v != version_hint.api_version]
         for api_version in api_versions:
             log.debug('Trying API version %s for account %s', api_version, account)
             r, session = post_ratelimited(
@@ -125,7 +126,7 @@ class EWSService(metaclass=abc.ABCMeta):
                 session=self.protocol.get_session(),
                 url=self.protocol.service_endpoint,
                 headers=extra_headers(account=account),
-                data=wrap(content=payload, version=api_version, account=account),
+                data=wrap(content=payload, api_version=api_version, account=account),
                 allow_redirects=False,
                 stream=self.streaming,
             )
@@ -142,7 +143,7 @@ class EWSService(metaclass=abc.ABCMeta):
             # The body may contain error messages from Exchange, but we still want to collect version info
             if header is not None:
                 try:
-                    self._update_api_version(hint=hint, api_version=api_version, header=header, **parse_opts)
+                    self._update_api_version(hint=version_hint, api_version=api_version, header=header, **parse_opts)
                 except TransportError as te:
                     log.debug('Failed to update version info (%s)', te)
             try:
@@ -208,13 +209,13 @@ class EWSService(metaclass=abc.ABCMeta):
         self.protocol.retry_policy.back_off(e.back_off)
         # We'll warn about this later if we actually need to sleep
 
-    def _update_api_version(self, hint, api_version, header, **parse_opts):
+    def _update_api_version(self, version_hint, api_version, header, **parse_opts):
         from ..version import Version
         head_version = Version.from_soap_header(requested_api_version=api_version, header=header)
-        if hint == head_version:
+        if version_hint == head_version:
             # Nothing to do
             return
-        log.debug('Found new version (%s -> %s)', hint, head_version)
+        log.debug('Found new version (%s -> %s)', version_hint, head_version)
         # The api_version that worked was different than our hint, or we never got a build version. Set new
         # version for account.
         if isinstance(self, EWSAccountService):

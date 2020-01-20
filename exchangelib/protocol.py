@@ -396,23 +396,27 @@ class CachingProtocol(type):
 
 class Protocol(BaseProtocol, metaclass=CachingProtocol):
     def __init__(self, *args, **kwargs):
-        self.version_hint = None
         super().__init__(*args, **kwargs)
+        self._api_version_hint = None
+        self._version_lock = Lock()
 
     def get_auth_type(self):
         # Autodetect authentication type. We also set version hint here.
         name = str(self.credentials) if self.credentials and str(self.credentials) else 'DUMMY'
-        auth_type, version_hint = get_service_authtype(
-            service_endpoint=self.service_endpoint, retry_policy=self.retry_policy, versions=API_VERSIONS, name=name
+        auth_type, api_version_hint = get_service_authtype(
+            service_endpoint=self.service_endpoint, retry_policy=self.retry_policy, api_versions=API_VERSIONS, name=name
         )
-        self.version_hint = version_hint
+        self._api_version_hint = api_version_hint
         return auth_type
 
     @property
     def version(self):
-        if not self.config.version:
-            # Version.guess() needs auth objects and a working session pool
-            self.config.version = Version.guess(self, hint=self.version_hint)
+        # Make sure only one thread does the guessing.
+        if not self.config.version or not self.config.version.build:
+            with self._version_lock:
+                if not self.config.version or not self.config.version.build:
+                    # Version.guess() needs auth objects and a working session pool
+                    self.config.version = Version.guess(self, api_version_hint=self._api_version_hint)
         return self.config.version
 
     @threaded_cached_property

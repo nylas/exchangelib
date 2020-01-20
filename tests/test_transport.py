@@ -87,9 +87,9 @@ class TransportTest(TimedTestCase):
         MockTZ = namedtuple('EWSTimeZone', ['ms_id'])
         MockAccount = namedtuple('Account', ['access_type', 'primary_smtp_address', 'default_timezone'])
         content = create_element('AAA')
-        version = 'BBB'
+        api_version = 'BBB'
         account = MockAccount(DELEGATE, 'foo@example.com', MockTZ('XXX'))
-        wrapped = wrap(content=content, version=version, account=account)
+        wrapped = wrap(content=content, api_version=api_version, account=account)
         self.assertEqual(
             PrettyXmlHandler.prettify_xml(wrapped),
             b'''<?xml version='1.0' encoding='utf-8'?>
@@ -109,7 +109,7 @@ class TransportTest(TimedTestCase):
 </s:Envelope>
 ''')
         account = MockAccount(IMPERSONATION, 'foo@example.com', MockTZ('XXX'))
-        wrapped = wrap(content=content, version=version, account=account)
+        wrapped = wrap(content=content, api_version=api_version, account=account)
         self.assertEqual(
             PrettyXmlHandler.prettify_xml(wrapped),
             b'''<?xml version='1.0' encoding='utf-8'?>

@@ -55,14 +55,14 @@ def extra_headers(account):
     return None
 
 
-def wrap(content, version, account=None):
+def wrap(content, api_version, account=None):
     """
     Generate the necessary boilerplate XML for a raw SOAP request. The XML is specific to the server version.
     ExchangeImpersonation allows to act as the user we want to impersonate.
     """
     envelope = create_element('s:Envelope', nsmap=ns_translation)
     header = create_element('s:Header')
-    requestserverversion = create_element('t:RequestServerVersion', attrs=dict(Version=version))
+    requestserverversion = create_element('t:RequestServerVersion', attrs=dict(Version=api_version))
     header.append(requestserverversion)
     if account:
         if account.access_type == IMPERSONATION:
@@ -98,7 +98,7 @@ def get_auth_instance(auth_type, **kwargs):
     return model(**kwargs)
 
 
-def get_service_authtype(service_endpoint, retry_policy, versions, name):
+def get_service_authtype(service_endpoint, retry_policy, api_versions, name):
     # Get auth type by tasting headers from the server. Only do POST requests. HEAD is too error prone, and some servers
     # are set up to redirect to OWA on all requests except POST to /EWS/Exchange.asmx
     #
@@ -109,8 +109,8 @@ def get_service_authtype(service_endpoint, retry_policy, versions, name):
     wait = 10  # seconds
     t_start = time.time()
     headers = DEFAULT_HEADERS.copy()
-    for version in versions:
-        data = dummy_xml(version=version, name=name)
+    for api_version in api_versions:
+        data = dummy_xml(api_version=api_version, name=name)
         log.debug('Requesting %s from %s', data, service_endpoint)
         while True:
             _back_off_if_needed(retry_policy.back_off_until)
@@ -138,7 +138,7 @@ def get_service_authtype(service_endpoint, retry_policy, versions, name):
         try:
             auth_type = get_auth_method_from_response(response=r)
             log.debug('Auth type is %s', auth_type)
-            return auth_type, version
+            return auth_type, api_version
         except UnauthorizedError:
             continue
     raise TransportError('Failed to get auth type from service')
@@ -194,7 +194,7 @@ def _tokenize(val):
     return auth_methods
 
 
-def dummy_xml(version, name):
+def dummy_xml(api_version, name):
     # Generate a minimal, valid EWS request
     from .services import ResolveNames  # Avoid circular import
     return wrap(content=ResolveNames(protocol=None).get_payload(
@@ -203,4 +203,4 @@ def dummy_xml(version, name):
         return_full_contact_data=False,
         search_scope=None,
         contact_data_shape=None,
-    ), version=version)
+    ), api_version=api_version)
