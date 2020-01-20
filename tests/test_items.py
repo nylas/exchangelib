@@ -1866,7 +1866,7 @@ class GenericItemTest(CommonItemTest):
                 continue
             self.assertIsNotNone(getattr(item, f.name), (f, getattr(item, f.name)))
         only_fields = ('subject', 'body', 'categories')
-        item = self.test_folder.only(*only_fields).get(categories__contains=item.categories)
+        item = self.test_folder.all().only(*only_fields).get(categories__contains=item.categories)
         self.assertIsInstance(item, self.ITEM_CLASS)
         for f in self.ITEM_CLASS.FIELDS:
             self.assertTrue(hasattr(item, f.name))
