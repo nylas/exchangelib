@@ -844,6 +844,408 @@ class CommonItemTest(BaseItemTest):
         self.assertIn('subject=', str(item))
         self.assertIn(item.__class__.__name__, repr(item))
 
+    def test_queryset_nonsearchable_fields(self):
+        for f in self.ITEM_CLASS.FIELDS:
+            if f.is_searchable or isinstance(f, IdField) or not f.supports_version(self.account.version):
+                continue
+            if f.name in ('percent_complete', 'allow_new_time_proposal'):
+                # These fields don't raise an error when used in a filter, but also don't match anything in a filter
+                continue
+            try:
+                filter_val = f.clean(self.random_val(f))
+                filter_kwargs = {'%s__in' % f.name: filter_val} if f.is_list else {f.name: filter_val}
+
+                # We raise ValueError when searching on an is_searchable=False field
+                with self.assertRaises(ValueError):
+                    list(self.test_folder.filter(**filter_kwargs))
+
+                # Make sure the is_searchable=False setting is correct by searching anyway and testing that this
+                # fails server-side. This only works for values that we are actually able to convert to a search
+                # string.
+                try:
+                    value_to_xml_text(filter_val)
+                except NotImplementedError:
+                    continue
+
+                f.is_searchable = True
+                if f.name in ('reminder_due_by',):
+                    # Filtering is accepted but doesn't work
+                    self.assertEqual(
+                        len(self.test_folder.filter(**filter_kwargs)),
+                        0
+                    )
+                else:
+                    with self.assertRaises((ErrorUnsupportedPathForQuery, ErrorInvalidValueForProperty)):
+                        list(self.test_folder.filter(**filter_kwargs))
+            finally:
+                f.is_searchable = False
+
+    def test_filter_on_all_fields(self):
+        # Test that we can filter on all field names
+        # TODO: Test filtering on subfields of IndexedField
+        item = self.get_test_item()
+        if hasattr(item, 'is_all_day'):
+            item.is_all_day = False  # Make sure start- and end dates don't change
+        ids = self.test_folder.bulk_create(items=[item])
+        common_qs = self.test_folder.filter(categories__contains=self.categories)
+        for f in self.ITEM_CLASS.FIELDS:
+            if not f.supports_version(self.account.version):
+                # Cannot be used with this EWS version
+                continue
+            if not f.is_searchable:
+                # Cannot be used in a QuerySet
+                continue
+            val = getattr(item, f.name)
+            if val is None:
+                # We cannot filter on None values
+                continue
+            if self.ITEM_CLASS == Contact and f.name in ('body', 'display_name'):
+                # filtering 'body' or 'display_name' on Contact items doesn't work at all. Error in EWS?
+                continue
+            if f.is_list:
+                # Filter multi-value fields with =, __in and __contains
+                if issubclass(f.value_cls, MultiFieldIndexedElement):
+                    # For these, we need to filter on the subfield
+                    filter_kwargs = []
+                    for v in val:
+                        for subfield in f.value_cls.supported_fields(version=self.account.version):
+                            field_path = FieldPath(field=f, label=v.label, subfield=subfield)
+                            path, subval = field_path.path, field_path.get_value(item)
+                            if subval is None:
+                                continue
+                            filter_kwargs.extend([
+                                {path: subval}, {'%s__in' % path: [subval]}, {'%s__contains' % path: [subval]}
+                            ])
+                elif issubclass(f.value_cls, SingleFieldIndexedElement):
+                    # For these, we may filter by item or subfield value
+                    filter_kwargs = []
+                    for v in val:
+                        for subfield in f.value_cls.supported_fields(version=self.account.version):
+                            field_path = FieldPath(field=f, label=v.label, subfield=subfield)
+                            path, subval = field_path.path, field_path.get_value(item)
+                            if subval is None:
+                                continue
+                            filter_kwargs.extend([
+                                {f.name: v}, {path: subval},
+                                {'%s__in' % path: [subval]}, {'%s__contains' % path: [subval]}
+                            ])
+                else:
+                    filter_kwargs = [{'%s__in' % f.name: val}, {'%s__contains' % f.name: val}]
+            else:
+                # Filter all others with =, __in and __contains. We could have more filters here, but these should
+                # always match.
+                filter_kwargs = [{f.name: val}, {'%s__in' % f.name: [val]}]
+                if isinstance(f, TextField) and not isinstance(f, (ChoiceField, BodyField)):
+                    # Choice fields cannot be filtered using __contains. BodyField often works in practice but often
+                    # fails with generated test data. Ugh.
+                    filter_kwargs.append({'%s__contains' % f.name: val[2:10]})
+            for kw in filter_kwargs:
+                self.assertEqual(len(common_qs.filter(**kw)), 1, (f.name, val, kw))
+        self.bulk_delete(ids)
+
+    def test_text_field_settings(self):
+        # Test that the max_length and is_complex field settings are correctly set for text fields
+        item = self.get_test_item().save()
+        for f in self.ITEM_CLASS.FIELDS:
+            if not f.supports_version(self.account.version):
+                # Cannot be used with this EWS version
+                continue
+            if not isinstance(f, TextField):
+                continue
+            if isinstance(f, ChoiceField):
+                # This one can't contain random values
+                continue
+            if isinstance(f, CultureField):
+                # This one can't contain random values
+                continue
+            if f.is_read_only:
+                continue
+            if f.name == 'categories':
+                # We're filtering on this one, so leave it alone
+                continue
+            old_max_length = getattr(f, 'max_length', None)
+            old_is_complex = f.is_complex
+            try:
+                # Set a string long enough to not be handled by FindItems
+                f.max_length = 4000
+                if f.is_list:
+                    setattr(item, f.name, [get_random_string(f.max_length) for _ in range(len(getattr(item, f.name)))])
+                else:
+                    setattr(item, f.name, get_random_string(f.max_length))
+                try:
+                    item.save(update_fields=[f.name])
+                except ErrorPropertyUpdate:
+                    # Some fields throw this error when updated to a huge value
+                    self.assertIn(f.name, ['given_name', 'middle_name', 'surname'])
+                    continue
+                except ErrorInvalidPropertySet:
+                    # Some fields can not be updated after save
+                    self.assertTrue(f.is_read_only_after_send)
+                    continue
+                # is_complex=True forces the query to use GetItems which will always get the full value
+                f.is_complex = True
+                new_full_item = self.test_folder.all().only(f.name).get(categories__contains=self.categories)
+                new_full = getattr(new_full_item, f.name)
+                if old_max_length:
+                    if f.is_list:
+                        for s in new_full:
+                            self.assertLessEqual(len(s), old_max_length, (f.name, len(s), old_max_length))
+                    else:
+                        self.assertLessEqual(len(new_full), old_max_length, (f.name, len(new_full), old_max_length))
+
+                # is_complex=False forces the query to use FindItems which will only get the short value
+                f.is_complex = False
+                new_short_item = self.test_folder.all().only(f.name).get(categories__contains=self.categories)
+                new_short = getattr(new_short_item, f.name)
+
+                if not old_is_complex:
+                    self.assertEqual(new_short, new_full, (f.name, new_short, new_full))
+            finally:
+                if old_max_length:
+                    f.max_length = old_max_length
+                else:
+                    delattr(f, 'max_length')
+                f.is_complex = old_is_complex
+
+    def test_save_and_delete(self):
+        # Test that we can create, update and delete single items using methods directly on the item.
+        # For CalendarItem instances, the 'is_all_day' attribute affects the 'start' and 'end' values. Changing from
+        # 'false' to 'true' removes the time part of these datetimes.
+        insert_kwargs = self.get_random_insert_kwargs()
+        if 'is_all_day' in insert_kwargs:
+            insert_kwargs['is_all_day'] = False
+        item = self.ITEM_CLASS(account=self.account, folder=self.test_folder, **insert_kwargs)
+        self.assertIsNone(item.id)
+        self.assertIsNone(item.changekey)
+
+        # Create
+        item.save()
+        self.assertIsNotNone(item.id)
+        self.assertIsNotNone(item.changekey)
+        for k, v in insert_kwargs.items():
+            self.assertEqual(getattr(item, k), v, (k, getattr(item, k), v))
+        # Test that whatever we have locally also matches whatever is in the DB
+        fresh_item = list(self.account.fetch(ids=[item]))[0]
+        for f in item.FIELDS:
+            old, new = getattr(item, f.name), getattr(fresh_item, f.name)
+            if f.is_read_only and old is None:
+                # Some fields are automatically set server-side
+                continue
+            if f.name == 'reminder_due_by':
+                # EWS sets a default value if it is not set on insert. Ignore
+                continue
+            if f.name == 'mime_content':
+                # This will change depending on other contents fields
+                continue
+            if f.is_list:
+                old, new = set(old or ()), set(new or ())
+            self.assertEqual(old, new, (f.name, old, new))
+
+        # Update
+        update_kwargs = self.get_random_update_kwargs(item=item, insert_kwargs=insert_kwargs)
+        for k, v in update_kwargs.items():
+            setattr(item, k, v)
+        item.save()
+        for k, v in update_kwargs.items():
+            self.assertEqual(getattr(item, k), v, (k, getattr(item, k), v))
+        # Test that whatever we have locally also matches whatever is in the DB
+        fresh_item = list(self.account.fetch(ids=[item]))[0]
+        for f in item.FIELDS:
+            old, new = getattr(item, f.name), getattr(fresh_item, f.name)
+            if f.is_read_only and old is None:
+                # Some fields are automatically updated server-side
+                continue
+            if f.name == 'mime_content':
+                # This will change depending on other contents fields
+                continue
+            if f.name == 'reminder_due_by':
+                if new is None:
+                    # EWS does not always return a value if reminder_is_set is False.
+                    continue
+                if old is not None:
+                    # EWS sometimes randomly sets the new reminder due date to one month before or after we
+                    # wanted it, and sometimes 30 days before or after. But only sometimes...
+                    old_date = old.astimezone(self.account.default_timezone).date()
+                    new_date = new.astimezone(self.account.default_timezone).date()
+                    if relativedelta(month=1) + new_date == old_date:
+                        item.reminder_due_by = new
+                        continue
+                    if relativedelta(month=1) + old_date == new_date:
+                        item.reminder_due_by = new
+                        continue
+                    elif abs(old_date - new_date) == datetime.timedelta(days=30):
+                        item.reminder_due_by = new
+                        continue
+            if f.is_list:
+                old, new = set(old or ()), set(new or ())
+            self.assertEqual(old, new, (f.name, old, new))
+
+        # Hard delete
+        item_id = (item.id, item.changekey)
+        item.delete()
+        for e in self.account.fetch(ids=[item_id]):
+            # It's gone from the account
+            self.assertIsInstance(e, ErrorItemNotFound)
+        # Really gone, not just changed ItemId
+        items = self.test_folder.filter(categories__contains=item.categories)
+        self.assertEqual(len(items), 0)
+
+    def test_item(self):
+        # Test insert
+        # For CalendarItem instances, the 'is_all_day' attribute affects the 'start' and 'end' values. Changing from
+        # 'false' to 'true' removes the time part of these datetimes.
+        insert_kwargs = self.get_random_insert_kwargs()
+        if 'is_all_day' in insert_kwargs:
+            insert_kwargs['is_all_day'] = False
+        item = self.ITEM_CLASS(**insert_kwargs)
+        # Test with generator as argument
+        insert_ids = self.test_folder.bulk_create(items=(i for i in [item]))
+        self.assertEqual(len(insert_ids), 1)
+        self.assertIsInstance(insert_ids[0], BaseItem)
+        find_ids = self.test_folder.filter(categories__contains=item.categories).values_list('id', 'changekey')
+        self.assertEqual(len(find_ids), 1)
+        self.assertEqual(len(find_ids[0]), 2, find_ids[0])
+        self.assertEqual(insert_ids, list(find_ids))
+        # Test with generator as argument
+        item = list(self.account.fetch(ids=(i for i in find_ids)))[0]
+        for f in self.ITEM_CLASS.FIELDS:
+            if not f.supports_version(self.account.version):
+                # Cannot be used with this EWS version
+                continue
+            if self.ITEM_CLASS == CalendarItem and f in CalendarItem.timezone_fields():
+                # Timezone fields will (and must) be populated automatically from the timestamp
+                continue
+            if f.is_read_only:
+                continue
+            if f.name == 'reminder_due_by':
+                # EWS sets a default value if it is not set on insert. Ignore
+                continue
+            if f.name == 'mime_content':
+                # This will change depending on other contents fields
+                continue
+            old, new = getattr(item, f.name), insert_kwargs[f.name]
+            if f.is_list:
+                old, new = set(old or ()), set(new or ())
+            self.assertEqual(old, new, (f.name, old, new))
+
+        # Test update
+        update_kwargs = self.get_random_update_kwargs(item=item, insert_kwargs=insert_kwargs)
+        if self.ITEM_CLASS in (Contact, DistributionList):
+            # Contact and DistributionList don't support mime_type updates at all
+            update_kwargs.pop('mime_content', None)
+        update_fieldnames = [f for f in update_kwargs.keys() if f != 'attachments']
+        for k, v in update_kwargs.items():
+            setattr(item, k, v)
+        # Test with generator as argument
+        update_ids = self.account.bulk_update(items=(i for i in [(item, update_fieldnames)]))
+        self.assertEqual(len(update_ids), 1)
+        self.assertEqual(len(update_ids[0]), 2, update_ids)
+        self.assertEqual(insert_ids[0].id, update_ids[0][0])  # ID should be the same
+        self.assertNotEqual(insert_ids[0].changekey, update_ids[0][1])  # Changekey should change when item is updated
+        item = list(self.account.fetch(update_ids))[0]
+        for f in self.ITEM_CLASS.FIELDS:
+            if not f.supports_version(self.account.version):
+                # Cannot be used with this EWS version
+                continue
+            if self.ITEM_CLASS == CalendarItem and f in CalendarItem.timezone_fields():
+                # Timezone fields will (and must) be populated automatically from the timestamp
+                continue
+            if f.is_read_only or f.is_read_only_after_send:
+                # These cannot be changed
+                continue
+            if f.name == 'mime_content':
+                # This will change depending on other contents fields
+                continue
+            old, new = getattr(item, f.name), update_kwargs[f.name]
+            if f.name == 'reminder_due_by':
+                if old is None:
+                    # EWS does not always return a value if reminder_is_set is False. Set one now
+                    item.reminder_due_by = new
+                    continue
+                elif old is not None and new is not None:
+                    # EWS sometimes randomly sets the new reminder due date to one month before or after we
+                    # wanted it, and sometimes 30 days before or after. But only sometimes...
+                    old_date = old.astimezone(self.account.default_timezone).date()
+                    new_date = new.astimezone(self.account.default_timezone).date()
+                    if relativedelta(month=1) + new_date == old_date:
+                        item.reminder_due_by = new
+                        continue
+                    if relativedelta(month=1) + old_date == new_date:
+                        item.reminder_due_by = new
+                        continue
+                    elif abs(old_date - new_date) == datetime.timedelta(days=30):
+                        item.reminder_due_by = new
+                        continue
+            if f.is_list:
+                old, new = set(old or ()), set(new or ())
+            self.assertEqual(old, new, (f.name, old, new))
+
+        # Test wiping or removing fields
+        wipe_kwargs = {}
+        for f in self.ITEM_CLASS.FIELDS:
+            if not f.supports_version(self.account.version):
+                # Cannot be used with this EWS version
+                continue
+            if self.ITEM_CLASS == CalendarItem and f in CalendarItem.timezone_fields():
+                # Timezone fields will (and must) be populated automatically from the timestamp
+                continue
+            if f.is_required or f.is_required_after_save:
+                # These cannot be deleted
+                continue
+            if f.is_read_only or f.is_read_only_after_send:
+                # These cannot be changed
+                continue
+            wipe_kwargs[f.name] = None
+        for k, v in wipe_kwargs.items():
+            setattr(item, k, v)
+        wipe_ids = self.account.bulk_update([(item, update_fieldnames), ])
+        self.assertEqual(len(wipe_ids), 1)
+        self.assertEqual(len(wipe_ids[0]), 2, wipe_ids)
+        self.assertEqual(insert_ids[0].id, wipe_ids[0][0])  # ID should be the same
+        self.assertNotEqual(insert_ids[0].changekey,
+                            wipe_ids[0][1])  # Changekey should not be the same when item is updated
+        item = list(self.account.fetch(wipe_ids))[0]
+        for f in self.ITEM_CLASS.FIELDS:
+            if not f.supports_version(self.account.version):
+                # Cannot be used with this EWS version
+                continue
+            if self.ITEM_CLASS == CalendarItem and f in CalendarItem.timezone_fields():
+                # Timezone fields will (and must) be populated automatically from the timestamp
+                continue
+            if f.is_required or f.is_required_after_save:
+                continue
+            if f.is_read_only or f.is_read_only_after_send:
+                continue
+            old, new = getattr(item, f.name), wipe_kwargs[f.name]
+            if f.is_list:
+                old, new = set(old or ()), set(new or ())
+            self.assertEqual(old, new, (f.name, old, new))
+
+        try:
+            self.ITEM_CLASS.register('extern_id', ExternId)
+            # Test extern_id = None, which deletes the extended property entirely
+            extern_id = None
+            item.extern_id = extern_id
+            wipe2_ids = self.account.bulk_update([(item, ['extern_id']), ])
+            self.assertEqual(len(wipe2_ids), 1)
+            self.assertEqual(len(wipe2_ids[0]), 2, wipe2_ids)
+            self.assertEqual(insert_ids[0].id, wipe2_ids[0][0])  # ID must be the same
+            self.assertNotEqual(insert_ids[0].changekey, wipe2_ids[0][1])  # Changekey must change when item is updated
+            item = list(self.account.fetch(wipe2_ids))[0]
+            self.assertEqual(item.extern_id, extern_id)
+        finally:
+            self.ITEM_CLASS.deregister('extern_id')
+
+        # Remove test item. Test with generator as argument
+        self.bulk_delete(ids=(i for i in wipe2_ids))
+
+
+class GenericItemTest(CommonItemTest):
+    # Tests that don't need to be run for every single folder type
+    TEST_FOLDER = 'inbox'
+    FOLDER_CLASS = Inbox
+    ITEM_CLASS = Message
+
     def test_validation(self):
         item = self.get_test_item()
         item.clean()
@@ -868,22 +1270,6 @@ class CommonItemTest(BaseItemTest):
         with self.assertRaises(ValueError):
             item = self.get_test_item()
             item.save(update_fields=['foo', 'bar'])  # update_fields is only valid on update
-
-        if self.ITEM_CLASS == Message:
-            with self.assertRaises(ValueError):
-                item = self.get_test_item()
-                item.account = None
-                item.send()  # Must have account on send
-            with self.assertRaises(ErrorItemNotFound):
-                item = self.get_test_item()
-                item.save()
-                item_id, changekey = item.id, item.changekey
-                item.delete()
-                item.id, item.changekey = item_id, changekey
-                item.send()  # Item disappeared
-            with self.assertRaises(AttributeError):
-                item = self.get_test_item()
-                item.send(copy_to_folder=self.account.trash, save_copy=False)  # Inconsistent args
 
         with self.assertRaises(ValueError):
             item = self.get_test_item()
@@ -945,6 +1331,23 @@ class CommonItemTest(BaseItemTest):
             item.id, item.changekey = item_id, changekey
             item.delete()  # Item disappeared
 
+    def test_invalid_kwargs_on_send(self):
+        # Only Message class has the send() method
+        with self.assertRaises(ValueError):
+            item = self.get_test_item()
+            item.account = None
+            item.send()  # Must have account on send
+        with self.assertRaises(ErrorItemNotFound):
+            item = self.get_test_item()
+            item.save()
+            item_id, changekey = item.id, item.changekey
+            item.delete()
+            item.id, item.changekey = item_id, changekey
+            item.send()  # Item disappeared
+        with self.assertRaises(AttributeError):
+            item = self.get_test_item()
+            item.send(copy_to_folder=self.account.trash, save_copy=False)  # Inconsistent args
+
     def test_unsupported_fields(self):
         # Create a field that is not supported by any current versions. Test that we fail when using this field
         class UnsupportedProp(ExtendedProperty):
@@ -971,42 +1374,6 @@ class CommonItemTest(BaseItemTest):
                 list(self.test_folder.all().values_list(attr_name))
         finally:
             self.ITEM_CLASS.deregister(attr_name=attr_name)
-
-    def test_queryset_nonsearchable_fields(self):
-        for f in self.ITEM_CLASS.FIELDS:
-            if f.is_searchable or isinstance(f, IdField) or not f.supports_version(self.account.version):
-                continue
-            if f.name in ('percent_complete', 'allow_new_time_proposal'):
-                # These fields don't raise an error when used in a filter, but also don't match anything in a filter
-                continue
-            try:
-                filter_val = f.clean(self.random_val(f))
-                filter_kwargs = {'%s__in' % f.name: filter_val} if f.is_list else {f.name: filter_val}
-
-                # We raise ValueError when searching on an is_searchable=False field
-                with self.assertRaises(ValueError):
-                    list(self.test_folder.filter(**filter_kwargs))
-
-                # Make sure the is_searchable=False setting is correct by searching anyway and testing that this
-                # fails server-side. This only works for values that we are actually able to convert to a search
-                # string.
-                try:
-                    value_to_xml_text(filter_val)
-                except NotImplementedError:
-                    continue
-
-                f.is_searchable = True
-                if f.name in ('reminder_due_by',):
-                    # Filtering is accepted but doesn't work
-                    self.assertEqual(
-                        len(self.test_folder.filter(**filter_kwargs)),
-                        0
-                    )
-                else:
-                    with self.assertRaises((ErrorUnsupportedPathForQuery, ErrorInvalidValueForProperty)):
-                        list(self.test_folder.filter(**filter_kwargs))
-            finally:
-                f.is_searchable = False
 
     def test_order_by(self):
         # Test order_by() on normal field
@@ -1052,52 +1419,6 @@ class CommonItemTest(BaseItemTest):
         finally:
             self.ITEM_CLASS.deregister('extern_id')
         self.bulk_delete(qs)
-
-        # Test order_by() on IndexedField (simple and multi-subfield). Only Contact items have these
-        if self.ITEM_CLASS == Contact:
-            test_items = []
-            label = self.random_val(EmailAddress.get_field_by_fieldname('label'))
-            for i in range(4):
-                item = self.get_test_item()
-                item.email_addresses = [EmailAddress(email='%s@foo.com' % i, label=label)]
-                test_items.append(item)
-            self.test_folder.bulk_create(items=test_items)
-            qs = QuerySet(
-                folder_collection=FolderCollection(account=self.account, folders=[self.test_folder])
-            ).filter(categories__contains=self.categories)
-            self.assertEqual(
-                [i[0].email for i in qs.order_by('email_addresses__%s' % label)
-                    .values_list('email_addresses', flat=True)],
-                ['0@foo.com', '1@foo.com', '2@foo.com', '3@foo.com']
-            )
-            self.assertEqual(
-                [i[0].email for i in qs.order_by('-email_addresses__%s' % label)
-                    .values_list('email_addresses', flat=True)],
-                ['3@foo.com', '2@foo.com', '1@foo.com', '0@foo.com']
-            )
-            self.bulk_delete(qs)
-
-            test_items = []
-            label = self.random_val(PhysicalAddress.get_field_by_fieldname('label'))
-            for i in range(4):
-                item = self.get_test_item()
-                item.physical_addresses = [PhysicalAddress(street='Elm St %s' % i, label=label)]
-                test_items.append(item)
-            self.test_folder.bulk_create(items=test_items)
-            qs = QuerySet(
-                folder_collection=FolderCollection(account=self.account, folders=[self.test_folder])
-            ).filter(categories__contains=self.categories)
-            self.assertEqual(
-                [i[0].street for i in qs.order_by('physical_addresses__%s__street' % label)
-                    .values_list('physical_addresses', flat=True)],
-                ['Elm St 0', 'Elm St 1', 'Elm St 2', 'Elm St 3']
-            )
-            self.assertEqual(
-                [i[0].street for i in qs.order_by('-physical_addresses__%s__street' % label)
-                    .values_list('physical_addresses', flat=True)],
-                ['Elm St 3', 'Elm St 2', 'Elm St 1', 'Elm St 0']
-            )
-            self.bulk_delete(qs)
 
         # Test sorting on multiple fields
         try:
@@ -1482,133 +1803,6 @@ class CommonItemTest(BaseItemTest):
         )
         item.delete()
 
-    def test_filter_on_all_fields(self):
-        # Test that we can filter on all field names
-        # TODO: Test filtering on subfields of IndexedField
-        item = self.get_test_item()
-        if hasattr(item, 'is_all_day'):
-            item.is_all_day = False  # Make sure start- and end dates don't change
-        ids = self.test_folder.bulk_create(items=[item])
-        common_qs = self.test_folder.filter(categories__contains=self.categories)
-        for f in self.ITEM_CLASS.FIELDS:
-            if not f.supports_version(self.account.version):
-                # Cannot be used with this EWS version
-                continue
-            if not f.is_searchable:
-                # Cannot be used in a QuerySet
-                continue
-            val = getattr(item, f.name)
-            if val is None:
-                # We cannot filter on None values
-                continue
-            if self.ITEM_CLASS == Contact and f.name in ('body', 'display_name'):
-                # filtering 'body' or 'display_name' on Contact items doesn't work at all. Error in EWS?
-                continue
-            if f.is_list:
-                # Filter multi-value fields with =, __in and __contains
-                if issubclass(f.value_cls, MultiFieldIndexedElement):
-                    # For these, we need to filter on the subfield
-                    filter_kwargs = []
-                    for v in val:
-                        for subfield in f.value_cls.supported_fields(version=self.account.version):
-                            field_path = FieldPath(field=f, label=v.label, subfield=subfield)
-                            path, subval = field_path.path, field_path.get_value(item)
-                            if subval is None:
-                                continue
-                            filter_kwargs.extend([
-                                {path: subval}, {'%s__in' % path: [subval]}, {'%s__contains' % path: [subval]}
-                            ])
-                elif issubclass(f.value_cls, SingleFieldIndexedElement):
-                    # For these, we may filter by item or subfield value
-                    filter_kwargs = []
-                    for v in val:
-                        for subfield in f.value_cls.supported_fields(version=self.account.version):
-                            field_path = FieldPath(field=f, label=v.label, subfield=subfield)
-                            path, subval = field_path.path, field_path.get_value(item)
-                            if subval is None:
-                                continue
-                            filter_kwargs.extend([
-                                {f.name: v}, {path: subval},
-                                {'%s__in' % path: [subval]}, {'%s__contains' % path: [subval]}
-                            ])
-                else:
-                    filter_kwargs = [{'%s__in' % f.name: val}, {'%s__contains' % f.name: val}]
-            else:
-                # Filter all others with =, __in and __contains. We could have more filters here, but these should
-                # always match.
-                filter_kwargs = [{f.name: val}, {'%s__in' % f.name: [val]}]
-                if isinstance(f, TextField) and not isinstance(f, (ChoiceField, BodyField)):
-                    # Choice fields cannot be filtered using __contains. BodyField often works in practice but often
-                    # fails with generated test data. Ugh.
-                    filter_kwargs.append({'%s__contains' % f.name: val[2:10]})
-            for kw in filter_kwargs:
-                self.assertEqual(len(common_qs.filter(**kw)), 1, (f.name, val, kw))
-        self.bulk_delete(ids)
-
-    def test_text_field_settings(self):
-        # Test that the max_length and is_complex field settings are correctly set for text fields
-        item = self.get_test_item().save()
-        for f in self.ITEM_CLASS.FIELDS:
-            if not f.supports_version(self.account.version):
-                # Cannot be used with this EWS version
-                continue
-            if not isinstance(f, TextField):
-                continue
-            if isinstance(f, ChoiceField):
-                # This one can't contain random values
-                continue
-            if isinstance(f, CultureField):
-                # This one can't contain random values
-                continue
-            if f.is_read_only:
-                continue
-            if f.name == 'categories':
-                # We're filtering on this one, so leave it alone
-                continue
-            old_max_length = getattr(f, 'max_length', None)
-            old_is_complex = f.is_complex
-            try:
-                # Set a string long enough to not be handled by FindItems
-                f.max_length = 4000
-                if f.is_list:
-                    setattr(item, f.name, [get_random_string(f.max_length) for _ in range(len(getattr(item, f.name)))])
-                else:
-                    setattr(item, f.name, get_random_string(f.max_length))
-                try:
-                    item.save(update_fields=[f.name])
-                except ErrorPropertyUpdate:
-                    # Some fields throw this error when updated to a huge value
-                    self.assertIn(f.name, ['given_name', 'middle_name', 'surname'])
-                    continue
-                except ErrorInvalidPropertySet:
-                    # Some fields can not be updated after save
-                    self.assertTrue(f.is_read_only_after_send)
-                    continue
-                # is_complex=True forces the query to use GetItems which will always get the full value
-                f.is_complex = True
-                new_full_item = self.test_folder.all().only(f.name).get(categories__contains=self.categories)
-                new_full = getattr(new_full_item, f.name)
-                if old_max_length:
-                    if f.is_list:
-                        for s in new_full:
-                            self.assertLessEqual(len(s), old_max_length, (f.name, len(s), old_max_length))
-                    else:
-                        self.assertLessEqual(len(new_full), old_max_length, (f.name, len(new_full), old_max_length))
-
-                # is_complex=False forces the query to use FindItems which will only get the short value
-                f.is_complex = False
-                new_short_item = self.test_folder.all().only(f.name).get(categories__contains=self.categories)
-                new_short = getattr(new_short_item, f.name)
-
-                if not old_is_complex:
-                    self.assertEqual(new_short, new_full, (f.name, new_short, new_full))
-            finally:
-                if old_max_length:
-                    f.max_length = old_max_length
-                else:
-                    delattr(f, 'max_length')
-                f.is_complex = old_is_complex
-
     def test_complex_fields(self):
         # Test that complex fields can be fetched using only(). This is a test for #141.
         insert_kwargs = self.get_random_insert_kwargs()
@@ -1655,278 +1849,41 @@ class CommonItemTest(BaseItemTest):
         item.delete()
 
     def test_only_fields(self):
-        item = self.get_test_item()
-        self.test_folder.bulk_create(items=[item, item])
-        items = self.test_folder.filter(categories__contains=item.categories)
-        for item in items:
-            self.assertIsInstance(item, self.ITEM_CLASS)
-            for f in self.ITEM_CLASS.FIELDS:
-                self.assertTrue(hasattr(item, f.name))
-                if not f.supports_version(self.account.version):
-                    # Cannot be used with this EWS version
-                    continue
-                if f.name in ('optional_attendees', 'required_attendees', 'resources'):
-                    continue
-                if f.name == 'reminder_due_by' and not item.reminder_is_set:
-                    # We delete the due date if reminder is not set
-                    continue
-                elif f.is_read_only:
-                    continue
-                self.assertIsNotNone(getattr(item, f.name), (f, getattr(item, f.name)))
-        self.assertEqual(len(items), 2)
+        item = self.get_test_item().save()
+        item = self.test_folder.get(categories__contains=item.categories)
+        self.assertIsInstance(item, self.ITEM_CLASS)
+        for f in self.ITEM_CLASS.FIELDS:
+            self.assertTrue(hasattr(item, f.name))
+            if not f.supports_version(self.account.version):
+                # Cannot be used with this EWS version
+                continue
+            if f.name in ('optional_attendees', 'required_attendees', 'resources'):
+                continue
+            if f.name == 'reminder_due_by' and not item.reminder_is_set:
+                # We delete the due date if reminder is not set
+                continue
+            elif f.is_read_only:
+                continue
+            self.assertIsNotNone(getattr(item, f.name), (f, getattr(item, f.name)))
         only_fields = ('subject', 'body', 'categories')
-        items = self.test_folder.filter(categories__contains=item.categories).only(*only_fields)
-        for item in items:
-            self.assertIsInstance(item, self.ITEM_CLASS)
-            for f in self.ITEM_CLASS.FIELDS:
-                self.assertTrue(hasattr(item, f.name))
-                if not f.supports_version(self.account.version):
-                    # Cannot be used with this EWS version
-                    continue
-                if f.name in only_fields:
-                    self.assertIsNotNone(getattr(item, f.name), (f.name, getattr(item, f.name)))
-                elif f.is_required:
-                    v = getattr(item, f.name)
-                    if f.name == 'attachments':
-                        self.assertEqual(v, [], (f.name, v))
-                    elif f.default is None:
-                        self.assertIsNone(v, (f.name, v))
-                    else:
-                        self.assertEqual(v, f.default, (f.name, v))
-        self.assertEqual(len(items), 2)
-        self.bulk_delete(items)
-
-    def test_save_and_delete(self):
-        # Test that we can create, update and delete single items using methods directly on the item.
-        # For CalendarItem instances, the 'is_all_day' attribute affects the 'start' and 'end' values. Changing from
-        # 'false' to 'true' removes the time part of these datetimes.
-        insert_kwargs = self.get_random_insert_kwargs()
-        if 'is_all_day' in insert_kwargs:
-            insert_kwargs['is_all_day'] = False
-        item = self.ITEM_CLASS(account=self.account, folder=self.test_folder, **insert_kwargs)
-        self.assertIsNone(item.id)
-        self.assertIsNone(item.changekey)
-
-        # Create
-        item.save()
-        self.assertIsNotNone(item.id)
-        self.assertIsNotNone(item.changekey)
-        for k, v in insert_kwargs.items():
-            self.assertEqual(getattr(item, k), v, (k, getattr(item, k), v))
-        # Test that whatever we have locally also matches whatever is in the DB
-        fresh_item = list(self.account.fetch(ids=[item]))[0]
-        for f in item.FIELDS:
-            old, new = getattr(item, f.name), getattr(fresh_item, f.name)
-            if f.is_read_only and old is None:
-                # Some fields are automatically set server-side
+        item = self.test_folder.only(*only_fields).get(categories__contains=item.categories)
+        self.assertIsInstance(item, self.ITEM_CLASS)
+        for f in self.ITEM_CLASS.FIELDS:
+            self.assertTrue(hasattr(item, f.name))
+            if not f.supports_version(self.account.version):
+                # Cannot be used with this EWS version
                 continue
-            if f.name == 'reminder_due_by':
-                # EWS sets a default value if it is not set on insert. Ignore
-                continue
-            if f.name == 'mime_content':
-                # This will change depending on other contents fields
-                continue
-            if f.is_list:
-                old, new = set(old or ()), set(new or ())
-            self.assertEqual(old, new, (f.name, old, new))
-
-        # Update
-        update_kwargs = self.get_random_update_kwargs(item=item, insert_kwargs=insert_kwargs)
-        for k, v in update_kwargs.items():
-            setattr(item, k, v)
-        item.save()
-        for k, v in update_kwargs.items():
-            self.assertEqual(getattr(item, k), v, (k, getattr(item, k), v))
-        # Test that whatever we have locally also matches whatever is in the DB
-        fresh_item = list(self.account.fetch(ids=[item]))[0]
-        for f in item.FIELDS:
-            old, new = getattr(item, f.name), getattr(fresh_item, f.name)
-            if f.is_read_only and old is None:
-                # Some fields are automatically updated server-side
-                continue
-            if f.name == 'mime_content':
-                # This will change depending on other contents fields
-                continue
-            if f.name == 'reminder_due_by':
-                if new is None:
-                    # EWS does not always return a value if reminder_is_set is False.
-                    continue
-                if old is not None:
-                    # EWS sometimes randomly sets the new reminder due date to one month before or after we
-                    # wanted it, and sometimes 30 days before or after. But only sometimes...
-                    old_date = old.astimezone(self.account.default_timezone).date()
-                    new_date = new.astimezone(self.account.default_timezone).date()
-                    if relativedelta(month=1) + new_date == old_date:
-                        item.reminder_due_by = new
-                        continue
-                    if relativedelta(month=1) + old_date == new_date:
-                        item.reminder_due_by = new
-                        continue
-                    elif abs(old_date - new_date) == datetime.timedelta(days=30):
-                        item.reminder_due_by = new
-                        continue
-            if f.is_list:
-                old, new = set(old or ()), set(new or ())
-            self.assertEqual(old, new, (f.name, old, new))
-
-        # Hard delete
-        item_id = (item.id, item.changekey)
+            if f.name in only_fields:
+                self.assertIsNotNone(getattr(item, f.name), (f.name, getattr(item, f.name)))
+            elif f.is_required:
+                v = getattr(item, f.name)
+                if f.name == 'attachments':
+                    self.assertEqual(v, [], (f.name, v))
+                elif f.default is None:
+                    self.assertIsNone(v, (f.name, v))
+                else:
+                    self.assertEqual(v, f.default, (f.name, v))
         item.delete()
-        for e in self.account.fetch(ids=[item_id]):
-            # It's gone from the account
-            self.assertIsInstance(e, ErrorItemNotFound)
-        # Really gone, not just changed ItemId
-        items = self.test_folder.filter(categories__contains=item.categories)
-        self.assertEqual(len(items), 0)
-
-    def test_item(self):
-        # Test insert
-        # For CalendarItem instances, the 'is_all_day' attribute affects the 'start' and 'end' values. Changing from
-        # 'false' to 'true' removes the time part of these datetimes.
-        insert_kwargs = self.get_random_insert_kwargs()
-        if 'is_all_day' in insert_kwargs:
-            insert_kwargs['is_all_day'] = False
-        item = self.ITEM_CLASS(**insert_kwargs)
-        # Test with generator as argument
-        insert_ids = self.test_folder.bulk_create(items=(i for i in [item]))
-        self.assertEqual(len(insert_ids), 1)
-        self.assertIsInstance(insert_ids[0], BaseItem)
-        find_ids = self.test_folder.filter(categories__contains=item.categories).values_list('id', 'changekey')
-        self.assertEqual(len(find_ids), 1)
-        self.assertEqual(len(find_ids[0]), 2, find_ids[0])
-        self.assertEqual(insert_ids, list(find_ids))
-        # Test with generator as argument
-        item = list(self.account.fetch(ids=(i for i in find_ids)))[0]
-        for f in self.ITEM_CLASS.FIELDS:
-            if not f.supports_version(self.account.version):
-                # Cannot be used with this EWS version
-                continue
-            if self.ITEM_CLASS == CalendarItem and f in CalendarItem.timezone_fields():
-                # Timezone fields will (and must) be populated automatically from the timestamp
-                continue
-            if f.is_read_only:
-                continue
-            if f.name == 'reminder_due_by':
-                # EWS sets a default value if it is not set on insert. Ignore
-                continue
-            if f.name == 'mime_content':
-                # This will change depending on other contents fields
-                continue
-            old, new = getattr(item, f.name), insert_kwargs[f.name]
-            if f.is_list:
-                old, new = set(old or ()), set(new or ())
-            self.assertEqual(old, new, (f.name, old, new))
-
-        # Test update
-        update_kwargs = self.get_random_update_kwargs(item=item, insert_kwargs=insert_kwargs)
-        if self.ITEM_CLASS in (Contact, DistributionList):
-            # Contact and DistributionList don't support mime_type updates at all
-            update_kwargs.pop('mime_content', None)
-        update_fieldnames = [f for f in update_kwargs.keys() if f != 'attachments']
-        for k, v in update_kwargs.items():
-            setattr(item, k, v)
-        # Test with generator as argument
-        update_ids = self.account.bulk_update(items=(i for i in [(item, update_fieldnames)]))
-        self.assertEqual(len(update_ids), 1)
-        self.assertEqual(len(update_ids[0]), 2, update_ids)
-        self.assertEqual(insert_ids[0].id, update_ids[0][0])  # ID should be the same
-        self.assertNotEqual(insert_ids[0].changekey, update_ids[0][1])  # Changekey should change when item is updated
-        item = list(self.account.fetch(update_ids))[0]
-        for f in self.ITEM_CLASS.FIELDS:
-            if not f.supports_version(self.account.version):
-                # Cannot be used with this EWS version
-                continue
-            if self.ITEM_CLASS == CalendarItem and f in CalendarItem.timezone_fields():
-                # Timezone fields will (and must) be populated automatically from the timestamp
-                continue
-            if f.is_read_only or f.is_read_only_after_send:
-                # These cannot be changed
-                continue
-            if f.name == 'mime_content':
-                # This will change depending on other contents fields
-                continue
-            old, new = getattr(item, f.name), update_kwargs[f.name]
-            if f.name == 'reminder_due_by':
-                if old is None:
-                    # EWS does not always return a value if reminder_is_set is False. Set one now
-                    item.reminder_due_by = new
-                    continue
-                elif old is not None and new is not None:
-                    # EWS sometimes randomly sets the new reminder due date to one month before or after we
-                    # wanted it, and sometimes 30 days before or after. But only sometimes...
-                    old_date = old.astimezone(self.account.default_timezone).date()
-                    new_date = new.astimezone(self.account.default_timezone).date()
-                    if relativedelta(month=1) + new_date == old_date:
-                        item.reminder_due_by = new
-                        continue
-                    if relativedelta(month=1) + old_date == new_date:
-                        item.reminder_due_by = new
-                        continue
-                    elif abs(old_date - new_date) == datetime.timedelta(days=30):
-                        item.reminder_due_by = new
-                        continue
-            if f.is_list:
-                old, new = set(old or ()), set(new or ())
-            self.assertEqual(old, new, (f.name, old, new))
-
-        # Test wiping or removing fields
-        wipe_kwargs = {}
-        for f in self.ITEM_CLASS.FIELDS:
-            if not f.supports_version(self.account.version):
-                # Cannot be used with this EWS version
-                continue
-            if self.ITEM_CLASS == CalendarItem and f in CalendarItem.timezone_fields():
-                # Timezone fields will (and must) be populated automatically from the timestamp
-                continue
-            if f.is_required or f.is_required_after_save:
-                # These cannot be deleted
-                continue
-            if f.is_read_only or f.is_read_only_after_send:
-                # These cannot be changed
-                continue
-            wipe_kwargs[f.name] = None
-        for k, v in wipe_kwargs.items():
-            setattr(item, k, v)
-        wipe_ids = self.account.bulk_update([(item, update_fieldnames), ])
-        self.assertEqual(len(wipe_ids), 1)
-        self.assertEqual(len(wipe_ids[0]), 2, wipe_ids)
-        self.assertEqual(insert_ids[0].id, wipe_ids[0][0])  # ID should be the same
-        self.assertNotEqual(insert_ids[0].changekey,
-                            wipe_ids[0][1])  # Changekey should not be the same when item is updated
-        item = list(self.account.fetch(wipe_ids))[0]
-        for f in self.ITEM_CLASS.FIELDS:
-            if not f.supports_version(self.account.version):
-                # Cannot be used with this EWS version
-                continue
-            if self.ITEM_CLASS == CalendarItem and f in CalendarItem.timezone_fields():
-                # Timezone fields will (and must) be populated automatically from the timestamp
-                continue
-            if f.is_required or f.is_required_after_save:
-                continue
-            if f.is_read_only or f.is_read_only_after_send:
-                continue
-            old, new = getattr(item, f.name), wipe_kwargs[f.name]
-            if f.is_list:
-                old, new = set(old or ()), set(new or ())
-            self.assertEqual(old, new, (f.name, old, new))
-
-        try:
-            self.ITEM_CLASS.register('extern_id', ExternId)
-            # Test extern_id = None, which deletes the extended property entirely
-            extern_id = None
-            item.extern_id = extern_id
-            wipe2_ids = self.account.bulk_update([(item, ['extern_id']), ])
-            self.assertEqual(len(wipe2_ids), 1)
-            self.assertEqual(len(wipe2_ids[0]), 2, wipe2_ids)
-            self.assertEqual(insert_ids[0].id, wipe2_ids[0][0])  # ID must be the same
-            self.assertNotEqual(insert_ids[0].changekey, wipe2_ids[0][1])  # Changekey must change when item is updated
-            item = list(self.account.fetch(wipe2_ids))[0]
-            self.assertEqual(item.extern_id, extern_id)
-        finally:
-            self.ITEM_CLASS.deregister('extern_id')
-
-        # Remove test item. Test with generator as argument
-        self.bulk_delete(ids=(i for i in wipe2_ids))
 
     def test_export_and_upload(self):
         # 15 new items which we will attempt to export and re-upload
@@ -2303,107 +2260,6 @@ class CalendarTest(CommonItemTest):
             [{'subject': s} for s in sorted([item1.subject, item2.subject])]
         )
 
-    def test_recurring_items(self):
-        tz = self.account.default_timezone
-        item = CalendarItem(
-            folder=self.test_folder,
-            start=tz.localize(EWSDateTime(2017, 9, 4, 11)),
-            end=tz.localize(EWSDateTime(2017, 9, 4, 13)),
-            subject='Hello Recurrence',
-            recurrence=Recurrence(
-                pattern=WeeklyPattern(interval=3, weekdays=[MONDAY, WEDNESDAY]),
-                start=EWSDate(2017, 9, 4),
-                number=7
-            ),
-            categories=self.categories,
-        ).save()
-
-        # Occurrence data for the master item
-        fresh_item = self.test_folder.get(id=item.id, changekey=item.changekey)
-        self.assertEqual(
-            str(fresh_item.recurrence),
-            'Pattern: Occurs on weekdays Monday, Wednesday of every 3 week(s) where the first day of the week is '
-            'Monday, Boundary: NumberedPattern(start=EWSDate(2017, 9, 4), number=7)'
-        )
-        self.assertIsInstance(fresh_item.first_occurrence, FirstOccurrence)
-        self.assertEqual(fresh_item.first_occurrence.start, tz.localize(EWSDateTime(2017, 9, 4, 11)))
-        self.assertEqual(fresh_item.first_occurrence.end, tz.localize(EWSDateTime(2017, 9, 4, 13)))
-        self.assertIsInstance(fresh_item.last_occurrence, LastOccurrence)
-        self.assertEqual(fresh_item.last_occurrence.start, tz.localize(EWSDateTime(2017, 11, 6, 11)))
-        self.assertEqual(fresh_item.last_occurrence.end, tz.localize(EWSDateTime(2017, 11, 6, 13)))
-        self.assertEqual(fresh_item.modified_occurrences, None)
-        self.assertEqual(fresh_item.deleted_occurrences, None)
-
-        # All occurrences expanded
-        all_start_times = []
-        for i in self.test_folder.view(
-                start=tz.localize(EWSDateTime(2017, 9, 1)),
-                end=tz.localize(EWSDateTime(2017, 12, 1))
-        ).only('start', 'categories').order_by('start'):
-            if i.categories != self.categories:
-                continue
-            all_start_times.append(i.start)
-        self.assertListEqual(
-            all_start_times,
-            [
-                tz.localize(EWSDateTime(2017, 9, 4, 11)),
-                tz.localize(EWSDateTime(2017, 9, 6, 11)),
-                tz.localize(EWSDateTime(2017, 9, 25, 11)),
-                tz.localize(EWSDateTime(2017, 9, 27, 11)),
-                tz.localize(EWSDateTime(2017, 10, 16, 11)),
-                tz.localize(EWSDateTime(2017, 10, 18, 11)),
-                tz.localize(EWSDateTime(2017, 11, 6, 11)),
-            ]
-        )
-
-        # Test updating and deleting
-        i = 0
-        for occurrence in self.test_folder.view(
-                start=tz.localize(EWSDateTime(2017, 9, 1)),
-                end=tz.localize(EWSDateTime(2017, 12, 1)),
-        ).order_by('start'):
-            if occurrence.categories != self.categories:
-                continue
-            if i % 2:
-                # Delete every other occurrence (items 1, 3 and 5)
-                occurrence.delete()
-            else:
-                # Update every other occurrence (items 0, 2, 4 and 6)
-                occurrence.refresh()  # changekey is sometimes updated. Possible due to neighbour occurrences changing?
-                # We receive timestamps as UTC but want to write them back as local timezone
-                occurrence.start = occurrence.start.astimezone(tz)
-                occurrence.start += datetime.timedelta(minutes=30)
-                occurrence.end = occurrence.end.astimezone(tz)
-                occurrence.end += datetime.timedelta(minutes=30)
-                occurrence.subject = 'Changed Occurrence'
-                occurrence.save()
-            i += 1
-
-        # We should only get half the items of before, and start times should be shifted 30 minutes
-        updated_start_times = []
-        for i in self.test_folder.view(
-                start=tz.localize(EWSDateTime(2017, 9, 1)),
-                end=tz.localize(EWSDateTime(2017, 12, 1))
-        ).only('start', 'subject', 'categories').order_by('start'):
-            if i.categories != self.categories:
-                continue
-            updated_start_times.append(i.start)
-            self.assertEqual(i.subject, 'Changed Occurrence')
-        self.assertListEqual(
-            updated_start_times,
-            [
-                tz.localize(EWSDateTime(2017, 9, 4, 11, 30)),
-                tz.localize(EWSDateTime(2017, 9, 25, 11, 30)),
-                tz.localize(EWSDateTime(2017, 10, 16, 11, 30)),
-                tz.localize(EWSDateTime(2017, 11, 6, 11, 30)),
-            ]
-        )
-
-        # Test that the master item sees the deletes and updates
-        fresh_item = self.test_folder.get(id=item.id, changekey=item.changekey)
-        self.assertEqual(len(fresh_item.modified_occurrences), 4)
-        self.assertEqual(len(fresh_item.deleted_occurrences), 3)
-
 
 class MessagesTest(CommonItemTest):
     # Just test one of the Message-type folders
@@ -2589,6 +2445,52 @@ class ContactsTest(CommonItemTest):
     TEST_FOLDER = 'contacts'
     FOLDER_CLASS = Contacts
     ITEM_CLASS = Contact
+
+    def test_order_by_on_indexed_field(self):
+        # Test order_by() on IndexedField (simple and multi-subfield). Only Contact items have these
+        test_items = []
+        label = self.random_val(EmailAddress.get_field_by_fieldname('label'))
+        for i in range(4):
+            item = self.get_test_item()
+            item.email_addresses = [EmailAddress(email='%s@foo.com' % i, label=label)]
+            test_items.append(item)
+        self.test_folder.bulk_create(items=test_items)
+        qs = QuerySet(
+            folder_collection=FolderCollection(account=self.account, folders=[self.test_folder])
+        ).filter(categories__contains=self.categories)
+        self.assertEqual(
+            [i[0].email for i in qs.order_by('email_addresses__%s' % label)
+                .values_list('email_addresses', flat=True)],
+            ['0@foo.com', '1@foo.com', '2@foo.com', '3@foo.com']
+        )
+        self.assertEqual(
+            [i[0].email for i in qs.order_by('-email_addresses__%s' % label)
+                .values_list('email_addresses', flat=True)],
+            ['3@foo.com', '2@foo.com', '1@foo.com', '0@foo.com']
+        )
+        self.bulk_delete(qs)
+
+        test_items = []
+        label = self.random_val(PhysicalAddress.get_field_by_fieldname('label'))
+        for i in range(4):
+            item = self.get_test_item()
+            item.physical_addresses = [PhysicalAddress(street='Elm St %s' % i, label=label)]
+            test_items.append(item)
+        self.test_folder.bulk_create(items=test_items)
+        qs = QuerySet(
+            folder_collection=FolderCollection(account=self.account, folders=[self.test_folder])
+        ).filter(categories__contains=self.categories)
+        self.assertEqual(
+            [i[0].street for i in qs.order_by('physical_addresses__%s__street' % label)
+                .values_list('physical_addresses', flat=True)],
+            ['Elm St 0', 'Elm St 1', 'Elm St 2', 'Elm St 3']
+        )
+        self.assertEqual(
+            [i[0].street for i in qs.order_by('-physical_addresses__%s__street' % label)
+                .values_list('physical_addresses', flat=True)],
+            ['Elm St 3', 'Elm St 2', 'Elm St 1', 'Elm St 0']
+        )
+        self.bulk_delete(qs)
 
     def test_order_by_failure(self):
         # Test error handling on indexed properties with labels and subfields
