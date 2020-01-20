@@ -29,10 +29,9 @@ class GetAttachment(EWSAccountService):
         payload.append(attachment_ids)
         return payload
 
-    def _update_api_version(self, hint, api_version, header, **parse_opts):
+    def _update_api_version(self, version_hint, api_version, header, **parse_opts):
         if not parse_opts.get('stream_file_content', False):
-            return super()._update_api_version(hint, api_version, header, **parse_opts)
-
+            return super()._update_api_version(version_hint, api_version, header, **parse_opts)
         # TODO: We're skipping this part in streaming mode because our streaming parser cannot parse the SOAP header
 
     @classmethod
