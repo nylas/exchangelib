@@ -59,10 +59,10 @@ class TimedTestCase(unittest.TestCase):
 
     def setUp(self):
         self.maxDiff = None
-        self.t1 = time.time()
+        self.t1 = time.monotonic()
 
     def tearDown(self):
-        t2 = time.time() - self.t1
+        t2 = time.monotonic() - self.t1
         if t2 > self.SLOW_TEST_DURATION:
             print("{:07.3f} : {}".format(t2, self.id()))
 

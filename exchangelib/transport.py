@@ -107,7 +107,7 @@ def get_service_authtype(service_endpoint, retry_policy, api_versions, name):
     from .protocol import BaseProtocol
     retry = 0
     wait = 10  # seconds
-    t_start = time.time()
+    t_start = time.monotonic()
     headers = DEFAULT_HEADERS.copy()
     for api_version in api_versions:
         data = dummy_xml(api_version=api_version, name=name)
@@ -122,7 +122,7 @@ def get_service_authtype(service_endpoint, retry_policy, api_versions, name):
                     break
                 except CONNECTION_ERRORS as e:
                     # Don't retry on TLS errors. They will most likely be persistent.
-                    total_wait = time.time() - t_start
+                    total_wait = time.monotonic() - t_start
                     r = DummyResponse(url=service_endpoint, headers={}, request_headers=headers)
                     if _may_retry_on_error(response=r, retry_policy=retry_policy, wait=total_wait):
                         log.info("Connection error on URL %s (retry %s, error: %s). Cool down %s secs",

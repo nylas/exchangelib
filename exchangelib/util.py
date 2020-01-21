@@ -669,6 +669,7 @@ Response data: %(xml_response)s
         xml_request=data,
         xml_response=None,
     )
+    t_start = time.monotonic()
     try:
         while True:
             backed_off = _back_off_if_needed(protocol.retry_policy.back_off_until)

@@ -221,7 +221,7 @@ class Autodiscovery:
         if method == 'post':
             kwargs['data'] = Autodiscover.payload(email=self.email)
         retry = 0
-        t_start = time.time()
+        t_start = time.monotonic()
         while True:
             _back_off_if_needed(self.INITIAL_RETRY_POLICY.back_off_until)
             log.debug('Trying to get response from %s', url)
@@ -234,7 +234,7 @@ class Autodiscovery:
                     raise TransportError(str(e))
                 except CONNECTION_ERRORS as e:
                     r = DummyResponse(url=url, headers={}, request_headers=kwargs['headers'])
-                    total_wait = time.time() - t_start
+                    total_wait = time.monotonic() - t_start
                     if _may_retry_on_error(response=r, retry_policy=self.INITIAL_RETRY_POLICY, wait=total_wait):
                         log.debug("Connection error on URL %s (retry %s, error: %s). Cool down", url, retry, e)
                         self.INITIAL_RETRY_POLICY.back_off(self.RETRY_WAIT)
