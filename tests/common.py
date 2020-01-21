@@ -83,6 +83,7 @@ class EWSTest(TimedTestCase):
             print('Copy settings.yml.sample to settings.yml and enter values for your test server')
             raise unittest.SkipTest('Skipping %s - no settings.yml file found' % cls.__name__)
 
+        cls.settings = settings
         cls.verify_ssl = settings.get('verify_ssl', True)
         if not cls.verify_ssl:
             # Allow unverified TLS if requested in settings file

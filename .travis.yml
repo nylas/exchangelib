@@ -12,8 +12,7 @@ python:
 # - "pypy3"
 
 before_install:
-- openssl aes-256-cbc -K $encrypted_e7f042a9cf96_key -iv $encrypted_e7f042a9cf96_iv
-  -in settings.yml.enc -out settings.yml -d
+- openssl aes-256-cbc -K $encrypted_ae8487d57299_key -iv $encrypted_ae8487d57299_iv -in settings.yml.enc -out settings.yml -d
 
 install:
 # Install master branches of Cython and Cython-built packages if we are testing on nightly since the C API of
