@@ -709,7 +709,8 @@ Response data: %(xml_response)s
             if _need_new_credentials(response=r):
                 session = protocol.refresh_credentials(session)
                 continue
-            if _may_retry_on_error(response=r, retry_policy=protocol.retry_policy, wait=wait):
+            total_wait = time.monotonic() - t_start
+            if _may_retry_on_error(response=r, retry_policy=protocol.retry_policy, wait=total_wait):
                 log.info("Session %s thread %s: Connection error on URL %s (code %s). Cool down %s secs",
                          session.session_id, thread_id, r.url, r.status_code, wait)
                 protocol.retry_policy.back_off(wait)
