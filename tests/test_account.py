@@ -2,7 +2,8 @@ from collections import namedtuple
 import pickle
 
 from exchangelib import Account, Credentials, FaultTolerance, Message, FileAttachment, DELEGATE, Configuration
-from exchangelib.errors import ErrorAccessDenied, ErrorFolderNotFound, UnauthorizedError
+from exchangelib.errors import ErrorAccessDenied, ErrorFolderNotFound, UnauthorizedError, TransportError, \
+    ErrorInvalidSchemaVersionForMailboxVersion
 from exchangelib.folders import Calendar
 from exchangelib.properties import DelegateUser, UserId, DelegatePermissions
 from exchangelib.protocol import Protocol
@@ -185,13 +186,36 @@ class AccountTest(EWSTest):
                 credentials=Credentials(self.account.protocol.credentials.username, 'WRONG_PASSWORD'),
                 version=self.account.version,
                 auth_type=self.account.protocol.auth_type,
+                retry_policy=self.retry_policy,
             ),
             autodiscover=False,
             locale='da_DK',
         )
-        # Should fail when credentials are wrong
-        with self.assertRaises(UnauthorizedError):
-            account.root.refresh()
+        # Should fail when credentials are wrong, but UnauthorizedError is caught and retried. Mock the needed methods
+        import exchangelib.util
+
+        _orig1 = exchangelib.util._may_retry_on_error
+        _orig2 = exchangelib.util._raise_response_errors
+
+        def _mock1(response, retry_policy, wait):
+            if response.status_code == 401:
+                return False
+            return _orig1(response, retry_policy, wait)
+
+        def _mock2(response, protocol, log_msg, log_vals):
+            if response.status_code == 401:
+                raise UnauthorizedError('Wrong username or password for %s' % response.url)
+            return _orig2(response, protocol, log_msg, log_vals)
+
+        exchangelib.util._may_retry_on_error = _mock1
+        exchangelib.util._raise_response_errors = _mock2
+        try:
+            with self.assertRaises(UnauthorizedError):
+                account.root.refresh()
+        finally:
+            exchangelib.util._may_retry_on_error = _orig1
+            exchangelib.util._raise_response_errors = _orig2
+
         # Cannot update from Configuration object
         with self.assertRaises(AttributeError):
             account.protocol.config.credentials = self.account.protocol.credentials
