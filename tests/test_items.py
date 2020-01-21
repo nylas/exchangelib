@@ -1000,7 +1000,9 @@ class CommonItemTest(BaseItemTest):
 
     def test_save_and_delete(self):
         # Test that we can create, update and delete single items using methods directly on the item.
-        item = self.get_test_item()
+        insert_kwargs = self.get_random_insert_kwargs()
+        insert_kwargs['categories'] = self.categories
+        return self.ITEM_CLASS(folder=self.test_folder, **insert_kwargs)
         self.assertIsNone(item.id)
         self.assertIsNone(item.changekey)
 
