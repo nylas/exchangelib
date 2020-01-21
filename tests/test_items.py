@@ -94,6 +94,10 @@ class BaseItemTest(EWSTest):
                 continue
             if f.name == 'end':
                 continue
+            if f.name == 'is_all_day':
+                # For CalendarItem instances, the 'is_all_day' attribute affects the 'start' and 'end' values. Changing
+                # from 'false' to 'true' removes the time part of these datetimes.
+                insert_kwargs['is_all_day'] = False
             if f.name == 'recurrence':
                 continue
             if f.name == 'due_date':
@@ -544,7 +548,6 @@ class ItemQuerySetTest(BaseItemTest):
             [i.subject for i in qs._copy_self()[4:0:-2]],
             ['Subj 3', 'Subj 1']
         )
-        self.bulk_delete(ids)
 
     def test_delete_via_queryset(self):
         self.get_test_item().save()
@@ -610,11 +613,7 @@ class ItemHelperTest(BaseItemTest):
     ITEM_CLASS = Message
 
     def test_save_with_update_fields(self):
-        # Create a test item
-        insert_kwargs = self.get_random_insert_kwargs()
-        if 'is_all_day' in insert_kwargs:
-            insert_kwargs['is_all_day'] = False
-        item = self.ITEM_CLASS(account=self.account, folder=self.test_folder, **insert_kwargs)
+        item = self.get_test_item()
         with self.assertRaises(ValueError):
             item.save(update_fields=['subject'])  # update_fields does not work on item creation
         item.save()
@@ -638,8 +637,6 @@ class ItemHelperTest(BaseItemTest):
             e.exception.args[0],
             "Field name(s) 's', 'u', 'b', 'j', 'e', 'c', 't' are not valid for a '%s' item" % self.ITEM_CLASS.__name__
         )
-
-        self.bulk_delete([item])
 
     def test_soft_delete(self):
         # First, empty trash bin
@@ -739,8 +736,6 @@ class BulkMethodTest(BaseItemTest):
 
         items = list(self.account.fetch(ids=ids, only_fields=[FieldPath.from_string('subject', self.test_folder)]))
         self.assertEqual(len(items), 2)
-
-        self.bulk_delete(ids)
 
     def test_empty_args(self):
         # We allow empty sequences for these methods
@@ -883,10 +878,7 @@ class CommonItemTest(BaseItemTest):
     def test_filter_on_all_fields(self):
         # Test that we can filter on all field names
         # TODO: Test filtering on subfields of IndexedField
-        item = self.get_test_item()
-        if hasattr(item, 'is_all_day'):
-            item.is_all_day = False  # Make sure start- and end dates don't change
-        ids = self.test_folder.bulk_create(items=[item])
+        item = self.get_test_item().save()
         common_qs = self.test_folder.filter(categories__contains=self.categories)
         for f in self.ITEM_CLASS.FIELDS:
             if not f.supports_version(self.account.version):
@@ -941,7 +933,6 @@ class CommonItemTest(BaseItemTest):
                     filter_kwargs.append({'%s__contains' % f.name: val[2:10]})
             for kw in filter_kwargs:
                 self.assertEqual(len(common_qs.filter(**kw)), 1, (f.name, val, kw))
-        self.bulk_delete(ids)
 
     def test_text_field_settings(self):
         # Test that the max_length and is_complex field settings are correctly set for text fields
@@ -1009,12 +1000,7 @@ class CommonItemTest(BaseItemTest):
 
     def test_save_and_delete(self):
         # Test that we can create, update and delete single items using methods directly on the item.
-        # For CalendarItem instances, the 'is_all_day' attribute affects the 'start' and 'end' values. Changing from
-        # 'false' to 'true' removes the time part of these datetimes.
-        insert_kwargs = self.get_random_insert_kwargs()
-        if 'is_all_day' in insert_kwargs:
-            insert_kwargs['is_all_day'] = False
-        item = self.ITEM_CLASS(account=self.account, folder=self.test_folder, **insert_kwargs)
+        item = self.get_test_item()
         self.assertIsNone(item.id)
         self.assertIsNone(item.changekey)
 
@@ -1092,12 +1078,9 @@ class CommonItemTest(BaseItemTest):
 
     def test_item(self):
         # Test insert
-        # For CalendarItem instances, the 'is_all_day' attribute affects the 'start' and 'end' values. Changing from
-        # 'false' to 'true' removes the time part of these datetimes.
         insert_kwargs = self.get_random_insert_kwargs()
-        if 'is_all_day' in insert_kwargs:
-            insert_kwargs['is_all_day'] = False
-        item = self.ITEM_CLASS(**insert_kwargs)
+        insert_kwargs['categories'] = self.categories
+        item = self.ITEM_CLASS(folder=self.test_folder, **insert_kwargs)
         # Test with generator as argument
         insert_ids = self.test_folder.bulk_create(items=(i for i in [item]))
         self.assertEqual(len(insert_ids), 1)
@@ -1235,9 +1218,6 @@ class CommonItemTest(BaseItemTest):
             self.assertEqual(item.extern_id, extern_id)
         finally:
             self.ITEM_CLASS.deregister('extern_id')
-
-        # Remove test item. Test with generator as argument
-        self.bulk_delete(ids=(i for i in wipe2_ids))
 
 
 class GenericItemTest(CommonItemTest):
@@ -1805,10 +1785,7 @@ class GenericItemTest(CommonItemTest):
 
     def test_complex_fields(self):
         # Test that complex fields can be fetched using only(). This is a test for #141.
-        insert_kwargs = self.get_random_insert_kwargs()
-        if 'is_all_day' in insert_kwargs:
-            insert_kwargs['is_all_day'] = False
-        item = self.ITEM_CLASS(account=self.account, folder=self.test_folder, **insert_kwargs).save()
+        item = self.get_test_item().save()
         for f in self.ITEM_CLASS.FIELDS:
             if not f.supports_version(self.account.version):
                 # Cannot be used with this EWS version
@@ -1836,7 +1813,6 @@ class GenericItemTest(CommonItemTest):
                 if f.is_list:
                     old, new = set(old or ()), set(new or ())
                 self.assertEqual(old, new, (f.name, old, new))
-        self.bulk_delete([item])
 
     def test_text_body(self):
         if self.account.version.build < EXCHANGE_2013:
@@ -1932,10 +1908,6 @@ class GenericItemTest(CommonItemTest):
         original_items = sorted([to_dict(item) for item in items], key=lambda i: i['subject'])
         self.assertListEqual(original_items, uploaded_items)
 
-        # Clean up after ourselves
-        self.bulk_delete(ids=upload_results)
-        self.bulk_delete(ids=ids)
-
     def test_export_with_error(self):
         # 15 new items which we will attempt to export and re-upload
         items = [self.get_test_item().save() for _ in range(15)]
@@ -1956,7 +1928,6 @@ class GenericItemTest(CommonItemTest):
 
         # Clean up after yourself
         del ids[3]  # Sending the deleted one through will cause an error
-        self.bulk_delete(ids)
 
     def test_item_attachments(self):
         item = self.get_test_item(folder=self.test_folder)
@@ -1964,8 +1935,6 @@ class GenericItemTest(CommonItemTest):
 
         attached_item1 = self.get_test_item(folder=self.test_folder)
         attached_item1.attachments = []
-        if hasattr(attached_item1, 'is_all_day'):
-            attached_item1.is_all_day = False
         attached_item1.save()
         attachment1 = ItemAttachment(name='attachment1', item=attached_item1)
         item.attach(attachment1)
@@ -2006,8 +1975,6 @@ class GenericItemTest(CommonItemTest):
         # Test attach on saved object
         attached_item2 = self.get_test_item(folder=self.test_folder)
         attached_item2.attachments = []
-        if hasattr(attached_item2, 'is_all_day'):
-            attached_item2.is_all_day = False
         attached_item2.save()
         attachment2 = ItemAttachment(name='attachment2', item=attached_item2)
         item.attach(attachment2)
@@ -2108,8 +2075,6 @@ class GenericItemTest(CommonItemTest):
         # Test attach with non-saved item
         attached_item3 = self.get_test_item(folder=self.test_folder)
         attached_item3.attachments = []
-        if hasattr(attached_item3, 'is_all_day'):
-            attached_item3.is_all_day = False
         attachment3 = ItemAttachment(name='attachment2', item=attached_item3)
         item.attach(attachment3)
         item.detach(attachment3)
@@ -2337,7 +2302,6 @@ class MessagesTest(CommonItemTest):
         # By default, sent items are placed in the sent folder
         ids = self.account.sent.filter(categories__contains=item.categories).values_list('id', 'changekey')
         self.assertEqual(len(ids), 1)
-        self.bulk_delete(ids)
 
     def test_reply(self):
         # Test that we can reply to a Message item. EWS only allows items that have been sent to receive a reply
@@ -2389,7 +2353,8 @@ class MessagesTest(CommonItemTest):
         item = self.ITEM_CLASS(
             folder=self.test_folder,
             to_recipients=[self.account.primary_smtp_address],
-            mime_content=mime_content
+            mime_content=mime_content,
+            categories=self.categories,
         ).save()
         self.assertEqual(self.test_folder.get(subject=subject).body, body)
         item.delete()
