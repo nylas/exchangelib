@@ -98,6 +98,7 @@ class BaseItemTest(EWSTest):
                 # For CalendarItem instances, the 'is_all_day' attribute affects the 'start' and 'end' values. Changing
                 # from 'false' to 'true' removes the time part of these datetimes.
                 insert_kwargs['is_all_day'] = False
+                continue
             if f.name == 'recurrence':
                 continue
             if f.name == 'due_date':

@@ -461,7 +461,7 @@ class PagingEWSMixIn(EWSService):
                 # Check sanity of paging offsets, but don't fail. When we are iterating huge collections that take a
                 # long time to complete, the collection may change while we are iterating. This can affect the
                 # 'next_offset' value and make it inconsistent with the number of already collected items.
-                # We don't worry about If breaking early due to having reached 'max_items'.
+                # We may have a mismatch if we stopped early due to reaching 'max_items'.
                 if paging_info['next_offset'] != paging_info['item_count'] and (
                     not max_items or total_item_count < max_items
                 ):
