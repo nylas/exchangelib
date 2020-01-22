@@ -13,10 +13,10 @@ from exchangelib.attachments import ItemAttachment
 from exchangelib.errors import ErrorItemNotFound, ErrorInvalidOperation, ErrorInvalidChangeKey, \
     ErrorUnsupportedPathForQuery, ErrorInvalidValueForProperty, ErrorPropertyUpdate, ErrorInvalidPropertySet, \
     ErrorInvalidIdMalformed
-from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC, UTC_NOW
+from exchangelib.ewsdatetime import EWSDateTime, EWSTimeZone, UTC, UTC_NOW
 from exchangelib.extended_properties import ExtendedProperty, ExternId
 from exchangelib.fields import TextField, BodyField, ExtendedPropertyField, FieldPath, CultureField, IdField, \
-    CharField, ChoiceField, AttachmentField, BooleanField, MONDAY, WEDNESDAY
+    CharField, ChoiceField, AttachmentField, BooleanField
 from exchangelib.folders import Calendar, Inbox, Tasks, Contacts, Folder, FolderCollection
 from exchangelib.indexed_properties import EmailAddress, PhysicalAddress, SingleFieldIndexedElement, \
     MultiFieldIndexedElement
@@ -24,14 +24,13 @@ from exchangelib.items import Item, CalendarItem, Message, Contact, Task, Distri
     SHALLOW, ASSOCIATED
 from exchangelib.properties import Mailbox, Member, Attendee
 from exchangelib.queryset import QuerySet, DoesNotExist, MultipleObjectsReturned
-from exchangelib.recurrence import Recurrence, WeeklyPattern, FirstOccurrence, LastOccurrence
 from exchangelib.restriction import Restriction, Q
 from exchangelib.services import GetPersona
 from exchangelib.util import value_to_xml_text
 from exchangelib.version import Build, EXCHANGE_2007, EXCHANGE_2013
 
 from .common import EWSTest, get_random_string, get_random_datetime_range, get_random_date, \
-    get_random_email, get_random_decimal, get_random_choice, mock_version
+    get_random_email, get_random_decimal, get_random_choice, get_random_int, mock_version
 
 
 class BaseItemTest(EWSTest):
@@ -883,59 +882,71 @@ class CommonItemTest(BaseItemTest):
         item = self.get_test_item().save()
         common_qs = self.test_folder.filter(categories__contains=self.categories)
         for f in self.ITEM_CLASS.FIELDS:
-            with self.subTest(f=f):
-                if not f.supports_version(self.account.version):
-                    # Cannot be used with this EWS version
-                    continue
-                if not f.is_searchable:
-                    # Cannot be used in a QuerySet
-                    continue
-                val = getattr(item, f.name)
-                if val is None:
-                    # We cannot filter on None values
-                    continue
-                if self.ITEM_CLASS == Contact and f.name in ('body', 'display_name'):
-                    # filtering 'body' or 'display_name' on Contact items doesn't work at all. Error in EWS?
-                    continue
-                if f.is_list:
-                    # Filter multi-value fields with =, __in and __contains
-                    if issubclass(f.value_cls, MultiFieldIndexedElement):
-                        # For these, we need to filter on the subfield
-                        filter_kwargs = []
-                        for v in val:
-                            for subfield in f.value_cls.supported_fields(version=self.account.version):
-                                field_path = FieldPath(field=f, label=v.label, subfield=subfield)
-                                path, subval = field_path.path, field_path.get_value(item)
-                                if subval is None:
-                                    continue
-                                filter_kwargs.extend([
-                                    {path: subval}, {'%s__in' % path: [subval]}, {'%s__contains' % path: [subval]}
-                                ])
-                    elif issubclass(f.value_cls, SingleFieldIndexedElement):
-                        # For these, we may filter by item or subfield value
-                        filter_kwargs = []
-                        for v in val:
-                            for subfield in f.value_cls.supported_fields(version=self.account.version):
-                                field_path = FieldPath(field=f, label=v.label, subfield=subfield)
-                                path, subval = field_path.path, field_path.get_value(item)
-                                if subval is None:
-                                    continue
-                                filter_kwargs.extend([
-                                    {f.name: v}, {path: subval},
-                                    {'%s__in' % path: [subval]}, {'%s__contains' % path: [subval]}
-                                ])
-                    else:
-                        filter_kwargs = [{'%s__in' % f.name: val}, {'%s__contains' % f.name: val}]
+            if not f.supports_version(self.account.version):
+                # Cannot be used with this EWS version
+                continue
+            if not f.is_searchable:
+                # Cannot be used in a QuerySet
+                continue
+            val = getattr(item, f.name)
+            if val is None:
+                # We cannot filter on None values
+                continue
+            if self.ITEM_CLASS == Contact and f.name in ('body', 'display_name'):
+                # filtering 'body' or 'display_name' on Contact items doesn't work at all. Error in EWS?
+                continue
+            if f.is_list:
+                # Filter multi-value fields with =, __in and __contains
+                if issubclass(f.value_cls, MultiFieldIndexedElement):
+                    # For these, we need to filter on the subfield
+                    filter_kwargs = []
+                    for v in val:
+                        for subfield in f.value_cls.supported_fields(version=self.account.version):
+                            field_path = FieldPath(field=f, label=v.label, subfield=subfield)
+                            path, subval = field_path.path, field_path.get_value(item)
+                            if subval is None:
+                                continue
+                            filter_kwargs.extend([
+                                {path: subval}, {'%s__in' % path: [subval]}, {'%s__contains' % path: [subval]}
+                            ])
+                elif issubclass(f.value_cls, SingleFieldIndexedElement):
+                    # For these, we may filter by item or subfield value
+                    filter_kwargs = []
+                    for v in val:
+                        for subfield in f.value_cls.supported_fields(version=self.account.version):
+                            field_path = FieldPath(field=f, label=v.label, subfield=subfield)
+                            path, subval = field_path.path, field_path.get_value(item)
+                            if subval is None:
+                                continue
+                            filter_kwargs.extend([
+                                {f.name: v}, {path: subval},
+                                {'%s__in' % path: [subval]}, {'%s__contains' % path: [subval]}
+                            ])
                 else:
-                    # Filter all others with =, __in and __contains. We could have more filters here, but these should
-                    # always match.
-                    filter_kwargs = [{f.name: val}, {'%s__in' % f.name: [val]}]
-                    if isinstance(f, TextField) and not isinstance(f, (ChoiceField, BodyField)):
-                        # Choice fields cannot be filtered using __contains. BodyField often works in practice but often
-                        # fails with generated test data. Ugh.
-                        filter_kwargs.append({'%s__contains' % f.name: val[2:10]})
-                for kw in filter_kwargs:
-                    self.assertEqual(len(common_qs.filter(**kw)), 1, (f.name, val, kw))
+                    filter_kwargs = [{'%s__in' % f.name: val}, {'%s__contains' % f.name: val}]
+            else:
+                # Filter all others with =, __in and __contains. We could have more filters here, but these should
+                # always match.
+                filter_kwargs = [{f.name: val}, {'%s__in' % f.name: [val]}]
+                if isinstance(f, TextField) and not isinstance(f, ChoiceField):
+                    # Choice fields cannot be filtered using __contains. Sort of makes sense.
+                    random_start = get_random_int(min_val=0, max_val=len(val)//2)
+                    random_end = get_random_int(min_val=len(val)//2+1, max_val=len(val))
+                    filter_kwargs.append({'%s__contains' % f.name: val[random_start:random_end]})
+            for kw in filter_kwargs:
+                with self.subTest(f=f, kw=kw):
+                    matches = len(common_qs.filter(**kw))
+                    if isinstance(f, TextField) and f.is_complex:
+                        # Complex text fields sometimes fail a search using generated data. In production,
+                        # they almost always work anyway. Give it one more try after 10 seconds; it seems EWS does
+                        # some sort of indexing that needs to catch up.
+                        if not matches:
+                            time.sleep(10)
+                            matches = len(common_qs.filter(**kw))
+                            if not matches and isinstance(f, BodyField):
+                                # The body field is particularly nasty in this area. Give up
+                                continue
+                    self.assertEqual(matches, 1, (f.name, val, kw))
 
     def test_text_field_settings(self):
         # Test that the max_length and is_complex field settings are correctly set for text fields
@@ -1814,17 +1825,17 @@ class GenericItemTest(CommonItemTest):
                     continue
                 old = getattr(item, f.name)
                 # Test field as single element in only()
-                for fresh_item in self.test_folder.filter(categories__contains=item.categories).only(f.name):
-                    new = getattr(fresh_item, f.name)
-                    if f.is_list:
-                        old, new = set(old or ()), set(new or ())
-                    self.assertEqual(old, new, (f.name, old, new))
+                fresh_item = self.test_folder.all().only(f.name).get(categories__contains=item.categories)
+                new = getattr(fresh_item, f.name)
+                if f.is_list:
+                    old, new = set(old or ()), set(new or ())
+                self.assertEqual(old, new, (f.name, old, new))
                 # Test field as one of the elements in only()
-                for fresh_item in self.test_folder.filter(categories__contains=item.categories).only('subject', f.name):
-                    new = getattr(fresh_item, f.name)
-                    if f.is_list:
-                        old, new = set(old or ()), set(new or ())
-                    self.assertEqual(old, new, (f.name, old, new))
+                fresh_item = self.test_folder.all().only('subject', f.name).get(categories__contains=item.categories)
+                new = getattr(fresh_item, f.name)
+                if f.is_list:
+                    old, new = set(old or ()), set(new or ())
+                self.assertEqual(old, new, (f.name, old, new))
 
     def test_text_body(self):
         if self.account.version.build < EXCHANGE_2013:
