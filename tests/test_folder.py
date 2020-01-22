@@ -32,12 +32,13 @@ class FolderTest(EWSTest):
                 (self.account.tasks, Tasks),
                 (self.account.calendar, Calendar),
         ):
-            self.assertIsInstance(f, cls)
-            f.test_access()
-            # Test item field lookup
-            self.assertEqual(f.get_item_field_by_fieldname('subject').name, 'subject')
-            with self.assertRaises(ValueError):
-                f.get_item_field_by_fieldname('XXX')
+            with self.subTest(f=f, cls=cls):
+                self.assertIsInstance(f, cls)
+                f.test_access()
+                # Test item field lookup
+                self.assertEqual(f.get_item_field_by_fieldname('subject').name, 'subject')
+                with self.assertRaises(ValueError):
+                    f.get_item_field_by_fieldname('XXX')
 
     def test_find_folders(self):
         folders = list(FolderCollection(account=self.account, folders=[self.account.root]).find_folders())
@@ -88,57 +89,58 @@ class FolderTest(EWSTest):
     def test_folder_grouping(self):
         # If you get errors here, you probably need to fill out [folder class].LOCALIZED_NAMES for your locale.
         for f in self.account.root.walk():
-            if isinstance(f, (
-                    Messages, DeletedItems, AllContacts, MyContactsExtended, Sharing, Favorites, SyncIssues, MyContacts
-            )):
-                self.assertEqual(f.folder_class, 'IPF.Note')
-            elif isinstance(f, GALContacts):
-                self.assertEqual(f.folder_class, 'IPF.Contact.GalContacts')
-            elif isinstance(f, RecipientCache):
-                self.assertEqual(f.folder_class, 'IPF.Contact.RecipientCache')
-            elif isinstance(f, Contacts):
-                self.assertEqual(f.folder_class, 'IPF.Contact')
-            elif isinstance(f, Calendar):
-                self.assertEqual(f.folder_class, 'IPF.Appointment')
-            elif isinstance(f, (Tasks, ToDoSearch)):
-                self.assertEqual(f.folder_class, 'IPF.Task')
-            elif isinstance(f, Reminders):
-                self.assertEqual(f.folder_class, 'Outlook.Reminder')
-            elif isinstance(f, AllItems):
-                self.assertEqual(f.folder_class, 'IPF')
-            elif isinstance(f, ConversationSettings):
-                self.assertEqual(f.folder_class, 'IPF.Configuration')
-            elif isinstance(f, Files):
-                self.assertEqual(f.folder_class, 'IPF.Files')
-            elif isinstance(f, Friends):
-                self.assertEqual(f.folder_class, 'IPF.Note')
-            elif isinstance(f, RSSFeeds):
-                self.assertEqual(f.folder_class, 'IPF.Note.OutlookHomepage')
-            elif isinstance(f, IMContactList):
-                self.assertEqual(f.folder_class, 'IPF.Contact.MOC.ImContactList')
-            elif isinstance(f, QuickContacts):
-                self.assertEqual(f.folder_class, 'IPF.Contact.MOC.QuickContacts')
-            elif isinstance(f, Journal):
-                self.assertEqual(f.folder_class, 'IPF.Journal')
-            elif isinstance(f, Notes):
-                self.assertEqual(f.folder_class, 'IPF.StickyNote')
-            elif isinstance(f, DefaultFoldersChangeHistory):
-                self.assertEqual(f.folder_class, 'IPM.DefaultFolderHistoryItem')
-            elif isinstance(f, PassThroughSearchResults):
-                self.assertEqual(f.folder_class, 'IPF.StoreItem.PassThroughSearchResults')
-            elif isinstance(f, SmsAndChatsSync):
-                self.assertEqual(f.folder_class, 'IPF.SmsAndChatsSync')
-            elif isinstance(f, GraphAnalytics):
-                self.assertEqual(f.folder_class, 'IPF.StoreItem.GraphAnalytics')
-            elif isinstance(f, Signal):
-                self.assertEqual(f.folder_class, 'IPF.StoreItem.Signal')
-            elif isinstance(f, PdpProfileV2Secured):
-                self.assertEqual(f.folder_class, 'IPF.StoreItem.PdpProfileSecured')
-            elif isinstance(f, VoiceMail):
-                self.assertEqual(f.folder_class, 'IPF.Note.Microsoft.Voicemail')
-            else:
-                self.assertIn(f.folder_class, (None, 'IPF'), (f.name, f.__class__.__name__, f.folder_class))
-                self.assertIsInstance(f, Folder)
+            with self.subTest(f=f):
+                if isinstance(f, (
+                        Messages, DeletedItems, AllContacts, MyContactsExtended, Sharing, Favorites, SyncIssues, MyContacts
+                )):
+                    self.assertEqual(f.folder_class, 'IPF.Note')
+                elif isinstance(f, GALContacts):
+                    self.assertEqual(f.folder_class, 'IPF.Contact.GalContacts')
+                elif isinstance(f, RecipientCache):
+                    self.assertEqual(f.folder_class, 'IPF.Contact.RecipientCache')
+                elif isinstance(f, Contacts):
+                    self.assertEqual(f.folder_class, 'IPF.Contact')
+                elif isinstance(f, Calendar):
+                    self.assertEqual(f.folder_class, 'IPF.Appointment')
+                elif isinstance(f, (Tasks, ToDoSearch)):
+                    self.assertEqual(f.folder_class, 'IPF.Task')
+                elif isinstance(f, Reminders):
+                    self.assertEqual(f.folder_class, 'Outlook.Reminder')
+                elif isinstance(f, AllItems):
+                    self.assertEqual(f.folder_class, 'IPF')
+                elif isinstance(f, ConversationSettings):
+                    self.assertEqual(f.folder_class, 'IPF.Configuration')
+                elif isinstance(f, Files):
+                    self.assertEqual(f.folder_class, 'IPF.Files')
+                elif isinstance(f, Friends):
+                    self.assertEqual(f.folder_class, 'IPF.Note')
+                elif isinstance(f, RSSFeeds):
+                    self.assertEqual(f.folder_class, 'IPF.Note.OutlookHomepage')
+                elif isinstance(f, IMContactList):
+                    self.assertEqual(f.folder_class, 'IPF.Contact.MOC.ImContactList')
+                elif isinstance(f, QuickContacts):
+                    self.assertEqual(f.folder_class, 'IPF.Contact.MOC.QuickContacts')
+                elif isinstance(f, Journal):
+                    self.assertEqual(f.folder_class, 'IPF.Journal')
+                elif isinstance(f, Notes):
+                    self.assertEqual(f.folder_class, 'IPF.StickyNote')
+                elif isinstance(f, DefaultFoldersChangeHistory):
+                    self.assertEqual(f.folder_class, 'IPM.DefaultFolderHistoryItem')
+                elif isinstance(f, PassThroughSearchResults):
+                    self.assertEqual(f.folder_class, 'IPF.StoreItem.PassThroughSearchResults')
+                elif isinstance(f, SmsAndChatsSync):
+                    self.assertEqual(f.folder_class, 'IPF.SmsAndChatsSync')
+                elif isinstance(f, GraphAnalytics):
+                    self.assertEqual(f.folder_class, 'IPF.StoreItem.GraphAnalytics')
+                elif isinstance(f, Signal):
+                    self.assertEqual(f.folder_class, 'IPF.StoreItem.Signal')
+                elif isinstance(f, PdpProfileV2Secured):
+                    self.assertEqual(f.folder_class, 'IPF.StoreItem.PdpProfileSecured')
+                elif isinstance(f, VoiceMail):
+                    self.assertEqual(f.folder_class, 'IPF.Note.Microsoft.Voicemail')
+                else:
+                    self.assertIn(f.folder_class, (None, 'IPF'), (f.name, f.__class__.__name__, f.folder_class))
+                    self.assertIsInstance(f, Folder)
 
     def test_counts(self):
         # Test count values on a folder
@@ -195,27 +197,28 @@ class FolderTest(EWSTest):
     def test_refresh(self):
         # Test that we can refresh folders
         for f in self.account.root.walk():
-            if isinstance(f, System):
-                # Can't refresh the 'System' folder for some reason
-                continue
-            old_values = {}
-            for field in f.FIELDS:
-                old_values[field.name] = getattr(f, field.name)
-                if field.name in ('account', 'id', 'changekey', 'parent_folder_id'):
-                    # These are needed for a successful refresh()
+            with self.subTest(f=f):
+                if isinstance(f, System):
+                    # Can't refresh the 'System' folder for some reason
                     continue
-                if field.is_read_only:
-                    continue
-                setattr(f, field.name, self.random_val(field))
-            f.refresh()
-            for field in f.FIELDS:
-                if field.name == 'changekey':
-                    # folders may change while we're testing
-                    continue
-                if field.is_read_only:
-                    # count values may change during the test
-                    continue
-                self.assertEqual(getattr(f, field.name), old_values[field.name], (f, field.name))
+                old_values = {}
+                for field in f.FIELDS:
+                    old_values[field.name] = getattr(f, field.name)
+                    if field.name in ('account', 'id', 'changekey', 'parent_folder_id'):
+                        # These are needed for a successful refresh()
+                        continue
+                    if field.is_read_only:
+                        continue
+                    setattr(f, field.name, self.random_val(field))
+                f.refresh()
+                for field in f.FIELDS:
+                    if field.name == 'changekey':
+                        # folders may change while we're testing
+                        continue
+                    if field.is_read_only:
+                        # count values may change during the test
+                        continue
+                    self.assertEqual(getattr(f, field.name), old_values[field.name], (f, field.name))
 
         # Test refresh of root
         all_folders = sorted(f.name for f in self.account.root.walk())

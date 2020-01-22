@@ -2,8 +2,7 @@ from collections import namedtuple
 import pickle
 
 from exchangelib import Account, Credentials, FaultTolerance, Message, FileAttachment, DELEGATE, Configuration
-from exchangelib.errors import ErrorAccessDenied, ErrorFolderNotFound, UnauthorizedError, TransportError, \
-    ErrorInvalidSchemaVersionForMailboxVersion
+from exchangelib.errors import ErrorAccessDenied, ErrorFolderNotFound, UnauthorizedError
 from exchangelib.folders import Calendar
 from exchangelib.properties import DelegateUser, UserId, DelegatePermissions
 from exchangelib.protocol import Protocol
@@ -86,25 +85,23 @@ class AccountTest(EWSTest):
         # Test that we can pickle various objects
         item = Message(folder=self.account.inbox, subject='XXX', categories=self.categories).save()
         attachment = FileAttachment(name='pickle_me.txt', content=b'')
-        try:
-            for o in (
-                Credentials('XXX', 'YYY'),
-                FaultTolerance(max_wait=3600),
-                self.account.protocol,
-                attachment,
-                self.account.root,
-                self.account.inbox,
-                self.account,
-                item,
-            ):
+        for o in (
+            Credentials('XXX', 'YYY'),
+            FaultTolerance(max_wait=3600),
+            self.account.protocol,
+            attachment,
+            self.account.root,
+            self.account.inbox,
+            self.account,
+            item,
+        ):
+            with self.subTest(o=o):
                 pickled_o = pickle.dumps(o)
                 unpickled_o = pickle.loads(pickled_o)
                 self.assertIsInstance(unpickled_o, type(o))
                 if not isinstance(o, (Account, Protocol, FaultTolerance)):
                     # __eq__ is not defined on some classes
                     self.assertEqual(o, unpickled_o)
-        finally:
-            item.delete()
 
     def test_mail_tips(self):
         # Test that mail tips work

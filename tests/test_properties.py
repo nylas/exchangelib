@@ -18,38 +18,40 @@ class PropertiesTest(TimedTestCase):
         from exchangelib import attachments, properties, items, folders, indexed_properties, recurrence, settings
         for module in (attachments, properties, items, folders, indexed_properties, recurrence, settings):
             for cls in vars(module).values():
-                if not isclass(cls) or not issubclass(cls, EWSElement):
-                    continue
-                # Assert that all FIELDS names are unique on the model. Also assert that the class defines __slots__,
-                # that all fields are mentioned in __slots__ and that __slots__ is unique.
-                field_names = set()
-                all_slots = tuple(chain(*(getattr(c, '__slots__', ()) for c in cls.__mro__)))
-                self.assertEqual(len(all_slots), len(set(all_slots)),
-                                 '__slots__ contains duplicates: %s' % sorted(all_slots))
-                for f in cls.FIELDS:
-                    self.assertNotIn(f.name, field_names,
-                                     'Field name %r is not unique on model %r' % (f.name, cls.__name__))
-                    self.assertIn(f.name, all_slots,
-                                  'Field name %s is not in __slots__ on model %s' % (f.name, cls.__name__))
-                    field_names.add(f.name)
-                # Finally, test that all models have a link to MSDN documentation
-                if issubclass(cls, Folder):
-                    # We have a long list of folders subclasses. Don't require a docstring for each
-                    continue
-                self.assertIsNotNone(cls.__doc__, '%s is missing a docstring' % cls)
-                if cls in (DLMailbox, BulkCreateResult):
-                    # Some classes are just workarounds for other classes
-                    continue
-                if cls.__doc__.startswith('Base class '):
-                    # Base classes don't have an MSDN link
-                    continue
-                if issubclass(cls, RootOfHierarchy):
-                    # Root folders don't have an MSDN link
-                    continue
-                # collapse multiline docstrings
-                docstring = ' '.join(l.strip() for l in cls.__doc__.split('\n'))
-                self.assertIn('MSDN: https://docs.microsoft.com', docstring,
-                              '%s is missing an MSDN link in the docstring' % cls)
+                with self.subTest(cls=cls):
+                    if not isclass(cls) or not issubclass(cls, EWSElement):
+                        continue
+                    # Assert that all FIELDS names are unique on the model. Also assert that the class defines __slots__,
+                    # that all fields are mentioned in __slots__ and that __slots__ is unique.
+                    field_names = set()
+                    all_slots = tuple(chain(*(getattr(c, '__slots__', ()) for c in cls.__mro__)))
+                    self.assertEqual(len(all_slots), len(set(all_slots)),
+                                     '__slots__ contains duplicates: %s' % sorted(all_slots))
+                    for f in cls.FIELDS:
+                        with self.subTest(f=f):
+                            self.assertNotIn(f.name, field_names,
+                                             'Field name %r is not unique on model %r' % (f.name, cls.__name__))
+                            self.assertIn(f.name, all_slots,
+                                          'Field name %s is not in __slots__ on model %s' % (f.name, cls.__name__))
+                            field_names.add(f.name)
+                    # Finally, test that all models have a link to MSDN documentation
+                    if issubclass(cls, Folder):
+                        # We have a long list of folders subclasses. Don't require a docstring for each
+                        continue
+                    self.assertIsNotNone(cls.__doc__, '%s is missing a docstring' % cls)
+                    if cls in (DLMailbox, BulkCreateResult):
+                        # Some classes are just workarounds for other classes
+                        continue
+                    if cls.__doc__.startswith('Base class '):
+                        # Base classes don't have an MSDN link
+                        continue
+                    if issubclass(cls, RootOfHierarchy):
+                        # Root folders don't have an MSDN link
+                        continue
+                    # collapse multiline docstrings
+                    docstring = ' '.join(l.strip() for l in cls.__doc__.split('\n'))
+                    self.assertIn('MSDN: https://docs.microsoft.com', docstring,
+                                  '%s is missing an MSDN link in the docstring' % cls)
 
     def test_uid(self):
         # Test translation of calendar UIDs. See #453

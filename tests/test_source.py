@@ -28,9 +28,10 @@ class CommonTest(EWSTest):
                 self.account.protocol,
                 self.account.version,
         ):
-            # Just test that these at least don't throw errors
-            repr(item)
-            str(item)
+            with self.subTest(item=item):
+                # Just test that these at least don't throw errors
+                repr(item)
+                str(item)
         for attr in (
                 'admin_audit_logs',
                 'archive_deleted_items',
@@ -74,16 +75,17 @@ class CommonTest(EWSTest):
                 'trash',
                 'voice_mail',
         ):
-            # Test distinguished folder shortcuts. Some may raise ErrorAccessDenied
-            try:
-                item = getattr(self.account, attr)
-            except (ErrorAccessDenied, ErrorFolderNotFound, ErrorItemNotFound, ErrorInvalidOperation,
-                    ErrorNoPublicFolderReplicaAvailable):
-                continue
-            else:
-                repr(item)
-                str(item)
-                self.assertTrue(item.is_distinguished)
+            with self.subTest(attr=attr):
+                # Test distinguished folder shortcuts. Some may raise ErrorAccessDenied
+                try:
+                    item = getattr(self.account, attr)
+                except (ErrorAccessDenied, ErrorFolderNotFound, ErrorItemNotFound, ErrorInvalidOperation,
+                        ErrorNoPublicFolderReplicaAvailable):
+                    continue
+                else:
+                    repr(item)
+                    str(item)
+                    self.assertTrue(item.is_distinguished)
 
     def test_from_xml(self):
         # Test for all EWSElement classes that they handle None as input to from_xml()
@@ -91,10 +93,11 @@ class CommonTest(EWSTest):
         for mod in (exchangelib.attachments, exchangelib.extended_properties, exchangelib.indexed_properties,
                     exchangelib.folders, exchangelib.items, exchangelib.properties):
             for k, v in vars(mod).items():
-                if type(v) != type:
-                    continue
-                if not issubclass(v, EWSElement):
-                    continue
-                # from_xml() does not support None input
-                with self.assertRaises(Exception):
-                    v.from_xml(elem=None, account=None)
+                with self.subTest(k=k, v=v):
+                    if type(v) != type:
+                        continue
+                    if not issubclass(v, EWSElement):
+                        continue
+                    # from_xml() does not support None input
+                    with self.assertRaises(Exception):
+                        v.from_xml(elem=None, account=None)
