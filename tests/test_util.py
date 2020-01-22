@@ -8,6 +8,7 @@ import requests_mock
 from exchangelib import FailFast, FaultTolerance
 from exchangelib.errors import RelativeRedirect, TransportError, RateLimitError, RedirectError, UnauthorizedError,\
     CASError
+import exchangelib.util
 from exchangelib.util import chunkify, peek, get_redirect_url, get_domain, PrettyXmlHandler, to_xml, BOM_UTF8, \
     ParseError, post_ratelimited, safe_b64decode, CONNECTION_ERRORS
 
@@ -151,6 +152,8 @@ class UtilTest(EWSTest):
 
         protocol = self.account.protocol
         retry_policy = protocol.config.retry_policy
+        RETRY_WAIT = exchangelib.util.RETRY_WAIT
+        MAX_REDIRECTS = exchangelib.util.MAX_REDIRECTS
 
         session = protocol.get_session()
         try:
@@ -201,7 +204,6 @@ class UtilTest(EWSTest):
             with self.assertRaises(TransportError):
                 r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
             # Redirect header to other location and allow_redirects=True
-            import exchangelib.util
             exchangelib.util.MAX_REDIRECTS = 0
             session.post = mock_post(url, 302, {'location': 'https://contoso.com'})
             with self.assertRaises(TransportError):
@@ -223,35 +225,34 @@ class UtilTest(EWSTest):
             with self.assertRaises(TransportError):
                 r, session = post_ratelimited(protocol=protocol, session=session, url=url, headers=None, data='')
 
-            # Rate limit exceeded
-            protocol.config.retry_policy = FaultTolerance(max_wait=1)
+            # Test rate limit exceeded
+            exchangelib.util.RETRY_WAIT = 1
+            protocol.config.retry_policy = FaultTolerance(max_wait=0.5)  # Fail after first RETRY_WAIT
             session.post = mock_post(url, 503, {'connection': 'close'})
-
             # Mock renew_session to return the same session so the session object's 'post' method is still mocked
             protocol.renew_session = lambda s: s
             with self.assertRaises(RateLimitError) as rle:
                 r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
-            self.assertEqual(
-                str(rle.exception),
-                'Max timeout reached (gave up after 10 seconds. URL https://example.com returned status code 503)'
-            )
-            self.assertEqual(rle.exception.url, url)
             self.assertEqual(rle.exception.status_code, 503)
+            self.assertEqual(rle.exception.url, url)
+            self.assertTrue(1 <= rle.exception.total_wait < 2)  # One RETRY_WAIT plus some overhead
+
             # Test something larger than the default wait, so we retry at least once
-            protocol.retry_policy.max_wait = 15
+            protocol.retry_policy.max_wait = 3  # Fail after second RETRY_WAIT
             session.post = mock_post(url, 503, {'connection': 'close'})
             with self.assertRaises(RateLimitError) as rle:
                 r, session = post_ratelimited(protocol=protocol, session=session, url='http://', headers=None, data='')
-            self.assertEqual(
-                str(rle.exception),
-                'Max timeout reached (gave up after 20 seconds. URL https://example.com returned status code 503)'
-            )
-            self.assertEqual(rle.exception.url, url)
             self.assertEqual(rle.exception.status_code, 503)
+            self.assertEqual(rle.exception.url, url)
+            # We double the wait for each retry, so this is RETRY_WAIT + 2*RETRY_WAIT plus some overhead
+            self.assertTrue(3 <= rle.exception.total_wait < 4, rle.exception.total_wait)
         finally:
             protocol.retire_session(session)  # We have patched the session, so discard it
             # Restore patched attributes and functions
             protocol.config.retry_policy = retry_policy
+            exchangelib.util.RETRY_WAIT = RETRY_WAIT
+            exchangelib.util.MAX_REDIRECTS = MAX_REDIRECTS
+
             try:
                 delattr(protocol, 'renew_session')
             except AttributeError:

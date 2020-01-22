@@ -587,7 +587,8 @@ def get_redirect_url(response, allow_relative=True, require_relative=False):
     return redirect_url
 
 
-MAX_REDIRECTS = 5  # Define a max redirection count. We don't want to be sent into an endless redirect loop
+RETRY_WAIT = 10  # Seconds to wait before retry on connection errors
+MAX_REDIRECTS = 10  # Maximum number of URL redirects before we give up
 
 # A collection of error classes we want to handle as general connection errors
 CONNECTION_ERRORS = (requests.exceptions.ChunkedEncodingError, requests.exceptions.ConnectionError,
@@ -630,7 +631,7 @@ def post_ratelimited(protocol, session, url, headers, data, allow_redirects=Fals
         https://docs.microsoft.com/en-us/exchange/client-developer/exchange-web-services/ews-throttling-in-exchange
     """
     thread_id = get_ident()
-    wait = 10  # seconds
+    wait = RETRY_WAIT  # Initial retry wait. We double the value on each retry
     retry = 0
     redirects = 0
     log_msg = '''\

@@ -45,7 +45,7 @@ class RateLimitError(TransportError):
 
     def __str__(self):
         return str(
-            '{value} (gave up after {total_wait} seconds. URL {url} returned status code {status_code})'.format(
+            '{value} (gave up after {total_wait:.3f} seconds. URL {url} returned status code {status_code})'.format(
                 value=self.value, url=self.url, status_code=self.status_code, total_wait=self.total_wait)
         )
 
