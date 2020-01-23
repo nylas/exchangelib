@@ -5,6 +5,15 @@ HEAD
 ----
 
 
+3.1.1
+-----
+-   The `max_wait` argument to `FaultTolerance` changed semantics. Previously, it triggered when
+    the delay until the next attempt would exceed this value. It now triggers after the given
+    timespan since the *first* request attempt.
+-   Fixed a bug when pagination is combined with `max_items` (#710)
+-   Other minor bug fixes
+
+
 3.1.0
 -----
 -   Removed the legacy autodiscover implementation.
