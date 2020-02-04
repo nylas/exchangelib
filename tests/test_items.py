@@ -737,6 +737,9 @@ class BulkMethodTest(BaseItemTest):
         items = list(self.account.fetch(ids=ids, only_fields=[FieldPath.from_string('subject', self.test_folder)]))
         self.assertEqual(len(items), 2)
 
+        items = list(self.account.fetch(ids=ids, only_fields=['id', 'changekey']))
+        self.assertEqual(len(items), 2)
+
     def test_empty_args(self):
         # We allow empty sequences for these methods
         self.assertEqual(self.test_folder.bulk_create(items=[]), [])
