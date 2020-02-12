@@ -1,3 +1,7 @@
+This is a fork of the original library
+======================================
+See https://github.com/ecederstrand/exchangelib for the master repository.
+
 Exchange Web Services client library
 ====================================
 
