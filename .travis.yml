@@ -15,14 +15,15 @@ before_install:
 - openssl aes-256-cbc -K $encrypted_ae8487d57299_key -iv $encrypted_ae8487d57299_iv -in settings.yml.enc -out settings.yml -d
 
 install:
+- python -m ensurepip --upgrade
 # Install master branches of Cython and Cython-built packages if we are testing on nightly since the C API of
 # CPython changes often and fixes for Python nightly are slow to reach released versions.
-- if [[ "$( python --version | grep '[a|b]' )" ]] ; then pip install git+https://github.com/cython/cython.git ; fi
-- if [[ "$( python --version | grep '[a|b]' )" ]] ; then pip install git+https://github.com/lxml/lxml.git ; fi
-- if [[ "$( python --version | grep '[a|b]' )" ]] ; then pip install git+https://github.com/yaml/pyyaml.git ; fi
-- pip install .
+- if [[ "$( python --version | grep '[a|b]' )" ]] ; then python -m pip install git+https://github.com/cython/cython.git ; fi
+- if [[ "$( python --version | grep '[a|b]' )" ]] ; then python -m pip install git+https://github.com/lxml/lxml.git ; fi
+- if [[ "$( python --version | grep '[a|b]' )" ]] ; then python -m pip install git+https://github.com/yaml/pyyaml.git ; fi
+- python -m pip install .
 # Install test dependencies manually since we're calling tests/__init__.py directly in the 'script' section
-- pip install PyYAML requests_mock psutil coverage coveralls flake8
+- python -m pip install PyYAML requests_mock psutil coverage coveralls flake8
 
 script:
 - coverage run --source=exchangelib setup.py test
