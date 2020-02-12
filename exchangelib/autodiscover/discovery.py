@@ -136,7 +136,9 @@ class Autodiscovery:
         # Get the server version. Not all protocol entries have a server version so we cheat a bit and also look at the
         # other ones that point to the same endpoint.
         for protocol in ad_response.account.protocols:
-            if protocol.ews_url.lower() == ews_url.lower() and protocol.server_version:
+            if not protocol.ews_url or not protocol.server_version:
+                continue
+            if protocol.ews_url.lower() == ews_url.lower():
                 version = Version(build=protocol.server_version)
                 break
         else:
