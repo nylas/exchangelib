@@ -258,8 +258,8 @@ class Version:
                 api_version_from_server = requested_api_version
             else:
                 # Trust API version from server response
-                log.info('API version "%s" worked but server reports version "%s". Using "%s"', requested_api_version,
-                         api_version_from_server, api_version_from_server)
+                log.debug('API version "%s" worked but server reports version "%s". Using "%s"', requested_api_version,
+                          api_version_from_server, api_version_from_server)
         return cls(build=build, api_version=api_version_from_server)
 
     def __eq__(self, other):
