@@ -3,6 +3,9 @@ Change Log
 
 HEAD
 ----
+-   Remove use of `ThreadPool` objects. Threads were used to implement async HTTP requests, but
+    were creating massive memory leaks. Async requests should be reimplemented using a real async
+    HTTP request package.
 
 
 3.1.1

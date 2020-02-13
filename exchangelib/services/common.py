@@ -508,39 +508,11 @@ class PagingEWSMixIn(EWSService):
 class EWSPooledMixIn(EWSService):
     def _pool_requests(self, payload_func, items, **kwargs):
         log.debug('Processing items in chunks of %s', self.chunk_size)
-        # Chop items list into suitable pieces and let worker threads chew on the work. The order of the output result
-        # list must be the same as the input id list, so the caller knows which status message belongs to which ID.
-        # Yield results as they become available.
-        results = []
-        n = 0
-        for chunk in chunkify(items, self.chunk_size):
-            n += 1
-            log.debug('Starting %s._get_elements worker %s for %s items', self.__class__.__name__, n, len(chunk))
-            results.append((n, self.protocol.thread_pool.apply_async(
-                lambda c: self._get_elements(payload=payload_func(c, **kwargs)),
-                (chunk,)
-            )))
-
-            # Results will be available before iteration has finished if 'items' is a slow generator. Return early
-            while True:
-                if not results:
-                    break
-                i, r = results[0]
-                if not r.ready():
-                    # First non-yielded result isn't ready yet. Yielding other ready results would mess up ordering
-                    break
-                log.debug('%s._get_elements result %s is ready early', self.__class__.__name__, i)
-                for elem in r.get():
-                    yield elem
-                # Results object has been processed. Remove from list.
-                del results[0]
-
-        # Yield remaining results in order, as they become available
-        for i, r in results:
-            log.debug('Waiting for %s._get_elements result %s of %s', self.__class__.__name__, i, n)
-            elems = r.get()
-            log.debug('%s._get_elements result %s of %s is ready', self.__class__.__name__, i, n)
-            for elem in elems:
+        # Chop items list into suitable pieces. The order of the output result list must be the same as the input id
+        # list, so the caller knows which status message belongs to which ID. Yield results as they become available.
+        for i, chunk in enumerate(chunkify(items, self.chunk_size), start=1):
+            log.debug('Processing %s chunk %s containing %s items', self.__class__.__name__, i, len(chunk))
+            for elem in self._get_elements(payload=payload_func(chunk, **kwargs)):
                 yield elem
 
 

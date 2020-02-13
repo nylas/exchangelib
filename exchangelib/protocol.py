@@ -6,12 +6,10 @@ when creating an Account.
 """
 import datetime
 import logging
-from multiprocessing.pool import ThreadPool
 import os
 from threading import Lock
 from queue import LifoQueue, Empty, Full
 
-from cached_property import threaded_cached_property
 import requests.adapters
 import requests.sessions
 import requests.utils
@@ -418,26 +416,6 @@ class Protocol(BaseProtocol, metaclass=CachingProtocol):
                     # Version.guess() needs auth objects and a working session pool
                     self.config.version = Version.guess(self, api_version_hint=self._api_version_hint)
         return self.config.version
-
-    @threaded_cached_property
-    def thread_pool(self):
-        # Used by services to process service requests that are able to run in parallel. Thread pool should be
-        # larger than the connection pool so we have time to process data without idling the connection.
-        # Create the pool as the last thing here, since we may fail in the version or auth type guessing, which would
-        # leave open threads around to be garbage collected.
-        thread_poolsize = 4 * self._session_pool_size
-        return ThreadPool(processes=thread_poolsize)
-
-    def close(self):
-        log.debug('Server %s: Closing thread pool', self.server)
-        # Close the thread pool before closing the session pool to ensure all sessions are released.
-        if "thread_pool" in self.__dict__:
-            # Calling thread_pool.join() in Python 3.8 will hang forever. This is seen when running a test case that
-            # uses the thread pool, e.g.: python tests/__init__.py MessagesTest.test_export_with_error
-            # I don't know yet why this is happening.
-            self.thread_pool.terminate()
-            del self.__dict__["thread_pool"]
-        super().close()
 
     def get_timezones(self, timezones=None, return_full_timezone_data=False):
         """ Get timezone definitions from the server
