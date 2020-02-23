@@ -75,7 +75,7 @@ class Autodiscovery:
         self._emails_visited = []  # Collects Autodiscover email redirects
 
     def discover(self):
-        self._emails_visited.append(self.email)
+        self._emails_visited.append(self.email.lower())
 
         # Check the autodiscover cache to see if we already know the autodiscover service endpoint for this email
         # domain. Use a lock to guard against multiple threads competing to cache information.
