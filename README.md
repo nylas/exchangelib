@@ -643,9 +643,17 @@ random_emails = a.inbox.all().order_by('-subject')[::3]  # This is just stupid, 
 
 # The syntax for filter() is modeled after Django QuerySet filters. The following filter lookup 
 # types are supported. Some lookups only work with string attributes. Range and less/greater 
-# operators only work for date or numerical attributes. Some attributes are not searchable at all 
-# via EWS:
-qs = a.calendar.all()
+# operators only work for date or numerical attributes. This is determined by the field type.
+#
+# Some attributes are not searchable at all via EWS. This is determined by the "is_searchable"
+# attribute on the field.
+
+# List the field name and field type of searchable fields for a certain item type
+for f in Message.FIELDS:
+    if f.is_searchable:
+        print(f.name, f)
+
+qs = a.calendar.all()  # No restrictions. Return all items.
 qs.filter(subject='foo')  # Returns items where subject is exactly 'foo'. Case-sensitive
 qs.filter(start__range=(start, end))  # Returns items within range
 qs.filter(subject__in=('foo', 'bar'))  # Return items where subject is either 'foo' or 'bar'
