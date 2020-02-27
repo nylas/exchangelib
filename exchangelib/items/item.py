@@ -86,8 +86,8 @@ class Item(BaseItem):
         BooleanField('reminder_is_set', field_uri='item:ReminderIsSet', is_required=True, default=False),
         IntegerField('reminder_minutes_before_start', field_uri='item:ReminderMinutesBeforeStart',
                      is_required_after_save=True, min=0, default=0),
-        CharField('display_cc', field_uri='item:DisplayCc', is_read_only=True),
-        CharField('display_to', field_uri='item:DisplayTo', is_read_only=True),
+        TextField('display_cc', field_uri='item:DisplayCc', is_read_only=True),
+        TextField('display_to', field_uri='item:DisplayTo', is_read_only=True),
         BooleanField('has_attachments', field_uri='item:HasAttachments', is_read_only=True),
         # ExtendedProperty fields go here
         CultureField('culture', field_uri='item:Culture', is_required_after_save=True, is_searchable=False),
