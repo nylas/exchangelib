@@ -312,3 +312,13 @@ class ExternId(ExtendedProperty):
     property_type = 'String'
 
     __slots__ = tuple()
+
+
+class Flag(ExtendedProperty):
+    """This property returns 0 for Not Flagged messages, 1 for Flagged messages and 2 for Completed messages.
+
+    For a description of each status, see:
+    https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/flagstatus
+    """
+    property_tag = 0x1090
+    property_type = 'Integer'
