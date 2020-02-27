@@ -415,15 +415,18 @@ class FolderId(ItemId):
 class Mailbox(EWSElement):
     """MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/mailbox"""
     ELEMENT_NAME = 'Mailbox'
+    MAILBOX = 'Mailbox'
+    ONE_OFF = 'OneOff'
+    MAILBOX_TYPE_CHOICES = {
+            Choice(MAILBOX), Choice('PublicDL'), Choice('PrivateDL'), Choice('Contact'), Choice('PublicFolder'),
+            Choice('Unknown'), Choice(ONE_OFF), Choice('GroupMailbox', supported_from=EXCHANGE_2013)
+        }
 
     FIELDS = [
         TextField('name', field_uri='Name'),
         EmailAddressField('email_address', field_uri='EmailAddress'),
         RoutingTypeField('routing_type', field_uri='RoutingType'),
-        ChoiceField('mailbox_type', field_uri='MailboxType', choices={
-            Choice('Mailbox'), Choice('PublicDL'), Choice('PrivateDL'), Choice('Contact'), Choice('PublicFolder'),
-            Choice('Unknown'), Choice('OneOff'), Choice('GroupMailbox', supported_from=EXCHANGE_2013)
-        }, default='Mailbox'),
+        ChoiceField('mailbox_type', field_uri='MailboxType', choices=MAILBOX_TYPE_CHOICES, default=MAILBOX),
         EWSElementField('item_id', value_cls=ItemId, is_read_only=True),
     ]
 
@@ -431,10 +434,12 @@ class Mailbox(EWSElement):
 
     def clean(self, version=None):
         super().clean(version=version)
-        if not self.email_address and not self.item_id:
-            # See "Remarks" section of
+
+        if self.mailbox_type != self.ONE_OFF and not self.email_address and not self.item_id:
+            # A OneOff Mailbox (a one-off member of a personal distribution list) may lack these fields, but other
+            # Mailboxes require at least one. See also "Remarks" section of
             # https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/mailbox
-            raise ValueError("Mailbox must have either 'email_address' or 'item_id' set")
+            raise ValueError("Mailbox type %r must have either 'email_address' or 'item_id' set" % self.mailbox_type)
 
     def __hash__(self):
         # Exchange may add 'mailbox_type' and 'name' on insert. We're satisfied if the item_id or email address matches.
