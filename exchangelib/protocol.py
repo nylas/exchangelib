@@ -431,8 +431,9 @@ class Protocol(BaseProtocol, metaclass=CachingProtocol):
     def get_free_busy_info(self, accounts, start, end, merged_free_busy_interval=30, requested_view='DetailedMerged'):
         """ Returns free/busy information for a list of accounts
 
-        :param accounts: A list of (account, attendee_type, exclude_conflicts) tuples, where account is an Account
-               object, attendee_type is a MailboxData.attendee_type choice, and exclude_conflicts is a boolean.
+        :param accounts: A list of (account, attendee_type, exclude_conflicts) tuples, where account is either an
+        Account object or a string, attendee_type is a MailboxData.attendee_type choice, and exclude_conflicts is a
+        boolean.
         :param start: The start datetime of the request
         :param end: The end datetime of the request
         :param merged_free_busy_interval: The interval, in minutes, of merged free/busy information
@@ -442,8 +443,8 @@ class Protocol(BaseProtocol, metaclass=CachingProtocol):
         """
         from .account import Account
         for account, attendee_type, exclude_conflicts in accounts:
-            if not isinstance(account, Account):
-                raise ValueError("'accounts' item %r must be an 'Account' instance" % account)
+            if not isinstance(account, (Account, str)):
+                raise ValueError("'accounts' item %r must be an 'Account' or 'str' instance" % account)
             if attendee_type not in MailboxData.ATTENDEE_TYPES:
                 raise ValueError("'accounts' item %r must be one of %s" % (attendee_type, MailboxData.ATTENDEE_TYPES))
             if not isinstance(exclude_conflicts, bool):
@@ -467,7 +468,7 @@ class Protocol(BaseProtocol, metaclass=CachingProtocol):
                     for_year=start.year
                 ),
                 mailbox_data=[MailboxData(
-                    email=account.primary_smtp_address,
+                    email=account.primary_smtp_address if isinstance(account, Account) else account,
                     attendee_type=attendee_type,
                     exclude_conflicts=exclude_conflicts
                 ) for account, attendee_type, exclude_conflicts in accounts],

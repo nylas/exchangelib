@@ -109,7 +109,7 @@ class ProtocolTest(EWSTest):
         accounts = [(self.account, 'Organizer', False)]
 
         with self.assertRaises(ValueError):
-            self.account.protocol.get_free_busy_info(accounts=[('XXX', 'XXX', 'XXX')], start=0, end=0)
+            self.account.protocol.get_free_busy_info(accounts=[(123, 'XXX', 'XXX')], start=0, end=0)
         with self.assertRaises(ValueError):
             self.account.protocol.get_free_busy_info(accounts=[(self.account, 'XXX', 'XXX')], start=0, end=0)
         with self.assertRaises(ValueError):
@@ -127,6 +127,12 @@ class ProtocolTest(EWSTest):
             self.assertIsInstance(view_info.working_hours_timezone, TimeZone)
             ms_id = view_info.working_hours_timezone.to_server_timezone(server_timezones, start.year)
             self.assertIn(ms_id, {t[0] for t in CLDR_TO_MS_TIMEZONE_MAP.values()})
+
+        # Test account as simple email
+        for view_info in self.account.protocol.get_free_busy_info(
+                accounts=[(self.account.primary_smtp_address, 'Organizer', False)], start=start, end=end
+        ):
+            self.assertIsInstance(view_info, FreeBusyView)
 
     def test_get_roomlists(self):
         # The test server is not guaranteed to have any room lists which makes this test less useful
