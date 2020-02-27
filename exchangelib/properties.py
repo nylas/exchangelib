@@ -10,7 +10,7 @@ from threading import Lock
 from .fields import SubField, TextField, EmailAddressField, ChoiceField, DateTimeField, EWSElementField, MailboxField, \
     Choice, BooleanField, IdField, ExtendedPropertyField, IntegerField, TimeField, EnumField, CharField, EmailField, \
     EWSElementListField, EnumListField, FreeBusyStatusField, UnknownEntriesField, MessageField, RecipientAddressField, \
-    WEEKDAY_NAMES, FieldPath, Field
+    RoutingTypeField, WEEKDAY_NAMES, FieldPath, Field
 from .util import get_xml_attr, create_element, set_xml_value, value_to_xml_text, MNS, TNS
 from .version import Version, EXCHANGE_2013
 
@@ -419,7 +419,7 @@ class Mailbox(EWSElement):
     FIELDS = [
         TextField('name', field_uri='Name'),
         EmailAddressField('email_address', field_uri='EmailAddress'),
-        ChoiceField('routing_type', field_uri='RoutingType', choices={Choice('SMTP')}, default='SMTP'),
+        RoutingTypeField('routing_type', field_uri='RoutingType'),
         ChoiceField('mailbox_type', field_uri='MailboxType', choices={
             Choice('Mailbox'), Choice('PublicDL'), Choice('PrivateDL'), Choice('Contact'), Choice('PublicFolder'),
             Choice('Unknown'), Choice('OneOff'), Choice('GroupMailbox', supported_from=EXCHANGE_2013)
@@ -480,7 +480,7 @@ class AvailabilityMailbox(EWSElement):
     FIELDS = [
         TextField('name', field_uri='Name'),
         EmailAddressField('email_address', field_uri='Address', is_required=True),
-        ChoiceField('routing_type', field_uri='RoutingType', choices={Choice('SMTP')}, default='SMTP'),
+        RoutingTypeField('routing_type', field_uri='RoutingType'),
     ]
 
     __slots__ = tuple(f.name for f in FIELDS)

@@ -1300,3 +1300,10 @@ class ProtocolListField(EWSElementListField):
 
     def from_xml(self, elem, account):
         return [self.value_cls.from_xml(elem=e, account=account) for e in elem.findall(self.value_cls.response_tag())]
+
+
+class RoutingTypeField(ChoiceField):
+    def __init__(self, *args, **kwargs):
+        kwargs['choices'] = {Choice('SMTP'), Choice('EX')}
+        kwargs['default'] = 'SMTP'
+        super().__init__(*args, **kwargs)
