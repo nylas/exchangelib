@@ -129,6 +129,7 @@ class OAuth2Credentials(BaseCredentials):
         self.client_id = client_id
         self.client_secret = client_secret
         self.tenant_id = tenant_id
+        self.access_token = None
 
     def refresh(self, session):
         # Creating a new session gets a new access token, so there's no

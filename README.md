@@ -176,9 +176,12 @@ config = Configuration(server='example.com', auth_type=SSPI)
 # OAuth is supported via the OAUTH2 auth type and the OAuth2Credentials class.
 # Use OAuth2AuthorizationCodeCredentials for the authorization code flow (useful
 # for applications that access multiple accounts).
+from oauthlib.oauth2 import OAuth2Token
 credentials = OAuth2Credentials(client_id='MY_ID', client_secret='MY_SECRET', tenant_id='TENANT_ID')
 credentials = OAuth2AuthorizationCodeCredentials(client_id='MY_ID', client_secret='MY_SECRET', authorization_code='AUTH_CODE')
-credentials = OAuth2AuthorizationCodeCredentials(client_id='MY_ID', client_secret='MY_SECRET', access_token='EXISTING_TOKEN')
+credentials = OAuth2AuthorizationCodeCredentials(
+    client_id='MY_ID', client_secret='MY_SECRET', access_token=OAuth2Token(access_token='EXISTING_TOKEN')
+)
 config = Configuration(credentials=credentials, auth_type=OAUTH2)
 
 # Applications using the authorization code flow that let exchangelib refresh
