@@ -1,6 +1,7 @@
 from collections import OrderedDict
 import logging
 
+from ..ewsdatetime import EWSDate
 from ..util import create_element, set_xml_value, MNS
 from ..version import EXCHANGE_2010, EXCHANGE_2013_SP1
 from .common import EWSAccountService, EWSPooledMixIn
@@ -88,6 +89,9 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
         value = field.clean(getattr(item, field.name), version=self.account.version)  # Make sure the value is OK
         if item.__class__ == CalendarItem:
             # For CalendarItem items where we update 'start' or 'end', we want to send values in the local timezone
+            if field.name in ('start', 'end') and type(value) == EWSDate:
+                # EWS always expects a datetime
+                return item.date_to_datetime(field_name=field.name)
             if self.account.version.build < EXCHANGE_2010:
                 if field.name in ('start', 'end'):
                     value = value.astimezone(getattr(item, meeting_tz_field.name))

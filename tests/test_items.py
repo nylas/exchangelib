@@ -193,14 +193,13 @@ class BaseItemTest(EWSTest):
                     update_kwargs[f.name] = None
                 continue
             update_kwargs[f.name] = self.random_val(f)
-        if update_kwargs.get('is_all_day', False):
-            # For is_all_day items, EWS will remove the time part of start and end values
-            update_kwargs['start'] = update_kwargs['start'].replace(hour=0, minute=0, second=0, microsecond=0)
-            update_kwargs['end'] = \
-                update_kwargs['end'].replace(hour=0, minute=0, second=0, microsecond=0) + datetime.timedelta(days=1)
         if self.ITEM_CLASS == CalendarItem:
             # EWS always sets due date to 'start'
             update_kwargs['reminder_due_by'] = update_kwargs['start']
+        if update_kwargs.get('is_all_day', False):
+            # For is_all_day items, EWS will remove the time part of start and end values
+            update_kwargs['start'] = update_kwargs['start'].date()
+            update_kwargs['end'] = (update_kwargs['end'] + datetime.timedelta(days=1)).date()
         return update_kwargs
 
     def get_test_item(self, folder=None, categories=None):
@@ -1076,13 +1075,13 @@ class CommonItemTest(BaseItemTest):
                         old_date = old.astimezone(self.account.default_timezone).date()
                         new_date = new.astimezone(self.account.default_timezone).date()
                         if relativedelta(month=1) + new_date == old_date:
-                            item.reminder_due_by = new
+                            item.reminder_due_by = new_date if item.is_all_day else new
                             continue
                         if relativedelta(month=1) + old_date == new_date:
-                            item.reminder_due_by = new
+                            item.reminder_due_by = new_date if item.is_all_day else new
                             continue
                         elif abs(old_date - new_date) == datetime.timedelta(days=30):
-                            item.reminder_due_by = new
+                            item.reminder_due_by = new_date if item.is_all_day else new
                             continue
                 if f.is_list:
                     old, new = set(old or ()), set(new or ())
@@ -1175,13 +1174,13 @@ class CommonItemTest(BaseItemTest):
                         old_date = old.astimezone(self.account.default_timezone).date()
                         new_date = new.astimezone(self.account.default_timezone).date()
                         if relativedelta(month=1) + new_date == old_date:
-                            item.reminder_due_by = new
+                            item.reminder_due_by = new_date if item.is_all_day else new
                             continue
                         if relativedelta(month=1) + old_date == new_date:
-                            item.reminder_due_by = new
+                            item.reminder_due_by = new_date if item.is_all_day else new
                             continue
                         elif abs(old_date - new_date) == datetime.timedelta(days=30):
-                            item.reminder_due_by = new
+                            item.reminder_due_by = new_date if item.is_all_day else new
                             continue
                 if f.is_list:
                     old, new = set(old or ()), set(new or ())
@@ -2165,20 +2164,35 @@ class CalendarTest(CommonItemTest):
         self.assertEqual(item.end, dt_end)
 
     def test_all_day_datetimes(self):
-        # Test that start and end datetimes for all-day items are returned in the datetime of the account.
+        # Test that we can use plain dates for start and end values for all-day items
         start = get_random_date()
         start_dt, end_dt = get_random_datetime_range(
             start_date=start,
             end_date=start + datetime.timedelta(days=365),
             tz=self.account.default_timezone
         )
+        # Assign datetimes for start and end
         item = self.ITEM_CLASS(folder=self.test_folder, start=start_dt, end=end_dt, is_all_day=True,
-                               categories=self.categories)
-        item.save()
+                               categories=self.categories).save()
 
-        item = self.test_folder.all().only('start', 'end').get(id=item.id, changekey=item.changekey)
-        self.assertEqual(item.start.astimezone(self.account.default_timezone).time(), datetime.time(0, 0))
-        self.assertEqual(item.end.astimezone(self.account.default_timezone).time(), datetime.time(0, 0))
+        # Returned item start and end values should be EWSDate instances
+        item = self.test_folder.all().only('is_all_day', 'start', 'end').get(id=item.id, changekey=item.changekey)
+        self.assertEqual(item.is_all_day, True)
+        self.assertEqual(item.start, start_dt.date())
+        self.assertEqual(item.end, end_dt.date())
+        item.save()  # Make sure we can update
+        item.delete()
+
+        # We are also allowed to assign plain dates as values for all-day items
+        item = self.ITEM_CLASS(folder=self.test_folder, start=start_dt.date(), end=end_dt.date(), is_all_day=True,
+                               categories=self.categories).save()
+
+        # Returned item start and end values should be EWSDate instances
+        item = self.test_folder.all().only('is_all_day', 'start', 'end').get(id=item.id, changekey=item.changekey)
+        self.assertEqual(item.is_all_day, True)
+        self.assertEqual(item.start, start_dt.date())
+        self.assertEqual(item.end, end_dt.date())
+        item.save()  # Make sure we can update
 
     def test_view(self):
         item1 = self.ITEM_CLASS(

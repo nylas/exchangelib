@@ -623,6 +623,27 @@ class DateTimeField(FieldURIField):
         return self.default
 
 
+class DateOrDateTimeField(DateTimeField):
+    """This field can handle both EWSDate and EWSDateTime. Used for calendar items where 'start' and 'end'
+    values are conceptually dates when the calendar item is an all-day event, but datetimes in all other cases.
+
+    For all-day items, we assume both start and end dates are inclusive.
+
+    For filtering kwarg validation and other places where we must decide on a specific class, we settle on datetime.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Create internal field to handle date-only logic
+        self._date_field = DateField(*args, **kwargs)
+
+    def clean(self, value, version=None):
+        # Most calendar items will contain datetime values. We can't access the is_all_day value here, so CalendarItem
+        # must handle that sanity check.
+        if type(value) == EWSDate:
+            return self._date_field.clean(value=value, version=version)
+        return super().clean(value=value, version=version)
+
+
 class TimeZoneField(FieldURIField):
     value_cls = EWSTimeZone
 

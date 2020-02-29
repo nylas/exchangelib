@@ -1,11 +1,14 @@
+import datetime
 import logging
 
+from ..ewsdatetime import EWSDate, EWSDateTime
 from ..fields import BooleanField, IntegerField, TextField, ChoiceField, URIField, BodyField, DateTimeField, \
     MessageHeaderField, AttachmentField, RecurrenceField, MailboxField, AttendeesField, Choice, OccurrenceField, \
     OccurrenceListField, TimeZoneField, CharField, EnumAsIntField, FreeBusyStatusField, ReferenceItemIdField, \
-    AssociatedCalendarItemIdField
+    AssociatedCalendarItemIdField, DateOrDateTimeField
 from ..properties import Attendee, ReferenceItemId, AssociatedCalendarItemId
 from ..recurrence import FirstOccurrence, LastOccurrence, Occurrence, DeletedOccurrence
+from ..util import set_xml_value
 from ..version import EXCHANGE_2010, EXCHANGE_2013
 from .base import BaseItem, BaseReplyItem, SEND_AND_SAVE_COPY
 from .item import Item
@@ -55,8 +58,8 @@ class CalendarItem(Item, AcceptDeclineMixIn):
     ELEMENT_NAME = 'CalendarItem'
     LOCAL_FIELDS = [
         TextField('uid', field_uri='calendar:UID', is_required_after_save=True, is_searchable=False),
-        DateTimeField('start', field_uri='calendar:Start', is_required=True),
-        DateTimeField('end', field_uri='calendar:End', is_required=True),
+        DateOrDateTimeField('start', field_uri='calendar:Start', is_required=True),
+        DateOrDateTimeField('end', field_uri='calendar:End', is_required=True),
         DateTimeField('original_start', field_uri='calendar:OriginalStart', is_read_only=True),
         BooleanField('is_all_day', field_uri='calendar:IsAllDayEvent', is_required=True, default=False),
         FreeBusyStatusField('legacy_free_busy_status', field_uri='calendar:LegacyFreeBusyStatus', is_required=True,
@@ -124,17 +127,29 @@ class CalendarItem(Item, AcceptDeclineMixIn):
     def clean_timezone_fields(self, version):
         # pylint: disable=access-member-before-definition
         # Sets proper values on the timezone fields if they are not already set
+        if self.start is None:
+            start_tz = None
+        elif type(self.start) == EWSDate:
+            start_tz = self.account.default_timezone
+        else:
+            start_tz = self.start.tzinfo
+        if self.end is None:
+            end_tz = None
+        elif type(self.end) == EWSDate:
+            end_tz = self.account.default_timezone
+        else:
+            end_tz = self.end.tzinfo
         if version.build < EXCHANGE_2010:
-            if self._meeting_timezone is None and self.start is not None:
-                self._meeting_timezone = self.start.tzinfo
+            if self._meeting_timezone is None:
+                self._meeting_timezone = start_tz
             self._start_timezone = None
             self._end_timezone = None
         else:
             self._meeting_timezone = None
-            if self._start_timezone is None and self.start is not None:
-                self._start_timezone = self.start.tzinfo
-            if self._end_timezone is None and self.end is not None:
-                self._end_timezone = self.end.tzinfo
+            if self._start_timezone is None:
+                self._start_timezone = start_tz
+            if self._end_timezone is None:
+                self._end_timezone = end_tz
 
     def clean(self, version=None):
         # pylint: disable=access-member-before-definition
@@ -159,6 +174,62 @@ class CalendarItem(Item, AcceptDeclineMixIn):
             update_fields.remove('recurrence')
             update_fields.remove('uid')
         return update_fields
+
+    @classmethod
+    def from_xml(cls, elem, account):
+        item = super().from_xml(elem=elem, account=account)
+        # EWS returns the start and end values as a datetime regardless of the is_all_day status. Convert to date if
+        # applicable.
+        if not item.is_all_day:
+            return item
+        for field_name in ('start', 'end'):
+            val = getattr(item, field_name)
+            if val is None:
+                continue
+            # Return just the date part of the value. Subtract 1 day from the date if this is the end field. This is
+            # the inverse of what we do in .to_xml(). Convert to the local timezone before getting the date.
+            if field_name == 'end':
+                val -= datetime.timedelta(days=1)
+            tz = getattr(item, '_%s_timezone' % field_name)
+            setattr(item, field_name, val.astimezone(tz).date())
+        return item
+
+    def date_to_datetime(self, field_name):
+        # EWS always expects a datetime. If we have a date value, then convert it to datetime in the local
+        # timezone. Additionally, if this the end field, add 1 day to the date. We could add 12 hours to both
+        # start and end values and let EWS apply its logic, but that seems hacky.
+        value = getattr(self, field_name)
+        if self.account.version.build < EXCHANGE_2010:
+            tz = self._meeting_timezone
+        else:
+            tz = getattr(self, '_%s_timezone' % field_name)
+        value = tz.localize(EWSDateTime.combine(value, datetime.time(0, 0)))
+        if field_name == 'end':
+            value += datetime.timedelta(days=1)
+        return value
+
+    def to_xml(self, version):
+        # EWS has some special logic related to all-day start and end values. Non-midnight start values are pushed to
+        # the previous midnight. Non-midnight end values are pushed to the following midnight. Midnight in this context
+        # refers to midnight in the local timezone. See
+        #
+        # https://docs.microsoft.com/en-us/exchange/client-developer/exchange-web-services/how-to-create-all-day-events-by-using-ews-in-exchange
+        #
+        elem = super().to_xml(version=version)
+        if not self.is_all_day:
+            return elem
+        for field_name in ('start', 'end'):
+            value = getattr(self, field_name)
+            if value is None:
+                continue
+            if type(value) == EWSDate:
+                # EWS always expects a datetime
+                value = self.date_to_datetime(field_name=field_name)
+                # We already generated an XML element for this field, but it contains a plain date at this point, which
+                # is invalid. Replace the value.
+                field = self.get_field_by_fieldname(field_name)
+                set_xml_value(elem=elem.find(field.response_tag()), value=value, version=version)
+        return elem
 
 
 class BaseMeetingItem(Item):

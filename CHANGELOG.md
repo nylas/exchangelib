@@ -5,7 +5,11 @@ HEAD
 ----
 -   Remove use of `ThreadPool` objects. Threads were used to implement async HTTP requests, but
     were creating massive memory leaks. Async requests should be reimplemented using a real async
-    HTTP request package.
+    HTTP request package, so this is just an emergency fix.
+-   All-day calendar items (created as `CalendarItem(is_all_day=True, ...)`) now accept `EWSDate`
+    instances for the `start` and `end` values. Similarly, all-day calendar items fetched from
+    the server now return `start` and `end` values as `EWSDate` instances. In this case, start
+    and end values are inclusive; a one-day event starts and ends on the same `EWSDate` value.
 
 
 3.1.1
