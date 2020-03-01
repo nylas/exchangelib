@@ -3,7 +3,7 @@ from exchangelib.extended_properties import ExtendedProperty
 from exchangelib.folders import Inbox
 
 from .common import get_random_int
-from .test_items import BaseItemTest
+from .test_items.test_basics import BaseItemTest
 
 
 class ExtendedPropertyTest(BaseItemTest):

@@ -5,7 +5,7 @@ from exchangelib.items import Item, Message
 from exchangelib.services import GetAttachment
 from exchangelib.util import chunkify, TNS
 
-from .test_items import BaseItemTest
+from .test_items.test_basics import BaseItemTest
 from .common import get_random_string
 
 
