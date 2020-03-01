@@ -664,7 +664,7 @@ class TimeZoneField(FieldURIField):
 
     def to_xml(self, value, version):
         return create_element(
-            't:%s' % self.field_uri_postfix,
+            self.request_tag(),
             attrs=OrderedDict([
                 ('Id', value.ms_id),
                 ('Name', value.ms_name),
