@@ -15,14 +15,25 @@ class GetDelegate(EWSAccountService, EWSPooledMixIn):
                 '%r is only supported for Exchange 2007 SP1 servers and later' % self.SERVICE_NAME)
         from ..properties import DLMailbox, DelegateUser  # The service expects a Mailbox element in the MNS namespace
 
-        for elem in self._pool_requests(
-            items=user_ids,
-            payload_func=self.get_payload,
-            **dict(
-                mailbox=DLMailbox(email_address=self.account.primary_smtp_address),
-                include_permissions=include_permissions,
+        if user_ids:
+            # Pool requests to avoid arbitrarily large requests when user_ids is huge
+            res = self._pool_requests(
+                items=user_ids,
+                payload_func=self.get_payload,
+                **dict(
+                    mailbox=DLMailbox(email_address=self.account.primary_smtp_address),
+                    include_permissions=include_permissions,
+                )
             )
-        ):
+        else:
+            # Pooling expects an iterable of items but we have None. Just call _get_elements directly.
+            res = self._get_elements(payload=self.get_payload(
+                mailbox=DLMailbox(email_address=self.account.primary_smtp_address),
+                user_ids=user_ids,
+                include_permissions=include_permissions,
+            ))
+
+        for elem in res:
             if isinstance(elem, Exception):
                 raise elem
             yield DelegateUser.from_xml(elem=elem, account=self.account)

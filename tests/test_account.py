@@ -108,7 +108,13 @@ class AccountTest(EWSTest):
         self.assertEqual(self.account.mail_tips.recipient_address, self.account.primary_smtp_address)
 
     def test_delegate(self):
-        # The test server does not have any delegate info. Mock instead.
+        # The test server does not have any delegate info. Test that account.delegates works, and mock to test parsing
+        # of a non-empty response.
+        self.assertGreaterEqual(
+            len(self.account.delegates),
+            0
+        )
+
         xml = b'''<?xml version="1.0" encoding="utf-8"?>
         <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
