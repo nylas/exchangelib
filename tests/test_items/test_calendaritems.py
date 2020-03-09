@@ -4,6 +4,9 @@ from exchangelib.errors import ErrorInvalidOperation
 from exchangelib.ewsdatetime import EWSDateTime, UTC
 from exchangelib.folders import Calendar
 from exchangelib.items import CalendarItem
+from exchangelib.items.calendar_item import SINGLE, OCCURRENCE, EXCEPTION, RECURRING_MASTER
+from exchangelib.recurrence import Recurrence, DailyPattern, Occurrence, FirstOccurrence, LastOccurrence, \
+    DeletedOccurrence
 
 from ..common import get_random_string, get_random_datetime_range, get_random_date
 from .test_basics import CommonItemTest
@@ -14,13 +17,19 @@ class CalendarTest(CommonItemTest):
     FOLDER_CLASS = Calendar
     ITEM_CLASS = CalendarItem
 
+    def match_cat(self, i):
+        return set(i.categories or []) == set(self.categories)
+
     def test_updating_timestamps(self):
         # Test that we can update an item without changing anything, and maintain the hidden timezone fields as local
         # timezones, and that returned timestamps are in UTC.
         item = self.get_test_item()
         item.reminder_is_set = True
         item.is_all_day = False
+        item.recurrence = None
         item.save()
+        item.refresh()
+        self.assertEqual(item.type, SINGLE)
         for i in self.account.calendar.filter(categories__contains=self.categories).only('start', 'end', 'categories'):
             self.assertEqual(i.start, item.start)
             self.assertEqual(i.start.tzinfo, UTC)
@@ -125,32 +134,29 @@ class CalendarTest(CommonItemTest):
         with self.assertRaises(ValueError):
             list(self.test_folder.view(start=item1.start, end=item1.end, max_items=0))
 
-        def match_cat(i):
-            return set(i.categories or []) == set(self.categories)
-
         # Test dates
         self.assertEqual(
-            len([i for i in self.test_folder.view(start=item1.start, end=item1.end) if match_cat(i)]),
+            len([i for i in self.test_folder.view(start=item1.start, end=item1.end) if self.match_cat(i)]),
             1
         )
         self.assertEqual(
-            len([i for i in self.test_folder.view(start=item1.start, end=item2.end) if match_cat(i)]),
+            len([i for i in self.test_folder.view(start=item1.start, end=item2.end) if self.match_cat(i)]),
             2
         )
         # Edge cases. Get view from end of item1 to start of item2. Should logically return 0 items, but Exchange wants
         # it differently and returns item1 even though there is no overlap.
         self.assertEqual(
-            len([i for i in self.test_folder.view(start=item1.end, end=item2.start) if match_cat(i)]),
+            len([i for i in self.test_folder.view(start=item1.end, end=item2.start) if self.match_cat(i)]),
             1
         )
         self.assertEqual(
-            len([i for i in self.test_folder.view(start=item1.start, end=item2.start) if match_cat(i)]),
+            len([i for i in self.test_folder.view(start=item1.start, end=item2.start) if self.match_cat(i)]),
             1
         )
 
         # Test max_items
         self.assertEqual(
-            len([i for i in self.test_folder.view(start=item1.start, end=item2.end, max_items=9999) if match_cat(i)]),
+            len([i for i in self.test_folder.view(start=item1.start, end=item2.end, max_items=9999) if self.match_cat(i)]),
             2
         )
         self.assertEqual(
@@ -167,3 +173,131 @@ class CalendarTest(CommonItemTest):
             [i for i in qs.order_by('subject').values('subject') if i['subject'] in (item1.subject, item2.subject)],
             [{'subject': s} for s in sorted([item1.subject, item2.subject])]
         )
+
+    def test_recurring_item(self):
+        # Create a recurring calendar item. Test that occurrence fields are correct on the master item
+
+        # Create a master item with 4 daily occurrences from 8:00 to 10:00. 'start' and 'end' are values for the first
+        # occurrence.
+        start = self.account.default_timezone.localize(EWSDateTime(2016, 1, 1, 8))
+        end = self.account.default_timezone.localize(EWSDateTime(2016, 1, 1, 10))
+        master_item = self.ITEM_CLASS(
+            folder=self.test_folder,
+            start=start,
+            end=end,
+            recurrence=Recurrence(pattern=DailyPattern(interval=1), start=start.date(), number=4),
+            categories=self.categories,
+        ).save()
+
+        master_item.refresh()
+        self.assertEqual(master_item.is_recurring, False)
+        self.assertEqual(master_item.type, RECURRING_MASTER)
+        self.assertIsInstance(master_item.first_occurrence, FirstOccurrence)
+        self.assertEqual(master_item.first_occurrence.start, start)
+        self.assertEqual(master_item.first_occurrence.end, end)
+        self.assertIsInstance(master_item.last_occurrence, LastOccurrence)
+        self.assertEqual(master_item.last_occurrence.start, start + datetime.timedelta(days=3))
+        self.assertEqual(master_item.last_occurrence.end, end + datetime.timedelta(days=3))
+        self.assertEqual(master_item.modified_occurrences, None)
+        self.assertEqual(master_item.deleted_occurrences, None)
+
+        # Test occurrences as full calendar items, unfolded from the master
+        range_start, range_end = start, end + datetime.timedelta(days=3)
+        unfolded = [i for i in self.test_folder.view(start=range_start, end=range_end) if self.match_cat(i)]
+        self.assertEqual(len(unfolded), 4)
+        for item in unfolded:
+            self.assertEqual(item.type, OCCURRENCE)
+            self.assertEqual(item.is_recurring, True)
+
+        first_occurrence = unfolded[0]
+        self.assertEqual(first_occurrence.id, master_item.first_occurrence.id)
+        self.assertEqual(first_occurrence.start, master_item.first_occurrence.start)
+        self.assertEqual(first_occurrence.end, master_item.first_occurrence.end)
+
+        second_occurrence = unfolded[1]
+        self.assertEqual(second_occurrence.start, master_item.start + datetime.timedelta(days=1))
+        self.assertEqual(second_occurrence.end, master_item.end + datetime.timedelta(days=1))
+
+        third_occurrence = unfolded[2]
+        self.assertEqual(third_occurrence.start, master_item.start + datetime.timedelta(days=2))
+        self.assertEqual(third_occurrence.end, master_item.end + datetime.timedelta(days=2))
+
+        last_occurrence = unfolded[3]
+        self.assertEqual(last_occurrence.id, master_item.last_occurrence.id)
+        self.assertEqual(last_occurrence.start, master_item.last_occurrence.start)
+        self.assertEqual(last_occurrence.end, master_item.last_occurrence.end)
+
+    def test_change_occurrence(self):
+        # Test that we can make changes to individual occurrences and see the effect on the master item.
+        start = self.account.default_timezone.localize(EWSDateTime(2016, 1, 1, 8))
+        end = self.account.default_timezone.localize(EWSDateTime(2016, 1, 1, 10))
+        master_item = self.ITEM_CLASS(
+            folder=self.test_folder,
+            start=start,
+            end=end,
+            recurrence=Recurrence(pattern=DailyPattern(interval=1), start=start.date(), number=4),
+            categories=self.categories,
+        ).save()
+        master_item.refresh()
+
+        # Test occurrences as full calendar items, unfolded from the master
+        range_start, range_end = start, end + datetime.timedelta(days=3)
+        unfolded = [i for i in self.test_folder.view(start=range_start, end=range_end) if self.match_cat(i)]
+
+        # Change the start and end of the second occurrence
+        second_occurrence = unfolded[1]
+        second_occurrence.start += datetime.timedelta(hours=1)
+        second_occurrence.end += datetime.timedelta(hours=1)
+        second_occurrence.save()
+
+        # Test change on the master item
+        master_item.refresh()
+        self.assertEqual(len(master_item.modified_occurrences), 1)
+        modified_occurrence = master_item.modified_occurrences[0]
+        self.assertIsInstance(modified_occurrence, Occurrence)
+        self.assertEqual(modified_occurrence.id, second_occurrence.id)
+        self.assertEqual(modified_occurrence.start, second_occurrence.start)
+        self.assertEqual(modified_occurrence.end, second_occurrence.end)
+        self.assertEqual(modified_occurrence.original_start, second_occurrence.start - datetime.timedelta(hours=1))
+        self.assertEqual(master_item.deleted_occurrences, None)
+
+        # Test change on the unfolded item
+        unfolded = [i for i in self.test_folder.view(start=range_start, end=range_end) if self.match_cat(i)]
+        self.assertEqual(len(unfolded), 4)
+        self.assertEqual(unfolded[1].type, EXCEPTION)
+        self.assertEqual(unfolded[1].start, second_occurrence.start)
+        self.assertEqual(unfolded[1].end, second_occurrence.end)
+        self.assertEqual(unfolded[1].original_start, second_occurrence.start - datetime.timedelta(hours=1))
+
+    def test_delete_occurrence(self):
+        # Test that we can delete an occurrence and see the cange on the master item
+        start = self.account.default_timezone.localize(EWSDateTime(2016, 1, 1, 8))
+        end = self.account.default_timezone.localize(EWSDateTime(2016, 1, 1, 10))
+        master_item = self.ITEM_CLASS(
+            folder=self.test_folder,
+            start=start,
+            end=end,
+            recurrence=Recurrence(pattern=DailyPattern(interval=1), start=start.date(), number=4),
+            categories=self.categories,
+        ).save()
+        master_item.refresh()
+
+        # Test occurrences as full calendar items, unfolded from the master
+        range_start, range_end = start, end + datetime.timedelta(days=3)
+        unfolded = [i for i in self.test_folder.view(start=range_start, end=range_end) if self.match_cat(i)]
+
+        # Delete the third occurrence
+        third_occurrence = unfolded[2]
+        third_occurrence.delete()
+
+        # Test change on the master item
+        master_item.refresh()
+        self.assertEqual(master_item.modified_occurrences, None)
+        self.assertEqual(len(master_item.deleted_occurrences), 1)
+        deleted_occurrence = master_item.deleted_occurrences[0]
+        self.assertIsInstance(deleted_occurrence, DeletedOccurrence)
+        self.assertEqual(deleted_occurrence.start, third_occurrence.start)
+
+        # Test change on the unfolded items
+        unfolded = [i for i in self.test_folder.view(start=range_start, end=range_end) if self.match_cat(i)]
+        self.assertEqual(len(unfolded), 3)
