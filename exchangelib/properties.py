@@ -369,12 +369,7 @@ class ConversationId(ItemId):
     """MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/conversationid"""
     ELEMENT_NAME = 'ConversationId'
 
-    FIELDS = [
-        IdField('id', field_uri=ItemId.ID_ATTR, is_required=True),
-        # Sometimes required, see MSDN link
-        IdField('changekey', field_uri=ItemId.CHANGEKEY_ATTR),
-    ]
-
+    # ChangeKey attribute is sometimes required, see MSDN link
     __slots__ = tuple()
 
 
@@ -530,11 +525,10 @@ class DistinguishedFolderId(ItemId):
     """MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/distinguishedfolderid"""
     ELEMENT_NAME = 'DistinguishedFolderId'
 
-    FIELDS = [
-        IdField('id', field_uri=ItemId.ID_ATTR, is_required=True),
-        IdField('changekey', field_uri=ItemId.CHANGEKEY_ATTR),
+    LOCAL_FIELDS = [
         MailboxField('mailbox'),
     ]
+    FIELDS = ItemId.FIELDS + LOCAL_FIELDS
 
     __slots__ = ('mailbox',)
 
