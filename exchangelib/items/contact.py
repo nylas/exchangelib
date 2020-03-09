@@ -1,7 +1,8 @@
 import logging
 
 from ..fields import BooleanField, Base64Field, TextField, ChoiceField, URIField, DateTimeField, PhoneNumberField, \
-    EmailAddressesField, PhysicalAddressField, Choice, MemberListField, CharField, TextListField, EmailAddressField
+    EmailAddressesField, PhysicalAddressField, Choice, MemberListField, CharField, TextListField, EmailAddressField, \
+    IdElementField
 from ..properties import PersonaId, IdChangeKeyMixIn
 from ..version import EXCHANGE_2010, EXCHANGE_2013
 from .item import Item
@@ -87,6 +88,7 @@ class Persona(IdChangeKeyMixIn):
     ELEMENT_NAME = 'Persona'
     ID_ELEMENT_CLS = PersonaId
     LOCAL_FIELDS = [
+        IdElementField('_id', field_uri='persona:PersonaId', value_cls=ID_ELEMENT_CLS),
         CharField('file_as', field_uri='persona:FileAs'),
         CharField('display_name', field_uri='persona:DisplayName'),
         CharField('given_name', field_uri='persona:GivenName'),

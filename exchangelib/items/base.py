@@ -2,8 +2,8 @@ import logging
 
 from ..extended_properties import ExtendedProperty
 from ..fields import BooleanField, ExtendedPropertyField, BodyField, MailboxField, MailboxListField, EWSElementField, \
-    CharField
-from ..properties import InvalidField, IdChangeKeyMixIn, EWSElement, ReferenceItemId
+    CharField, IdElementField
+from ..properties import InvalidField, IdChangeKeyMixIn, EWSElement, ReferenceItemId, ItemId
 from ..version import EXCHANGE_2007_SP1
 
 log = logging.getLogger(__name__)
@@ -64,7 +64,13 @@ class RegisterMixIn(IdChangeKeyMixIn):
 
 class BaseItem(RegisterMixIn):
     """Base class for all other classes that implement EWS items"""
-    __slots__ = ('account', 'folder')
+    ID_ELEMENT_CLS = ItemId
+
+    FIELDS = [
+        IdElementField('_id', field_uri='item:ItemId', value_cls=ID_ELEMENT_CLS),
+    ]
+
+    __slots__ = tuple(f.name for f in FIELDS) + ('account', 'folder')
 
     def __init__(self, **kwargs):
         # 'account' is optional but allows calling 'send()' and 'delete()'

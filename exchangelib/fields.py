@@ -1328,3 +1328,10 @@ class RoutingTypeField(ChoiceField):
         kwargs['choices'] = {Choice('SMTP'), Choice('EX')}
         kwargs['default'] = 'SMTP'
         super().__init__(*args, **kwargs)
+
+
+class IdElementField(EWSElementField):
+    def __init__(self, *args, **kwargs):
+        kwargs['is_searchable'] = False
+        kwargs['is_read_only'] = True
+        super().__init__(*args, **kwargs)

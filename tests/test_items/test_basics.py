@@ -109,6 +109,10 @@ class BaseItemTest(EWSTest):
             insert_kwargs[f.name] = self.random_val(f)
         return insert_kwargs
 
+    def get_item_fields(self):
+        return [self.ITEM_CLASS.get_field_by_fieldname('id'), self.ITEM_CLASS.get_field_by_fieldname('changekey')] \
+               + [f for f in self.ITEM_CLASS.FIELDS if f.name != '_id']
+
     def get_random_update_kwargs(self, item, insert_kwargs):
         update_kwargs = {}
         now = UTC_NOW()
@@ -214,7 +218,7 @@ class CommonItemTest(BaseItemTest):
         self.assertIn(item.__class__.__name__, repr(item))
 
     def test_queryset_nonsearchable_fields(self):
-        for f in self.ITEM_CLASS.FIELDS:
+        for f in self.get_item_fields():
             with self.subTest(f=f):
                 if f.is_searchable or isinstance(f, IdField) or not f.supports_version(self.account.version):
                     continue
@@ -255,7 +259,7 @@ class CommonItemTest(BaseItemTest):
         # TODO: Test filtering on subfields of IndexedField
         item = self.get_test_item().save()
         common_qs = self.test_folder.filter(categories__contains=self.categories)
-        for f in self.ITEM_CLASS.FIELDS:
+        for f in self.get_item_fields():
             if not f.supports_version(self.account.version):
                 # Cannot be used with this EWS version
                 continue
@@ -403,7 +407,7 @@ class CommonItemTest(BaseItemTest):
             self.assertEqual(getattr(item, k), v, (k, getattr(item, k), v))
         # Test that whatever we have locally also matches whatever is in the DB
         fresh_item = list(self.account.fetch(ids=[item]))[0]
-        for f in item.FIELDS:
+        for f in self.ITEM_CLASS.FIELDS:
             with self.subTest(f=f):
                 old, new = getattr(item, f.name), getattr(fresh_item, f.name)
                 if f.is_read_only and old is None:
@@ -428,7 +432,7 @@ class CommonItemTest(BaseItemTest):
             self.assertEqual(getattr(item, k), v, (k, getattr(item, k), v))
         # Test that whatever we have locally also matches whatever is in the DB
         fresh_item = list(self.account.fetch(ids=[item]))[0]
-        for f in item.FIELDS:
+        for f in self.ITEM_CLASS.FIELDS:
             with self.subTest(f=f):
                 old, new = getattr(item, f.name), getattr(fresh_item, f.name)
                 if f.is_read_only and old is None:

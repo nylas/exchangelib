@@ -682,12 +682,12 @@ class GenericItemTest(CommonItemTest):
         def to_dict(item):
             dict_item = {}
             # fieldnames is everything except the ID so we'll use it to compare
-            for f in item.FIELDS:
+            for f in self.ITEM_CLASS.FIELDS:
                 # datetime_created and last_modified_time aren't copied, but instead are added to the new item after
                 # uploading. This means mime_content and size can also change. Items also get new IDs on upload. And
                 # meeting_count values are dependent on contents of current calendar. Form query strings contain the
                 # item ID and will also change.
-                if f.name in {'id', 'changekey', 'first_occurrence', 'last_occurrence', 'datetime_created',
+                if f.name in {'_id', 'first_occurrence', 'last_occurrence', 'datetime_created',
                               'last_modified_time', 'mime_content', 'size', 'conversation_id',
                               'adjacent_meeting_count', 'conflicting_meeting_count',
                               'web_client_read_form_query_string', 'web_client_edit_form_query_string'}:

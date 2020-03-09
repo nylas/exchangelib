@@ -1,8 +1,8 @@
 import logging
 
 from .fields import IntegerField, EnumField, EnumListField, DateField, DateTimeField, EWSElementField, \
-    MONTHS, WEEK_NUMBERS, WEEKDAYS
-from .properties import EWSElement, IdChangeKeyMixIn
+    IdElementField, MONTHS, WEEK_NUMBERS, WEEKDAYS
+from .properties import EWSElement, IdChangeKeyMixIn, ItemId
 
 log = logging.getLogger(__name__)
 
@@ -210,8 +210,10 @@ class NumberedPattern(Boundary):
 class Occurrence(IdChangeKeyMixIn):
     """MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/occurrence"""
     ELEMENT_NAME = 'Occurrence'
+    ID_ELEMENT_CLS = ItemId
 
-    LOCAL_FIELDS = [
+    FIELDS = [
+        IdElementField('_id', field_uri='ItemId', value_cls=ID_ELEMENT_CLS),
         # The modified start time of the item, as EWSDateTime
         DateTimeField('start', field_uri='Start'),
         # The modified end time of the item, as EWSDateTime
@@ -219,9 +221,8 @@ class Occurrence(IdChangeKeyMixIn):
         # The original start time of the item, as EWSDateTime
         DateTimeField('original_start', field_uri='OriginalStart'),
     ]
-    FIELDS = IdChangeKeyMixIn.FIELDS + LOCAL_FIELDS
 
-    __slots__ = tuple(f.name for f in LOCAL_FIELDS)
+    __slots__ = tuple(f.name for f in FIELDS)
 
 
 # Container elements:

@@ -1206,32 +1206,55 @@ class AlternatePublicFolderItemId(EWSElement):
 
 
 class IdChangeKeyMixIn(EWSElement):
-    """Base class for classes that have 'id' and 'changekey' fields which are actually attributes on ID element"""
-    ID_ELEMENT_CLS = ItemId
+    """Base class for classes that have a concept of 'id' and 'changekey' values. The values are actually stored on
+     a separate element but we add convenience methods to hide that fact."""
+    ID_ELEMENT_CLS = None
 
-    FIELDS = [
-        IdField('id', field_uri=ID_ELEMENT_CLS.ID_ATTR, is_read_only=True),
-        IdField('changekey', field_uri=ID_ELEMENT_CLS.CHANGEKEY_ATTR, is_read_only=True),
-    ]
+    __slots__ = tuple()
 
-    __slots__ = tuple(f.name for f in FIELDS)
+    def __init__(self, **kwargs):
+        _id = self.ID_ELEMENT_CLS(kwargs.pop('id', None), kwargs.pop('changekey', None))
+        if _id.id or _id.changekey:
+            kwargs['_id'] = _id
+        super().__init__(**kwargs)
+
+    @classmethod
+    def get_field_by_fieldname(cls, fieldname):
+        if fieldname in ('id', 'changekey'):
+            return cls.ID_ELEMENT_CLS.get_field_by_fieldname(fieldname=fieldname)
+        return super().get_field_by_fieldname(fieldname=fieldname)
+
+    @property
+    def id(self):
+        if self._id is None:
+            return None
+        return self._id.id
+
+    @id.setter
+    def id(self, value):
+        if self._id is None:
+            self._id = self.ID_ELEMENT_CLS()
+        self._id.id = value
+
+    @property
+    def changekey(self):
+        if self._id is None:
+            return None
+        return self._id.changekey
+
+    @changekey.setter
+    def changekey(self, value):
+        if self._id is None:
+            self._id = self.ID_ELEMENT_CLS()
+        self._id.changekey = value
 
     @classmethod
     def id_from_xml(cls, elem):
+        # This method must be reasonably fast
         id_elem = elem.find(cls.ID_ELEMENT_CLS.response_tag())
         if id_elem is None:
             return None, None
         return id_elem.get(cls.ID_ELEMENT_CLS.ID_ATTR), id_elem.get(cls.ID_ELEMENT_CLS.CHANGEKEY_ATTR)
-
-    @classmethod
-    def from_xml(cls, elem, account):
-        # The ID and changekey are actually in an 'ItemId' child element
-        item_id, changekey = cls.id_from_xml(elem)
-        kwargs = {
-            f.name: f.from_xml(elem=elem, account=account) for f in cls.FIELDS if f.name not in ('id', 'changekey')
-        }
-        cls._clear(elem)
-        return cls(id=item_id, changekey=changekey, **kwargs)
 
     def __eq__(self, other):
         if isinstance(other, tuple):

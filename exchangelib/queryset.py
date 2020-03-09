@@ -132,7 +132,7 @@ class QuerySet(SearchableMixIn):
         raise InvalidField("Unknown field path %r on folders %s" % (field_path, self.folder_collection.folders))
 
     @property
-    def _item_id_field(self):
+    def _id_field(self):
         return self._get_field_path('id')
 
     @property
@@ -350,7 +350,7 @@ class QuerySet(SearchableMixIn):
             # _query() will return an iterator of (id, changekey) tuples
             if self._changekey_field not in self.only_fields:
                 transform_func = id_only_func
-            elif self._item_id_field not in self.only_fields:
+            elif self._id_field not in self.only_fields:
                 transform_func = changekey_only_func
             else:
                 transform_func = id_and_changekey_func
@@ -544,7 +544,7 @@ class QuerySet(SearchableMixIn):
             # We allow calling get(id=..., changekey=...) to get a single item, but only if exactly these two
             # kwargs are present.
             account = self.folder_collection.account
-            item_id = self._item_id_field.field.clean(kwargs['id'], version=account.version)
+            item_id = self._id_field.field.clean(kwargs['id'], version=account.version)
             changekey = self._changekey_field.field.clean(kwargs.get('changekey'), version=account.version)
             items = list(account.fetch(ids=[(item_id, changekey)], only_fields=self.only_fields))
         else:

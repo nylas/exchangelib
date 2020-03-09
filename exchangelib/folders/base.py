@@ -5,7 +5,7 @@ from operator import attrgetter
 from ..errors import ErrorAccessDenied, ErrorFolderNotFound, ErrorCannotEmptyFolder, ErrorCannotDeleteObject, \
     ErrorDeleteDistinguishedFolder
 from ..fields import IntegerField, CharField, FieldPath, EffectiveRightsField, PermissionSetField, EWSElementField, \
-    Field
+    Field, IdElementField
 from ..items import CalendarItem, RegisterMixIn, Persona, ITEM_CLASSES, ITEM_TRAVERSAL_CHOICES, SHAPE_CHOICES, \
     ID_ONLY, DELETE_TYPE_CHOICES, HARD_DELETE, SHALLOW as SHALLOW_ITEMS
 from ..properties import Mailbox, FolderId, ParentFolderId, InvalidField, DistinguishedFolderId
@@ -40,7 +40,8 @@ class BaseFolder(RegisterMixIn, SearchableMixIn):
     LOCALIZED_NAMES = dict()  # A map of (str)locale: (tuple)localized_folder_names
     ITEM_MODEL_MAP = {cls.response_tag(): cls for cls in ITEM_CLASSES}
     ID_ELEMENT_CLS = FolderId
-    LOCAL_FIELDS = [
+    FIELDS = [
+        IdElementField('_id', field_uri='folder:FolderId', value_cls=ID_ELEMENT_CLS),
         EWSElementField('parent_folder_id', field_uri='folder:ParentFolderId', value_cls=ParentFolderId,
                         is_read_only=True),
         CharField('folder_class', field_uri='folder:FolderClass', is_required_after_save=True),
@@ -49,9 +50,7 @@ class BaseFolder(RegisterMixIn, SearchableMixIn):
         IntegerField('child_folder_count', field_uri='folder:ChildFolderCount', is_read_only=True),
         IntegerField('unread_count', field_uri='folder:UnreadCount', is_read_only=True),
     ]
-    FIELDS = RegisterMixIn.FIELDS + LOCAL_FIELDS
-
-    __slots__ = tuple(f.name for f in LOCAL_FIELDS) + ('is_distinguished',)
+    __slots__ = tuple(f.name for f in FIELDS) + ('is_distinguished',)
 
     # Used to register extended properties
     INSERT_AFTER_FIELD = 'child_folder_count'
@@ -466,13 +465,9 @@ class BaseFolder(RegisterMixIn, SearchableMixIn):
 
     @classmethod
     def _kwargs_from_elem(cls, elem, account):
-        folder_id, changekey = cls.id_from_xml(elem)
-        kwargs = dict(id=folder_id, changekey=changekey)
         # Check for 'DisplayName' element before collecting kwargs because because that clears the elements
         has_name_elem = elem.find(cls.get_field_by_fieldname('name').response_tag()) is not None
-        kwargs.update({
-            f.name: f.from_xml(elem=elem, account=account) for f in cls.FIELDS if f.name not in ('id', 'changekey')
-        })
+        kwargs = {f.name: f.from_xml(elem=elem, account=account) for f in cls.FIELDS}
         if has_name_elem and not kwargs['name']:
             # When we request the 'DisplayName' property, some folders may still be returned with an empty value.
             # Assign a default name to these folders.
