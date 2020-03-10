@@ -15,6 +15,7 @@ from exchangelib.fields import TextField, BodyField, FieldPath, CultureField, Id
 from exchangelib.indexed_properties import SingleFieldIndexedElement, MultiFieldIndexedElement
 from exchangelib.items import CalendarItem, Contact, Task, DistributionList, BaseItem
 from exchangelib.properties import Mailbox, Attendee
+from exchangelib.queryset import Q
 from exchangelib.util import value_to_xml_text
 
 from ..common import EWSTest, get_random_string, get_random_datetime_range, get_random_date, \
@@ -37,12 +38,12 @@ class BaseItemTest(EWSTest):
         self.test_folder = getattr(self.account, self.TEST_FOLDER)
         self.assertEqual(type(self.test_folder), self.FOLDER_CLASS)
         self.assertEqual(self.test_folder.DISTINGUISHED_FOLDER_ID, self.TEST_FOLDER)
-        self.test_folder.filter(categories__contains=self.categories).delete()
 
     def tearDown(self):
-        self.test_folder.filter(categories__contains=self.categories).delete()
-        # Delete all delivery receipts
-        self.test_folder.filter(subject__startswith='Delivered: Subject: ').delete()
+        # Delete all test items and delivery receipts
+        self.test_folder.filter(
+            Q(categories__contains=self.categories) | Q(subject__startswith='Delivered: Subject: ')
+        ).delete()
         super().tearDown()
 
     def get_random_insert_kwargs(self):
