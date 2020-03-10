@@ -136,7 +136,7 @@ class Item(BaseItem):
             if self.id != item_id:
                 raise ValueError("'id' mismatch in returned update response")
             # Don't check that changekeys are different. No-op saves will sometimes leave the changekey intact
-            self.changekey = changekey
+            self._id = self.ID_ELEMENT_CLS(item_id, changekey)
         else:
             if update_fields:
                 raise ValueError("'update_fields' is only valid for updates")
@@ -146,7 +146,7 @@ class Item(BaseItem):
                 # the attachment of this item temporarily and attach later.
                 tmp_attachments, self.attachments = self.attachments, []
             item = self._create(message_disposition=SAVE_ONLY, send_meeting_invitations=send_meeting_invitations)
-            self.id, self.changekey = item.id, item.changekey
+            self._id = self.ID_ELEMENT_CLS(item.id, item.changekey)
             for old_att, new_att in zip(self.attachments, item.attachments):
                 if old_att.attachment_id is not None:
                     raise ValueError("Old 'attachment_id' is not empty")
@@ -269,13 +269,13 @@ class Item(BaseItem):
         res = self.account.bulk_move(ids=[self], to_folder=to_folder)
         if not res:
             # Assume 'to_folder' is a public folder or a folder in a different mailbox
-            self.id, self.changekey = None, None
+            self._id = None
             return
         if len(res) != 1:
             raise ValueError('Expected result length 1, but got %s' % res)
         if isinstance(res[0], Exception):
             raise res[0]
-        self.id, self.changekey = res[0]
+        self._id = self.ID_ELEMENT_CLS(*res[0])
         self.folder = to_folder
 
     def move_to_trash(self, send_meeting_cancellations=SEND_TO_NONE, affected_task_occurrences=ALL_OCCURRENCIES,
@@ -283,7 +283,7 @@ class Item(BaseItem):
         # Delete and move to the trash folder.
         self._delete(delete_type=MOVE_TO_DELETED_ITEMS, send_meeting_cancellations=send_meeting_cancellations,
                      affected_task_occurrences=affected_task_occurrences, suppress_read_receipts=suppress_read_receipts)
-        self.id, self.changekey = None, None
+        self._id = None
         self.folder = self.account.trash
 
     def soft_delete(self, send_meeting_cancellations=SEND_TO_NONE, affected_task_occurrences=ALL_OCCURRENCIES,
@@ -291,7 +291,7 @@ class Item(BaseItem):
         # Delete and move to the dumpster, if it is enabled.
         self._delete(delete_type=SOFT_DELETE, send_meeting_cancellations=send_meeting_cancellations,
                      affected_task_occurrences=affected_task_occurrences, suppress_read_receipts=suppress_read_receipts)
-        self.id, self.changekey = None, None
+        self._id = None
         self.folder = self.account.recoverable_items_deletions
 
     def delete(self, send_meeting_cancellations=SEND_TO_NONE, affected_task_occurrences=ALL_OCCURRENCIES,
@@ -299,7 +299,7 @@ class Item(BaseItem):
         # Remove the item permanently. No copies are stored anywhere.
         self._delete(delete_type=HARD_DELETE, send_meeting_cancellations=send_meeting_cancellations,
                      affected_task_occurrences=affected_task_occurrences, suppress_read_receipts=suppress_read_receipts)
-        self.id, self.changekey, self.folder = None, None, None
+        self._id, self.folder = None, None
 
     def _delete(self, delete_type, send_meeting_cancellations, affected_task_occurrences, suppress_read_receipts):
         if not self.account:

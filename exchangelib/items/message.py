@@ -56,7 +56,7 @@ class Message(Item):
             if isinstance(res[0], Exception):
                 raise res[0]
             # The item will be deleted from the original folder
-            self.id, self.changekey = None, None
+            self._id = None
             self.folder = copy_to_folder
             return None
 

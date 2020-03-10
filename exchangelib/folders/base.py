@@ -366,7 +366,7 @@ class BaseFolder(RegisterMixIn, SearchableMixIn):
                 raise ValueError('Expected result length 1, but got %s' % res)
             if isinstance(res[0], Exception):
                 raise res[0]
-            self.id, self.changekey = res[0].id, res[0].changekey
+            self._id = self.ID_ELEMENT_CLS(res[0].id, res[0].changekey)
             self.root.add_folder(self)  # Add this folder to the cache
             return self
 
@@ -405,7 +405,7 @@ class BaseFolder(RegisterMixIn, SearchableMixIn):
         if isinstance(res[0], Exception):
             raise res[0]
         self.root.remove_folder(self)  # Remove the updated folder from the cache
-        self.id, self.changekey = None, None
+        self._id = None
 
     def empty(self, delete_type=HARD_DELETE, delete_sub_folders=False):
         if delete_type not in DELETE_TYPE_CHOICES:
