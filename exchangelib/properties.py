@@ -163,7 +163,10 @@ class EWSElement(metaclass=abc.ABCMeta):
         # Clears an XML element to reduce memory consumption
         elem.clear()
         # Don't attempt to clean up previous siblings. We may not have parsed them yet.
-        elem.getparent().remove(elem)
+        parent = elem.getparent()
+        if parent is None:
+            return
+        parent.remove(elem)
 
     @classmethod
     def from_xml(cls, elem, account):
@@ -1200,6 +1203,52 @@ class AlternatePublicFolderItemId(EWSElement):
         ChoiceField('format', field_uri='Format', is_required=True, is_attribute=True,
                     choices={Choice(c) for c in ID_FORMATS}),
         CharField('item_id', field_uri='ItemId', is_required=True, is_attribute=True),
+    ]
+
+    __slots__ = tuple(f.name for f in FIELDS)
+
+
+class FieldURI(EWSElement):
+    """MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/fielduri"""
+    ELEMENT_NAME = 'FieldURI'
+    FIELDS = [
+        CharField('field_uri', field_uri='FieldURI', is_attribute=True, is_required=True),
+    ]
+
+    __slots__ = tuple(f.name for f in FIELDS)
+
+
+class IndexedFieldURI(EWSElement):
+    """MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/indexedfielduri"""
+    ELEMENT_NAME = 'IndexedFieldURI'
+    FIELDS = [
+        CharField('field_uri', field_uri='FieldURI', is_attribute=True, is_required=True),
+        CharField('field_index', field_uri='FieldIndex', is_attribute=True, is_required=True),
+    ]
+
+    __slots__ = tuple(f.name for f in FIELDS)
+
+
+class ExtendedFieldURI(EWSElement):
+    """MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/extendedfielduri"""
+    ELEMENT_NAME = 'ExtendedFieldURI'
+    FIELDS = [
+        CharField('distinguished_property_set_id', field_uri='DistinguishedPropertySetId', is_attribute=True),
+        CharField('property_set_id', field_uri='PropertySetId', is_attribute=True),
+        CharField('property_tag', field_uri='PropertyTag', is_attribute=True),
+        CharField('property_name', field_uri='PropertyName', is_attribute=True),
+        CharField('property_id', field_uri='PropertyId', is_attribute=True),
+        CharField('property_type', field_uri='PropertyType', is_attribute=True),
+    ]
+
+    __slots__ = tuple(f.name for f in FIELDS)
+
+
+class ExceptionFieldURI(EWSElement):
+    """MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/exceptionfielduri"""
+    ELEMENT_NAME = 'ExceptionFieldURI'
+    FIELDS = [
+        CharField('field_uri', field_uri='FieldURI', is_attribute=True, is_required=True),
     ]
 
     __slots__ = tuple(f.name for f in FIELDS)

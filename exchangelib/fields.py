@@ -361,9 +361,10 @@ class FieldURIField(Field):
         return set_xml_value(field_elem, value, version=version)
 
     def field_uri_xml(self):
+        from .properties import FieldURI
         if not self.field_uri:
             raise ValueError("'field_uri' value is missing")
-        return create_element('t:FieldURI', attrs=dict(FieldURI=self.field_uri))
+        return FieldURI(field_uri=self.field_uri).to_xml(version=None)
 
     def request_tag(self):
         if not self.field_uri_postfix:
@@ -1084,13 +1085,8 @@ class SubField(Field):
 
     @staticmethod
     def field_uri_xml(field_uri, label):
-        return create_element(
-            't:IndexedFieldURI',
-            attrs=OrderedDict([
-                ('FieldURI', field_uri),
-                ('FieldIndex', label),
-            ])
-        )
+        from .properties import IndexedFieldURI
+        return IndexedFieldURI(field_uri=field_uri, field_index=label).to_xml(version=None)
 
     def __hash__(self):
         return hash(self.name)
@@ -1126,13 +1122,8 @@ class NamedSubField(SubField):
         return set_xml_value(field_elem, value, version=version)
 
     def field_uri_xml(self, field_uri, label):
-        return create_element(
-            't:IndexedFieldURI',
-            attrs=OrderedDict([
-                ('FieldURI', '%s:%s' % (field_uri, self.field_uri)),
-                ('FieldIndex', label),
-            ])
-        )
+        from .properties import IndexedFieldURI
+        return IndexedFieldURI(field_uri='%s:%s' % (field_uri, self.field_uri), field_index=label).to_xml(version=None)
 
     def request_tag(self):
         return 't:%s' % self.field_uri
@@ -1219,20 +1210,16 @@ class ExtendedPropertyField(Field):
         return value
 
     def field_uri_xml(self):
-        elem = create_element('t:ExtendedFieldURI')
+        from .properties import ExtendedFieldURI
         cls = self.value_cls
-        if cls.distinguished_property_set_id:
-            elem.set('DistinguishedPropertySetId', cls.distinguished_property_set_id)
-        if cls.property_set_id:
-            elem.set('PropertySetId', cls.property_set_id)
-        if cls.property_tag:
-            elem.set('PropertyTag', cls.property_tag_as_hex())
-        if cls.property_name:
-            elem.set('PropertyName', cls.property_name)
-        if cls.property_id:
-            elem.set('PropertyId', value_to_xml_text(cls.property_id))
-        elem.set('PropertyType', cls.property_type)
-        return elem
+        return ExtendedFieldURI(
+            distinguished_property_set_id=cls.distinguished_property_set_id,
+            property_set_id=cls.property_set_id.lower() if cls.property_set_id else None,
+            property_tag=cls.property_tag_as_hex(),
+            property_name=cls.property_name,
+            property_id=value_to_xml_text(cls.property_id) if cls.property_id else None,
+            property_type=cls.property_type,
+        ).to_xml(version=None)
 
     def from_xml(self, elem, account):
         extended_properties = elem.findall(self.value_cls.response_tag())

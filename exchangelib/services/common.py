@@ -15,6 +15,7 @@ from ..errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired,
     ErrorCannotDeleteTaskOccurrence, ErrorMimeContentConversionFailed, ErrorRecurrenceHasNoOccurrence, \
     ErrorNoPublicFolderReplicaAvailable, MalformedResponseError, ErrorExceededConnectionCount, \
     SessionPoolMinSizeReached, ErrorIncorrectSchemaVersion, ErrorInvalidRequest
+from ..properties import FieldURI, IndexedFieldURI, ExtendedFieldURI, ExceptionFieldURI
 from ..transport import wrap, extra_headers
 from ..util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, \
     xml_to_str, set_xml_value, SOAPNS, TNS, MNS, ENS, ParseError
@@ -339,17 +340,18 @@ class EWSService(metaclass=abc.ABCMeta):
         except self.ERRORS_TO_CATCH_IN_RESPONSE as e:
             return e
 
-    @classmethod
-    def _get_exception(cls, code, text, msg_xml):
+    @staticmethod
+    def _get_exception(code, text, msg_xml):
         if not code:
             return TransportError('Empty ResponseCode in ResponseMessage (MessageText: %s, MessageXml: %s)' % (
                 text, msg_xml))
         if msg_xml is not None:
             # If this is an ErrorInvalidPropertyRequest error, the xml may contain a specific FieldURI
-            for tag_name in ('FieldURI', 'IndexedFieldURI', 'ExtendedFieldURI', 'ExceptionFieldURI'):
-                field_uri_elem = msg_xml.find('{%s}%s' % (TNS, tag_name))
-                if field_uri_elem is not None:
-                    text += ' (field: %s)' % xml_to_str(field_uri_elem)
+            for elem_cls in (FieldURI, IndexedFieldURI, ExtendedFieldURI, ExceptionFieldURI):
+                elem = msg_xml.find(elem_cls.response_tag())
+                if elem is not None:
+                    field_uri = elem_cls.from_xml(elem, account=None)
+                    text += ' (field: %s)' % field_uri
             # If this is an ErrorInternalServerError error, the xml may contain a more specific error code
             inner_code, inner_text = None, None
             for value_elem in msg_xml.findall('{%s}Value' % TNS):

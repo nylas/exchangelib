@@ -197,6 +197,7 @@ class ExtendedProperty(EWSElement):
         # Returns whether an 'ExtendedProperty' element matches the definition for this class. Extended property fields
         # do not have a name, so we must match on the cls.property_* attributes to match a field in the request with a
         # field in the response.
+        # TODO: Rewrite to take advantage of exchangelib.properties.ExtendedFieldURI
         extended_field_uri = elem.find('{%s}ExtendedFieldURI' % TNS)
         cls_props = cls.properties_map()
         elem_props = {k: extended_field_uri.get(k) for k in cls_props.keys()}
