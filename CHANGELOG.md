@@ -10,6 +10,12 @@ HEAD
     instances for the `start` and `end` values. Similarly, all-day calendar items fetched from
     the server now return `start` and `end` values as `EWSDate` instances. In this case, start
     and end values are inclusive; a one-day event starts and ends on the same `EWSDate` value.
+-   Add support for `RecurringMasterItemId` and `OccurrenceItemId` elements that allow to request
+    the master recurrence from a `CalendarItem` occurrence, and to request a specific occurrence
+    from a `CalendarItem` master recurrence. `CalendarItem.master_recurrence()` and 
+    `CalendarItem.occurrence(some_occurrence_index)` methods were added to aid this traversal.
+    `some_occurrence_index` in the last method specifies which item in the list of occurrences to
+    target; `CalendarItem.occurrence(3)` gets the third occurrence in the recurrence.
 
 
 3.1.1

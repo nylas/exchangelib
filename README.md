@@ -1061,7 +1061,7 @@ from exchangelib.recurrence import Recurrence, WeeklyPattern
 a = Account(...)
 start = a.default_timezone.localize(EWSDateTime(2017, 9, 1, 11))
 end = start + timedelta(hours=2)
-item = CalendarItem(
+master_recurrence = CalendarItem(
     folder=a.calendar,
     start=start,
     end=end,
@@ -1104,6 +1104,20 @@ for occurrence in a.calendar.view(start=start, end=start + timedelta(days=4*3*7)
         occurrence.save()
     else:
         occurrence.delete()
+
+# If you want to access a specific occurrence any you oly have the master recurrence:
+third_occurrence = master_recurrence.occurrence(index=3)
+# Get all fields on this occurrence
+third_occurrence.refresh()
+# Change a field on the occurrence
+third_occurrence.start += timedelta(hours=3)
+# Delete occurrence
+third_occurrence.save(update_fields=['start'])
+
+# Similarly, you can reach the master recurrence from the occurrence
+master = third_occurrence.master_recurrence()
+master.subject = 'An update'
+master.save(update_fields=['subject'])
 ```
 
 ## Message timestamp fields

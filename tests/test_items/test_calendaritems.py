@@ -1,6 +1,6 @@
 import datetime
 
-from exchangelib.errors import ErrorInvalidOperation
+from exchangelib.errors import ErrorInvalidOperation, ErrorItemNotFound
 from exchangelib.ewsdatetime import EWSDateTime, UTC
 from exchangelib.folders import Calendar
 from exchangelib.items import CalendarItem
@@ -301,3 +301,98 @@ class CalendarTest(CommonItemTest):
         # Test change on the unfolded items
         unfolded = [i for i in self.test_folder.view(start=range_start, end=range_end) if self.match_cat(i)]
         self.assertEqual(len(unfolded), 3)
+
+    def test_change_occurrence_via_index(self):
+        # Test updating occurrences via occurrence index without knowing the ID of the occurrence.
+        start = self.account.default_timezone.localize(EWSDateTime(2016, 1, 1, 8))
+        end = self.account.default_timezone.localize(EWSDateTime(2016, 1, 1, 10))
+        master_item = self.ITEM_CLASS(
+            folder=self.test_folder,
+            start=start,
+            end=end,
+            subject=get_random_string(16),
+            recurrence=Recurrence(pattern=DailyPattern(interval=1), start=start.date(), number=4),
+            categories=self.categories,
+        ).save()
+
+        # Change the start and end of the second occurrence
+        second_occurrence = master_item.occurrence(index=2)
+        second_occurrence.start = start + datetime.timedelta(days=1, hours=1)
+        second_occurrence.end = end + datetime.timedelta(days=1, hours=1)
+        second_occurrence.save(update_fields=['start', 'end'])  # Test that UpdateItem works with only a few fields
+
+        second_occurrence = master_item.occurrence(index=2)
+        second_occurrence.refresh()
+        self.assertEqual(second_occurrence.subject, master_item.subject)
+        second_occurrence.start += datetime.timedelta(hours=1)
+        second_occurrence.end += datetime.timedelta(hours=1)
+        second_occurrence.save(update_fields=['start', 'end'])  # Test that UpdateItem works after refresh
+
+        # Test change on the master item
+        master_item.refresh()
+        self.assertEqual(len(master_item.modified_occurrences), 1)
+        modified_occurrence = master_item.modified_occurrences[0]
+        self.assertIsInstance(modified_occurrence, Occurrence)
+        self.assertEqual(modified_occurrence.id, second_occurrence.id)
+        self.assertEqual(modified_occurrence.start, second_occurrence.start)
+        self.assertEqual(modified_occurrence.end, second_occurrence.end)
+        self.assertEqual(modified_occurrence.original_start, second_occurrence.start - datetime.timedelta(hours=2))
+        self.assertEqual(master_item.deleted_occurrences, None)
+
+    def test_delete_occurrence_via_index(self):
+        # Test deleting occurrences via occurrence index without knowing the ID of the occurrence.
+        start = self.account.default_timezone.localize(EWSDateTime(2016, 1, 1, 8))
+        end = self.account.default_timezone.localize(EWSDateTime(2016, 1, 1, 10))
+        master_item = self.ITEM_CLASS(
+            folder=self.test_folder,
+            start=start,
+            end=end,
+            subject=get_random_string(16),
+            recurrence=Recurrence(pattern=DailyPattern(interval=1), start=start.date(), number=4),
+            categories=self.categories,
+        ).save()
+
+        # Delete the third occurrence
+        third_occurrence = master_item.occurrence(index=3)
+        third_occurrence.refresh()  # Test that GetItem works
+
+        third_occurrence = master_item.occurrence(index=3)
+        third_occurrence.delete()  # Test that DeleteItem works
+
+        # Test change on the master item
+        master_item.refresh()
+        self.assertEqual(master_item.modified_occurrences, None)
+        self.assertEqual(len(master_item.deleted_occurrences), 1)
+        deleted_occurrence = master_item.deleted_occurrences[0]
+        self.assertIsInstance(deleted_occurrence, DeletedOccurrence)
+        self.assertEqual(deleted_occurrence.start, start + datetime.timedelta(days=2))
+
+    def test_get_master_recurrence(self):
+        # Test getting the master recurrence via an occurrence
+        start = self.account.default_timezone.localize(EWSDateTime(2016, 1, 1, 8))
+        end = self.account.default_timezone.localize(EWSDateTime(2016, 1, 1, 10))
+        master_item = self.ITEM_CLASS(
+            folder=self.test_folder,
+            start=start,
+            end=end,
+            subject=get_random_string(16),
+            recurrence=Recurrence(pattern=DailyPattern(interval=1), start=start.date(), number=4),
+            categories=self.categories,
+        ).save()
+
+        # Get the master from an occurrence
+        range_start, range_end = start, end + datetime.timedelta(days=3)
+        unfolded = [i for i in self.test_folder.view(start=range_start, end=range_end) if self.match_cat(i)]
+        third_occurrence = unfolded[2]
+        master_from_occurrence = third_occurrence.recurring_master()
+
+        master_from_occurrence.refresh()  # Test that GetItem works
+        self.assertEqual(master_from_occurrence.subject, master_item.subject)
+
+        master_from_occurrence = third_occurrence.recurring_master()
+        master_from_occurrence.subject = get_random_string(16)
+        master_from_occurrence.save(update_fields=['subject'])  # Test that UpdateItem works
+        master_from_occurrence.delete()  # Test that DeleteItem works
+
+        with self.assertRaises(ErrorItemNotFound):
+            master_item.delete()  # Item is gone from the server, so this should fail

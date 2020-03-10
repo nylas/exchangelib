@@ -3,7 +3,7 @@ import logging
 from ..fields import BooleanField, IntegerField, TextField, CharListField, ChoiceField, URIField, BodyField, \
     DateTimeField, MessageHeaderField, AttachmentField, Choice, EWSElementField, EffectiveRightsField, CultureField, \
     CharField, MimeContentField
-from ..properties import ConversationId, ParentFolderId, ReferenceItemId
+from ..properties import ConversationId, ParentFolderId, ReferenceItemId, OccurrenceItemId, RecurringMasterItemId
 from ..util import is_iterable
 from ..version import EXCHANGE_2010, EXCHANGE_2013
 from .base import BaseItem, SAVE_ONLY, SEND_ONLY, SEND_AND_SAVE_COPY
@@ -133,7 +133,9 @@ class Item(BaseItem):
                 conflict_resolution=conflict_resolution,
                 send_meeting_invitations=send_meeting_invitations
             )
-            if self.id != item_id:
+            if self.id != item_id and not isinstance(self._id, (OccurrenceItemId, RecurringMasterItemId)):
+                # When we update an item with an OccurrenceItemId as ID, EWS returns the ID of the occurrence, so
+                # the ID of this item changes.
                 raise ValueError("'id' mismatch in returned update response")
             # Don't check that changekeys are different. No-op saves will sometimes leave the changekey intact
             self._id = self.ID_ELEMENT_CLS(item_id, changekey)
@@ -237,8 +239,10 @@ class Item(BaseItem):
         if isinstance(res[0], Exception):
             raise res[0]
         fresh_item = res[0]
-        if self.id != fresh_item.id:
-            raise ValueError('Unexpected ID of fresh item')
+        if self.id != fresh_item.id and not isinstance(self._id, (OccurrenceItemId, RecurringMasterItemId)):
+            # When we refresh an item with an OccurrenceItemId as ID, EWS returns the ID of the occurrence, so
+            # the ID of this item changes.
+            raise ValueError("'id' mismatch in returned update response")
         for f in self.FIELDS:
             setattr(self, f.name, getattr(fresh_item, f.name))
         # 'parent_item' should point to 'self', not 'fresh_item'. That way, 'fresh_item' can be garbage collected.

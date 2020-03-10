@@ -6,7 +6,7 @@ from ..fields import BooleanField, IntegerField, TextField, ChoiceField, URIFiel
     MessageHeaderField, AttachmentField, RecurrenceField, MailboxField, AttendeesField, Choice, OccurrenceField, \
     OccurrenceListField, TimeZoneField, CharField, EnumAsIntField, FreeBusyStatusField, ReferenceItemIdField, \
     AssociatedCalendarItemIdField, DateOrDateTimeField
-from ..properties import Attendee, ReferenceItemId, AssociatedCalendarItemId
+from ..properties import Attendee, ReferenceItemId, AssociatedCalendarItemId, OccurrenceItemId, RecurringMasterItemId
 from ..recurrence import FirstOccurrence, LastOccurrence, Occurrence, DeletedOccurrence
 from ..util import set_xml_value
 from ..version import EXCHANGE_2010, EXCHANGE_2013
@@ -119,6 +119,30 @@ class CalendarItem(Item, AcceptDeclineMixIn):
     FIELDS = Item.FIELDS + LOCAL_FIELDS
 
     __slots__ = tuple(f.name for f in LOCAL_FIELDS)
+
+    def occurrence(self, index):
+        """Return a new CalendarItem instance with an ID pointing to the n'th occurrence in the recurrence. The index
+        is 1-based. No other field values are fetched from the server.
+
+        Only call this method on a recurring master.
+        """
+        return self.__class__(
+            account=self.account,
+            folder=self.folder,
+            _id=OccurrenceItemId(id=self.id, changekey=self.changekey, instance_index=index),
+        )
+
+    def recurring_master(self):
+        """Return a new CalendarItem instance with an ID pointing to the recurring master item of this occurrence. No
+        other field values are fetched from the server.
+
+        Only call this method on an occurrence of a recurring master.
+        """
+        return self.__class__(
+            account=self.account,
+            folder=self.folder,
+            _id=RecurringMasterItemId(id=self.id, changekey=self.changekey),
+        )
 
     @classmethod
     def timezone_fields(cls):

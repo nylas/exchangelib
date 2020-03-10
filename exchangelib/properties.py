@@ -410,6 +410,35 @@ class FolderId(ItemId):
     __slots__ = tuple()
 
 
+class RecurringMasterItemId(ItemId):
+    """MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/recurringmasteritemid"""
+    ELEMENT_NAME = 'RecurringMasterItemId'
+
+    ID_ATTR = 'OccurrenceId'
+    CHANGEKEY_ATTR = 'ChangeKey'
+    FIELDS = [
+        IdField('id', field_uri=ID_ATTR, is_required=True),
+        IdField('changekey', field_uri=CHANGEKEY_ATTR, is_required=False),
+    ]
+
+    __slots__ = tuple()
+
+
+class OccurrenceItemId(ItemId):
+    """MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/occurrenceitemid"""
+    ELEMENT_NAME = 'OccurrenceItemId'
+
+    ID_ATTR = 'RecurringMasterId'
+    CHANGEKEY_ATTR = 'ChangeKey'
+    FIELDS = [
+        IdField('id', field_uri=ID_ATTR, is_required=True),
+        IdField('changekey', field_uri=CHANGEKEY_ATTR, is_required=False),
+        IntegerField('instance_index', field_uri='InstanceIndex', is_attribute=True, is_required=True, min=1),
+    ]
+
+    __slots__ = tuple() + ('instance_index',)
+
+
 class Mailbox(EWSElement):
     """MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/mailbox"""
     ELEMENT_NAME = 'Mailbox'
