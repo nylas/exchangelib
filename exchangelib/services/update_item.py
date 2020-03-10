@@ -4,7 +4,7 @@ import logging
 from ..ewsdatetime import EWSDate
 from ..util import create_element, set_xml_value, MNS
 from ..version import EXCHANGE_2010, EXCHANGE_2013_SP1
-from .common import EWSAccountService, EWSPooledMixIn
+from .common import EWSAccountService, EWSPooledMixIn, to_item_id
 
 log = logging.getLogger(__name__)
 
@@ -163,12 +163,13 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
                 ])
             )
         itemchanges = create_element('m:ItemChanges')
+        version = self.account.version
         for item, fieldnames in items:
             if not fieldnames:
                 raise ValueError('"fieldnames" must not be empty')
             itemchange = create_element('t:ItemChange')
-            log.debug('Updating item %s values %s', item.id, fieldnames)
-            set_xml_value(itemchange, ItemId(item.id, item.changekey), version=self.account.version)
+            log.debug('Updating item %s fields %s', item, fieldnames)
+            set_xml_value(itemchange, to_item_id(item, ItemId, version=version), version=version)
             updates = create_element('t:Updates')
             for elem in self._get_item_update_elems(item=item, fieldnames=fieldnames):
                 updates.append(elem)

@@ -20,8 +20,9 @@ class GetPersona(EWSService):
 
     def get_payload(self, persona):
         from ..properties import PersonaId
+        version = self.protocol.version
         payload = create_element('m:%s' % self.SERVICE_NAME)
-        set_xml_value(payload, to_item_id(persona, PersonaId), version=self.protocol.version)
+        set_xml_value(payload, to_item_id(persona, PersonaId, version=version), version=version)
         return payload
 
     @classmethod

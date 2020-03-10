@@ -518,11 +518,16 @@ class EWSPooledMixIn(EWSService):
                 yield elem
 
 
-def to_item_id(item, item_cls):
+def to_item_id(item, item_cls, version):
     # Coerce a tuple, dict or object to an 'item_cls' instance. Used to create [Parent][Item|Folder]Id instances from a
     # variety of input.
     if isinstance(item, item_cls):
+        # Allow any subclass of item_cls, e.g. OccurrenceItemId when ItemId is passed
         return item
+    from ..folders import BaseFolder
+    from ..items import BaseItem
+    if isinstance(item, (BaseFolder, BaseItem)):
+        return item.to_id_xml(version=version)
     if isinstance(item, (tuple, list)):
         return item_cls(*item)
     if isinstance(item, dict):
@@ -542,12 +547,12 @@ def create_shape_element(tag, shape, additional_fields, version):
 
 
 def create_folder_ids_element(tag, folders, version):
-    from ..folders import BaseFolder, FolderId, DistinguishedFolderId
+    from ..folders import FolderId, DistinguishedFolderId
     folder_ids = create_element(tag)
     for folder in folders:
         log.debug('Collecting folder %s', folder)
-        if not isinstance(folder, (BaseFolder, FolderId, DistinguishedFolderId)):
-            folder = to_item_id(folder, FolderId)
+        if not isinstance(folder, DistinguishedFolderId):
+            folder = to_item_id(folder, FolderId, version=version)
         set_xml_value(folder_ids, folder, version=version)
     if not len(folder_ids):
         raise ValueError('"folders" must not be empty')
@@ -559,7 +564,7 @@ def create_item_ids_element(items, version):
     item_ids = create_element('m:ItemIds')
     for item in items:
         log.debug('Collecting item %s', item)
-        set_xml_value(item_ids, to_item_id(item, ItemId), version=version)
+        set_xml_value(item_ids, to_item_id(item, ItemId, version=version), version=version)
     if not len(item_ids):
         raise ValueError('"items" must not be empty')
     return item_ids

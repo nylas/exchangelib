@@ -1305,6 +1305,9 @@ class IdChangeKeyMixIn(EWSElement):
             return None, None
         return id_elem.get(cls.ID_ELEMENT_CLS.ID_ATTR), id_elem.get(cls.ID_ELEMENT_CLS.CHANGEKEY_ATTR)
 
+    def to_id_xml(self, version):
+        raise NotImplementedError()
+
     def __eq__(self, other):
         if isinstance(other, tuple):
             return hash((self.id, self.changekey)) == hash(other)

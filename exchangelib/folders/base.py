@@ -488,6 +488,10 @@ class BaseFolder(RegisterMixIn, SearchableMixIn):
             return FolderId(id=self.id, changekey=self.changekey).to_xml(version=version)
         return super().to_xml(version=version)
 
+    def to_id_xml(self, version):
+        # Folder(name='Foo') is a perfectly valid ID to e.g. create a folder
+        return self.to_xml(version=version)
+
     @classmethod
     def resolve(cls, account, folder):
         # Resolve a single folder

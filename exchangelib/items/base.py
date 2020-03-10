@@ -99,6 +99,9 @@ class BaseItem(RegisterMixIn):
         item.account = account
         return item
 
+    def to_id_xml(self, version):
+        return self._id.to_xml(version=version)
+
 
 class BaseReplyItem(EWSElement):
     """Base class for reply/forward elements that share the same fields"""

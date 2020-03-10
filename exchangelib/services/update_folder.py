@@ -66,12 +66,13 @@ class UpdateFolder(EWSAccountService):
         from ..folders import BaseFolder, FolderId, DistinguishedFolderId
         updatefolder = create_element('m:%s' % self.SERVICE_NAME)
         folderchanges = create_element('m:FolderChanges')
+        version = self.account.version
         for folder, fieldnames in folders:
-            log.debug('Updating folder %s', folder)
+            log.debug('Updating folder %s fields %s', folder, fieldnames)
             folderchange = create_element('t:FolderChange')
             if not isinstance(folder, (BaseFolder, FolderId, DistinguishedFolderId)):
-                folder = to_item_id(folder, FolderId)
-            set_xml_value(folderchange, folder, version=self.account.version)
+                folder = to_item_id(folder, FolderId, version=version)
+            set_xml_value(folderchange, folder, version=version)
             updates = create_element('t:Updates')
             for elem in self._get_folder_update_elems(folder=folder, fieldnames=fieldnames):
                 updates.append(elem)
