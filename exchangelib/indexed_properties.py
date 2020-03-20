@@ -28,10 +28,9 @@ class SingleFieldIndexedElement(IndexedElement):
 class EmailAddress(SingleFieldIndexedElement):
     """MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/entry-emailaddress"""
     ELEMENT_NAME = 'Entry'
+    LABEL_CHOICES = ('EmailAddress1', 'EmailAddress2', 'EmailAddress3')
     FIELDS = [
-        LabelField('label', field_uri='Key', choices={
-            Choice('EmailAddress1'), Choice('EmailAddress2'), Choice('EmailAddress3')
-        }, default='EmailAddress1'),
+        LabelField('label', field_uri='Key', choices={Choice(c) for c in LABEL_CHOICES}, default=LABEL_CHOICES[0]),
         EmailSubField('email'),
     ]
 

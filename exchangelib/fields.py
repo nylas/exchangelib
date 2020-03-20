@@ -1162,6 +1162,20 @@ class EmailAddressesField(IndexedField):
     def field_uri_xml(self):
         raise NotImplementedError()
 
+    def clean(self, value, version=None):
+        if value is not None:
+            default_labels = self.value_cls.LABEL_CHOICES
+            if len(value) > len(default_labels):
+                raise ValueError('This field can handle at most %s values (value: %r)' % (len(default_labels), value))
+            tmp = []
+            for s, default_label in zip(value, default_labels):
+                if not isinstance(s, str):
+                    tmp.append(s)
+                    continue
+                tmp.append(self.value_cls(email=s, label=default_label))
+            value = tmp
+        return super().clean(value, version=version)
+
 
 class PhoneNumberField(IndexedField):
     is_list = True
