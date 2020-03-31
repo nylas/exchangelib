@@ -12,27 +12,28 @@ log = logging.getLogger(__name__)
 
 
 class Configuration:
-    """
-    Assembles a connection protocol when autodiscover is not used.
+    """Contains information needed to create an authenticated connection to an EWS endpoint.
 
-    If the server is not configured with autodiscover, the following should be sufficient:
+    The 'credentials' argument contains the credentials needed to authenticate with the server. Multiple credentials
+    implementations are available in 'exchangelib.credentials'.
 
-        config = Configuration(server='example.com', credentials=Credentials('MYWINDOMAIN\\myusername', 'topsecret'))
-        account = Account(primary_smtp_address='john@example.com', config=config)
+    config = Configuration(credentials=Credentials('john@example.com', 'MY_SECRET'), ...)
 
-    You can also set the EWS service endpoint directly:
+    The 'server' and 'service_endpoint' arguments are mutually exclusive. The former must contain only a domain name,
+    the latter a full URL:
 
-        config = Configuration(service_endpoint='https://mail.example.com/EWS/Exchange.asmx', credentials=...)
+        config = Configuration(server='example.com', ...)
+        config = Configuration(service_endpoint='https://mail.example.com/EWS/Exchange.asmx', ...)
 
-    If you know which authentication type the server uses, you add that as a hint:
+    If you know which authentication type the server uses, you add that as a hint in 'auth_type'. Likewise, you can
+    add the server version as a hint. This allows to skip the auth type and version guessing routines:
 
-        config = Configuration(service_endpoint='https://example.com/EWS/Exchange.asmx', auth_type=NTLM, credentials=..)
+        config = Configuration(auth_type=NTLM, ...)
+        config = Configuration(version=Version(build=Build(15, 1, 2, 3)), ...)
 
-    If you want to use autodiscover, don't use a Configuration object. Instead, set up an account like this:
+    Finally, you can use 'retry_policy' to define a custom retry policy for handling server connection failures: 
 
-        credentials = Credentials(username='MYWINDOMAIN\\myusername', password='topsecret')
-        account = Account(primary_smtp_address='john@example.com', credentials=credentials, autodiscover=True)
-
+        config = Configuration(retry_policy=FaultTolerance(max_wait=3600), ...)
     """
     def __init__(self, credentials=None, server=None, service_endpoint=None, auth_type=None, version=None,
                  retry_policy=None):
