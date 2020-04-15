@@ -2,7 +2,7 @@ import logging
 
 from ..fields import BooleanField, Base64Field, TextField, MailboxField, MailboxListField, CharField
 from ..properties import ReferenceItemId
-from ..version import EXCHANGE_2010
+from ..version import EXCHANGE_2013
 from .base import BaseReplyItem
 from .item import Item, AUTO_RESOLVE, SEND_TO_NONE, SEND_ONLY, SEND_AND_SAVE_COPY
 
@@ -69,9 +69,9 @@ class Message(Item):
             return self.send_and_save(conflict_resolution=conflict_resolution,
                                       send_meeting_invitations=send_meeting_invitations)
 
-        if self.account.version.build < EXCHANGE_2010 and self.attachments:
-            # Exchange 2007 can't send attachments immediately. You need to first save, then attach, then send.
-            # This is done in send_and_save(). send() will delete the item again.
+        if self.account.version.build < EXCHANGE_2013 and self.attachments:
+            # At least some versions prior to Exchange 2013 can't send attachments immediately. You need to first save,
+            # then attach, then send. This is done in send_and_save(). send() will delete the item again.
             self.send_and_save(conflict_resolution=conflict_resolution,
                                send_meeting_invitations=send_meeting_invitations)
             return None
@@ -92,9 +92,9 @@ class Message(Item):
                 send_meeting_invitations=send_meeting_invitations
             )
         else:
-            if self.account.version.build < EXCHANGE_2010 and self.attachments:
-                # Exchange 2007 can't send-and-save attachments immediately. You need to first save, then attach, then
-                # send. This is done in save().
+            if self.account.version.build < EXCHANGE_2013 and self.attachments:
+                # At least some versions prior to Exchange 2013 can't send-and-save attachments immediately. You need
+                # to first save, then attach, then send. This is done in save().
                 self.save(update_fields=update_fields, conflict_resolution=conflict_resolution,
                           send_meeting_invitations=send_meeting_invitations)
                 self.send(save_copy=False, conflict_resolution=conflict_resolution,

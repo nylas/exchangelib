@@ -143,9 +143,9 @@ class Item(BaseItem):
             if update_fields:
                 raise ValueError("'update_fields' is only valid for updates")
             tmp_attachments = None
-            if self.account and self.account.version.build < EXCHANGE_2010 and self.attachments:
-                # Exchange 2007 can't save attachments immediately. You need to first save, then attach. Store
-                # the attachment of this item temporarily and attach later.
+            if self.account and self.account.version.build < EXCHANGE_2013 and self.attachments:
+                # At least some versions prior to Exchange 2013 can't save attachments immediately. You need to first
+                # save, then attach. Store the attachment of this item temporarily and attach later.
                 tmp_attachments, self.attachments = self.attachments, []
             item = self._create(message_disposition=SAVE_ONLY, send_meeting_invitations=send_meeting_invitations)
             self._id = self.ID_ELEMENT_CLS(item.id, item.changekey)
