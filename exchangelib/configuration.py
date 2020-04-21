@@ -31,7 +31,7 @@ class Configuration:
         config = Configuration(auth_type=NTLM, ...)
         config = Configuration(version=Version(build=Build(15, 1, 2, 3)), ...)
 
-    Finally, you can use 'retry_policy' to define a custom retry policy for handling server connection failures: 
+    Finally, you can use 'retry_policy' to define a custom retry policy for handling server connection failures:
 
         config = Configuration(retry_policy=FaultTolerance(max_wait=3600), ...)
     """
