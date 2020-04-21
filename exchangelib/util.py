@@ -13,8 +13,7 @@ import time
 from urllib.parse import urlparse
 import xml.sax.handler
 
-# Import _etree via defusedxml instead of directly from lxml.etree, to silence overly strict linters
-from defusedxml.lxml import parse, tostring, GlobalParserTLS, RestrictedElement, _etree
+import lxml.etree  # nosec
 from defusedxml.expatreader import DefusedExpatParser
 from defusedxml.sax import _InputSource
 import dns.resolver
@@ -31,7 +30,7 @@ from .errors import TransportError, RateLimitError, RedirectError, RelativeRedir
 log = logging.getLogger(__name__)
 
 
-class ParseError(_etree.ParseError):
+class ParseError(lxml.etree.ParseError):
     """Used to wrap lxml ParseError in our own class"""
     pass
 
@@ -60,7 +59,7 @@ ns_translation = OrderedDict([
     ('t', TNS),
 ])
 for item in ns_translation.items():
-    _etree.register_namespace(*item)
+    lxml.etree.register_namespace(*item)
 
 
 def is_iterable(value, generators_allowed=False):
@@ -124,8 +123,8 @@ def xml_to_str(tree, encoding=None, xml_declaration=False):
     if xml_declaration and not encoding:
         raise ValueError("'xml_declaration' is not supported when 'encoding' is None")
     if encoding:
-        return tostring(tree, encoding=encoding, xml_declaration=True)
-    return tostring(tree, encoding=str, xml_declaration=False)
+        return lxml.etree.tostring(tree, encoding=encoding, xml_declaration=True)
+    return lxml.etree.tostring(tree, encoding=str, xml_declaration=False)
 
 
 def get_xml_attr(tree, name):
@@ -191,7 +190,7 @@ def set_xml_value(elem, value, version):
     from .version import Version
     if isinstance(value, (str, bool, bytes, int, Decimal, datetime.time, EWSDate, EWSDateTime)):
         elem.text = value_to_xml_text(value)
-    elif isinstance(value, RestrictedElement):
+    elif isinstance(value, _element_class):
         elem.append(value)
     elif is_iterable(value, generators_allowed=True):
         for v in value:
@@ -201,7 +200,7 @@ def set_xml_value(elem, value, version):
                 if not isinstance(version, Version):
                     raise ValueError("'version' %r must be a Version instance" % version)
                 elem.append(v.to_xml(version=version))
-            elif isinstance(v, RestrictedElement):
+            elif isinstance(v, _element_class):
                 elem.append(v)
             elif isinstance(v, str):
                 add_xml_child(elem, 't:String', v)
@@ -228,12 +227,11 @@ def create_element(name, attrs=None, nsmap=None):
     if ':' in name:
         ns, name = name.split(':')
         name = '{%s}%s' % (ns_translation[ns], name)
-    elem = RestrictedElement(nsmap=nsmap)
+    elem = _forgiving_parser.makeelement(name, nsmap=nsmap)
     if attrs:
         # Try hard to keep attribute order, to ensure deterministic output. This simplifies testing.
         for k, v in attrs.items():
             elem.set(k, v)
-    elem.tag = name
     return elem
 
 
@@ -344,15 +342,12 @@ class StreamingBase64Parser(DefusedExpatParser):
         self.buffer = [remainder] if remainder else []
 
 
-class ForgivingParser(GlobalParserTLS):
-    parser_config = {
-        'resolve_entities': False,
-        'recover': True,  # This setting is non-default
-        'huge_tree': True,  # This setting enables parsing huge attachments, mime_content and other large data
-    }
-
-
-_forgiving_parser = ForgivingParser()
+_forgiving_parser = lxml.etree.XMLParser(
+    resolve_entities=False,  # This setting is recommended by lxml for safety
+    recover=True,  # This setting is non-default
+    huge_tree=True,  # This setting enables parsing huge attachments, mime_content and other large data
+)
+_element_class = _forgiving_parser.makeelement('x').__class__
 
 
 class BytesGeneratorIO(io.RawIOBase):
@@ -410,12 +405,11 @@ def to_xml(bytes_content):
         stream = io.BytesIO(bytes_content)
     else:
         stream = BytesGeneratorIO(bytes_content)
-    forgiving_parser = _forgiving_parser.getDefaultParser()
     try:
-        return parse(stream, parser=forgiving_parser)
+        return lxml.etree.parse(stream, parser=_forgiving_parser)
     except AssertionError as e:
         raise ParseError(e.args[0], '<not from file>', -1, 0)
-    except _etree.ParseError as e:
+    except lxml.etree.ParseError as e:
         if hasattr(e, 'position'):
             e.lineno, e.offset = e.position
         if not e.lineno:
@@ -452,12 +446,12 @@ class PrettyXmlHandler(logging.StreamHandler):
     """A steaming log handler that prettifies log statements containing XML when output is a terminal"""
     @staticmethod
     def parse_bytes(xml_bytes):
-        return parse(io.BytesIO(xml_bytes))
+        return lxml.etree.parse(io.BytesIO(xml_bytes), parser=_forgiving_parser)
 
     @classmethod
     def prettify_xml(cls, xml_bytes):
         # Re-formats an XML document to a consistent style
-        return tostring(
+        return lxml.etree.tostring(
             cls.parse_bytes(xml_bytes),
             xml_declaration=True,
             encoding='utf-8',
@@ -505,7 +499,7 @@ class AnonymizingXmlHandler(PrettyXmlHandler):
         super().__init__(*args, **kwargs)
 
     def parse_bytes(self, xml_bytes):
-        root = parse(io.BytesIO(xml_bytes))
+        root = lxml.etree.parse(io.BytesIO(xml_bytes), parser=_forgiving_parser)
         for elem in root.iter():
             for attr in set(elem.keys()) & {'RootItemId', 'ItemId', 'Id', 'RootItemChangeKey', 'ChangeKey'}:
                 elem.set(attr, 'DEADBEEF=')
