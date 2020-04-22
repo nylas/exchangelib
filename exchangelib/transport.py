@@ -59,6 +59,15 @@ def wrap(content, api_version, account=None):
     """
     Generate the necessary boilerplate XML for a raw SOAP request. The XML is specific to the server version.
     ExchangeImpersonation allows to act as the user we want to impersonate.
+
+    RequestServerVersion element on MSDN:
+    https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/requestserverversion
+
+    ExchangeImpersonation element on MSDN:
+    https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/exchangeimpersonation
+
+    TimeZoneContent element on MSDN:
+    https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/timezonecontext
     """
     envelope = create_element('s:Envelope', nsmap=ns_translation)
     header = create_element('s:Header')
