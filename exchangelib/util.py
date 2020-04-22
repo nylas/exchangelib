@@ -406,7 +406,7 @@ def to_xml(bytes_content):
     else:
         stream = BytesGeneratorIO(bytes_content)
     try:
-        res = lxml.etree.parse(stream, parser=_forgiving_parser)
+        res = lxml.etree.parse(stream, parser=_forgiving_parser)  # nosec
     except AssertionError as e:
         raise ParseError(e.args[0], '<not from file>', -1, 0)
     except lxml.etree.ParseError as e:
@@ -455,7 +455,7 @@ class PrettyXmlHandler(logging.StreamHandler):
     """A steaming log handler that prettifies log statements containing XML when output is a terminal"""
     @staticmethod
     def parse_bytes(xml_bytes):
-        return lxml.etree.parse(io.BytesIO(xml_bytes), parser=_forgiving_parser)
+        return lxml.etree.parse(io.BytesIO(xml_bytes), parser=_forgiving_parser)  # nosec
 
     @classmethod
     def prettify_xml(cls, xml_bytes):
@@ -508,7 +508,7 @@ class AnonymizingXmlHandler(PrettyXmlHandler):
         super().__init__(*args, **kwargs)
 
     def parse_bytes(self, xml_bytes):
-        root = lxml.etree.parse(io.BytesIO(xml_bytes), parser=_forgiving_parser)
+        root = lxml.etree.parse(io.BytesIO(xml_bytes), parser=_forgiving_parser)  # nosec
         for elem in root.iter():
             for attr in set(elem.keys()) & {'RootItemId', 'ItemId', 'Id', 'RootItemChangeKey', 'ChangeKey'}:
                 elem.set(attr, 'DEADBEEF=')
