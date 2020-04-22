@@ -36,7 +36,7 @@ class Account:
     """Models an Exchange server user account. The primary key for an account is its PrimarySMTPAddress
     """
     def __init__(self, primary_smtp_address, fullname=None, access_type=None, autodiscover=False, credentials=None,
-                 config=None, locale=None, default_timezone=None):
+                 config=None, locale=None, default_timezone=None, sid=None, upn=None):
         """
         :param primary_smtp_address: The primary email address associated with the account on the Exchange server
         :param fullname: The full name of the account. Optional.
@@ -48,6 +48,9 @@ class Account:
         :param locale: The locale of the user, e.g. 'en_US'. Defaults to the locale of the host, if available.
         :param default_timezone: EWS may return some datetime values without timezone information. In this case, we will
         assume values to be in the provided timezone. Defaults to the timezone of the host.
+        :param: sid: The security identifier (SID) of this account, in security descriptor definition language (SDDL)
+        form.
+        :param: upn: The User Principal Name (UPN) of this account
         """
         if '@' not in primary_smtp_address:
             raise ValueError("primary_smtp_address %r is not an email address" % primary_smtp_address)
@@ -92,6 +95,12 @@ class Account:
             self.primary_smtp_address = primary_smtp_address
             self.ad_response = None
             self.protocol = Protocol(config=config)
+
+        # Other ways of identifying the account. Currently only used for SOAP impersonation headers.
+        self.sid = sid
+        self.upn = upn
+        self.smtp_address = None
+
         # We may need to override the default server version on a per-account basis because Microsoft may report one
         # server version up-front but delegate account requests to an older backend server.
         self.version = self.protocol.version

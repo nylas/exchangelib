@@ -85,10 +85,12 @@ class TransportTest(TimedTestCase):
     def test_wrap(self):
         # Test payload wrapper with both delegation, impersonation and timezones
         MockTZ = namedtuple('EWSTimeZone', ['ms_id'])
-        MockAccount = namedtuple('Account', ['access_type', 'primary_smtp_address', 'default_timezone'])
+        MockAccount = namedtuple(
+            'Account', ['access_type', 'primary_smtp_address', 'upn', 'sid', 'smtp_address', 'default_timezone']
+        )
         content = create_element('AAA')
         api_version = 'BBB'
-        account = MockAccount(DELEGATE, 'foo@example.com', MockTZ('XXX'))
+        account = MockAccount(DELEGATE, 'foo@example.com', None, None, None, MockTZ('XXX'))
         wrapped = wrap(content=content, api_version=api_version, account=account)
         self.assertEqual(
             PrettyXmlHandler.prettify_xml(wrapped),
@@ -108,11 +110,27 @@ class TransportTest(TimedTestCase):
   </s:Body>
 </s:Envelope>
 ''')
-        account = MockAccount(IMPERSONATION, 'foo@example.com', MockTZ('XXX'))
-        wrapped = wrap(content=content, api_version=api_version, account=account)
-        self.assertEqual(
-            PrettyXmlHandler.prettify_xml(wrapped),
-            b'''<?xml version='1.0' encoding='utf-8'?>
+        for attr, tag in (
+                ('primary_smtp_address', 'PrimarySmtpAddress'),
+                ('upn', 'PrincipalName'),
+                ('sid', 'SID'),
+                ('smtp_address', 'SmtpAddress'),
+        ):
+            kwargs = {
+                'access_type': IMPERSONATION,
+                'primary_smtp_address': None,
+                'upn': None,
+                'sid': None,
+                'smtp_address': None,
+                'default_timezone': MockTZ('XXX'),
+            }
+            val = '%s@example.com' % attr
+            kwargs[attr] = val
+            account = MockAccount(**kwargs)
+            wrapped = wrap(content=content, api_version=api_version, account=account)
+            self.assertEqual(
+                PrettyXmlHandler.prettify_xml(wrapped),
+                '''<?xml version='1.0' encoding='utf-8'?>
 <s:Envelope
     xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"
     xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"
@@ -121,7 +139,7 @@ class TransportTest(TimedTestCase):
     <t:RequestServerVersion Version="BBB"/>
     <t:ExchangeImpersonation>
       <t:ConnectingSID>
-        <t:PrimarySmtpAddress>foo@example.com</t:PrimarySmtpAddress>
+        <t:{tag}>{val}</t:{tag}>
       </t:ConnectingSID>
     </t:ExchangeImpersonation>
     <t:TimeZoneContext>
@@ -132,4 +150,4 @@ class TransportTest(TimedTestCase):
     <AAA/>
   </s:Body>
 </s:Envelope>
-''')
+'''.format(tag=tag, val=val).encode())

@@ -77,7 +77,17 @@ def wrap(content, api_version, account=None):
         if account.access_type == IMPERSONATION:
             exchangeimpersonation = create_element('t:ExchangeImpersonation')
             connectingsid = create_element('t:ConnectingSID')
-            add_xml_child(connectingsid, 't:PrimarySmtpAddress', account.primary_smtp_address)
+            # We have multiple options for uniquely identifying the user. Here's a prioritized list in accordance with
+            # https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/connectingsid
+            if account.sid:
+                add_xml_child(connectingsid, 't:SID', account.sid)
+            elif account.upn:
+                add_xml_child(connectingsid, 't:PrincipalName', account.upn)
+            elif account.smtp_address:
+                add_xml_child(connectingsid, 't:SmtpAddress', account.smtp_address)
+            else:
+                # primary_smtp_address should always be available
+                add_xml_child(connectingsid, 't:PrimarySmtpAddress', account.primary_smtp_address)
             exchangeimpersonation.append(connectingsid)
             header.append(exchangeimpersonation)
         timezonecontext = create_element('t:TimeZoneContext')
