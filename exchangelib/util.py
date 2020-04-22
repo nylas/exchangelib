@@ -406,7 +406,7 @@ def to_xml(bytes_content):
     else:
         stream = BytesGeneratorIO(bytes_content)
     try:
-        return lxml.etree.parse(stream, parser=_forgiving_parser)
+        res = lxml.etree.parse(stream, parser=_forgiving_parser)
     except AssertionError as e:
         raise ParseError(e.args[0], '<not from file>', -1, 0)
     except lxml.etree.ParseError as e:
@@ -422,13 +422,22 @@ def to_xml(bytes_content):
         else:
             offending_excerpt = offending_line[max(0, e.offset - 20):e.offset + 20]
             msg = '%s\nOffending text: [...]%s[...]' % (str(e), offending_excerpt)
-            raise ParseError(msg, e.lineno, e.offset)
+            raise ParseError(msg, '<not from file>', e.lineno, e.offset)
     except TypeError:
         try:
             stream.seek(0)
         except (IndexError, io.UnsupportedOperation):
             pass
         raise ParseError('This is not XML: %r' % stream.read(), '<not from file>', -1, 0)
+
+    if not res.getroot():
+        try:
+            stream.seek(0)
+            msg = 'No root element found: %r' % stream.read()
+        except (IndexError, io.UnsupportedOperation):
+            msg = 'No root element found'
+        raise ParseError(msg, '<not from file>', -1, 0)
+    return res
 
 
 def is_xml(text):

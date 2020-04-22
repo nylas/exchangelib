@@ -74,6 +74,7 @@ class VersionTest(TimedTestCase):
                 'Exchange2013',
                 to_xml(b'''\
 <s:Header>
+    <foo/>
 </s:Header>''')
             )
         with self.assertRaises(TransportError):
