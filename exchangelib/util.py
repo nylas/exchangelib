@@ -11,7 +11,7 @@ import socket
 from threading import get_ident
 import time
 from urllib.parse import urlparse
-import xml.sax.handler
+import xml.sax.handler  # nosec
 
 import lxml.etree  # nosec
 from defusedxml.expatreader import DefusedExpatParser
