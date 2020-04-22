@@ -1,7 +1,7 @@
 from ..errors import ErrorNonExistentMailbox, AutoDiscoverFailed
 from ..fields import TextField, EmailAddressField, ChoiceField, Choice, EWSElementField, OnOffField, BooleanField, \
     IntegerField, BuildField, ProtocolListField
-from ..properties import EWSElement
+from ..properties import EWSElement, Fields
 from ..transport import DEFAULT_ENCODING
 from ..util import create_element, add_xml_child, to_xml, is_xml, xml_to_str, AUTODISCOVER_REQUEST_NS, \
     AUTODISCOVER_BASE_NS, AUTODISCOVER_RESPONSE_NS as RNS, ParseError
@@ -14,20 +14,20 @@ class AutodiscoverBase(EWSElement):
 class User(AutodiscoverBase):
     """MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/user-pox"""
     ELEMENT_NAME = 'User'
-    FIELDS = [
+    FIELDS = Fields(
         TextField('display_name', field_uri='DisplayName', namespace=RNS),
         TextField('legacy_dn', field_uri='LegacyDN', namespace=RNS),
         TextField('deployment_id', field_uri='DeploymentId', namespace=RNS),  # GUID format
         EmailAddressField('autodiscover_smtp_address', field_uri='AutoDiscoverSMTPAddress', namespace=RNS),
-    ]
+    )
     __slots__ = tuple(f.name for f in FIELDS)
 
 
 class IntExtUrlBase(AutodiscoverBase):
-    FIELDS = [
+    FIELDS = Fields(
         TextField('external_url', field_uri='ExternalUrl', namespace=RNS),
         TextField('internal_url', field_uri='InternalUrl', namespace=RNS),
-    ]
+    )
     __slots__ = tuple(f.name for f in FIELDS)
 
 
@@ -45,12 +45,12 @@ class MailStore(IntExtUrlBase):
 class NetworkRequirements(AutodiscoverBase):
     """MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/networkrequirements-pox"""
     ELEMENT_NAME = 'NetworkRequirements'
-    FIELDS = [
+    FIELDS = Fields(
         TextField('ipv4_start', field_uri='IPv4Start', namespace=RNS),
         TextField('ipv4_end', field_uri='IPv4End', namespace=RNS),
         TextField('ipv6_start', field_uri='IPv6Start', namespace=RNS),
         TextField('ipv6_end', field_uri='IPv6End', namespace=RNS),
-    ]
+    )
     __slots__ = tuple(f.name for f in FIELDS)
 
 
@@ -60,21 +60,22 @@ class SimpleProtocol(AutodiscoverBase):
     Used for the 'Internal' and 'External' elements that may contain a stripped-down version of the Protocol element.
     """
     ELEMENT_NAME = 'Protocol'
-    FIELDS = [
+    FIELDS = Fields(
         ChoiceField('type', field_uri='Type', choices={
             Choice('WEB'), Choice('EXCH'), Choice('EXPR'), Choice('EXHTTP')
         }, namespace=RNS),
         TextField('as_url', field_uri='ASUrl', namespace=RNS),
-    ]
+    )
     __slots__ = tuple(f.name for f in FIELDS)
 
 
 class IntExtBase(AutodiscoverBase):
-    FIELDS = [
+    FIELDS = Fields(
         # TODO: 'OWAUrl' also has an AuthenticationMethod enum-style XML attribute
         TextField('owa_url', field_uri='OWAUrl', namespace=RNS),
         EWSElementField('protocol', value_cls=SimpleProtocol),
-    ]
+    )
+
     __slots__ = tuple(f.name for f in FIELDS)
 
 
@@ -94,7 +95,7 @@ class Protocol(AutodiscoverBase):
     """MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/protocol-pox"""
     ELEMENT_NAME = 'Protocol'
     TYPES = ('WEB', 'EXCH', 'EXPR', 'EXHTTP')
-    FIELDS = [
+    FIELDS = Fields(
         # Attribute 'Type' is ignored here. Has a name conflict with the child element and does not seem useful.
         TextField('version', field_uri='Version', is_attribute=True, namespace=RNS),
         ChoiceField('type', field_uri='Type', namespace=RNS, choices={Choice(p) for p in TYPES}),
@@ -145,7 +146,8 @@ class Protocol(AutodiscoverBase):
         EWSElementField('network_requirements', value_cls=NetworkRequirements),
         EWSElementField('address_book', value_cls=AddressBook),
         EWSElementField('mail_store', value_cls=MailStore),
-    ]
+    )
+
     __slots__ = tuple(f.name for f in FIELDS)
 
     @property
@@ -171,13 +173,14 @@ class Error(EWSElement):
     """MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/error-pox"""
     ELEMENT_NAME = 'Error'
     NAMESPACE = AUTODISCOVER_BASE_NS
-    FIELDS = [
+    FIELDS = Fields(
         TextField('id', field_uri='Id', namespace=AUTODISCOVER_BASE_NS, is_attribute=True),
         TextField('time', field_uri='Time', namespace=AUTODISCOVER_BASE_NS, is_attribute=True),
         TextField('code', field_uri='ErrorCode', namespace=AUTODISCOVER_BASE_NS),
         TextField('message', field_uri='Message', namespace=AUTODISCOVER_BASE_NS),
         TextField('debug_data', field_uri='DebugData', namespace=AUTODISCOVER_BASE_NS),
-    ]
+    )
+
     __slots__ = tuple(f.name for f in FIELDS)
 
 
@@ -188,7 +191,7 @@ class Account(AutodiscoverBase):
     REDIRECT_ADDR = 'redirectAddr'
     SETTINGS = 'settings'
     ACTIONS = (REDIRECT_URL, REDIRECT_ADDR, SETTINGS)
-    FIELDS = [
+    FIELDS = Fields(
         ChoiceField('type', field_uri='AccountType', namespace=RNS, choices={Choice('email')}),
         ChoiceField('action', field_uri='Action', namespace=RNS, choices={Choice(p) for p in ACTIONS}),
         BooleanField('microsoft_online', field_uri='MicrosoftOnline', namespace=RNS),
@@ -199,7 +202,8 @@ class Account(AutodiscoverBase):
         ProtocolListField('protocols'),
         # 'SmtpAddress' is inside the 'PublicFolderInformation' element
         TextField('public_folder_smtp_address', field_uri='SmtpAddress', namespace=RNS),
-    ]
+    )
+
     __slots__ = tuple(f.name for f in FIELDS)
 
     @classmethod
@@ -220,10 +224,11 @@ class Account(AutodiscoverBase):
 class Response(AutodiscoverBase):
     """MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/response-pox"""
     ELEMENT_NAME = 'Response'
-    FIELDS = [
+    FIELDS = Fields(
         EWSElementField('user', value_cls=User),
         EWSElementField('account', value_cls=Account),
-    ]
+    )
+
     __slots__ = tuple(f.name for f in FIELDS)
 
     @property
@@ -275,19 +280,21 @@ class ErrorResponse(EWSElement):
     """
     ELEMENT_NAME = 'Response'
     NAMESPACE = AUTODISCOVER_BASE_NS
-    FIELDS = [
+    FIELDS = Fields(
         EWSElementField('error', value_cls=Error),
-    ]
+    )
+
     __slots__ = tuple(f.name for f in FIELDS)
 
 
 class Autodiscover(EWSElement):
     ELEMENT_NAME = 'Autodiscover'
     NAMESPACE = AUTODISCOVER_BASE_NS
-    FIELDS = [
+    FIELDS = Fields(
         EWSElementField('response', value_cls=Response),
         EWSElementField('error_response', value_cls=ErrorResponse),
-    ]
+    )
+
     __slots__ = tuple(f.name for f in FIELDS)
 
     @staticmethod

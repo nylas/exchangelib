@@ -1,6 +1,6 @@
 from .ewsdatetime import UTC_NOW
 from .fields import DateTimeField, MessageField, ChoiceField, Choice
-from .properties import EWSElement, OutOfOffice
+from .properties import EWSElement, OutOfOffice, Fields
 from .util import create_element, set_xml_value
 
 
@@ -12,7 +12,7 @@ class OofSettings(EWSElement):
     ENABLED = 'Enabled'
     SCHEDULED = 'Scheduled'
     DISABLED = 'Disabled'
-    FIELDS = [
+    FIELDS = Fields(
         ChoiceField('state', field_uri='OofState', is_required=True,
                     choices={Choice(ENABLED), Choice(SCHEDULED), Choice(DISABLED)}),
         ChoiceField('external_audience', field_uri='ExternalAudience',
@@ -21,7 +21,7 @@ class OofSettings(EWSElement):
         DateTimeField('end', field_uri='EndTime'),
         MessageField('internal_reply', field_uri='InternalReply'),
         MessageField('external_reply', field_uri='ExternalReply'),
-    ]
+    )
 
     __slots__ = tuple(f.name for f in FIELDS)
 

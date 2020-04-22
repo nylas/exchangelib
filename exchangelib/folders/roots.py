@@ -3,6 +3,7 @@ import logging
 from ..errors import ErrorAccessDenied, ErrorFolderNotFound, ErrorNoPublicFolderReplicaAvailable, ErrorItemNotFound, \
     ErrorInvalidOperation
 from ..fields import EffectiveRightsField
+from ..properties import Fields
 from ..version import EXCHANGE_2007_SP1, EXCHANGE_2010_SP1
 from .collections import FolderCollection
 from .base import BaseFolder
@@ -22,13 +23,13 @@ class RootOfHierarchy(BaseFolder):
     # 'RootOfHierarchy' subclasses must not be in this list.
     WELLKNOWN_FOLDERS = []
 
-    LOCAL_FIELDS = [
+    LOCAL_FIELDS = Fields(
         # This folder type also has 'folder:PermissionSet' on some server versions, but requesting it sometimes causes
         # 'ErrorAccessDenied', as reported by some users. Ignore it entirely for root folders - it's usefulness is
         # deemed minimal at best.
         EffectiveRightsField('effective_rights', field_uri='folder:EffectiveRights', is_read_only=True,
                              supported_from=EXCHANGE_2007_SP1),
-    ]
+    )
     FIELDS = BaseFolder.FIELDS + LOCAL_FIELDS
     __slots__ = tuple(f.name for f in LOCAL_FIELDS) + ('_account', '_subfolders')
 

@@ -8,6 +8,7 @@ from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextFie
     Base64Field, TimeZoneField, ExtendedPropertyField, CharListField, Choice, DateField, EnumField, EnumListField, \
     CharField
 from exchangelib.indexed_properties import SingleFieldIndexedElement
+from exchangelib.properties import Fields
 from exchangelib.version import EXCHANGE_2007, EXCHANGE_2010, EXCHANGE_2013
 from exchangelib.util import to_xml, TNS
 
@@ -227,7 +228,7 @@ class FieldTest(TimedTestCase):
     def test_single_field_indexed_element(self):
         # A SingleFieldIndexedElement must have only one field defined
         class TestField(SingleFieldIndexedElement):
-            FIELDS = [CharField('a'), CharField('b')]
+            FIELDS = Fields(CharField('a'), CharField('b'))
 
         with self.assertRaises(ValueError):
             TestField.value_field()

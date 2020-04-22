@@ -1,7 +1,7 @@
 import logging
 
 from ..fields import BooleanField, Base64Field, TextField, MailboxField, MailboxListField, CharField
-from ..properties import ReferenceItemId
+from ..properties import ReferenceItemId, Fields
 from ..version import EXCHANGE_2013
 from .base import BaseReplyItem
 from .item import Item, AUTO_RESOLVE, SEND_TO_NONE, SEND_ONLY, SEND_AND_SAVE_COPY
@@ -14,7 +14,7 @@ class Message(Item):
     MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/message-ex15websvcsotherref
     """
     ELEMENT_NAME = 'Message'
-    LOCAL_FIELDS = [
+    LOCAL_FIELDS = Fields(
         MailboxField('sender', field_uri='message:Sender', is_read_only=True, is_read_only_after_send=True),
         MailboxListField('to_recipients', field_uri='message:ToRecipients', is_read_only_after_send=True,
                          is_searchable=False),
@@ -38,7 +38,7 @@ class Message(Item):
         MailboxField('received_by', field_uri='message:ReceivedBy', is_read_only=True),
         MailboxField('received_representing', field_uri='message:ReceivedRepresenting', is_read_only=True),
         # Placeholder for ReminderMessageData
-    ]
+    )
     FIELDS = Item.FIELDS + LOCAL_FIELDS
 
     __slots__ = tuple(f.name for f in LOCAL_FIELDS)

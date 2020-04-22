@@ -3,7 +3,7 @@ import logging
 from ..fields import BooleanField, Base64Field, TextField, ChoiceField, URIField, DateTimeField, PhoneNumberField, \
     EmailAddressesField, PhysicalAddressField, Choice, MemberListField, CharField, TextListField, EmailAddressField, \
     IdElementField
-from ..properties import PersonaId, IdChangeKeyMixIn
+from ..properties import PersonaId, IdChangeKeyMixIn, Fields
 from ..version import EXCHANGE_2010, EXCHANGE_2013
 from .item import Item
 
@@ -15,7 +15,7 @@ class Contact(Item):
     MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/contact
     """
     ELEMENT_NAME = 'Contact'
-    LOCAL_FIELDS = [
+    LOCAL_FIELDS = Fields(
         TextField('file_as', field_uri='contacts:FileAs'),
         ChoiceField('file_as_mapping', field_uri='contacts:FileAsMapping', choices={
             Choice('None'), Choice('LastCommaFirst'), Choice('FirstSpaceLast'), Choice('Company'),
@@ -77,7 +77,7 @@ class Contact(Item):
         TextField('directory_id', field_uri='contacts:DirectoryId', supported_from=EXCHANGE_2013, is_read_only=True),
         # Placeholder for ManagerMailbox
         # Placeholder for DirectReports
-    ]
+    )
     FIELDS = Item.FIELDS + LOCAL_FIELDS
 
     __slots__ = tuple(f.name for f in LOCAL_FIELDS)
@@ -87,7 +87,7 @@ class Persona(IdChangeKeyMixIn):
     """MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/persona"""
     ELEMENT_NAME = 'Persona'
     ID_ELEMENT_CLS = PersonaId
-    LOCAL_FIELDS = [
+    LOCAL_FIELDS = Fields(
         IdElementField('_id', field_uri='persona:PersonaId', value_cls=ID_ELEMENT_CLS),
         CharField('file_as', field_uri='persona:FileAs'),
         CharField('display_name', field_uri='persona:DisplayName'),
@@ -101,7 +101,7 @@ class Persona(IdChangeKeyMixIn):
         CharField('company_name', field_uri='persona:CompanyName'),
         CharField('im_address', field_uri='persona:ImAddress'),
         TextField('initials', field_uri='persona:Initials'),
-    ]
+    )
     FIELDS = IdChangeKeyMixIn.FIELDS + LOCAL_FIELDS
 
     __slots__ = tuple(f.name for f in LOCAL_FIELDS)
@@ -112,14 +112,14 @@ class DistributionList(Item):
     MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/distributionlist
     """
     ELEMENT_NAME = 'DistributionList'
-    LOCAL_FIELDS = [
+    LOCAL_FIELDS = Fields(
         CharField('display_name', field_uri='contacts:DisplayName', is_required=True),
         CharField('file_as', field_uri='contacts:FileAs', is_read_only=True),
         ChoiceField('contact_source', field_uri='contacts:ContactSource', choices={
             Choice('Store'), Choice('ActiveDirectory')
         }, is_read_only=True),
         MemberListField('members', field_uri='distributionlist:Members'),
-    ]
+    )
     FIELDS = Item.FIELDS + LOCAL_FIELDS
 
     __slots__ = tuple(f.name for f in LOCAL_FIELDS)

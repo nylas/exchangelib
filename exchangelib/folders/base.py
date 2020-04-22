@@ -8,7 +8,7 @@ from ..fields import IntegerField, CharField, FieldPath, EffectiveRightsField, P
     Field, IdElementField
 from ..items import CalendarItem, RegisterMixIn, Persona, ITEM_CLASSES, ITEM_TRAVERSAL_CHOICES, SHAPE_CHOICES, \
     ID_ONLY, DELETE_TYPE_CHOICES, HARD_DELETE, SHALLOW as SHALLOW_ITEMS
-from ..properties import Mailbox, FolderId, ParentFolderId, InvalidField, DistinguishedFolderId
+from ..properties import Mailbox, FolderId, ParentFolderId, InvalidField, DistinguishedFolderId, Fields
 from ..queryset import QuerySet, SearchableMixIn, DoesNotExist
 from ..restriction import Restriction
 from ..services import CreateFolder, UpdateFolder, DeleteFolder, EmptyFolder, FindPeople
@@ -40,7 +40,7 @@ class BaseFolder(RegisterMixIn, SearchableMixIn):
     LOCALIZED_NAMES = dict()  # A map of (str)locale: (tuple)localized_folder_names
     ITEM_MODEL_MAP = {cls.response_tag(): cls for cls in ITEM_CLASSES}
     ID_ELEMENT_CLS = FolderId
-    FIELDS = [
+    FIELDS = Fields(
         IdElementField('_id', field_uri='folder:FolderId', value_cls=ID_ELEMENT_CLS),
         EWSElementField('parent_folder_id', field_uri='folder:ParentFolderId', value_cls=ParentFolderId,
                         is_read_only=True),
@@ -49,7 +49,8 @@ class BaseFolder(RegisterMixIn, SearchableMixIn):
         IntegerField('total_count', field_uri='folder:TotalCount', is_read_only=True),
         IntegerField('child_folder_count', field_uri='folder:ChildFolderCount', is_read_only=True),
         IntegerField('unread_count', field_uri='folder:UnreadCount', is_read_only=True),
-    ]
+    )
+
     __slots__ = tuple(f.name for f in FIELDS) + ('is_distinguished',)
 
     # Used to register extended properties
@@ -563,11 +564,11 @@ class BaseFolder(RegisterMixIn, SearchableMixIn):
 
 class Folder(BaseFolder):
     """MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/folder"""
-    LOCAL_FIELDS = [
+    LOCAL_FIELDS = Fields(
         PermissionSetField('permission_set', field_uri='folder:PermissionSet', supported_from=EXCHANGE_2007_SP1),
         EffectiveRightsField('effective_rights', field_uri='folder:EffectiveRights', is_read_only=True,
                              supported_from=EXCHANGE_2007_SP1),
-    ]
+    )
     FIELDS = BaseFolder.FIELDS + LOCAL_FIELDS
 
     __slots__ = tuple(f.name for f in LOCAL_FIELDS) + ('_root',)

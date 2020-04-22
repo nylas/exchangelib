@@ -4,6 +4,7 @@ import logging
 from ..ewsdatetime import UTC_NOW
 from ..fields import BooleanField, IntegerField, DecimalField, TextField, ChoiceField, DateTimeField, Choice, \
     CharField, TextListField
+from ..properties import Fields
 from .item import Item
 
 log = logging.getLogger(__name__)
@@ -16,7 +17,7 @@ class Task(Item):
     ELEMENT_NAME = 'Task'
     NOT_STARTED = 'NotStarted'
     COMPLETED = 'Completed'
-    LOCAL_FIELDS = [
+    LOCAL_FIELDS = Fields(
         IntegerField('actual_work', field_uri='task:ActualWork', min=0),
         DateTimeField('assigned_time', field_uri='task:AssignedTime', is_read_only=True),
         TextField('billing_information', field_uri='task:BillingInformation'),
@@ -45,7 +46,7 @@ class Task(Item):
         }, is_required=True, is_searchable=False, default=NOT_STARTED),
         CharField('status_description', field_uri='task:StatusDescription', is_read_only=True),
         IntegerField('total_work', field_uri='task:TotalWork', min=0),
-    ]
+    )
     FIELDS = Item.FIELDS + LOCAL_FIELDS
 
     __slots__ = tuple(f.name for f in LOCAL_FIELDS)

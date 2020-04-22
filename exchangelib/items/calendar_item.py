@@ -6,7 +6,8 @@ from ..fields import BooleanField, IntegerField, TextField, ChoiceField, URIFiel
     MessageHeaderField, AttachmentField, RecurrenceField, MailboxField, AttendeesField, Choice, OccurrenceField, \
     OccurrenceListField, TimeZoneField, CharField, EnumAsIntField, FreeBusyStatusField, ReferenceItemIdField, \
     AssociatedCalendarItemIdField, DateOrDateTimeField
-from ..properties import Attendee, ReferenceItemId, AssociatedCalendarItemId, OccurrenceItemId, RecurringMasterItemId
+from ..properties import Attendee, ReferenceItemId, AssociatedCalendarItemId, OccurrenceItemId, RecurringMasterItemId, \
+    Fields
 from ..recurrence import FirstOccurrence, LastOccurrence, Occurrence, DeletedOccurrence
 from ..util import set_xml_value
 from ..version import EXCHANGE_2010, EXCHANGE_2013
@@ -56,7 +57,7 @@ class CalendarItem(Item, AcceptDeclineMixIn):
     MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/calendaritem
     """
     ELEMENT_NAME = 'CalendarItem'
-    LOCAL_FIELDS = [
+    LOCAL_FIELDS = Fields(
         TextField('uid', field_uri='calendar:UID', is_required_after_save=True, is_searchable=False),
         DateOrDateTimeField('start', field_uri='calendar:Start', is_required=True),
         DateOrDateTimeField('end', field_uri='calendar:End', is_required=True),
@@ -115,7 +116,7 @@ class CalendarItem(Item, AcceptDeclineMixIn):
                      is_read_only=True),
         URIField('meeting_workspace_url', field_uri='calendar:MeetingWorkspaceUrl'),
         URIField('net_show_url', field_uri='calendar:NetShowUrl'),
-    ]
+    )
     FIELDS = Item.FIELDS + LOCAL_FIELDS
 
     __slots__ = tuple(f.name for f in LOCAL_FIELDS)
@@ -267,7 +268,7 @@ class BaseMeetingItem(Item):
     Therefore BaseMeetingItem inherits from  EWSElement has no save() or send() method
 
     """
-    LOCAL_FIELDS = Message.LOCAL_FIELDS[:-2] + [
+    LOCAL_FIELDS = Message.LOCAL_FIELDS[:-2] + Fields(
         AssociatedCalendarItemIdField('associated_calendar_item_id', field_uri='meeting:AssociatedCalendarItemId',
                                       value_cls=AssociatedCalendarItemId),
         BooleanField('is_delegated', field_uri='meeting:IsDelegated', is_read_only=True, default=False),
@@ -277,7 +278,7 @@ class BaseMeetingItem(Item):
                     choices={Choice('Unknown'), Choice('Organizer'), Choice('Tentative'),
                              Choice('Accept'), Choice('Decline'), Choice('NoResponseReceived')},
                     is_required=True, default='Unknown'),
-    ]
+    )
     FIELDS = Item.FIELDS + LOCAL_FIELDS
 
     __slots__ = tuple(f.name for f in LOCAL_FIELDS)
@@ -288,7 +289,7 @@ class MeetingRequest(BaseMeetingItem, AcceptDeclineMixIn):
     MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/meetingrequest
     """
     ELEMENT_NAME = 'MeetingRequest'
-    LOCAL_FIELDS = [
+    LOCAL_FIELDS = Fields(
         ChoiceField('meeting_request_type', field_uri='meetingRequest:MeetingRequestType',
                     choices={Choice('FullUpdate'), Choice('InformationalUpdate'), Choice('NewMeetingRequest'),
                              Choice('None'), Choice('Outdated'), Choice('PrincipalWantsCopy'),
@@ -297,7 +298,7 @@ class MeetingRequest(BaseMeetingItem, AcceptDeclineMixIn):
         ChoiceField('intended_free_busy_status', field_uri='meetingRequest:IntendedFreeBusyStatus', choices={
                     Choice('Free'), Choice('Tentative'), Choice('Busy'), Choice('OOF'), Choice('NoData')},
                     is_required=True, default='Busy'),
-    ] + [f for f in CalendarItem.LOCAL_FIELDS[1:] if f.name != 'is_response_requested']
+    ) + Fields(*(f for f in CalendarItem.LOCAL_FIELDS[1:] if f.name != 'is_response_requested'))
 
     # FIELDS on this element are shuffled compared to other elements
     culture_idx = None
@@ -329,10 +330,10 @@ class MeetingMessage(BaseMeetingItem):
 class MeetingResponse(BaseMeetingItem):
     """MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/meetingresponse"""
     ELEMENT_NAME = 'MeetingResponse'
-    LOCAL_FIELDS = [
+    LOCAL_FIELDS = Fields(
         MailboxField('received_by', field_uri='message:ReceivedBy', is_read_only=True),
         MailboxField('received_representing', field_uri='message:ReceivedRepresenting', is_read_only=True),
-    ]
+    )
     # FIELDS on this element are shuffled compared to other elements
     culture_idx = None
     for i, field in enumerate(Item.FIELDS):
@@ -356,7 +357,7 @@ class MeetingCancellation(BaseMeetingItem):
 
 class BaseMeetingReplyItem(BaseItem):
     """Base class for meeting request reply items that share the same fields (Accept, TentativelyAccept, Decline)"""
-    FIELDS = [
+    FIELDS = Fields(
         CharField('item_class', field_uri='item:ItemClass', is_read_only=True),
         ChoiceField('sensitivity', field_uri='item:Sensitivity', choices={
             Choice('Normal'), Choice('Personal'), Choice('Private'), Choice('Confidential')
@@ -364,13 +365,13 @@ class BaseMeetingReplyItem(BaseItem):
         BodyField('body', field_uri='item:Body'),  # Accepts and returns Body or HTMLBody instances
         AttachmentField('attachments', field_uri='item:Attachments'),  # ItemAttachment or FileAttachment
         MessageHeaderField('headers', field_uri='item:InternetMessageHeaders', is_read_only=True),
-    ] + Message.LOCAL_FIELDS[:6] + [
+    ) + Message.LOCAL_FIELDS[:6] + Fields(
         ReferenceItemIdField('reference_item_id', field_uri='item:ReferenceItemId', value_cls=ReferenceItemId),
         MailboxField('received_by', field_uri='message:ReceivedBy', is_read_only=True),
         MailboxField('received_representing', field_uri='message:ReceivedRepresenting', is_read_only=True),
         DateTimeField('proposed_start', field_uri='meeting:ProposedStart', supported_from=EXCHANGE_2013),
         DateTimeField('proposed_end', field_uri='meeting:ProposedEnd', supported_from=EXCHANGE_2013),
-    ]
+    )
 
     __slots__ = tuple(f.name for f in FIELDS)
 
@@ -410,5 +411,5 @@ class DeclineItem(BaseMeetingReplyItem):
 class CancelCalendarItem(BaseReplyItem):
     """MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/cancelcalendaritem"""
     ELEMENT_NAME = 'CancelCalendarItem'
-    FIELDS = [f for f in BaseReplyItem.FIELDS if f.name != 'author']
+    FIELDS = Fields(*(f for f in BaseReplyItem.FIELDS if f.name != 'author'))
     __slots__ = tuple()

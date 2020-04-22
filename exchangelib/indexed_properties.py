@@ -1,7 +1,7 @@
 import logging
 
 from .fields import EmailSubField, LabelField, SubField, NamedSubField, Choice
-from .properties import EWSElement
+from .properties import EWSElement, Fields
 
 log = logging.getLogger(__name__)
 
@@ -29,10 +29,10 @@ class EmailAddress(SingleFieldIndexedElement):
     """MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/entry-emailaddress"""
     ELEMENT_NAME = 'Entry'
     LABEL_CHOICES = ('EmailAddress1', 'EmailAddress2', 'EmailAddress3')
-    FIELDS = [
+    FIELDS = Fields(
         LabelField('label', field_uri='Key', choices={Choice(c) for c in LABEL_CHOICES}, default=LABEL_CHOICES[0]),
         EmailSubField('email'),
-    ]
+    )
 
     __slots__ = tuple(f.name for f in FIELDS)
 
@@ -40,7 +40,7 @@ class EmailAddress(SingleFieldIndexedElement):
 class PhoneNumber(SingleFieldIndexedElement):
     """MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/entry-phonenumber"""
     ELEMENT_NAME = 'Entry'
-    FIELDS = [
+    FIELDS = Fields(
         LabelField('label', field_uri='Key', choices={
             Choice('AssistantPhone'), Choice('BusinessFax'), Choice('BusinessPhone'), Choice('BusinessPhone2'),
             Choice('Callback'), Choice('CarPhone'), Choice('CompanyMainPhone'), Choice('HomeFax'), Choice('HomePhone'),
@@ -48,7 +48,7 @@ class PhoneNumber(SingleFieldIndexedElement):
             Choice('Pager'), Choice('PrimaryPhone'), Choice('RadioPhone'), Choice('Telex'), Choice('TtyTddPhone'),
         }, default='PrimaryPhone'),
         SubField('phone_number'),
-    ]
+    )
 
     __slots__ = tuple(f.name for f in FIELDS)
 
@@ -61,7 +61,7 @@ class MultiFieldIndexedElement(IndexedElement):
 class PhysicalAddress(MultiFieldIndexedElement):
     """MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/entry-physicaladdress"""
     ELEMENT_NAME = 'Entry'
-    FIELDS = [
+    FIELDS = Fields(
         LabelField('label', field_uri='Key', choices={
             Choice('Business'), Choice('Home'), Choice('Other')
         }, default='Business'),
@@ -70,7 +70,7 @@ class PhysicalAddress(MultiFieldIndexedElement):
         NamedSubField('state', field_uri='State'),
         NamedSubField('country', field_uri='CountryOrRegion'),
         NamedSubField('zipcode', field_uri='PostalCode'),
-    ]
+    )
 
     __slots__ = tuple(f.name for f in FIELDS)
 

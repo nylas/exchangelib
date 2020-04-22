@@ -3,7 +3,8 @@ import logging
 from ..fields import BooleanField, IntegerField, TextField, CharListField, ChoiceField, URIField, BodyField, \
     DateTimeField, MessageHeaderField, AttachmentField, Choice, EWSElementField, EffectiveRightsField, CultureField, \
     CharField, MimeContentField
-from ..properties import ConversationId, ParentFolderId, ReferenceItemId, OccurrenceItemId, RecurringMasterItemId
+from ..properties import ConversationId, ParentFolderId, ReferenceItemId, OccurrenceItemId, RecurringMasterItemId,\
+    Fields
 from ..util import is_iterable
 from ..version import EXCHANGE_2010, EXCHANGE_2013
 from .base import BaseItem, SAVE_ONLY, SEND_ONLY, SEND_AND_SAVE_COPY
@@ -53,7 +54,7 @@ class Item(BaseItem):
     """
     ELEMENT_NAME = 'Item'
 
-    LOCAL_FIELDS = [
+    LOCAL_FIELDS = Fields(
         MimeContentField('mime_content', field_uri='item:MimeContent', is_read_only_after_send=True),
         EWSElementField('parent_folder_id', field_uri='item:ParentFolderId', value_cls=ParentFolderId,
                         is_read_only=True),
@@ -102,8 +103,7 @@ class Item(BaseItem):
         EWSElementField('conversation_id', field_uri='item:ConversationId', value_cls=ConversationId,
                         is_read_only=True, supported_from=EXCHANGE_2010),
         BodyField('unique_body', field_uri='item:UniqueBody', is_read_only=True, supported_from=EXCHANGE_2010),
-    ]
-
+    )
     FIELDS = LOCAL_FIELDS[0:1] + BaseItem.FIELDS + LOCAL_FIELDS[1:]
 
     __slots__ = tuple(f.name for f in LOCAL_FIELDS)
@@ -397,9 +397,9 @@ class Item(BaseItem):
 
 class BulkCreateResult(BaseItem):
     """A dummy class to store return values from a CreateItem service call"""
-    LOCAL_FIELDS = [
+    LOCAL_FIELDS = Fields(
         AttachmentField('attachments', field_uri='item:Attachments'),  # ItemAttachment or FileAttachment
-    ]
+    )
     FIELDS = BaseItem.FIELDS + LOCAL_FIELDS
 
     __slots__ = tuple(f.name for f in LOCAL_FIELDS)

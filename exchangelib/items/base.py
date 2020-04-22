@@ -3,7 +3,7 @@ import logging
 from ..extended_properties import ExtendedProperty
 from ..fields import BooleanField, ExtendedPropertyField, BodyField, MailboxField, MailboxListField, EWSElementField, \
     CharField, IdElementField
-from ..properties import InvalidField, IdChangeKeyMixIn, EWSElement, ReferenceItemId, ItemId
+from ..properties import InvalidField, IdChangeKeyMixIn, EWSElement, ReferenceItemId, ItemId, Fields
 from ..version import EXCHANGE_2007_SP1
 
 log = logging.getLogger(__name__)
@@ -66,9 +66,9 @@ class BaseItem(RegisterMixIn):
     """Base class for all other classes that implement EWS items"""
     ID_ELEMENT_CLS = ItemId
 
-    FIELDS = [
+    FIELDS = Fields(
         IdElementField('_id', field_uri='item:ItemId', value_cls=ID_ELEMENT_CLS),
-    ]
+    )
 
     __slots__ = tuple(f.name for f in FIELDS) + ('account', 'folder')
 
@@ -105,7 +105,7 @@ class BaseItem(RegisterMixIn):
 
 class BaseReplyItem(EWSElement):
     """Base class for reply/forward elements that share the same fields"""
-    FIELDS = [
+    FIELDS = Fields(
         CharField('subject', field_uri='Subject'),
         BodyField('body', field_uri='Body'),  # Accepts and returns Body or HTMLBody instances
         MailboxListField('to_recipients', field_uri='ToRecipients'),
@@ -118,7 +118,7 @@ class BaseReplyItem(EWSElement):
         BodyField('new_body', field_uri='NewBodyContent'),  # Accepts and returns Body or HTMLBody instances
         MailboxField('received_by', field_uri='ReceivedBy', supported_from=EXCHANGE_2007_SP1),
         MailboxField('received_by_representing', field_uri='ReceivedRepresenting', supported_from=EXCHANGE_2007_SP1),
-    ]
+    )
 
     __slots__ = tuple(f.name for f in FIELDS) + ('account',)
 

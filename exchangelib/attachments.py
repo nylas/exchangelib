@@ -4,7 +4,7 @@ import mimetypes
 
 from .fields import BooleanField, TextField, IntegerField, URIField, DateTimeField, EWSElementField, Base64Field, \
     ItemField, IdField
-from .properties import RootItemId, EWSElement
+from .properties import RootItemId, EWSElement, Fields
 from .services import GetAttachment, CreateAttachment, DeleteAttachment
 
 log = logging.getLogger(__name__)
@@ -20,11 +20,11 @@ class AttachmentId(EWSElement):
     ID_ATTR = 'Id'
     ROOT_ID_ATTR = 'RootItemId'
     ROOT_CHANGEKEY_ATTR = 'RootItemChangeKey'
-    FIELDS = [
+    FIELDS = Fields(
         IdField('id', field_uri=ID_ATTR, is_required=True),
         IdField('root_id', field_uri=ROOT_ID_ATTR),
         IdField('root_changekey', field_uri=ROOT_CHANGEKEY_ATTR),
-    ]
+    )
 
     __slots__ = tuple(f.name for f in FIELDS)
 
@@ -32,7 +32,7 @@ class AttachmentId(EWSElement):
 class Attachment(EWSElement):
     """Base class for FileAttachment and ItemAttachment
     """
-    FIELDS = [
+    FIELDS = Fields(
         EWSElementField('attachment_id', value_cls=AttachmentId),
         TextField('name', field_uri='Name'),
         TextField('content_type', field_uri='ContentType'),
@@ -41,7 +41,7 @@ class Attachment(EWSElement):
         IntegerField('size', field_uri='Size', is_read_only=True),  # Attachment size in bytes
         DateTimeField('last_modified_time', field_uri='LastModifiedTime'),
         BooleanField('is_inline', field_uri='IsInline'),
-    ]
+    )
 
     __slots__ = tuple(f.name for f in FIELDS) + ('parent_item',)
 
@@ -124,10 +124,10 @@ class FileAttachment(Attachment):
     MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/fileattachment
     """
     ELEMENT_NAME = 'FileAttachment'
-    FIELDS = Attachment.FIELDS + [
+    FIELDS = Attachment.FIELDS + Fields(
         BooleanField('is_contact_photo', field_uri='IsContactPhoto'),
         Base64Field('_content', field_uri='Content'),
-    ]
+    )
 
     __slots__ = ('is_contact_photo', '_content', '_fp')
 
@@ -200,9 +200,9 @@ class ItemAttachment(Attachment):
     """
     ELEMENT_NAME = 'ItemAttachment'
     # noinspection PyTypeChecker
-    FIELDS = Attachment.FIELDS + [
+    FIELDS = Attachment.FIELDS + Fields(
         ItemField('_item', field_uri='Item'),
-    ]
+    )
 
     __slots__ = ('_item',)
 
