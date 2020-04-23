@@ -36,8 +36,9 @@ class BaseProtocol:
 
     # The maximum number of sessions (== TCP connections, see below) we will open to this service endpoint. Keep this
     # low unless you have an agreement with the Exchange admin on the receiving end to hammer the server and
-    # rate-limiting policies have been disabled for the connecting user.
-    SESSION_POOLSIZE = 4
+    # rate-limiting policies have been disabled for the connecting user. Changing this setting only makes sense if
+    # you are using a thread pool to run multiple concurrent workers in this process.
+    SESSION_POOLSIZE = 1
     # We want only 1 TCP connection per Session object. We may have lots of different credentials hitting the server and
     # each credential needs its own session (NTLM auth will only send credentials once and then secure the connection,
     # so a connection can only handle requests for one credential). Having multiple connections ser Session could

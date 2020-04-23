@@ -71,14 +71,18 @@ class ProtocolTest(EWSTest):
         self.assertEqual(len({p.raddr[0] for p in proc.connections() if p.raddr[0] in ip_addresses}), 0)
 
     def test_poolsize(self):
-        self.assertEqual(self.account.protocol.SESSION_POOLSIZE, 4)
+        self.assertEqual(self.account.protocol.SESSION_POOLSIZE, 1)
 
     def test_decrease_poolsize(self):
+        # Temporarily change the session pool size so we can test decreasing the pool size
+        tmp = Protocol.SESSION_POOLSIZE
+        Protocol.SESSION_POOLSIZE = 4
         protocol = Protocol(config=Configuration(
             service_endpoint='https://example.com/Foo.asmx', credentials=Credentials('A', 'B'),
             auth_type=NTLM, version=Version(Build(15, 1)), retry_policy=FailFast()
         ))
-        self.assertEqual(protocol._session_pool.qsize(), Protocol.SESSION_POOLSIZE)
+        Protocol.SESSION_POOLSIZE = tmp
+        self.assertEqual(protocol._session_pool.qsize(), 4)
         protocol.decrease_poolsize()
         self.assertEqual(protocol._session_pool.qsize(), 3)
         protocol.decrease_poolsize()
