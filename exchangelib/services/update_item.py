@@ -18,6 +18,24 @@ class UpdateItem(EWSAccountService, EWSPooledMixIn):
 
     def call(self, items, conflict_resolution, message_disposition, send_meeting_invitations_or_cancellations,
              suppress_read_receipts):
+        from ..items import CONFLICT_RESOLUTION_CHOICES, MESSAGE_DISPOSITION_CHOICES, \
+            SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES, SEND_ONLY
+        if conflict_resolution not in CONFLICT_RESOLUTION_CHOICES:
+            raise ValueError("'conflict_resolution' %s must be one of %s" % (
+                conflict_resolution, CONFLICT_RESOLUTION_CHOICES
+            ))
+        if message_disposition not in MESSAGE_DISPOSITION_CHOICES:
+            raise ValueError("'message_disposition' %s must be one of %s" % (
+                message_disposition, MESSAGE_DISPOSITION_CHOICES
+            ))
+        if send_meeting_invitations_or_cancellations not in SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES:
+            raise ValueError("'send_meeting_invitations_or_cancellations' %s must be one of %s" % (
+                send_meeting_invitations_or_cancellations, SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES
+            ))
+        if suppress_read_receipts not in (True, False):
+            raise ValueError("'suppress_read_receipts' %s must be True or False" % suppress_read_receipts)
+        if message_disposition == SEND_ONLY:
+            raise ValueError('Cannot send-only existing objects. Use SendItem service instead')
         return self._pool_requests(payload_func=self.get_payload, **dict(
             items=items,
             conflict_resolution=conflict_resolution,

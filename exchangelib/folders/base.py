@@ -366,12 +366,8 @@ class BaseFolder(RegisterMixIn, SearchableMixIn):
             # New folder
             if update_fields:
                 raise ValueError("'update_fields' is only valid for updates")
-            res = list(CreateFolder(account=self.account).call(parent_folder=self.parent, folders=[self]))
-            if len(res) != 1:
-                raise ValueError('Expected result length 1, but got %s' % res)
-            if isinstance(res[0], Exception):
-                raise res[0]
-            self._id = self.ID_ELEMENT_CLS(res[0].id, res[0].changekey)
+            res = CreateFolder(account=self.account).get(parent_folder=self.parent, folders=[self])
+            self._id = self.ID_ELEMENT_CLS(res.id, res.changekey)
             self.root.add_folder(self)  # Add this folder to the cache
             return self
 
@@ -388,12 +384,8 @@ class BaseFolder(RegisterMixIn, SearchableMixIn):
                         # These are required and cannot be deleted
                         continue
                 update_fields.append(f.name)
-        res = list(UpdateFolder(account=self.account).call(folders=[(self, update_fields)]))
-        if len(res) != 1:
-            raise ValueError('Expected result length 1, but got %s' % res)
-        if isinstance(res[0], Exception):
-            raise res[0]
-        folder_id, changekey = res[0].id, res[0].changekey
+        res = UpdateFolder(account=self.account).get(folders=[(self, update_fields)])
+        folder_id, changekey = res.id, res.changekey
         if self.id != folder_id:
             raise ValueError('ID mismatch')
         # Don't check changekey value. It may not change on no-op updates
@@ -404,24 +396,16 @@ class BaseFolder(RegisterMixIn, SearchableMixIn):
     def delete(self, delete_type=HARD_DELETE):
         if delete_type not in DELETE_TYPE_CHOICES:
             raise ValueError("'delete_type' %s must be one of %s" % (delete_type, DELETE_TYPE_CHOICES))
-        res = list(DeleteFolder(account=self.account).call(folders=[self], delete_type=delete_type))
-        if len(res) != 1:
-            raise ValueError('Expected result length 1, but got %s' % res)
-        if isinstance(res[0], Exception):
-            raise res[0]
+        DeleteFolder(account=self.account).get(folders=[self], delete_type=delete_type)
         self.root.remove_folder(self)  # Remove the updated folder from the cache
         self._id = None
 
     def empty(self, delete_type=HARD_DELETE, delete_sub_folders=False):
         if delete_type not in DELETE_TYPE_CHOICES:
             raise ValueError("'delete_type' %s must be one of %s" % (delete_type, DELETE_TYPE_CHOICES))
-        res = list(EmptyFolder(account=self.account).call(
-            folders=[self], delete_type=delete_type, delete_sub_folders=delete_sub_folders)
+        EmptyFolder(account=self.account).get(
+            folders=[self], delete_type=delete_type, delete_sub_folders=delete_sub_folders
         )
-        if len(res) != 1:
-            raise ValueError('Expected result length 1, but got %s' % res)
-        if isinstance(res[0], Exception):
-            raise res[0]
         if delete_sub_folders:
             # We don't know exactly what was deleted, so invalidate the entire folder cache to be safe
             self.root.clear_cache()

@@ -10,6 +10,9 @@ class SendItem(EWSAccountService):
     element_container_name = None  # SendItem doesn't return a response object, just status in XML attrs
 
     def call(self, items, saved_item_folder):
+        from ..folders import BaseFolder, FolderId, DistinguishedFolderId
+        if saved_item_folder and not isinstance(saved_item_folder, (BaseFolder, FolderId, DistinguishedFolderId)):
+            raise ValueError("'saved_item_folder' %r must be a Folder or FolderId instance" % saved_item_folder)
         return self._get_elements(payload=self.get_payload(items=items, saved_item_folder=saved_item_folder))
 
     def get_payload(self, items, saved_item_folder):

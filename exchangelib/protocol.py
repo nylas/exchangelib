@@ -495,13 +495,6 @@ class Protocol(BaseProtocol, metaclass=CachingProtocol):
         :param shape:
         :return: A list of Mailbox items or, if return_full_contact_data is True, tuples of (Mailbox, Contact) items
         """
-        from .items import SHAPE_CHOICES, SEARCH_SCOPE_CHOICES
-        if search_scope:
-            if search_scope not in SEARCH_SCOPE_CHOICES:
-                raise ValueError("'search_scope' %s must be one if %s" % (search_scope, SEARCH_SCOPE_CHOICES))
-        if shape:
-            if shape not in SHAPE_CHOICES:
-                raise ValueError("'shape' %s must be one if %s" % (shape, SHAPE_CHOICES))
         return list(ResolveNames(protocol=self).call(
             unresolved_entries=names, return_full_contact_data=return_full_contact_data, search_scope=search_scope,
             contact_data_shape=shape,
@@ -538,9 +531,7 @@ class Protocol(BaseProtocol, metaclass=CachingProtocol):
         :param destination_format: A string
         :return: a generator of AlternateId, AlternatePublicFolderId or AlternatePublicFolderItemId instances
         """
-        from .properties import ID_FORMATS, AlternateId, AlternatePublicFolderId, AlternatePublicFolderItemId
-        if destination_format not in ID_FORMATS:
-            raise ValueError("'destination_format' %r must be one of %s" % (destination_format, ID_FORMATS))
+        from .properties import AlternateId, AlternatePublicFolderId, AlternatePublicFolderItemId
         cls_map = {cls.response_tag(): cls for cls in (
             AlternateId, AlternatePublicFolderId, AlternatePublicFolderItemId
         )}

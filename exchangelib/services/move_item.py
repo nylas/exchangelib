@@ -10,6 +10,9 @@ class MoveItem(EWSAccountService):
     element_container_name = '{%s}Items' % MNS
 
     def call(self, items, to_folder):
+        from ..folders import BaseFolder, FolderId, DistinguishedFolderId
+        if not isinstance(to_folder, (BaseFolder, FolderId, DistinguishedFolderId)):
+            raise ValueError("'to_folder' %r must be a Folder or FolderId instance" % to_folder)
         return self._get_elements(payload=self.get_payload(
             items=items,
             to_folder=to_folder,

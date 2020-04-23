@@ -21,6 +21,9 @@ class ConvertId(EWSPooledMixIn):
         if self.protocol.version.build < EXCHANGE_2007_SP1:
             raise NotImplementedError(
                 '%r is only supported for Exchange 2007 SP1 servers and later' % self.SERVICE_NAME)
+        from ..properties import ID_FORMATS
+        if destination_format not in ID_FORMATS:
+            raise ValueError("'destination_format' %r must be one of %s" % (destination_format, ID_FORMATS))
         return self._pool_requests(payload_func=self.get_payload, **dict(
             items=items,
             destination_format=destination_format,

@@ -2,50 +2,16 @@ import logging
 
 from ..fields import BooleanField, IntegerField, TextField, CharListField, ChoiceField, URIField, BodyField, \
     DateTimeField, MessageHeaderField, AttachmentField, Choice, EWSElementField, EffectiveRightsField, CultureField, \
-    CharField, MimeContentField
+    CharField, MimeContentField, FieldPath
 from ..properties import ConversationId, ParentFolderId, ReferenceItemId, OccurrenceItemId, RecurringMasterItemId,\
     Fields
+from ..services import GetItem, CreateItem, UpdateItem, DeleteItem, MoveItem, CopyItem, ArchiveItem
 from ..util import is_iterable
 from ..version import EXCHANGE_2010, EXCHANGE_2013
-from .base import BaseItem, SAVE_ONLY, SEND_ONLY, SEND_AND_SAVE_COPY
+from .base import BaseItem, SAVE_ONLY, SEND_ONLY, SEND_AND_SAVE_COPY, ID_ONLY, SEND_TO_NONE, AUTO_RESOLVE, \
+    SOFT_DELETE, HARD_DELETE, ALL_OCCURRENCIES, MOVE_TO_DELETED_ITEMS
 
 log = logging.getLogger(__name__)
-
-# SendMeetingInvitations values. See
-# https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/createitem
-# SendMeetingInvitationsOrCancellations. See
-# https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/updateitem
-# SendMeetingCancellations values. See
-# https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/deleteitem
-SEND_TO_NONE = 'SendToNone'
-SEND_ONLY_TO_ALL = 'SendOnlyToAll'
-SEND_ONLY_TO_CHANGED = 'SendOnlyToChanged'
-SEND_TO_ALL_AND_SAVE_COPY = 'SendToAllAndSaveCopy'
-SEND_TO_CHANGED_AND_SAVE_COPY = 'SendToChangedAndSaveCopy'
-SEND_MEETING_INVITATIONS_CHOICES = (SEND_TO_NONE, SEND_ONLY_TO_ALL, SEND_TO_ALL_AND_SAVE_COPY)
-SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES = (SEND_TO_NONE, SEND_ONLY_TO_ALL, SEND_ONLY_TO_CHANGED,
-                                                      SEND_TO_ALL_AND_SAVE_COPY, SEND_TO_CHANGED_AND_SAVE_COPY)
-SEND_MEETING_CANCELLATIONS_CHOICES = (SEND_TO_NONE, SEND_ONLY_TO_ALL, SEND_TO_ALL_AND_SAVE_COPY)
-
-# AffectedTaskOccurrences values. See
-# https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/deleteitem
-ALL_OCCURRENCIES = 'AllOccurrences'
-SPECIFIED_OCCURRENCE_ONLY = 'SpecifiedOccurrenceOnly'
-AFFECTED_TASK_OCCURRENCES_CHOICES = (ALL_OCCURRENCIES, SPECIFIED_OCCURRENCE_ONLY)
-
-# ConflictResolution values. See
-# https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/updateitem
-NEVER_OVERWRITE = 'NeverOverwrite'
-AUTO_RESOLVE = 'AutoResolve'
-ALWAYS_OVERWRITE = 'AlwaysOverwrite'
-CONFLICT_RESOLUTION_CHOICES = (NEVER_OVERWRITE, AUTO_RESOLVE, ALWAYS_OVERWRITE)
-
-# DeleteType values. See
-# https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/deleteitem
-HARD_DELETE = 'HardDelete'
-SOFT_DELETE = 'SoftDelete'
-MOVE_TO_DELETED_ITEMS = 'MoveToDeletedItems'
-DELETE_TYPE_CHOICES = (HARD_DELETE, SOFT_DELETE, MOVE_TO_DELETED_ITEMS)
 
 
 class Item(BaseItem):
@@ -163,19 +129,17 @@ class Item(BaseItem):
     def _create(self, message_disposition, send_meeting_invitations):
         if not self.account:
             raise ValueError('%s must have an account' % self.__class__.__name__)
-        # bulk_create() returns an Item because we want to return the ID of both the main item *and* attachments
-        res = self.account.bulk_create(
-            items=[self], folder=self.folder, message_disposition=message_disposition,
-            send_meeting_invitations=send_meeting_invitations)
-        if message_disposition in (SEND_ONLY, SEND_AND_SAVE_COPY):
-            if res:
-                raise ValueError('Got a response in non-save mode')
-            return None
-        if len(res) != 1:
-            raise ValueError('Expected result length 1, but got %s' % res)
-        if isinstance(res[0], Exception):
-            raise res[0]
-        return res[0]
+        # Return a BulkCreateResult because we want to return the ID of both the main item *and* attachments
+        res = CreateItem(account=self.account).get(
+            items=[self],
+            folder=self.folder,
+            message_disposition=message_disposition,
+            send_meeting_invitations=send_meeting_invitations,
+            expect_result=message_disposition not in (SEND_ONLY, SEND_AND_SAVE_COPY),
+        )
+        if not res:
+            return
+        return BulkCreateResult.from_xml(elem=res, account=self)
 
     def _update_fieldnames(self):
         from .contact import Contact, DistributionList
@@ -212,20 +176,17 @@ class Item(BaseItem):
         if not update_fieldnames:
             # The fields to update was not specified explicitly. Update all fields where update is possible
             update_fieldnames = self._update_fieldnames()
-        # bulk_update() returns a tuple
-        res = self.account.bulk_update(
-            items=[(self, update_fieldnames)], message_disposition=message_disposition,
+        res = UpdateItem(account=self.account).get(
+            items=[(self, update_fieldnames)],
+            message_disposition=message_disposition,
             conflict_resolution=conflict_resolution,
-            send_meeting_invitations_or_cancellations=send_meeting_invitations)
-        if message_disposition == SEND_AND_SAVE_COPY:
-            if res:
-                raise ValueError('Got a response in non-save mode')
-            return None
-        if len(res) != 1:
-            raise ValueError('Expected result length 1, but got %s' % res)
-        if isinstance(res[0], Exception):
-            raise res[0]
-        return res[0]
+            send_meeting_invitations_or_cancellations=send_meeting_invitations,
+            suppress_read_receipts=True,
+            expect_result=message_disposition != SEND_AND_SAVE_COPY,
+        )
+        if not res:
+            return
+        return Item.id_from_xml(res)
 
     def refresh(self):
         # Updates the item based on fresh data from EWS
@@ -233,53 +194,54 @@ class Item(BaseItem):
             raise ValueError('%s must have an account' % self.__class__.__name__)
         if not self.id:
             raise ValueError('%s must have an ID' % self.__class__.__name__)
-        res = list(self.account.fetch(ids=[self]))
-        if len(res) != 1:
-            raise ValueError('Expected result length 1, but got %s' % res)
-        if isinstance(res[0], Exception):
-            raise res[0]
-        fresh_item = res[0]
-        if self.id != fresh_item.id and not isinstance(self._id, (OccurrenceItemId, RecurringMasterItemId)):
+        from ..folders import Folder
+        additional_fields = {
+            FieldPath(field=f) for f in Folder(root=self.account.root).allowed_item_fields(version=self.account.version)
+        }
+
+        elem = GetItem(account=self.account).get(items=[self], additional_fields=additional_fields, shape=ID_ONLY)
+        res = Folder.item_model_from_tag(elem.tag).from_xml(elem=elem, account=self.account)
+        if self.id != res.id and not isinstance(self._id, (OccurrenceItemId, RecurringMasterItemId)):
             # When we refresh an item with an OccurrenceItemId as ID, EWS returns the ID of the occurrence, so
             # the ID of this item changes.
             raise ValueError("'id' mismatch in returned update response")
         for f in self.FIELDS:
-            setattr(self, f.name, getattr(fresh_item, f.name))
+            setattr(self, f.name, getattr(res, f.name))
         # 'parent_item' should point to 'self', not 'fresh_item'. That way, 'fresh_item' can be garbage collected.
         for a in self.attachments:
             a.parent_item = self
-        del fresh_item
+        del res
 
     def copy(self, to_folder):
         if not self.account:
             raise ValueError('%s must have an account' % self.__class__.__name__)
         if not self.id:
             raise ValueError('%s must have an ID' % self.__class__.__name__)
-        res = self.account.bulk_copy(ids=[self], to_folder=to_folder)
+        res = CopyItem(account=self.account).get(
+            items=[self],
+            to_folder=to_folder,
+            expect_result=None,
+        )
         if not res:
             # Assume 'to_folder' is a public folder or a folder in a different mailbox
             return
-        if len(res) != 1:
-            raise ValueError('Expected result length 1, but got %s' % res)
-        if isinstance(res[0], Exception):
-            raise res[0]
-        return res[0]
+        return Item.id_from_xml(res)
 
     def move(self, to_folder):
         if not self.account:
             raise ValueError('%s must have an account' % self.__class__.__name__)
         if not self.id:
             raise ValueError('%s must have an ID' % self.__class__.__name__)
-        res = self.account.bulk_move(ids=[self], to_folder=to_folder)
+        res = MoveItem(account=self.account).get(
+            items=[self],
+            to_folder=to_folder,
+            expect_result=None,
+        )
         if not res:
             # Assume 'to_folder' is a public folder or a folder in a different mailbox
             self._id = None
             return
-        if len(res) != 1:
-            raise ValueError('Expected result length 1, but got %s' % res)
-        if isinstance(res[0], Exception):
-            raise res[0]
-        self._id = self.ID_ELEMENT_CLS(*res[0])
+        self._id = self.ID_ELEMENT_CLS(*Item.id_from_xml(res))
         self.folder = to_folder
 
     def move_to_trash(self, send_meeting_cancellations=SEND_TO_NONE, affected_task_occurrences=ALL_OCCURRENCIES,
@@ -310,25 +272,20 @@ class Item(BaseItem):
             raise ValueError('%s must have an account' % self.__class__.__name__)
         if not self.id:
             raise ValueError('%s must have an ID' % self.__class__.__name__)
-        res = self.account.bulk_delete(
-            ids=[self], delete_type=delete_type, send_meeting_cancellations=send_meeting_cancellations,
-            affected_task_occurrences=affected_task_occurrences, suppress_read_receipts=suppress_read_receipts)
-        if len(res) != 1:
-            raise ValueError('Expected result length 1, but got %s' % res)
-        if isinstance(res[0], Exception):
-            raise res[0]
+        DeleteItem(account=self.account).get(
+            items=[self],
+            delete_type=delete_type,
+            send_meeting_cancellations=send_meeting_cancellations,
+            affected_task_occurrences=affected_task_occurrences,
+            suppress_read_receipts=suppress_read_receipts,
+        )
 
     def archive(self, to_folder):
         if not self.account:
             raise ValueError('%s must have an account' % self.__class__.__name__)
         if not self.id:
             raise ValueError('%s must have an ID' % self.__class__.__name__)
-        res = self.account.bulk_archive(ids=[self], to_folder=to_folder)
-        if len(res) != 1:
-            raise ValueError('Expected result length 1, but got %s' % res)
-        if isinstance(res[0], Exception):
-            raise res[0]
-        return res[0]
+        return ArchiveItem(account=self.account).get(items=[self], to_folder=to_folder)
 
     def attach(self, attachments):
         """Add an attachment, or a list of attachments, to this item. If the item has already been saved, the

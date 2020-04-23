@@ -9,9 +9,10 @@ from ..fields import BooleanField, IntegerField, TextField, ChoiceField, URIFiel
 from ..properties import Attendee, ReferenceItemId, AssociatedCalendarItemId, OccurrenceItemId, RecurringMasterItemId, \
     Fields
 from ..recurrence import FirstOccurrence, LastOccurrence, Occurrence, DeletedOccurrence
+from ..services import CreateItem
 from ..util import set_xml_value
 from ..version import EXCHANGE_2010, EXCHANGE_2013
-from .base import BaseItem, BaseReplyItem, SEND_AND_SAVE_COPY
+from .base import BaseItem, BaseReplyItem, SEND_ONLY, SEND_AND_SAVE_COPY, SEND_TO_NONE
 from .item import Item
 from .message import Message
 
@@ -379,12 +380,13 @@ class BaseMeetingReplyItem(BaseItem):
         if not self.account:
             raise ValueError('%s must have an account' % self.__class__.__name__)
 
-        res = self.account.bulk_create(items=[self], folder=self.folder, message_disposition=message_disposition)
-
-        for r_item in res:
-            if isinstance(r_item, Exception):
-                raise r_item
-        return res
+        return CreateItem(account=self.account).get(
+            items=[self],
+            folder=self.folder,
+            message_disposition=message_disposition,
+            send_meeting_invitations=SEND_TO_NONE,
+            expect_result=message_disposition not in (SEND_ONLY, SEND_AND_SAVE_COPY),
+        )
 
 
 class AcceptItem(BaseMeetingReplyItem):

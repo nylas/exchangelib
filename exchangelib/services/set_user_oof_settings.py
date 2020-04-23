@@ -10,10 +10,13 @@ class SetUserOofSettings(EWSAccountService):
     SERVICE_NAME = 'SetUserOofSettings'
 
     def call(self, oof_settings, mailbox):
-        res = list(self._get_elements(payload=self.get_payload(oof_settings=oof_settings, mailbox=mailbox)))
-        if len(res) != 1:
-            raise ValueError("Expected 'res' length 1, got %s" % res)
-        return res[0]
+        from ..settings import OofSettings
+        from ..properties import Mailbox
+        if not isinstance(oof_settings, OofSettings):
+            raise ValueError("'oof_settings' %r must be an OofSettings instance" % oof_settings)
+        if not isinstance(mailbox, Mailbox):
+            raise ValueError("'mailbox' %r must be an Mailbox instance" % mailbox)
+        return self._get_elements(payload=self.get_payload(oof_settings=oof_settings, mailbox=mailbox))
 
     def get_payload(self, oof_settings, mailbox):
         from ..properties import AvailabilityMailbox

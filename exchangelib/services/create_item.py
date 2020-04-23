@@ -18,6 +18,28 @@ class CreateItem(EWSAccountService, EWSPooledMixIn):
     element_container_name = '{%s}Items' % MNS
 
     def call(self, items, folder, message_disposition, send_meeting_invitations):
+        from ..folders import BaseFolder, FolderId, DistinguishedFolderId
+        from ..items import SAVE_ONLY, SEND_AND_SAVE_COPY, SEND_ONLY, SEND_MEETING_INVITATIONS_CHOICES, \
+            MESSAGE_DISPOSITION_CHOICES
+        if message_disposition not in MESSAGE_DISPOSITION_CHOICES:
+            raise ValueError("'message_disposition' %s must be one of %s" % (
+                message_disposition, MESSAGE_DISPOSITION_CHOICES
+            ))
+        if send_meeting_invitations not in SEND_MEETING_INVITATIONS_CHOICES:
+            raise ValueError("'send_meeting_invitations' %s must be one of %s" % (
+                send_meeting_invitations, SEND_MEETING_INVITATIONS_CHOICES
+            ))
+        if folder is not None:
+            if not isinstance(folder, (BaseFolder, FolderId, DistinguishedFolderId)):
+                raise ValueError("'folder' %r must be a Folder or FolderId instance" % folder)
+            if folder.account != self.account:
+                raise ValueError('"Folder must belong to this account')
+        if message_disposition == SAVE_ONLY and folder is None:
+            raise AttributeError("Folder must be supplied when in save-only mode")
+        if message_disposition == SEND_AND_SAVE_COPY and folder is None:
+            folder = self.account.sent  # 'Sent' is default EWS behaviour
+        if message_disposition == SEND_ONLY and folder is not None:
+            raise AttributeError("Folder must be None in send-ony mode")
         return self._pool_requests(payload_func=self.get_payload, **dict(
             items=items,
             folder=folder,

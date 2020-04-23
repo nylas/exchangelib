@@ -1,8 +1,7 @@
-from exchangelib.account import SAVE_ONLY, SEND_ONLY, SEND_AND_SAVE_COPY
 from exchangelib.errors import ErrorItemNotFound, ErrorInvalidChangeKey, ErrorInvalidIdMalformed
 from exchangelib.fields import FieldPath
 from exchangelib.folders import Inbox, Folder
-from exchangelib.items import Item, Message
+from exchangelib.items import Item, Message, SAVE_ONLY, SEND_ONLY, SEND_AND_SAVE_COPY
 
 from .test_basics import BaseItemTest
 
@@ -48,15 +47,16 @@ class BulkMethodTest(BaseItemTest):
         qs = self.test_folder.none()
         self.assertEqual(list(self.account.fetch(ids=qs)), [])
         with self.assertRaises(ValueError):
+            # bulk_create() does not allow queryset input
+            self.account.bulk_create(folder=self.test_folder, items=qs)
+        with self.assertRaises(ValueError):
             # bulk_update() does not allow queryset input
-            self.assertEqual(self.account.bulk_update(items=qs), [])
+            self.account.bulk_update(items=qs)
         self.assertEqual(self.account.bulk_delete(ids=qs), [])
         self.assertEqual(self.account.bulk_send(ids=qs), [])
         self.assertEqual(self.account.bulk_copy(ids=qs, to_folder=self.account.trash), [])
         self.assertEqual(self.account.bulk_move(ids=qs, to_folder=self.account.trash), [])
-        with self.assertRaises(ValueError):
-            # upload() does not allow queryset input
-            self.assertEqual(self.account.upload(data=qs), [])
+        self.assertEqual(self.account.upload(data=qs), [])
         self.assertEqual(self.account.export(items=qs), [])
 
     def test_no_kwargs(self):
@@ -75,20 +75,20 @@ class BulkMethodTest(BaseItemTest):
         # Test bulk_create
         with self.assertRaises(ValueError):
             # Folder must belong to account
-            self.account.bulk_create(folder=Folder(root=None), items=[])
+            self.account.bulk_create(folder=Folder(root=None), items=[1])
         with self.assertRaises(AttributeError):
             # Must have folder on save
-            self.account.bulk_create(folder=None, items=[], message_disposition=SAVE_ONLY)
+            self.account.bulk_create(folder=None, items=[1], message_disposition=SAVE_ONLY)
         # Test that we can send_and_save with a default folder
         self.account.bulk_create(folder=None, items=[], message_disposition=SEND_AND_SAVE_COPY)
         with self.assertRaises(AttributeError):
             # Must not have folder on send-only
-            self.account.bulk_create(folder=self.test_folder, items=[], message_disposition=SEND_ONLY)
+            self.account.bulk_create(folder=self.test_folder, items=[1], message_disposition=SEND_ONLY)
 
         # Test bulk_update
         with self.assertRaises(ValueError):
             # Cannot update in send-only mode
-            self.account.bulk_update(items=[], message_disposition=SEND_ONLY)
+            self.account.bulk_update(items=[1], message_disposition=SEND_ONLY)
 
     def test_bulk_failure(self):
         # Test that bulk_* can handle EWS errors and return the errors in order without losing non-failure results

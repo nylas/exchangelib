@@ -15,18 +15,13 @@ from .folders import Folder, AdminAuditLogs, ArchiveDeletedItems, ArchiveInbox, 
     Directory, Drafts, Favorites, IMContactList, Inbox, Journal, JunkEmail, LocalFailures, MsgFolderRoot, MyContacts, \
     Notes, Outbox, PeopleConnect, PublicFoldersRoot, QuickContacts, RecipientCache, RecoverableItemsDeletions, \
     RecoverableItemsPurges, RecoverableItemsRoot, RecoverableItemsVersions, Root, SearchFolders, SentItems, \
-    ServerFailures, SyncIssues, Tasks, ToDoSearch, VoiceMail, BaseFolder
-from .items import Item, BulkCreateResult, HARD_DELETE, \
-    AUTO_RESOLVE, SEND_TO_NONE, SAVE_ONLY, SEND_AND_SAVE_COPY, SEND_ONLY, ALL_OCCURRENCIES, \
-    DELETE_TYPE_CHOICES, MESSAGE_DISPOSITION_CHOICES, CONFLICT_RESOLUTION_CHOICES, AFFECTED_TASK_OCCURRENCES_CHOICES, \
-    SEND_MEETING_INVITATIONS_CHOICES, SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES, \
-    SEND_MEETING_CANCELLATIONS_CHOICES, ID_ONLY
-from .properties import Mailbox, SendingAs, FolderId, DistinguishedFolderId
+    ServerFailures, SyncIssues, Tasks, ToDoSearch, VoiceMail
+from .items import Item, BulkCreateResult, HARD_DELETE, AUTO_RESOLVE, SEND_TO_NONE, SAVE_ONLY, ALL_OCCURRENCIES, ID_ONLY
+from .properties import Mailbox, SendingAs
 from .protocol import Protocol
 from .queryset import QuerySet
 from .services import ExportItems, UploadItems, GetItem, CreateItem, UpdateItem, DeleteItem, MoveItem, SendItem, \
     CopyItem, GetUserOofSettings, SetUserOofSettings, GetMailTips, ArchiveItem, GetDelegate
-from .settings import OofSettings
 from .util import get_domain, peek
 
 log = getLogger(__name__)
@@ -294,11 +289,9 @@ class Account:
 
     @oof_settings.setter
     def oof_settings(self, value):
-        if not isinstance(value, OofSettings):
-            raise ValueError("'value' %r must be an OofSettings instance" % value)
-        SetUserOofSettings(account=self).call(
-            mailbox=Mailbox(email_address=self.primary_smtp_address),
+        SetUserOofSettings(account=self).get(
             oof_settings=value,
+            mailbox=Mailbox(email_address=self.primary_smtp_address),
         )
 
     def _consume_item_service(self, service_cls, items, chunk_size, kwargs):
@@ -343,12 +336,9 @@ class Account:
                         (account.calendar, "ABCXYZ...")])
         -> [("idA", "changekey"), ("idB", "changekey"), ("idC", "changekey")]
         """
-        is_empty, data = peek(data)
-        if is_empty:
-            # We accept generators, so it's not always convenient for caller to know up-front if 'upload_data' is empty.
-            # Allow empty 'upload_data' and return early.
-            return []
-        return list(UploadItems(account=self, chunk_size=chunk_size).call(data=data))
+        return list(
+            self._consume_item_service(service_cls=UploadItems, items=data, chunk_size=chunk_size, kwargs=dict())
+        )
 
     def bulk_create(self, folder, items, message_disposition=SAVE_ONLY, send_meeting_invitations=SEND_TO_NONE,
                     chunk_size=None):
@@ -365,25 +355,6 @@ class Account:
                  BulkCreateResult objects are normal Item objects except they only contain the 'id' and 'changekey'
                  of the created item, and the 'id' of any attachments that were also created.
         """
-        if message_disposition not in MESSAGE_DISPOSITION_CHOICES:
-            raise ValueError("'message_disposition' %s must be one of %s" % (
-                message_disposition, MESSAGE_DISPOSITION_CHOICES
-            ))
-        if send_meeting_invitations not in SEND_MEETING_INVITATIONS_CHOICES:
-            raise ValueError("'send_meeting_invitations' %s must be one of %s" % (
-                send_meeting_invitations, SEND_MEETING_INVITATIONS_CHOICES
-            ))
-        if folder is not None:
-            if not isinstance(folder, BaseFolder):
-                raise ValueError("'folder' %r must be a Folder instance" % folder)
-            if folder.account != self:
-                raise ValueError('"Folder must belong to this account')
-        if message_disposition == SAVE_ONLY and folder is None:
-            raise AttributeError("Folder must be supplied when in save-only mode")
-        if message_disposition == SEND_AND_SAVE_COPY and folder is None:
-            folder = self.sent  # 'Sent' is default EWS behaviour
-        if message_disposition == SEND_ONLY and folder is not None:
-            raise AttributeError("Folder must be None in send-ony mode")
         if isinstance(items, QuerySet):
             # bulk_create() on a queryset does not make sense because it returns items that have already been created
             raise ValueError('Cannot bulk create items from a QuerySet')
@@ -422,22 +393,6 @@ class Account:
 
         :return: a list of either (id, changekey) tuples or exception instances, in the same order as the input
         """
-        if conflict_resolution not in CONFLICT_RESOLUTION_CHOICES:
-            raise ValueError("'conflict_resolution' %s must be one of %s" % (
-                conflict_resolution, CONFLICT_RESOLUTION_CHOICES
-            ))
-        if message_disposition not in MESSAGE_DISPOSITION_CHOICES:
-            raise ValueError("'message_disposition' %s must be one of %s" % (
-                message_disposition, MESSAGE_DISPOSITION_CHOICES
-            ))
-        if send_meeting_invitations_or_cancellations not in SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES:
-            raise ValueError("'send_meeting_invitations_or_cancellations' %s must be one of %s" % (
-                send_meeting_invitations_or_cancellations, SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES
-            ))
-        if suppress_read_receipts not in (True, False):
-            raise ValueError("'suppress_read_receipts' %s must be True or False" % suppress_read_receipts)
-        if message_disposition == SEND_ONLY:
-            raise ValueError('Cannot send-only existing objects. Use SendItem service instead')
         # bulk_update() on a queryset does not make sense because there would be no opportunity to alter the items. In
         # fact, it could be dangerous if the queryset contains an '.only()'. This would wipe out certain fields
         # entirely.
@@ -476,20 +431,6 @@ class Account:
 
         :return: a list of either True or exception instances, in the same order as the input
         """
-        if delete_type not in DELETE_TYPE_CHOICES:
-            raise ValueError("'delete_type' %s must be one of %s" % (
-                delete_type, DELETE_TYPE_CHOICES
-            ))
-        if send_meeting_cancellations not in SEND_MEETING_CANCELLATIONS_CHOICES:
-            raise ValueError("'send_meeting_cancellations' %s must be one of %s" % (
-                send_meeting_cancellations, SEND_MEETING_CANCELLATIONS_CHOICES
-            ))
-        if affected_task_occurrences not in AFFECTED_TASK_OCCURRENCES_CHOICES:
-            raise ValueError("'affected_task_occurrences' %s must be one of %s" % (
-                affected_task_occurrences, AFFECTED_TASK_OCCURRENCES_CHOICES
-            ))
-        if suppress_read_receipts not in (True, False):
-            raise ValueError("'suppress_read_receipts' %s must be True or False" % suppress_read_receipts)
         log.debug(
             'Deleting items for %s (delete_type: %s, send_meeting_invitations: %s, affected_task_occurences: %s)',
             self,
@@ -519,8 +460,6 @@ class Account:
             raise AttributeError("'save_copy' must be True when 'copy_to_folder' is set")
         if save_copy and not copy_to_folder:
             copy_to_folder = self.sent  # 'Sent' is default EWS behaviour
-        if copy_to_folder and not isinstance(copy_to_folder, BaseFolder):
-            raise ValueError("'copy_to_folder' %r must be a Folder instance" % copy_to_folder)
         return list(
             self._consume_item_service(service_cls=SendItem, items=ids, chunk_size=chunk_size, kwargs=dict(
                 saved_item_folder=copy_to_folder,
@@ -535,8 +474,6 @@ class Account:
         :param chunk_size: The number of items to send to the server in a single request
         :return: Status for each send operation, in the same order as the input
         """
-        if not isinstance(to_folder, BaseFolder):
-            raise ValueError("'to_folder' %r must be a Folder instance" % to_folder)
         return list(
             i if isinstance(i, Exception) else Item.id_from_xml(i)
             for i in self._consume_item_service(service_cls=CopyItem, items=ids, chunk_size=chunk_size, kwargs=dict(
@@ -553,8 +490,6 @@ class Account:
         :return: The new IDs of the moved items, in the same order as the input. If 'to_folder' is a public folder or a
         folder in a different mailbox, an empty list is returned.
         """
-        if not isinstance(to_folder, BaseFolder):
-            raise ValueError("'to_folder' %r must be a Folder instance" % to_folder)
         return list(
             i if isinstance(i, Exception) else Item.id_from_xml(i)
             for i in self._consume_item_service(service_cls=MoveItem, items=ids, chunk_size=chunk_size, kwargs=dict(
@@ -571,8 +506,6 @@ class Account:
         :param chunk_size: The number of items to send to the server in a single request
         :return: A list containing True or an exception instance in stable order of the requested items
         """
-        if not isinstance(to_folder, (BaseFolder, FolderId, DistinguishedFolderId)):
-            raise ValueError("'to_folder' %r must be a Folder or FolderId instance" % to_folder)
         return list(self._consume_item_service(service_cls=ArchiveItem, items=ids, chunk_size=chunk_size, kwargs=dict(
                 to_folder=to_folder,
             ))
@@ -618,16 +551,11 @@ class Account:
         """See self.oof_settings about caching considerations
         """
         # mail_tips_requested must be one of properties.MAIL_TIPS_TYPES
-        res = list(GetMailTips(protocol=self.protocol).call(
+        return GetMailTips(protocol=self.protocol).get(
             sending_as=SendingAs(email_address=self.primary_smtp_address),
             recipients=[Mailbox(email_address=self.primary_smtp_address)],
             mail_tips_requested='All',
-        ))
-        if len(res) != 1:
-            raise ValueError('Expected result length 1, but got %s' % res)
-        if isinstance(res[0], Exception):
-            raise res[0]
-        return res[0]
+        )
 
     @property
     def delegates(self):

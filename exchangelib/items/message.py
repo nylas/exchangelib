@@ -2,6 +2,7 @@ import logging
 
 from ..fields import BooleanField, Base64Field, TextField, MailboxField, MailboxListField, CharField
 from ..properties import ReferenceItemId, Fields
+from ..services import SendItem
 from ..version import EXCHANGE_2013
 from .base import BaseReplyItem
 from .item import Item, AUTO_RESOLVE, SEND_TO_NONE, SEND_ONLY, SEND_AND_SAVE_COPY
@@ -49,12 +50,12 @@ class Message(Item):
         # not yet exist in EWS.
         if not self.account:
             raise ValueError('%s must have an account' % self.__class__.__name__)
+        if copy_to_folder and not save_copy:
+            raise AttributeError("'save_copy' must be True when 'copy_to_folder' is set")
+        if save_copy and not copy_to_folder:
+            copy_to_folder = self.account.sent  # 'Sent' is default EWS behaviour
         if self.id:
-            res = self.account.bulk_send(ids=[self], save_copy=save_copy, copy_to_folder=copy_to_folder)
-            if len(res) != 1:
-                raise ValueError('Expected result length 1, but got %s' % res)
-            if isinstance(res[0], Exception):
-                raise res[0]
+            SendItem(account=self.account).get(items=[self], saved_item_folder=copy_to_folder)
             # The item will be deleted from the original folder
             self._id = None
             self.folder = copy_to_folder
@@ -62,8 +63,6 @@ class Message(Item):
 
         # New message
         if copy_to_folder:
-            if not save_copy:
-                raise AttributeError("'save_copy' must be True when 'copy_to_folder' is set")
             # This would better be done via send_and_save() but lets just support it here
             self.folder = copy_to_folder
             return self.send_and_save(conflict_resolution=conflict_resolution,
@@ -76,9 +75,7 @@ class Message(Item):
                                send_meeting_invitations=send_meeting_invitations)
             return None
 
-        res = self._create(message_disposition=SEND_ONLY, send_meeting_invitations=send_meeting_invitations)
-        if res:
-            raise ValueError('Unexpected response in send-only mode')
+        self._create(message_disposition=SEND_ONLY, send_meeting_invitations=send_meeting_invitations)
         return None
 
     def send_and_save(self, update_fields=None, conflict_resolution=AUTO_RESOLVE,

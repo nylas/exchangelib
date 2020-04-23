@@ -4,9 +4,18 @@ from ..extended_properties import ExtendedProperty
 from ..fields import BooleanField, ExtendedPropertyField, BodyField, MailboxField, MailboxListField, EWSElementField, \
     CharField, IdElementField
 from ..properties import InvalidField, IdChangeKeyMixIn, EWSElement, ReferenceItemId, ItemId, Fields
+from ..services import CreateItem
 from ..version import EXCHANGE_2007_SP1
 
 log = logging.getLogger(__name__)
+
+# Shape enums
+ID_ONLY = 'IdOnly'
+DEFAULT = 'Default'
+# AllProperties doesn't actually get all properties in FindItem, just the "first-class" ones. See
+# https://docs.microsoft.com/en-us/exchange/client-developer/exchange-web-services/email-properties-and-elements-in-ews-in-exchange
+ALL_PROPERTIES = 'AllProperties'
+SHAPE_CHOICES = (ID_ONLY, DEFAULT, ALL_PROPERTIES)
 
 # MessageDisposition values. See
 # https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/createitem
@@ -14,6 +23,42 @@ SAVE_ONLY = 'SaveOnly'
 SEND_ONLY = 'SendOnly'
 SEND_AND_SAVE_COPY = 'SendAndSaveCopy'
 MESSAGE_DISPOSITION_CHOICES = (SAVE_ONLY, SEND_ONLY, SEND_AND_SAVE_COPY)
+
+# SendMeetingInvitations values. See
+# https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/createitem
+# SendMeetingInvitationsOrCancellations. See
+# https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/updateitem
+# SendMeetingCancellations values. See
+# https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/deleteitem
+SEND_TO_NONE = 'SendToNone'
+SEND_ONLY_TO_ALL = 'SendOnlyToAll'
+SEND_ONLY_TO_CHANGED = 'SendOnlyToChanged'
+SEND_TO_ALL_AND_SAVE_COPY = 'SendToAllAndSaveCopy'
+SEND_TO_CHANGED_AND_SAVE_COPY = 'SendToChangedAndSaveCopy'
+SEND_MEETING_INVITATIONS_CHOICES = (SEND_TO_NONE, SEND_ONLY_TO_ALL, SEND_TO_ALL_AND_SAVE_COPY)
+SEND_MEETING_INVITATIONS_AND_CANCELLATIONS_CHOICES = (SEND_TO_NONE, SEND_ONLY_TO_ALL, SEND_ONLY_TO_CHANGED,
+                                                      SEND_TO_ALL_AND_SAVE_COPY, SEND_TO_CHANGED_AND_SAVE_COPY)
+SEND_MEETING_CANCELLATIONS_CHOICES = (SEND_TO_NONE, SEND_ONLY_TO_ALL, SEND_TO_ALL_AND_SAVE_COPY)
+
+# AffectedTaskOccurrences values. See
+# https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/deleteitem
+ALL_OCCURRENCIES = 'AllOccurrences'
+SPECIFIED_OCCURRENCE_ONLY = 'SpecifiedOccurrenceOnly'
+AFFECTED_TASK_OCCURRENCES_CHOICES = (ALL_OCCURRENCIES, SPECIFIED_OCCURRENCE_ONLY)
+
+# ConflictResolution values. See
+# https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/updateitem
+NEVER_OVERWRITE = 'NeverOverwrite'
+AUTO_RESOLVE = 'AutoResolve'
+ALWAYS_OVERWRITE = 'AlwaysOverwrite'
+CONFLICT_RESOLUTION_CHOICES = (NEVER_OVERWRITE, AUTO_RESOLVE, ALWAYS_OVERWRITE)
+
+# DeleteType values. See
+# https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/deleteitem
+HARD_DELETE = 'HardDelete'
+SOFT_DELETE = 'SoftDelete'
+MOVE_TO_DELETED_ITEMS = 'MoveToDeletedItems'
+DELETE_TYPE_CHOICES = (HARD_DELETE, SOFT_DELETE, MOVE_TO_DELETED_ITEMS)
 
 
 class RegisterMixIn(IdChangeKeyMixIn):
@@ -137,9 +182,13 @@ class BaseReplyItem(EWSElement):
             if not save_copy:
                 raise AttributeError("'save_copy' must be True when 'copy_to_folder' is set")
         message_disposition = SEND_AND_SAVE_COPY if save_copy else SEND_ONLY
-        res = self.account.bulk_create(items=[self], folder=copy_to_folder, message_disposition=message_disposition)
-        if res and isinstance(res[0], Exception):
-            raise res[0]
+        CreateItem(account=self.account).get(
+            items=[self],
+            folder=copy_to_folder,
+            message_disposition=message_disposition,
+            send_meeting_invitations=SEND_TO_NONE,
+            expect_result=False,
+        )
 
     def save(self, folder):
         """
@@ -148,10 +197,9 @@ class BaseReplyItem(EWSElement):
         """
         if not self.account:
             raise ValueError('%s must have an account' % self.__class__.__name__)
-        res = self.account.bulk_create(items=[self], folder=folder, message_disposition=SAVE_ONLY)
-        if res and isinstance(res[0], Exception):
-            raise res[0]
-        res = list(self.account.fetch(res))  # retrieve result
-        if res and isinstance(res[0], Exception):
-            raise res[0]
-        return res[0]
+        return CreateItem(account=self.account).get(
+            items=[self],
+            folder=folder,
+            message_disposition=SAVE_ONLY,
+            send_meeting_invitations=SEND_TO_NONE,
+        )

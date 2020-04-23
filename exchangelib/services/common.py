@@ -60,6 +60,23 @@ class EWSService(metaclass=abc.ABCMeta):
     # def get_payload(self, **kwargs):
     #     raise NotImplementedError()
 
+    def get(self, expect_result=True, **kwargs):
+        # Calls the service but expects exactly one result, or None when expect_result=False, or None or exactly one
+        # result when expect_result=None.
+        res = list(self.call(**kwargs))
+        if expect_result is None and not res:
+            # Allow empty result
+            return
+        if expect_result is False:
+            if res:
+                raise ValueError('Expected result length 0, but got %r', res)
+            return
+        if len(res) != 1:
+            raise ValueError('Expected result length 1, but got %r' % res)
+        if isinstance(res[0], Exception):
+            raise res[0]
+        return res[0]
+
     def _get_elements(self, payload):
         while True:
             try:

@@ -17,6 +17,21 @@ class DeleteItem(EWSAccountService, EWSPooledMixIn):
     element_container_name = None  # DeleteItem doesn't return a response object, just status in XML attrs
 
     def call(self, items, delete_type, send_meeting_cancellations, affected_task_occurrences, suppress_read_receipts):
+        from ..items import DELETE_TYPE_CHOICES, SEND_MEETING_CANCELLATIONS_CHOICES, AFFECTED_TASK_OCCURRENCES_CHOICES
+        if delete_type not in DELETE_TYPE_CHOICES:
+            raise ValueError("'delete_type' %s must be one of %s" % (
+                delete_type, DELETE_TYPE_CHOICES
+            ))
+        if send_meeting_cancellations not in SEND_MEETING_CANCELLATIONS_CHOICES:
+            raise ValueError("'send_meeting_cancellations' %s must be one of %s" % (
+                send_meeting_cancellations, SEND_MEETING_CANCELLATIONS_CHOICES
+            ))
+        if affected_task_occurrences not in AFFECTED_TASK_OCCURRENCES_CHOICES:
+            raise ValueError("'affected_task_occurrences' %s must be one of %s" % (
+                affected_task_occurrences, AFFECTED_TASK_OCCURRENCES_CHOICES
+            ))
+        if suppress_read_receipts not in (True, False):
+            raise ValueError("'suppress_read_receipts' %s must be True or False" % suppress_read_receipts)
         return self._pool_requests(payload_func=self.get_payload, **dict(
             items=items,
             delete_type=delete_type,
