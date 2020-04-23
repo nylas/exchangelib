@@ -3,6 +3,7 @@ from codecs import BOM_UTF8
 from collections import OrderedDict
 import datetime
 from decimal import Decimal
+from functools import wraps
 import io
 import itertools
 import logging
@@ -28,6 +29,26 @@ from .errors import TransportError, RateLimitError, RedirectError, RelativeRedir
     ErrorInvalidSchemaVersionForMailboxVersion
 
 log = logging.getLogger(__name__)
+
+
+def require_account(f):
+    @wraps(f)
+    def wrapper(self, *args, **kwargs):
+        if not self.account:
+            raise ValueError('%s must have an account' % self.__class__.__name__)
+        return f(self, *args, **kwargs)
+    return wrapper
+
+
+def require_id(f):
+    @wraps(f)
+    def wrapper(self, *args, **kwargs):
+        if not self.account:
+            raise ValueError('%s must have an account' % self.__class__.__name__)
+        if not self.id:
+            raise ValueError('%s must have an ID' % self.__class__.__name__)
+        return f(self, *args, **kwargs)
+    return wrapper
 
 
 class ParseError(lxml.etree.ParseError):

@@ -6,10 +6,10 @@ from ..fields import BooleanField, IntegerField, TextField, CharListField, Choic
 from ..properties import ConversationId, ParentFolderId, ReferenceItemId, OccurrenceItemId, RecurringMasterItemId,\
     Fields
 from ..services import GetItem, CreateItem, UpdateItem, DeleteItem, MoveItem, CopyItem, ArchiveItem
-from ..util import is_iterable
+from ..util import is_iterable, require_account, require_id
 from ..version import EXCHANGE_2010, EXCHANGE_2013
-from .base import BaseItem, SAVE_ONLY, SEND_ONLY, SEND_AND_SAVE_COPY, ID_ONLY, SEND_TO_NONE, AUTO_RESOLVE, \
-    SOFT_DELETE, HARD_DELETE, ALL_OCCURRENCIES, MOVE_TO_DELETED_ITEMS
+from .base import BaseItem, BulkCreateResult, SAVE_ONLY, SEND_ONLY, SEND_AND_SAVE_COPY, ID_ONLY, SEND_TO_NONE, \
+    AUTO_RESOLVE, SOFT_DELETE, HARD_DELETE, ALL_OCCURRENCIES, MOVE_TO_DELETED_ITEMS
 
 log = logging.getLogger(__name__)
 
@@ -126,9 +126,8 @@ class Item(BaseItem):
                 self.attach(tmp_attachments)
         return self
 
+    @require_account
     def _create(self, message_disposition, send_meeting_invitations):
-        if not self.account:
-            raise ValueError('%s must have an account' % self.__class__.__name__)
         # Return a BulkCreateResult because we want to return the ID of both the main item *and* attachments
         res = CreateItem(account=self.account).get(
             items=[self],
@@ -137,7 +136,7 @@ class Item(BaseItem):
             send_meeting_invitations=send_meeting_invitations,
             expect_result=message_disposition not in (SEND_ONLY, SEND_AND_SAVE_COPY),
         )
-        if not res:
+        if res is None:
             return
         return BulkCreateResult.from_xml(elem=res, account=self)
 
@@ -168,9 +167,8 @@ class Item(BaseItem):
             update_fieldnames.append(f.name)
         return update_fieldnames
 
+    @require_account
     def _update(self, update_fieldnames, message_disposition, conflict_resolution, send_meeting_invitations):
-        if not self.account:
-            raise ValueError('%s must have an account' % self.__class__.__name__)
         if not self.changekey:
             raise ValueError('%s must have changekey' % self.__class__.__name__)
         if not update_fieldnames:
@@ -184,16 +182,13 @@ class Item(BaseItem):
             suppress_read_receipts=True,
             expect_result=message_disposition != SEND_AND_SAVE_COPY,
         )
-        if not res:
+        if res is None:
             return
         return Item.id_from_xml(res)
 
+    @require_id
     def refresh(self):
         # Updates the item based on fresh data from EWS
-        if not self.account:
-            raise ValueError('%s must have an account' % self.__class__.__name__)
-        if not self.id:
-            raise ValueError('%s must have an ID' % self.__class__.__name__)
         from ..folders import Folder
         additional_fields = {
             FieldPath(field=f) for f in Folder(root=self.account.root).allowed_item_fields(version=self.account.version)
@@ -212,32 +207,26 @@ class Item(BaseItem):
             a.parent_item = self
         del res
 
+    @require_id
     def copy(self, to_folder):
-        if not self.account:
-            raise ValueError('%s must have an account' % self.__class__.__name__)
-        if not self.id:
-            raise ValueError('%s must have an ID' % self.__class__.__name__)
         res = CopyItem(account=self.account).get(
             items=[self],
             to_folder=to_folder,
             expect_result=None,
         )
-        if not res:
+        if res is None:
             # Assume 'to_folder' is a public folder or a folder in a different mailbox
             return
         return Item.id_from_xml(res)
 
+    @require_id
     def move(self, to_folder):
-        if not self.account:
-            raise ValueError('%s must have an account' % self.__class__.__name__)
-        if not self.id:
-            raise ValueError('%s must have an ID' % self.__class__.__name__)
         res = MoveItem(account=self.account).get(
             items=[self],
             to_folder=to_folder,
             expect_result=None,
         )
-        if not res:
+        if res is None:
             # Assume 'to_folder' is a public folder or a folder in a different mailbox
             self._id = None
             return
@@ -267,11 +256,8 @@ class Item(BaseItem):
                      affected_task_occurrences=affected_task_occurrences, suppress_read_receipts=suppress_read_receipts)
         self._id, self.folder = None, None
 
+    @require_id
     def _delete(self, delete_type, send_meeting_cancellations, affected_task_occurrences, suppress_read_receipts):
-        if not self.account:
-            raise ValueError('%s must have an account' % self.__class__.__name__)
-        if not self.id:
-            raise ValueError('%s must have an ID' % self.__class__.__name__)
         DeleteItem(account=self.account).get(
             items=[self],
             delete_type=delete_type,
@@ -280,11 +266,8 @@ class Item(BaseItem):
             suppress_read_receipts=suppress_read_receipts,
         )
 
+    @require_id
     def archive(self, to_folder):
-        if not self.account:
-            raise ValueError('%s must have an account' % self.__class__.__name__)
-        if not self.id:
-            raise ValueError('%s must have an ID' % self.__class__.__name__)
         return ArchiveItem(account=self.account).get(items=[self], to_folder=to_folder)
 
     def attach(self, attachments):
@@ -326,12 +309,9 @@ class Item(BaseItem):
             if a in self.attachments:
                 self.attachments.remove(a)
 
+    @require_id
     def create_forward(self, subject, body, to_recipients, cc_recipients=None, bcc_recipients=None):
         from .message import ForwardItem
-        if not self.account:
-            raise ValueError('%s must have an account' % self.__class__.__name__)
-        if not self.id:
-            raise ValueError('%s must have an ID' % self.__class__.__name__)
         return ForwardItem(
             account=self.account,
             reference_item_id=ReferenceItemId(id=self.id, changekey=self.changekey),
@@ -350,19 +330,3 @@ class Item(BaseItem):
             cc_recipients,
             bcc_recipients,
         ).send()
-
-
-class BulkCreateResult(BaseItem):
-    """A dummy class to store return values from a CreateItem service call"""
-    LOCAL_FIELDS = Fields(
-        AttachmentField('attachments', field_uri='item:Attachments'),  # ItemAttachment or FileAttachment
-    )
-    FIELDS = BaseItem.FIELDS + LOCAL_FIELDS
-
-    __slots__ = tuple(f.name for f in LOCAL_FIELDS)
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        # pylint: disable=access-member-before-definition
-        if self.attachments is None:
-            self.attachments = []

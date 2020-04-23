@@ -63,7 +63,7 @@ class MessagesTest(CommonItemTest):
         item.send()  # Send the draft
         self.assertIsNone(item.id)
         self.assertIsNone(item.changekey)
-        self.assertIsNone(item.folder)
+        self.assertEqual(item.folder, self.account.sent)
         self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 0)
 
     def test_send_and_copy_to_folder(self):
@@ -118,11 +118,9 @@ class MessagesTest(CommonItemTest):
         new_subject = ('Re: %s' % sent_item.subject)[:255]
         sent_item.forward(subject=new_subject, body='Hello reply', to_recipients=[item.author])
         reply = self.get_incoming_message(new_subject)
-        reply2 = sent_item.create_forward(subject=new_subject, body='Hello reply', to_recipients=[item.author])
-        reply2 = reply2.save(self.account.drafts)
-        self.assertIsInstance(reply2, Message)
-
-        self.account.bulk_delete([sent_item, reply, reply2])
+        forward = sent_item.create_forward(subject=new_subject, body='Hello reply', to_recipients=[item.author])
+        res = forward.save(self.account.drafts)
+        self.account.bulk_delete([sent_item, reply, res])
 
     def test_mime_content(self):
         # Tests the 'mime_content' field
@@ -134,7 +132,7 @@ class MessagesTest(CommonItemTest):
         body = 'MIME test mail'
         msg.attach(MIMEText(body, 'plain', _charset='utf-8'))
         mime_content = msg.as_bytes()
-        item = self.ITEM_CLASS(
+        self.ITEM_CLASS(
             folder=self.test_folder,
             to_recipients=[self.account.primary_smtp_address],
             mime_content=mime_content,

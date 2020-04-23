@@ -10,9 +10,9 @@ from ..properties import Attendee, ReferenceItemId, AssociatedCalendarItemId, Oc
     Fields
 from ..recurrence import FirstOccurrence, LastOccurrence, Occurrence, DeletedOccurrence
 from ..services import CreateItem
-from ..util import set_xml_value
+from ..util import set_xml_value, require_account
 from ..version import EXCHANGE_2010, EXCHANGE_2013
-from .base import BaseItem, BaseReplyItem, SEND_ONLY, SEND_AND_SAVE_COPY, SEND_TO_NONE
+from .base import BaseItem, BaseReplyItem, BulkCreateResult, SEND_ONLY, SEND_AND_SAVE_COPY, SEND_TO_NONE
 from .item import Item
 from .message import Message
 
@@ -376,17 +376,16 @@ class BaseMeetingReplyItem(BaseItem):
 
     __slots__ = tuple(f.name for f in FIELDS)
 
+    @require_account
     def send(self, message_disposition=SEND_AND_SAVE_COPY):
-        if not self.account:
-            raise ValueError('%s must have an account' % self.__class__.__name__)
-
-        return CreateItem(account=self.account).get(
+        res = CreateItem(account=self.account).get(
             items=[self],
             folder=self.folder,
             message_disposition=message_disposition,
             send_meeting_invitations=SEND_TO_NONE,
             expect_result=message_disposition not in (SEND_ONLY, SEND_AND_SAVE_COPY),
         )
+        return BulkCreateResult.from_xml(elem=res, account=self)
 
 
 class AcceptItem(BaseMeetingReplyItem):

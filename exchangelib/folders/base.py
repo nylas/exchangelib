@@ -12,7 +12,7 @@ from ..properties import Mailbox, FolderId, ParentFolderId, InvalidField, Distin
 from ..queryset import QuerySet, SearchableMixIn, DoesNotExist
 from ..restriction import Restriction
 from ..services import CreateFolder, UpdateFolder, DeleteFolder, EmptyFolder, FindPeople
-from ..util import TNS
+from ..util import TNS, require_id
 from ..version import Version, EXCHANGE_2007_SP1, EXCHANGE_2010
 from .collections import FolderCollection
 from .queryset import SingleFolderQuerySet, SHALLOW as SHALLOW_FOLDERS, DEEP as DEEP_FOLDERS
@@ -496,11 +496,8 @@ class BaseFolder(RegisterMixIn, SearchableMixIn):
             raise ValueError("Expected folder %r to be a %s instance" % (f, cls))
         return f
 
+    @require_id
     def refresh(self):
-        if not self.account:
-            raise ValueError('%s must have an account' % self.__class__.__name__)
-        if not self.id:
-            raise ValueError('%s must have an ID' % self.__class__.__name__)
         fresh_folder = self.resolve(account=self.account, folder=self)
         if self.id != fresh_folder.id:
             raise ValueError('ID mismatch')

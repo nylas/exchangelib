@@ -3,6 +3,7 @@ import logging
 from ..fields import BooleanField, Base64Field, TextField, MailboxField, MailboxListField, CharField
 from ..properties import ReferenceItemId, Fields
 from ..services import SendItem
+from ..util import require_account, require_id
 from ..version import EXCHANGE_2013
 from .base import BaseReplyItem
 from .item import Item, AUTO_RESOLVE, SEND_TO_NONE, SEND_ONLY, SEND_AND_SAVE_COPY
@@ -44,12 +45,11 @@ class Message(Item):
 
     __slots__ = tuple(f.name for f in LOCAL_FIELDS)
 
+    @require_account
     def send(self, save_copy=True, copy_to_folder=None, conflict_resolution=AUTO_RESOLVE,
              send_meeting_invitations=SEND_TO_NONE):
         # Only sends a message. The message can either be an existing draft stored in EWS or a new message that does
         # not yet exist in EWS.
-        if not self.account:
-            raise ValueError('%s must have an account' % self.__class__.__name__)
         if copy_to_folder and not save_copy:
             raise AttributeError("'save_copy' must be True when 'copy_to_folder' is set")
         if save_copy and not copy_to_folder:
@@ -104,11 +104,8 @@ class Message(Item):
                 if res:
                     raise ValueError('Unexpected response in send-only mode')
 
+    @require_id
     def create_reply(self, subject, body, to_recipients=None, cc_recipients=None, bcc_recipients=None):
-        if not self.account:
-            raise ValueError('%s must have an account' % self.__class__.__name__)
-        if not self.id:
-            raise ValueError('%s must have an ID' % self.__class__.__name__)
         if to_recipients is None:
             if not self.author:
                 raise ValueError("'to_recipients' must be set when message has no 'author'")
@@ -132,11 +129,8 @@ class Message(Item):
             bcc_recipients
         ).send()
 
+    @require_id
     def create_reply_all(self, subject, body):
-        if not self.account:
-            raise ValueError('%s must have an account' % self.__class__.__name__)
-        if not self.id:
-            raise ValueError('%s must have an ID' % self.__class__.__name__)
         to_recipients = list(self.to_recipients) if self.to_recipients else []
         if self.author:
             to_recipients.append(self.author)

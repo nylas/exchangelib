@@ -8,6 +8,7 @@ from ..properties import CalendarView, InvalidField
 from ..queryset import QuerySet, SearchableMixIn
 from ..restriction import Restriction
 from ..services import FindFolder, GetFolder, FindItem
+from ..util import require_account
 from .queryset import FOLDER_TRAVERSAL_CHOICES
 
 log = logging.getLogger(__name__)
@@ -256,6 +257,7 @@ class FolderCollection(SearchableMixIn):
         ):
             yield f
 
+    @require_account
     def find_folders(self, q=None, shape=ID_ONLY, depth=None, additional_fields=None, page_size=None, max_items=None,
                      offset=0):
         # 'depth' controls whether to return direct children or recurse into sub-folders
@@ -263,8 +265,6 @@ class FolderCollection(SearchableMixIn):
         if not self.folders:
             log.debug('Folder list is empty')
             return
-        if not self.account:
-            raise ValueError('Folder must have an account')
         if q is None or q.is_empty():
             restriction = None
         else:

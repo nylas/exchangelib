@@ -2,9 +2,10 @@ import logging
 
 from ..extended_properties import ExtendedProperty
 from ..fields import BooleanField, ExtendedPropertyField, BodyField, MailboxField, MailboxListField, EWSElementField, \
-    CharField, IdElementField
+    CharField, IdElementField, AttachmentField
 from ..properties import InvalidField, IdChangeKeyMixIn, EWSElement, ReferenceItemId, ItemId, Fields
 from ..services import CreateItem
+from ..util import require_account
 from ..version import EXCHANGE_2007_SP1
 
 log = logging.getLogger(__name__)
@@ -175,9 +176,8 @@ class BaseReplyItem(EWSElement):
             raise ValueError("'account' %r must be an Account instance" % self.account)
         super().__init__(**kwargs)
 
+    @require_account
     def send(self, save_copy=True, copy_to_folder=None):
-        if not self.account:
-            raise ValueError('%s must have an account' % self.__class__.__name__)
         if copy_to_folder:
             if not save_copy:
                 raise AttributeError("'save_copy' must be True when 'copy_to_folder' is set")
@@ -190,16 +190,32 @@ class BaseReplyItem(EWSElement):
             expect_result=False,
         )
 
+    @require_account
     def save(self, folder):
         """
         save reply/forward and retrieve the item result for further modification,
         you may want to use account.drafts as the folder.
         """
-        if not self.account:
-            raise ValueError('%s must have an account' % self.__class__.__name__)
-        return CreateItem(account=self.account).get(
+        res = CreateItem(account=self.account).get(
             items=[self],
             folder=folder,
             message_disposition=SAVE_ONLY,
             send_meeting_invitations=SEND_TO_NONE,
         )
+        return BulkCreateResult.from_xml(elem=res, account=self)
+
+
+class BulkCreateResult(BaseItem):
+    """A dummy class to store return values from a CreateItem service call"""
+    LOCAL_FIELDS = Fields(
+        AttachmentField('attachments', field_uri='item:Attachments'),  # ItemAttachment or FileAttachment
+    )
+    FIELDS = BaseItem.FIELDS + LOCAL_FIELDS
+
+    __slots__ = tuple(f.name for f in LOCAL_FIELDS)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # pylint: disable=access-member-before-definition
+        if self.attachments is None:
+            self.attachments = []
