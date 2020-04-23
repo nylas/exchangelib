@@ -16,6 +16,9 @@ HEAD
     `CalendarItem.occurrence(some_occurrence_index)` methods were added to aid this traversal.
     `some_occurrence_index` in the last method specifies which item in the list of occurrences to
     target; `CalendarItem.occurrence(3)` gets the third occurrence in the recurrence.
+-   Change `Contact.birthday` and `Contact.wedding_anniversary` from `EWSDateTime` to `EWSDate`
+    fields. EWS still expects and sends datetime values but has started to reset the time part to
+    11:59. Dates are a better match for these two fields anyway.
 
 
 3.1.1

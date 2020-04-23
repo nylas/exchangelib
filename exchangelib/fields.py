@@ -7,7 +7,7 @@ from decimal import Decimal, InvalidOperation
 import logging
 
 from .errors import ErrorInvalidServerVersion
-from .ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, NaiveDateTimeNotAllowed, UnknownTimeZone
+from .ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, NaiveDateTimeNotAllowed, UnknownTimeZone, UTC
 from .util import create_element, get_xml_attrs, set_xml_value, value_to_xml_text, is_iterable, safe_b64decode, TNS
 from .version import Build, Version, EXCHANGE_2013
 
@@ -574,6 +574,30 @@ class DateField(FieldURIField):
                 log.warning("Cannot convert value '%s' on field '%s' to type %s", val, self.name, self.value_cls)
                 return None
         return self.default
+
+
+class DateTimeBackedDateField(FieldURIField):
+    # A field that acts like a date, but where values are sent to EWS as EWSDateTime.
+    value_cls = datetime.date
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Create internal field to handle datetime-only logic
+        self._datetime_field = DateTimeField(*args, **kwargs)
+
+    def date_to_datetime(self, value):
+        return UTC.localize(self._datetime_field.value_cls.combine(value, datetime.time(11, 59)))
+
+    def from_xml(self, elem, account):
+        res = self._datetime_field.from_xml(elem=elem, account=account)
+        if res is None:
+            return res
+        return res.date()
+
+    def to_xml(self, value, version):
+        # Convert date to datetime. EWS changes all values to have a time of 11:59 local time, so let's send that.
+        value = self.date_to_datetime(value)
+        return self._datetime_field.to_xml(value=value, version=version)
 
 
 class TimeField(FieldURIField):

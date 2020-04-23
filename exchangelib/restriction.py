@@ -384,6 +384,7 @@ class Q:
         # return None.
         from .indexed_properties import SingleFieldIndexedElement
         from .extended_properties import ExtendedProperty
+        from .fields import DateTimeBackedDateField
         # Don't check self.value just yet. We want to return error messages on the field path first, and then the value.
         # This is done in _get_field_path() and _get_clean_value(), respectively.
         self._check_integrity()
@@ -400,6 +401,9 @@ class Q:
                 # We allow a filter shortcut of e.g. email_addresses__contains=EmailAddress(label='Foo', ...) instead of
                 # email_addresses__Foo_email_address=.... Set FieldPath label now so we can generate the field_uri.
                 field_path.label = clean_value.label
+            elif isinstance(field_path.field, DateTimeBackedDateField):
+                # We need to convert to datetime
+                clean_value = field_path.field.date_to_datetime(clean_value)
             elem.append(field_path.to_xml())
             constant = create_element('t:Constant')
             if self.op != self.EXISTS:

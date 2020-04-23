@@ -1,8 +1,8 @@
 import logging
 
-from ..fields import BooleanField, Base64Field, TextField, ChoiceField, URIField, DateTimeField, PhoneNumberField, \
-    EmailAddressesField, PhysicalAddressField, Choice, MemberListField, CharField, TextListField, EmailAddressField, \
-    IdElementField
+from ..fields import BooleanField, Base64Field, TextField, ChoiceField, URIField, DateTimeBackedDateField, \
+    PhoneNumberField, EmailAddressesField, PhysicalAddressField, Choice, MemberListField, CharField, TextListField, \
+    EmailAddressField, IdElementField
 from ..properties import PersonaId, IdChangeKeyMixIn, Fields
 from ..version import EXCHANGE_2010, EXCHANGE_2013
 from .item import Item
@@ -36,7 +36,7 @@ class Contact(Item):
         PhysicalAddressField('physical_addresses', field_uri='contacts:PhysicalAddress'),
         PhoneNumberField('phone_numbers', field_uri='contacts:PhoneNumber'),
         TextField('assistant_name', field_uri='contacts:AssistantName'),
-        DateTimeField('birthday', field_uri='contacts:Birthday'),
+        DateTimeBackedDateField('birthday', field_uri='contacts:Birthday'),
         URIField('business_homepage', field_uri='contacts:BusinessHomePage'),
         TextListField('children', field_uri='contacts:Children'),
         TextListField('companies', field_uri='contacts:Companies', is_searchable=False),
@@ -56,7 +56,7 @@ class Contact(Item):
         TextField('profession', field_uri='contacts:Profession'),
         TextField('spouse_name', field_uri='contacts:SpouseName'),
         CharField('surname', field_uri='contacts:Surname'),
-        DateTimeField('wedding_anniversary', field_uri='contacts:WeddingAnniversary'),
+        DateTimeBackedDateField('wedding_anniversary', field_uri='contacts:WeddingAnniversary'),
         BooleanField('has_picture', field_uri='contacts:HasPicture', supported_from=EXCHANGE_2010, is_read_only=True),
         TextField('phonetic_full_name', field_uri='contacts:PhoneticFullName', supported_from=EXCHANGE_2013,
                   is_read_only=True),

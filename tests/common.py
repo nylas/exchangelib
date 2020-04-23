@@ -20,7 +20,8 @@ from exchangelib.ewsdatetime import EWSDateTime, EWSDate, EWSTimeZone, UTC
 from exchangelib.fields import BooleanField, IntegerField, DecimalField, TextField, EmailAddressField, URIField, \
     ChoiceField, BodyField, DateTimeField, Base64Field, PhoneNumberField, EmailAddressesField, TimeZoneField, \
     PhysicalAddressField, ExtendedPropertyField, MailboxField, AttendeesField, AttachmentField, CharListField, \
-    MailboxListField, EWSElementField, CultureField, CharField, TextListField, PermissionSetField, MimeContentField
+    MailboxListField, EWSElementField, CultureField, CharField, TextListField, PermissionSetField, MimeContentField, \
+    DateField, DateTimeBackedDateField
 from exchangelib.indexed_properties import EmailAddress, PhysicalAddress, PhoneNumber
 from exchangelib.properties import Attendee, Mailbox, PermissionSet, Permission, UserId
 from exchangelib.protocol import BaseProtocol, NoVerifyHTTPAdapter, FaultTolerance
@@ -159,6 +160,10 @@ class EWSTest(TimedTestCase):
             return get_random_decimal(field.min or 1, field.max or 99)
         if isinstance(field, IntegerField):
             return get_random_int(field.min or 0, field.max or 256)
+        if isinstance(field, DateField):
+            return get_random_date()
+        if isinstance(field, DateTimeBackedDateField):
+            return get_random_date()
         if isinstance(field, DateTimeField):
             return get_random_datetime(tz=self.account.default_timezone)
         if isinstance(field, AttachmentField):
