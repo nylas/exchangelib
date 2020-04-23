@@ -597,6 +597,9 @@ class RetryPolicy:
     def back_off_until(self, value):
         raise NotImplementedError()
 
+    def back_off(self, seconds):
+        raise NotImplementedError()
+
 
 class FailFast(RetryPolicy):
     """Fail immediately on server errors"""

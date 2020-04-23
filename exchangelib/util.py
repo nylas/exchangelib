@@ -430,7 +430,7 @@ def to_xml(bytes_content):
             pass
         raise ParseError('This is not XML: %r' % stream.read(), '<not from file>', -1, 0)
 
-    if not res.getroot():
+    if res.getroot() is None:
         try:
             stream.seek(0)
             msg = 'No root element found: %r' % stream.read()
