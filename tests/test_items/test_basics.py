@@ -246,7 +246,7 @@ class CommonItemTest(BaseItemTest):
                     if f.name in ('reminder_due_by',):
                         # Filtering is accepted but doesn't work
                         self.assertEqual(
-                            len(self.test_folder.filter(**filter_kwargs)),
+                            self.test_folder.filter(**filter_kwargs).count(),
                             0
                         )
                     else:
@@ -314,14 +314,14 @@ class CommonItemTest(BaseItemTest):
                     filter_kwargs.append({'%s__contains' % f.name: val[random_start:random_end]})
             for kw in filter_kwargs:
                 with self.subTest(f=f, kw=kw):
-                    matches = len(common_qs.filter(**kw))
+                    matches = common_qs.filter(**kw).count()
                     if isinstance(f, TextField) and f.is_complex:
                         # Complex text fields sometimes fail a search using generated data. In production,
                         # they almost always work anyway. Give it one more try after 10 seconds; it seems EWS does
                         # some sort of indexing that needs to catch up.
                         if not matches:
                             time.sleep(10)
-                            matches = len(common_qs.filter(**kw))
+                            matches = common_qs.filter(**kw).count()
                             if not matches and isinstance(f, BodyField):
                                 # The body field is particularly nasty in this area. Give up
                                 continue
@@ -476,7 +476,7 @@ class CommonItemTest(BaseItemTest):
             self.assertIsInstance(e, ErrorItemNotFound)
         # Really gone, not just changed ItemId
         items = self.test_folder.filter(categories__contains=item.categories)
-        self.assertEqual(len(items), 0)
+        self.assertEqual(items.count(), 0)
 
     def test_item(self):
         # Test insert
@@ -487,10 +487,10 @@ class CommonItemTest(BaseItemTest):
         insert_ids = self.test_folder.bulk_create(items=(i for i in [item]))
         self.assertEqual(len(insert_ids), 1)
         self.assertIsInstance(insert_ids[0], BaseItem)
-        find_ids = self.test_folder.filter(categories__contains=item.categories).values_list('id', 'changekey')
+        find_ids = list(self.test_folder.filter(categories__contains=item.categories).values_list('id', 'changekey'))
         self.assertEqual(len(find_ids), 1)
         self.assertEqual(len(find_ids[0]), 2, find_ids[0])
-        self.assertEqual(insert_ids, list(find_ids))
+        self.assertEqual(insert_ids, find_ids)
         # Test with generator as argument
         item = list(self.account.fetch(ids=(i for i in find_ids)))[0]
         for f in self.ITEM_CLASS.FIELDS:

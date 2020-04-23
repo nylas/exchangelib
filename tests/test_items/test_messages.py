@@ -35,7 +35,7 @@ class MessagesTest(CommonItemTest):
         item.send()
         self.assertIsNone(item.id)
         self.assertIsNone(item.changekey)
-        self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 0)
+        self.assertEqual(self.test_folder.filter(categories__contains=item.categories).count(), 0)
 
     def test_send_and_save(self):
         # Test that we can send_and_save Message items
@@ -45,7 +45,7 @@ class MessagesTest(CommonItemTest):
         self.assertIsNone(item.changekey)
         time.sleep(5)  # Requests are supposed to be transactional, but apparently not...
         # Also, the sent item may be followed by an automatic message with the same category
-        self.assertGreaterEqual(len(self.test_folder.filter(categories__contains=item.categories)), 1)
+        self.assertGreaterEqual(self.test_folder.filter(categories__contains=item.categories).count(), 1)
 
         # Test update, although it makes little sense
         item = self.get_test_item()
@@ -53,7 +53,7 @@ class MessagesTest(CommonItemTest):
         item.send_and_save()
         time.sleep(5)  # Requests are supposed to be transactional, but apparently not...
         # Also, the sent item may be followed by an automatic message with the same category
-        self.assertGreaterEqual(len(self.test_folder.filter(categories__contains=item.categories)), 1)
+        self.assertGreaterEqual(self.test_folder.filter(categories__contains=item.categories).count(), 1)
 
     def test_send_draft(self):
         item = self.get_test_item()
@@ -64,7 +64,7 @@ class MessagesTest(CommonItemTest):
         self.assertIsNone(item.id)
         self.assertIsNone(item.changekey)
         self.assertEqual(item.folder, self.account.sent)
-        self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 0)
+        self.assertEqual(self.test_folder.filter(categories__contains=item.categories).count(), 0)
 
     def test_send_and_copy_to_folder(self):
         item = self.get_test_item()
@@ -73,7 +73,7 @@ class MessagesTest(CommonItemTest):
         self.assertIsNone(item.changekey)
         self.assertEqual(item.folder, self.account.sent)
         time.sleep(5)  # Requests are supposed to be transactional, but apparently not...
-        self.assertEqual(len(self.account.sent.filter(categories__contains=item.categories)), 1)
+        self.assertEqual(self.account.sent.filter(categories__contains=item.categories).count(), 1)
 
     def test_bulk_send(self):
         with self.assertRaises(AttributeError):
@@ -85,7 +85,7 @@ class MessagesTest(CommonItemTest):
         time.sleep(10)  # Requests are supposed to be transactional, but apparently not...
         # By default, sent items are placed in the sent folder
         ids = self.account.sent.filter(categories__contains=item.categories).values_list('id', 'changekey')
-        self.assertEqual(len(ids), 1)
+        self.assertEqual(ids.count(), 1)
 
     def test_reply(self):
         # Test that we can reply to a Message item. EWS only allows items that have been sent to receive a reply

@@ -19,6 +19,15 @@ HEAD
 -   Change `Contact.birthday` and `Contact.wedding_anniversary` from `EWSDateTime` to `EWSDate`
     fields. EWS still expects and sends datetime values but has started to reset the time part to
     11:59. Dates are a better match for these two fields anyway.
+-   Remove support for `len(some_queryset)`. It had the nasty side-effect of forcing
+    `list(some_queryset)` to run the query twice, once for pre-allocating the list via the result
+    of `len(some_queryset)`, and then once more to fetch the results. All occurrences of
+    `len(some_queryset)` can be replaced with `some_queryset.count()`.
+-   Added `Account.upn`, `Account.sid` and `Account.smtp_address` attributes to allow impersonation
+    using these values. Setting `upn` or `sid` removes the need for an AD lookup on every request.
+    `upn` will often be the same as `primary_smtp_address`, but it is not guaranteed. If you have
+    access to your organization's AD servers, you can look up these values once and add them to your
+    `Account` object to improve performance of the following requests.
 
 
 3.1.1

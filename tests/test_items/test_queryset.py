@@ -163,12 +163,11 @@ class ItemQuerySetTest(BaseItemTest):
         with self.assertRaises(MultipleObjectsReturned):
             qs.get(subject__startswith='Item')
         # len() and count()
-        self.assertEqual(len(qs), 4)
         self.assertEqual(qs.count(), 4)
         # Indexing and slicing
         self.assertTrue(isinstance(qs[0], self.ITEM_CLASS))
         self.assertEqual(len(list(qs[1:3])), 2)
-        self.assertEqual(len(qs), 4)
+        self.assertEqual(qs.count(), 4)
         with self.assertRaises(IndexError):
             print(qs[99999])
         # Exists

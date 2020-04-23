@@ -437,7 +437,7 @@ class ProtocolTest(EWSTest):
         self.assertEqual(len(return_ids), len(items))
         ids = self.account.calendar.filter(start__lt=end, end__gt=start, categories__contains=self.categories) \
             .values_list('id', 'changekey')
-        self.assertEqual(len(ids), len(items))
+        self.assertEqual(ids.count(), len(items))
 
     def test_disable_ssl_verification(self):
         # Test that we can make requests when SSL verification is turned off. I don't know how to mock TLS responses

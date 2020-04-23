@@ -288,11 +288,19 @@ class QuerySet(SearchableMixIn):
             yield val
         self._cache = _cache
 
+    """Do not implement __len__. The implementation of list() tries to preallocate memory by calling __len__ on the
+    given sequence, before calling __iter__. If we implemented __len__, we would end up calling FindItems twice, once
+    to get the result of self.count(), an once to return the actual result.
+
+    Also, according to https://stackoverflow.com/questions/37189968/how-to-have-list-consume-iter-without-calling-len,
+    a __len__ implementation should be cheap. That does not hold for self.count().
+
     def __len__(self):
         if self.is_cached:
             return len(self._cache)
         # This queryset has no cache yet. Call the optimized counting implementation
         return self.count()
+    """
 
     def __getitem__(self, idx_or_slice):
         # Support indexing and slicing. This is non-greedy when possible (slicing start, stop and step are not negative,
@@ -667,7 +675,7 @@ class QuerySet(SearchableMixIn):
     def __str__(self):
         fmt_args = [('q', str(self.q)), ('folders', '[%s]' % ', '.join(str(f) for f in self.folder_collection.folders))]
         if self.is_cached:
-            fmt_args.append(('len', str(len(self))))
+            fmt_args.append(('len', str(len(self._cache))))
         return self.__class__.__name__ + '(%s)' % ', '.join('%s=%s' % (k, v) for k, v in fmt_args)
 
 

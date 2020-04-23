@@ -48,10 +48,12 @@ class ItemHelperTest(BaseItemTest):
             # It's gone from the test folder
             self.assertIsInstance(e, ErrorItemNotFound)
         # Really gone, not just changed ItemId
-        self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 0)
-        self.assertEqual(len(self.account.trash.filter(categories__contains=item.categories)), 0)
+        self.assertEqual(self.test_folder.filter(categories__contains=item.categories).count(), 0)
+        self.assertEqual(self.account.trash.filter(categories__contains=item.categories).count(), 0)
         # But we can find it in the recoverable items folder
-        self.assertEqual(len(self.account.recoverable_items_deletions.filter(categories__contains=item.categories)), 1)
+        self.assertEqual(
+            self.account.recoverable_items_deletions.filter(categories__contains=item.categories).count(), 1
+        )
 
     def test_move_to_trash(self):
         # First, empty trash bin
@@ -64,7 +66,7 @@ class ItemHelperTest(BaseItemTest):
             # Not in the test folder anymore
             self.assertIsInstance(e, ErrorItemNotFound)
         # Really gone, not just changed ItemId
-        self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 0)
+        self.assertEqual(self.test_folder.filter(categories__contains=item.categories).count(), 0)
         # Test that the item moved to trash
         item = self.account.trash.get(categories__contains=item.categories)
         moved_item = list(self.account.fetch(ids=[item]))[0]
@@ -78,7 +80,7 @@ class ItemHelperTest(BaseItemTest):
         # Copy to trash. We use trash because it can contain all item types.
         copy_item_id, copy_changekey = item.copy(to_folder=self.account.trash)
         # Test that the item still exists in the folder
-        self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 1)
+        self.assertEqual(self.test_folder.filter(categories__contains=item.categories).count(), 1)
         # Test that the copied item exists in trash
         copied_item = self.account.trash.get(categories__contains=item.categories)
         self.assertNotEqual(item.id, copied_item.id)
@@ -97,7 +99,7 @@ class ItemHelperTest(BaseItemTest):
             # original item ID no longer exists
             self.assertIsInstance(e, ErrorItemNotFound)
         # Test that the item moved to trash
-        self.assertEqual(len(self.test_folder.filter(categories__contains=item.categories)), 0)
+        self.assertEqual(self.test_folder.filter(categories__contains=item.categories).count(), 0)
         moved_item = self.account.trash.get(categories__contains=item.categories)
         self.assertEqual(item.id, moved_item.id)
         self.assertEqual(item.changekey, moved_item.changekey)

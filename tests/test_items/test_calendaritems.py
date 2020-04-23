@@ -160,7 +160,7 @@ class CalendarTest(CommonItemTest):
             2
         )
         self.assertEqual(
-            len(self.test_folder.view(start=item1.start, end=item2.end, max_items=1)),
+            self.test_folder.view(start=item1.start, end=item2.end, max_items=1).count(),
             1
         )
 

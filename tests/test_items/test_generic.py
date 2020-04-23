@@ -249,22 +249,22 @@ class GenericItemTest(CommonItemTest):
         ids = self.test_folder.bulk_create(items=[item])
         # No arguments. There may be leftover items in the folder, so just make sure there's at least one.
         self.assertGreaterEqual(
-            len(self.test_folder.filter()),
+            self.test_folder.filter().count(),
             1
         )
         # Q object
         self.assertEqual(
-            len(self.test_folder.filter(Q(subject=item.subject))),
+            self.test_folder.filter(Q(subject=item.subject)).count(),
             1
         )
         # Multiple Q objects
         self.assertEqual(
-            len(self.test_folder.filter(Q(subject=item.subject), ~Q(subject=item.subject[:-3] + 'XXX'))),
+            self.test_folder.filter(Q(subject=item.subject), ~Q(subject=item.subject[:-3] + 'XXX')).count(),
             1
         )
         # Multiple Q object and kwargs
         self.assertEqual(
-            len(self.test_folder.filter(Q(subject=item.subject), categories__contains=item.categories)),
+            self.test_folder.filter(Q(subject=item.subject), categories__contains=item.categories).count(),
             1
         )
         self.bulk_delete(ids)
@@ -274,49 +274,49 @@ class GenericItemTest(CommonItemTest):
         ids = self.test_folder.bulk_create(items=[item])
         common_qs = self.test_folder.filter(subject=item.subject)  # Guard against other simultaneous runs
         self.assertEqual(
-            len(common_qs.filter(categories__contains='ci6xahH1')),  # Plain string
+            common_qs.filter(categories__contains='ci6xahH1').count(),  # Plain string
             0
         )
         self.assertEqual(
-            len(common_qs.filter(categories__contains=['ci6xahH1'])),  # Same, but as list
+            common_qs.filter(categories__contains=['ci6xahH1']).count(),  # Same, but as list
             0
         )
         self.assertEqual(
-            len(common_qs.filter(categories__contains=['TestA', 'TestC'])),  # One wrong category
+            common_qs.filter(categories__contains=['TestA', 'TestC']).count(),  # One wrong category
             0
         )
         self.assertEqual(
-            len(common_qs.filter(categories__contains=['TESTA'])),  # Test case insensitivity
+            common_qs.filter(categories__contains=['TESTA']).count(),  # Test case insensitivity
             1
         )
         self.assertEqual(
-            len(common_qs.filter(categories__contains=['testa'])),  # Test case insensitivity
+            common_qs.filter(categories__contains=['testa']).count(),  # Test case insensitivity
             1
         )
         self.assertEqual(
-            len(common_qs.filter(categories__contains=['TestA'])),  # Partial
+            common_qs.filter(categories__contains=['TestA']).count(),  # Partial
             1
         )
         self.assertEqual(
-            len(common_qs.filter(categories__contains=item.categories)),  # Exact match
+            common_qs.filter(categories__contains=item.categories).count(),  # Exact match
             1
         )
         with self.assertRaises(ValueError):
-            len(common_qs.filter(categories__in='ci6xahH1'))  # Plain string is not supported
+            common_qs.filter(categories__in='ci6xahH1').count()  # Plain string is not supported
         self.assertEqual(
-            len(common_qs.filter(categories__in=['ci6xahH1'])),  # Same, but as list
+            common_qs.filter(categories__in=['ci6xahH1']).count(),  # Same, but as list
             0
         )
         self.assertEqual(
-            len(common_qs.filter(categories__in=['TestA', 'TestC'])),  # One wrong category
+            common_qs.filter(categories__in=['TestA', 'TestC']).count(),  # One wrong category
             1
         )
         self.assertEqual(
-            len(common_qs.filter(categories__in=['TestA'])),  # Partial
+            common_qs.filter(categories__in=['TestA']).count(),  # Partial
             1
         )
         self.assertEqual(
-            len(common_qs.filter(categories__in=item.categories)),  # Exact match
+            common_qs.filter(categories__in=item.categories).count(),  # Exact match
             1
         )
         self.bulk_delete(ids)
@@ -327,11 +327,11 @@ class GenericItemTest(CommonItemTest):
         # Test 'exists'
         ids = self.test_folder.bulk_create(items=[self.get_test_item()])
         self.assertEqual(
-            len(common_qs.filter(datetime_created__exists=True)),
+            common_qs.filter(datetime_created__exists=True).count(),
             1
         )
         self.assertEqual(
-            len(common_qs.filter(datetime_created__exists=False)),
+            common_qs.filter(datetime_created__exists=False).count(),
             0
         )
         self.bulk_delete(ids)
@@ -339,11 +339,11 @@ class GenericItemTest(CommonItemTest):
         # Test 'range'
         ids = self.test_folder.bulk_create(items=[self.get_test_item()])
         self.assertEqual(
-            len(common_qs.filter(datetime_created__range=(now + one_hour, now + two_hours))),
+            common_qs.filter(datetime_created__range=(now + one_hour, now + two_hours)).count(),
             0
         )
         self.assertEqual(
-            len(common_qs.filter(datetime_created__range=(now - one_hour, now + one_hour))),
+            common_qs.filter(datetime_created__range=(now - one_hour, now + one_hour)).count(),
             1
         )
         self.bulk_delete(ids)
@@ -351,11 +351,11 @@ class GenericItemTest(CommonItemTest):
         # Test '>'
         ids = self.test_folder.bulk_create(items=[self.get_test_item()])
         self.assertEqual(
-            len(common_qs.filter(datetime_created__gt=now + one_hour)),
+            common_qs.filter(datetime_created__gt=now + one_hour).count(),
             0
         )
         self.assertEqual(
-            len(common_qs.filter(datetime_created__gt=now - one_hour)),
+            common_qs.filter(datetime_created__gt=now - one_hour).count(),
             1
         )
         self.bulk_delete(ids)
@@ -363,11 +363,11 @@ class GenericItemTest(CommonItemTest):
         # Test '>='
         ids = self.test_folder.bulk_create(items=[self.get_test_item()])
         self.assertEqual(
-            len(common_qs.filter(datetime_created__gte=now + one_hour)),
+            common_qs.filter(datetime_created__gte=now + one_hour).count(),
             0
         )
         self.assertEqual(
-            len(common_qs.filter(datetime_created__gte=now - one_hour)),
+            common_qs.filter(datetime_created__gte=now - one_hour).count(),
             1
         )
         self.bulk_delete(ids)
@@ -375,11 +375,11 @@ class GenericItemTest(CommonItemTest):
         # Test '<'
         ids = self.test_folder.bulk_create(items=[self.get_test_item()])
         self.assertEqual(
-            len(common_qs.filter(datetime_created__lt=now - one_hour)),
+            common_qs.filter(datetime_created__lt=now - one_hour).count(),
             0
         )
         self.assertEqual(
-            len(common_qs.filter(datetime_created__lt=now + one_hour)),
+            common_qs.filter(datetime_created__lt=now + one_hour).count(),
             1
         )
         self.bulk_delete(ids)
@@ -387,11 +387,11 @@ class GenericItemTest(CommonItemTest):
         # Test '<='
         ids = self.test_folder.bulk_create(items=[self.get_test_item()])
         self.assertEqual(
-            len(common_qs.filter(datetime_created__lte=now - one_hour)),
+            common_qs.filter(datetime_created__lte=now - one_hour).count(),
             0
         )
         self.assertEqual(
-            len(common_qs.filter(datetime_created__lte=now + one_hour)),
+            common_qs.filter(datetime_created__lte=now + one_hour).count(),
             1
         )
         self.bulk_delete(ids)
@@ -400,11 +400,11 @@ class GenericItemTest(CommonItemTest):
         item = self.get_test_item()
         ids = self.test_folder.bulk_create(items=[item])
         self.assertEqual(
-            len(common_qs.filter(subject=item.subject[:-3] + 'XXX')),
+            common_qs.filter(subject=item.subject[:-3] + 'XXX').count(),
             0
         )
         self.assertEqual(
-            len(common_qs.filter(subject=item.subject)),
+            common_qs.filter(subject=item.subject).count(),
             1
         )
         self.bulk_delete(ids)
@@ -413,11 +413,11 @@ class GenericItemTest(CommonItemTest):
         item = self.get_test_item()
         ids = self.test_folder.bulk_create(items=[item])
         self.assertEqual(
-            len(common_qs.filter(subject__not=item.subject)),
+            common_qs.filter(subject__not=item.subject).count(),
             0
         )
         self.assertEqual(
-            len(common_qs.filter(subject__not=item.subject[:-3] + 'XXX')),
+            common_qs.filter(subject__not=item.subject[:-3] + 'XXX').count(),
             1
         )
         self.bulk_delete(ids)
@@ -427,19 +427,19 @@ class GenericItemTest(CommonItemTest):
         item.subject = 'aA' + item.subject[2:]
         ids = self.test_folder.bulk_create(items=[item])
         self.assertEqual(
-            len(common_qs.filter(subject__exact=item.subject[:-3] + 'XXX')),
+            common_qs.filter(subject__exact=item.subject[:-3] + 'XXX').count(),
             0
         )
         self.assertEqual(
-            len(common_qs.filter(subject__exact=item.subject.lower())),
+            common_qs.filter(subject__exact=item.subject.lower()).count(),
             0
         )
         self.assertEqual(
-            len(common_qs.filter(subject__exact=item.subject.upper())),
+            common_qs.filter(subject__exact=item.subject.upper()).count(),
             0
         )
         self.assertEqual(
-            len(common_qs.filter(subject__exact=item.subject)),
+            common_qs.filter(subject__exact=item.subject).count(),
             1
         )
         self.bulk_delete(ids)
@@ -449,19 +449,19 @@ class GenericItemTest(CommonItemTest):
         item.subject = 'aA' + item.subject[2:]
         ids = self.test_folder.bulk_create(items=[item])
         self.assertEqual(
-            len(common_qs.filter(subject__iexact=item.subject[:-3] + 'XXX')),
+            common_qs.filter(subject__iexact=item.subject[:-3] + 'XXX').count(),
             0
         )
         self.assertIn(
-            len(common_qs.filter(subject__iexact=item.subject.lower())),
+            common_qs.filter(subject__iexact=item.subject.lower()).count(),
             (0, 1)  # iexact search is broken on some EWS versions
         )
         self.assertIn(
-            len(common_qs.filter(subject__iexact=item.subject.upper())),
+            common_qs.filter(subject__iexact=item.subject.upper()).count(),
             (0, 1)  # iexact search is broken on some EWS versions
         )
         self.assertEqual(
-            len(common_qs.filter(subject__iexact=item.subject)),
+            common_qs.filter(subject__iexact=item.subject).count(),
             1
         )
         self.bulk_delete(ids)
@@ -471,19 +471,19 @@ class GenericItemTest(CommonItemTest):
         item.subject = item.subject[2:8] + 'aA' + item.subject[8:]
         ids = self.test_folder.bulk_create(items=[item])
         self.assertEqual(
-            len(common_qs.filter(subject__contains=item.subject[2:14] + 'XXX')),
+            common_qs.filter(subject__contains=item.subject[2:14] + 'XXX').count(),
             0
         )
         self.assertEqual(
-            len(common_qs.filter(subject__contains=item.subject[2:14].lower())),
+            common_qs.filter(subject__contains=item.subject[2:14].lower()).count(),
             0
         )
         self.assertEqual(
-            len(common_qs.filter(subject__contains=item.subject[2:14].upper())),
+            common_qs.filter(subject__contains=item.subject[2:14].upper()).count(),
             0
         )
         self.assertEqual(
-            len(common_qs.filter(subject__contains=item.subject[2:14])),
+            common_qs.filter(subject__contains=item.subject[2:14]).count(),
             1
         )
         self.bulk_delete(ids)
@@ -493,19 +493,19 @@ class GenericItemTest(CommonItemTest):
         item.subject = item.subject[2:8] + 'aA' + item.subject[8:]
         ids = self.test_folder.bulk_create(items=[item])
         self.assertEqual(
-            len(common_qs.filter(subject__icontains=item.subject[2:14] + 'XXX')),
+            common_qs.filter(subject__icontains=item.subject[2:14] + 'XXX').count(),
             0
         )
         self.assertIn(
-            len(common_qs.filter(subject__icontains=item.subject[2:14].lower())),
+            common_qs.filter(subject__icontains=item.subject[2:14].lower()).count(),
             (0, 1)  # icontains search is broken on some EWS versions
         )
         self.assertIn(
-            len(common_qs.filter(subject__icontains=item.subject[2:14].upper())),
+            common_qs.filter(subject__icontains=item.subject[2:14].upper()).count(),
             (0, 1)  # icontains search is broken on some EWS versions
         )
         self.assertEqual(
-            len(common_qs.filter(subject__icontains=item.subject[2:14])),
+            common_qs.filter(subject__icontains=item.subject[2:14]).count(),
             1
         )
         self.bulk_delete(ids)
@@ -515,19 +515,19 @@ class GenericItemTest(CommonItemTest):
         item.subject = 'aA' + item.subject[2:]
         ids = self.test_folder.bulk_create(items=[item])
         self.assertEqual(
-            len(common_qs.filter(subject__startswith='XXX' + item.subject[:12])),
+            common_qs.filter(subject__startswith='XXX' + item.subject[:12]).count(),
             0
         )
         self.assertEqual(
-            len(common_qs.filter(subject__startswith=item.subject[:12].lower())),
+            common_qs.filter(subject__startswith=item.subject[:12].lower()).count(),
             0
         )
         self.assertEqual(
-            len(common_qs.filter(subject__startswith=item.subject[:12].upper())),
+            common_qs.filter(subject__startswith=item.subject[:12].upper()).count(),
             0
         )
         self.assertEqual(
-            len(common_qs.filter(subject__startswith=item.subject[:12])),
+            common_qs.filter(subject__startswith=item.subject[:12]).count(),
             1
         )
         self.bulk_delete(ids)
@@ -537,19 +537,19 @@ class GenericItemTest(CommonItemTest):
         item.subject = 'aA' + item.subject[2:]
         ids = self.test_folder.bulk_create(items=[item])
         self.assertEqual(
-            len(common_qs.filter(subject__istartswith='XXX' + item.subject[:12])),
+            common_qs.filter(subject__istartswith='XXX' + item.subject[:12]).count(),
             0
         )
         self.assertIn(
-            len(common_qs.filter(subject__istartswith=item.subject[:12].lower())),
+            common_qs.filter(subject__istartswith=item.subject[:12].lower()).count(),
             (0, 1)  # istartswith search is broken on some EWS versions
         )
         self.assertIn(
-            len(common_qs.filter(subject__istartswith=item.subject[:12].upper())),
+            common_qs.filter(subject__istartswith=item.subject[:12].upper()).count(),
             (0, 1)  # istartswith search is broken on some EWS versions
         )
         self.assertEqual(
-            len(common_qs.filter(subject__istartswith=item.subject[:12])),
+            common_qs.filter(subject__istartswith=item.subject[:12]).count(),
             1
         )
         self.bulk_delete(ids)
@@ -574,7 +574,7 @@ class GenericItemTest(CommonItemTest):
         # For some reason, the querystring search doesn't work instantly. We may have to wait for up to 60 seconds.
         # I'm too impatient for that, so also allow empty results. This makes the test almost worthless but I blame EWS.
         self.assertIn(
-            len(self.test_folder.filter('Subject:%s' % item.subject)),
+            self.test_folder.filter('Subject:%s' % item.subject).count(),
             (0, 1)
         )
 
