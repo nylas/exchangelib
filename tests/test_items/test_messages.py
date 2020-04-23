@@ -84,8 +84,7 @@ class MessagesTest(CommonItemTest):
             self.assertEqual(res, True)
         time.sleep(10)  # Requests are supposed to be transactional, but apparently not...
         # By default, sent items are placed in the sent folder
-        ids = self.account.sent.filter(categories__contains=item.categories).values_list('id', 'changekey')
-        self.assertEqual(ids.count(), 1)
+        self.assertEqual(self.account.sent.filter(categories__contains=item.categories).count(), 1)
 
     def test_reply(self):
         # Test that we can reply to a Message item. EWS only allows items that have been sent to receive a reply

@@ -4,6 +4,7 @@ import requests
 import requests_mock
 
 from exchangelib import DELEGATE, IMPERSONATION
+from exchangelib.account import Identity
 from exchangelib.errors import UnauthorizedError
 from exchangelib.transport import wrap, get_auth_method_from_response, BASIC, NOAUTH, NTLM, DIGEST
 from exchangelib.util import PrettyXmlHandler, create_element
@@ -86,12 +87,12 @@ class TransportTest(TimedTestCase):
         # Test payload wrapper with both delegation, impersonation and timezones
         MockTZ = namedtuple('EWSTimeZone', ['ms_id'])
         MockAccount = namedtuple(
-            'Account', ['access_type', 'primary_smtp_address', 'upn', 'sid', 'smtp_address', 'default_timezone']
+            'Account', ['access_type', 'identity', 'default_timezone']
         )
         content = create_element('AAA')
         api_version = 'BBB'
-        account = MockAccount(DELEGATE, 'foo@example.com', None, None, None, MockTZ('XXX'))
-        wrapped = wrap(content=content, api_version=api_version, account=account)
+        account = MockAccount(access_type=DELEGATE, identity=None, default_timezone=MockTZ('XXX'))
+        wrapped = wrap(content=content, api_version=api_version, timezone=account.default_timezone)
         self.assertEqual(
             PrettyXmlHandler.prettify_xml(wrapped),
             b'''<?xml version='1.0' encoding='utf-8'?>
@@ -116,18 +117,14 @@ class TransportTest(TimedTestCase):
                 ('sid', 'SID'),
                 ('smtp_address', 'SmtpAddress'),
         ):
-            kwargs = {
-                'access_type': IMPERSONATION,
-                'primary_smtp_address': None,
-                'upn': None,
-                'sid': None,
-                'smtp_address': None,
-                'default_timezone': MockTZ('XXX'),
-            }
             val = '%s@example.com' % attr
-            kwargs[attr] = val
-            account = MockAccount(**kwargs)
-            wrapped = wrap(content=content, api_version=api_version, account=account)
+            account = MockAccount(access_type=DELEGATE, identity=Identity(**{attr: val}), default_timezone=MockTZ('XXX'))
+            wrapped = wrap(
+                content=content,
+                api_version=api_version,
+                account_to_impersonate=account.identity,
+                timezone=account.default_timezone,
+            )
             self.assertEqual(
                 PrettyXmlHandler.prettify_xml(wrapped),
                 '''<?xml version='1.0' encoding='utf-8'?>

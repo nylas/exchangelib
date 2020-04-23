@@ -1,4 +1,4 @@
-from .account import Account
+from .account import Account, Identity
 from .attachments import FileAttachment, ItemAttachment
 from .autodiscover import discover
 from .configuration import Configuration
@@ -20,7 +20,7 @@ __version__ = '3.1.1'
 
 __all__ = [
     '__version__',
-    'Account',
+    'Account', 'Identity',
     'FileAttachment', 'ItemAttachment',
     'discover',
     'Configuration',

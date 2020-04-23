@@ -5,7 +5,6 @@ import requests.auth
 import requests_ntlm
 import requests_oauthlib
 
-from .credentials import IMPERSONATION
 from .errors import UnauthorizedError, TransportError
 from .util import create_element, add_xml_child, xml_to_str, ns_translation, _may_retry_on_error, _back_off_if_needed, \
     DummyResponse, CONNECTION_ERRORS
@@ -45,17 +44,17 @@ DEFAULT_ENCODING = 'utf-8'
 DEFAULT_HEADERS = {'Content-Type': 'text/xml; charset=%s' % DEFAULT_ENCODING, 'Accept-Encoding': 'gzip, deflate'}
 
 
-def extra_headers(account):
+def extra_headers(primary_smtp_address):
     """Generate extra HTTP headers
     """
-    if account:
+    if primary_smtp_address:
         # See
         # https://blogs.msdn.microsoft.com/webdav_101/2015/05/11/best-practices-ews-authentication-and-access-issues/
-        return {'X-AnchorMailbox': account.primary_smtp_address}
+        return {'X-AnchorMailbox': primary_smtp_address}
     return None
 
 
-def wrap(content, api_version, account=None):
+def wrap(content, api_version, account_to_impersonate=None, timezone=None):
     """
     Generate the necessary boilerplate XML for a raw SOAP request. The XML is specific to the server version.
     ExchangeImpersonation allows to act as the user we want to impersonate.
@@ -73,25 +72,26 @@ def wrap(content, api_version, account=None):
     header = create_element('s:Header')
     requestserverversion = create_element('t:RequestServerVersion', attrs=dict(Version=api_version))
     header.append(requestserverversion)
-    if account:
-        if account.access_type == IMPERSONATION:
-            exchangeimpersonation = create_element('t:ExchangeImpersonation')
-            connectingsid = create_element('t:ConnectingSID')
-            # We have multiple options for uniquely identifying the user. Here's a prioritized list in accordance with
-            # https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/connectingsid
-            if account.sid:
-                add_xml_child(connectingsid, 't:SID', account.sid)
-            elif account.upn:
-                add_xml_child(connectingsid, 't:PrincipalName', account.upn)
-            elif account.smtp_address:
-                add_xml_child(connectingsid, 't:SmtpAddress', account.smtp_address)
-            else:
-                # primary_smtp_address should always be available
-                add_xml_child(connectingsid, 't:PrimarySmtpAddress', account.primary_smtp_address)
-            exchangeimpersonation.append(connectingsid)
-            header.append(exchangeimpersonation)
+    if account_to_impersonate:
+        exchangeimpersonation = create_element('t:ExchangeImpersonation')
+        connectingsid = create_element('t:ConnectingSID')
+        # We have multiple options for uniquely identifying the user. Here's a prioritized list in accordance with
+        # https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/connectingsid
+        for attr, tag in (
+            ('sid', 'SID'),
+            ('upn', 'PrincipalName'),
+            ('smtp_address', 'SmtpAddress'),
+            ('primary_smtp_address', 'PrimarySmtpAddress'),
+        ):
+            val = getattr(account_to_impersonate, attr)
+            if val:
+                add_xml_child(connectingsid, 't:%s' % tag, val)
+                break
+        exchangeimpersonation.append(connectingsid)
+        header.append(exchangeimpersonation)
+    if timezone:
         timezonecontext = create_element('t:TimeZoneContext')
-        timezonedefinition = create_element('t:TimeZoneDefinition', attrs=dict(Id=account.default_timezone.ms_id))
+        timezonedefinition = create_element('t:TimeZoneDefinition', attrs=dict(Id=timezone.ms_id))
         timezonecontext.append(timezonedefinition)
         header.append(timezonecontext)
     envelope.append(header)

@@ -122,13 +122,16 @@ class OAuth2Credentials(BaseCredentials):
     :param client_id: ID of an authorized OAuth application
     :param client_secret: Secret associated with the OAuth application
     :param tenant_id: Microsoft tenant ID of the account to access
+    :param identity: An Identity object representing the account that these
+    credentials are connected to.
     """
 
-    def __init__(self, client_id, client_secret, tenant_id):
+    def __init__(self, client_id, client_secret, tenant_id, identity=None):
         super().__init__()
         self.client_id = client_id
         self.client_secret = client_secret
         self.tenant_id = tenant_id
+        self.identity = identity
         self.access_token = None
 
     def refresh(self, session):

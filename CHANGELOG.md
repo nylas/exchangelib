@@ -24,8 +24,8 @@ HEAD
     `list(some_queryset)` to run the query twice, once for pre-allocating the list via the result
     of `len(some_queryset)`, and then once more to fetch the results. All occurrences of
     `len(some_queryset)` can be replaced with `some_queryset.count()`.
--   Added `Account.upn`, `Account.sid` and `Account.smtp_address` attributes to allow impersonation
-    using these values. Setting `upn` or `sid` removes the need for an AD lookup on every request.
+-   Added `Account.identity`, an attribute to contain extra information for impersonation. Setting
+    `Account.identity.upn` or `Account.identity.sid` removes the need for an AD lookup on every request.
     `upn` will often be the same as `primary_smtp_address`, but it is not guaranteed. If you have
     access to your organization's AD servers, you can look up these values once and add them to your
     `Account` object to improve performance of the following requests.

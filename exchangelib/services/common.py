@@ -128,23 +128,36 @@ class EWSService(metaclass=abc.ABCMeta):
         # guessing tango, but then the server may decide that any arbitrary legacy backend server may actually process
         # the request for an account. Prepare to handle ErrorInvalidSchemaVersionForMailboxVersion errors and set the
         # server version per-account.
+        from ..credentials import IMPERSONATION, OAuth2Credentials
         from ..version import API_VERSIONS
+        account_to_impersonate = None
+        timezone = None
+        primary_smtp_address = None
         if isinstance(self, EWSAccountService):
-            account = self.account
             version_hint = self.account.version
+            if self.account.access_type == IMPERSONATION:
+                account_to_impersonate = self.account.identity
+            timezone = self.account.default_timezone
+            primary_smtp_address = self.account.primary_smtp_address
         else:
-            account = None
             # We may be here due to version guessing in Protocol.version, so we can't use the Protocol.version property
             version_hint = self.protocol.config.version
+            if isinstance(self.protocol.credentials, OAuth2Credentials):
+                account_to_impersonate = self.protocol.credentials.identity
         api_versions = [version_hint.api_version] + [v for v in API_VERSIONS if v != version_hint.api_version]
         for api_version in api_versions:
-            log.debug('Trying API version %s for account %s', api_version, account)
+            log.debug('Trying API version %s', api_version)
             r, session = post_ratelimited(
                 protocol=self.protocol,
                 session=self.protocol.get_session(),
                 url=self.protocol.service_endpoint,
-                headers=extra_headers(account=account),
-                data=wrap(content=payload, api_version=api_version, account=account),
+                headers=extra_headers(primary_smtp_address=primary_smtp_address),
+                data=wrap(
+                    content=payload,
+                    api_version=api_version,
+                    account_to_impersonate=account_to_impersonate,
+                    timezone=timezone,
+                ),
                 allow_redirects=False,
                 stream=self.streaming,
             )
@@ -172,11 +185,8 @@ class EWSService(metaclass=abc.ABCMeta):
                 log.debug('API version %s was invalid', api_version)
                 continue
             except ErrorInvalidSchemaVersionForMailboxVersion:
-                if not account:
-                    # This should never happen for non-account services
-                    raise ValueError("'account' should not be None")
                 # The guessed server version is wrong for this account. Try the next version
-                log.debug('API version %s was invalid for account %s', api_version, account)
+                log.debug('API version %s was invalid', api_version)
                 continue
             except ErrorExceededConnectionCount as e:
                 # ErrorExceededConnectionCount indicates that the connecting user has too many open TCP connections to
@@ -211,9 +221,8 @@ class EWSService(metaclass=abc.ABCMeta):
                     # a Session can handle multiple unfinished streaming requests, though.
                     self.protocol.release_session(session)
             return res
-        if account:
-            raise ErrorInvalidSchemaVersionForMailboxVersion('Tried versions %s but all were invalid for account %s' %
-                                                             (api_versions, account))
+        if isinstance(self, EWSAccountService):
+            raise ErrorInvalidSchemaVersionForMailboxVersion('Tried versions %s but all were invalid' % api_versions)
         raise ErrorInvalidServerVersion('Tried versions %s but all were invalid' % api_versions)
 
     def _handle_backoff(self, e):

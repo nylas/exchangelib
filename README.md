@@ -94,7 +94,7 @@ fails to install.
 ```python
 from exchangelib import DELEGATE, IMPERSONATION, Account, Credentials, OAuth2Credentials, \
     OAuth2AuthorizationCodeCredentials, FaultTolerance, Configuration, NTLM, GSSAPI, SSPI, \
-    OAUTH2, Build, Version
+    OAUTH2, Build, Version, Identity
 from exchangelib.autodiscover import AutodiscoverProtocol
 
 # Specify your credentials. Username is usually in WINDOMAIN\username format, where WINDOMAIN is
@@ -138,6 +138,11 @@ account = Account(primary_smtp_address='john@example.com', credentials=credentia
 # different 'access_type':
 account = Account(primary_smtp_address='john@example.com', credentials=credentials,
                   autodiscover=True, access_type=IMPERSONATION)
+# According to MSDN docs, you can avoid a per-request AD lookup if you specify the UPN or SID
+# of the account when you are using impersonation. To do this, set one of these values. EWS cannot
+# provide you with these values - you have to fetch them by some other means, e.g. via AD lookup:
+account.identity.sid = 'S-my-sid'
+account.identity.upn = 'john@subdomain.example.com'
 
 # If the server doesn't support autodiscover, or you want to avoid the overhead of autodiscover,
 # use a Configuration object to set the server location instead:
@@ -178,6 +183,12 @@ config = Configuration(server='example.com', auth_type=SSPI)
 # for applications that access multiple accounts).
 from oauthlib.oauth2 import OAuth2Token
 credentials = OAuth2Credentials(client_id='MY_ID', client_secret='MY_SECRET', tenant_id='TENANT_ID')
+# The OAuth2Credentials flow may need to have impersonation headers set. If you get
+# impersonation errors, add information about the account that the OAuth2Credentials
+# was created for:
+credentials = OAuth2Credentials(..., identity=Identity(primary_smtp_address='svc_acct@example.com'))
+credentials = OAuth2Credentials(..., identity=Identity(upn='svc_acct@subdomain.example.com'))
+
 credentials = OAuth2AuthorizationCodeCredentials(client_id='MY_ID', client_secret='MY_SECRET', authorization_code='AUTH_CODE')
 credentials = OAuth2AuthorizationCodeCredentials(
     client_id='MY_ID', client_secret='MY_SECRET', access_token=OAuth2Token(access_token='EXISTING_TOKEN')
