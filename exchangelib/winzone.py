@@ -1,5 +1,7 @@
 """ A dict to translate from pytz location name to Windows timezone name. Translations taken from
 http://unicode.org/repos/cldr/trunk/common/supplemental/windowsZones.xml """
+import re
+
 import requests
 
 from .util import to_xml
@@ -15,10 +17,12 @@ def generate_map(timeout=10):
         raise ValueError('Unexpected response: %s' % r)
     tz_map = {}
     for e in to_xml(r.content).find('windowsZones').find('mapTimezones').findall('mapZone'):
-        for location in e.get('type').split(' '):
+        for location in re.split(r'\s+', e.get('type')):
             if e.get('territory') == DEFAULT_TERRITORY or location not in tz_map:
                 # Prefer default territory. This is so MS_TIMEZONE_TO_PYTZ_MAP maps from MS timezone ID back to the
                 # "preferred" region/location timezone name.
+                if not location:
+                    raise ValueError('Expected location')
                 tz_map[location] = e.get('other'), e.get('territory')
     return tz_map
 
