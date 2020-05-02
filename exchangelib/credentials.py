@@ -132,6 +132,7 @@ class OAuth2Credentials(BaseCredentials):
         self.client_secret = client_secret
         self.tenant_id = tenant_id
         self.identity = identity
+        # When set, access_token is a dict (or an oauthlib.oauth2.OAuth2Token, which is also a dict)
         self.access_token = None
 
     def refresh(self, session):
@@ -152,17 +153,15 @@ class OAuth2Credentials(BaseCredentials):
         """
         # Ensure we don't update the object in the middle of a new session
         # being created, which could cause a race
+        if not isinstance(access_token, dict):
+            raise ValueError("'access_token' must be an OAuth2Token")
         with self.lock:
             self.access_token = access_token
 
     def _get_hash_values(self):
-        # access_token is a dict (or an oauthlib.oauth2.OAuth2Token,
-        # which is also a dict) and isn't hashable. Extract its
-        # access_token field, which is the important one.
-        return (
-            getattr(self, k) if k != 'access_token' else self.access_token['access_token']
-            for k in self.__dict__.keys() if k != '_lock'
-        )
+        # 'access_token' may be refreshed once in a while. This should not affect the hash signature.
+        # 'identity' is just informational and should also not affect the hash signature.
+        return (getattr(self, k) for k in self.__dict__.keys() if k not in  ('_lock', 'identity', 'access_token'))
 
     def __repr__(self):
         return self.__class__.__name__ + repr((self.client_id, '********'))
@@ -204,6 +203,8 @@ class OAuth2AuthorizationCodeCredentials(OAuth2Credentials):
     def __init__(self, client_id=None, client_secret=None, authorization_code=None, access_token=None):
         super().__init__(client_id, client_secret, tenant_id=None)
         self.authorization_code = authorization_code
+        if access_token is not None and not isinstance(access_token, dict):
+            raise ValueError("'access_token' must be an OAuth2Token")
         self.access_token = access_token
 
     def __repr__(self):

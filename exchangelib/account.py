@@ -43,6 +43,18 @@ class Identity:
         self.upn = upn
         self.sid = sid
 
+    def __eq__(self, other):
+        for k in self.__dict__.keys():
+            if getattr(self, k) != getattr(other, k):
+                return False
+        return True
+
+    def __hash__(self):
+        return hash(repr(self))
+
+    def __repr__(self):
+        return self.__class__.__name__ + repr((self.primary_smtp_address, self.smtp_address, self.upn, self.sid))
+
 
 class Account:
     """Models an Exchange server user account.

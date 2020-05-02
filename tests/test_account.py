@@ -86,7 +86,6 @@ class AccountTest(EWSTest):
         item = Message(folder=self.account.inbox, subject='XXX', categories=self.categories).save()
         attachment = FileAttachment(name='pickle_me.txt', content=b'')
         for o in (
-            Credentials('XXX', 'YYY'),
             FaultTolerance(max_wait=3600),
             self.account.protocol,
             attachment,
