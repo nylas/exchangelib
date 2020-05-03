@@ -161,7 +161,7 @@ class OAuth2Credentials(BaseCredentials):
     def _get_hash_values(self):
         # 'access_token' may be refreshed once in a while. This should not affect the hash signature.
         # 'identity' is just informational and should also not affect the hash signature.
-        return (getattr(self, k) for k in self.__dict__.keys() if k not in  ('_lock', 'identity', 'access_token'))
+        return (getattr(self, k) for k in self.__dict__.keys() if k not in ('_lock', 'identity', 'access_token'))
 
     def __repr__(self):
         return self.__class__.__name__ + repr((self.client_id, '********'))
