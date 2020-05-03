@@ -843,7 +843,7 @@ def _raise_response_errors(response, protocol, log_msg, log_vals):
         raise TransportError('The service account is currently locked out')
     if response.status_code == 401 and protocol.retry_policy.fail_fast:
         # This is a login failure
-        raise UnauthorizedError('Wrong username or password for %s' % response.url)
+        raise UnauthorizedError('Invalid credentials for %s' % response.url)
     if 'TimeoutException' in response.headers:
         raise response.headers['TimeoutException']
     # This could be anything. Let higher layers handle this. Add full context for better debugging.

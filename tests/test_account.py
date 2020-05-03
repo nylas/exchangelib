@@ -206,7 +206,7 @@ class AccountTest(EWSTest):
 
         def _mock2(response, protocol, log_msg, log_vals):
             if response.status_code == 401:
-                raise UnauthorizedError('Wrong username or password for %s' % response.url)
+                raise UnauthorizedError('Invalid credentials for %s' % response.url)
             return _orig2(response, protocol, log_msg, log_vals)
 
         exchangelib.util._may_retry_on_error = _mock1
