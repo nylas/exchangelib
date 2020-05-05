@@ -218,9 +218,12 @@ class MyCredentials(OAuth2AuthorizationCodeCredentials):
 ews_url = account.protocol.service_endpoint
 ews_auth_type = account.protocol.auth_type
 primary_smtp_address = account.primary_smtp_address
+# This one is optional. It is used as a hint to the initial connection and avoids one or more roundtrips
+# to guess the correct Exchange server version.
+version = account.version
 
 # You can now create the Account without autodiscovering, using the cached values:
-config = Configuration(service_endpoint=ews_url, credentials=credentials, auth_type=ews_auth_type)
+config = Configuration(service_endpoint=ews_url, credentials=credentials, auth_type=ews_auth_type, version=version)
 account = Account(
     primary_smtp_address=primary_smtp_address, 
     config=config, autodiscover=False, 
