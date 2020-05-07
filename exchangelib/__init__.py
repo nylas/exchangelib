@@ -10,10 +10,10 @@ from .folders import Folder, RootOfHierarchy, FolderCollection, SHALLOW, DEEP
 from .items import AcceptItem, TentativelyAcceptItem, DeclineItem, CalendarItem, CancelCalendarItem, Contact, \
     DistributionList, Message, PostItem, Task
 from .properties import Body, HTMLBody, ItemId, Mailbox, Attendee, Room, RoomList, UID, DLMailbox
-from .protocol import FaultTolerance, FailFast
+from .protocol import FaultTolerance, FailFast, BaseProtocol, NoVerifyHTTPAdapter, TLSClientAuth
 from .settings import OofSettings
 from .restriction import Q
-from .transport import BASIC, DIGEST, NTLM, GSSAPI, SSPI, OAUTH2
+from .transport import BASIC, DIGEST, NTLM, GSSAPI, SSPI, OAUTH2, CBA
 from .version import Build, Version
 
 __version__ = '3.1.1'
@@ -31,10 +31,10 @@ __all__ = [
     'AcceptItem', 'TentativelyAcceptItem', 'DeclineItem', 'CalendarItem', 'CancelCalendarItem', 'Contact',
     'DistributionList', 'Message', 'PostItem', 'Task',
     'ItemId', 'Mailbox', 'DLMailbox', 'Attendee', 'Room', 'RoomList', 'Body', 'HTMLBody', 'UID',
-    'FailFast', 'FaultTolerance',
+    'FailFast', 'FaultTolerance', 'BaseProtocol', 'NoVerifyHTTPAdapter', 'TLSClientAuth',
     'OofSettings',
     'Q',
-    'BASIC', 'DIGEST', 'NTLM', 'GSSAPI', 'SSPI', 'OAUTH2',
+    'BASIC', 'DIGEST', 'NTLM', 'GSSAPI', 'SSPI', 'OAUTH2', 'CBA',
     'Build', 'Version',
 ]
 

@@ -19,12 +19,17 @@ DIGEST = 'digest'
 GSSAPI = 'gssapi'
 SSPI = 'sspi'
 OAUTH2 = 'OAuth 2.0'
+CBA = 'CBA'  # Certificate Based Authentication
+
+# The auth types that must be accompanied by a credentials object
+CREDENTIALS_REQUIRED = (NTLM, BASIC, DIGEST, OAUTH2)
 
 AUTH_TYPE_MAP = {
     NTLM: requests_ntlm.HttpNtlmAuth,
     BASIC: requests.auth.HTTPBasicAuth,
     DIGEST: requests.auth.HTTPDigestAuth,
     OAUTH2: requests_oauthlib.OAuth2,
+    CBA: None,
     NOAUTH: None,
 }
 try:

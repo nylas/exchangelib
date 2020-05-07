@@ -153,7 +153,7 @@ class Protocol(AutodiscoverBase):
     @property
     def auth_type(self):
         # Translates 'auth_package' value to our own 'auth_type' enum vals
-        from ..transport import NOAUTH, NTLM, BASIC, GSSAPI, SSPI
+        from ..transport import NOAUTH, NTLM, BASIC, GSSAPI, SSPI, CBA
         if not self.auth_required:
             return NOAUTH
         return {
@@ -162,7 +162,7 @@ class Protocol(AutodiscoverBase):
             'kerb': GSSAPI,
             'kerbntlm': NTLM,  # Means client can chose between NTLM and GSSAPI
             'ntlm': NTLM,
-            # 'certificate' is not supported by us
+            'certificate': CBA,
             'negotiate': SSPI,  # Unsure about this one
             'nego2': GSSAPI,
             'anonymous': NOAUTH,  # Seen in some docs even though it's not mentioned in MSDN

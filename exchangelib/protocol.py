@@ -21,7 +21,7 @@ from .errors import TransportError, SessionPoolMinSizeReached
 from .properties import FreeBusyViewOptions, MailboxData, TimeWindow, TimeZone
 from .services import GetServerTimeZones, GetRoomLists, GetRooms, ResolveNames, GetUserAvailability, \
     GetSearchableMailboxes, ExpandDL, ConvertId
-from .transport import get_auth_instance, get_service_authtype, NTLM, GSSAPI, SSPI, OAUTH2, DEFAULT_HEADERS
+from .transport import get_auth_instance, get_service_authtype, NTLM, OAUTH2, CREDENTIALS_REQUIRED, DEFAULT_HEADERS
 from .version import Version, API_VERSIONS
 
 log = logging.getLogger(__name__)
@@ -229,30 +229,32 @@ class BaseProtocol:
         return self.renew_session(session)
 
     def create_session(self):
-        with self.credentials.lock:
-            if self.auth_type is None:
-                raise ValueError('Cannot create session without knowing the auth type')
-            if isinstance(self.credentials, OAuth2Credentials):
-                session = self.create_oauth2_session()
-            elif self.credentials:
-                if self.auth_type == NTLM and self.credentials.type == self.credentials.EMAIL:
-                    username = '\\' + self.credentials.username
+        if self.auth_type is None:
+            raise ValueError('Cannot create session without knowing the auth type')
+        if self.credentials is None:
+            if self.auth_type in CREDENTIALS_REQUIRED:
+                raise ValueError('Auth type %r requires credentials' % self.auth_type)
+            session = self.raw_session()
+            session.auth = get_auth_instance(auth_type=self.auth_type)
+        else:
+            with self.credentials.lock:
+                if isinstance(self.credentials, OAuth2Credentials):
+                    session = self.create_oauth2_session()
+                    # Keep track of the credentials used to create this session. If
+                    # and when we need to renew credentials (for example, refreshing
+                    # an OAuth access token), this lets us easily determine whether
+                    # the credentials have already been refreshed in another thread
+                    # by the time this session tries.
+                    session.credentials_sig = self.credentials.sig()
                 else:
-                    username = self.credentials.username
-                session = self.raw_session()
-                session.auth = get_auth_instance(auth_type=self.auth_type, username=username,
-                                                 password=self.credentials.password)
-            else:
-                if self.auth_type not in (GSSAPI, SSPI):
-                    raise ValueError('Auth type %r requires credentials' % self.auth_type)
-                session = self.raw_session()
-                session.auth = get_auth_instance(auth_type=self.auth_type)
-            # Keep track of the credentials used to create this session. If
-            # and when we need to renew credentials (for example, refreshing
-            # an OAuth access token), this lets us easily determine whether
-            # the credentials have already been refreshed in another thread
-            # by the time this session tries.
-            session.credentials_hash = hash(self.credentials)
+                    if self.auth_type == NTLM and self.credentials.type == self.credentials.EMAIL:
+                        username = '\\' + self.credentials.username
+                    else:
+                        username = self.credentials.username
+                    session = self.raw_session()
+                    session.auth = get_auth_instance(auth_type=self.auth_type, username=username,
+                                                     password=self.credentials.password)
+
         # Add some extra info
         session.session_id = sum(map(ord, str(os.urandom(100))))  # Used for debugging messages in services
         session.protocol = self
@@ -580,6 +582,15 @@ class NoVerifyHTTPAdapter(requests.adapters.HTTPAdapter):
         # pylint: disable=unused-argument
         # We're overiding a method so we have to keep the signature
         super().cert_verify(conn=conn, url=url, verify=False, cert=cert)
+
+
+class TLSClientAuth(requests.adapters.HTTPAdapter):
+    """An HTTP adapter that implements Certificate Based Authentication (CBA)"""
+    cert_file = None
+
+    def init_poolmanager(self, *args, **kwargs):
+        kwargs['cert_file'] = self.cert_file
+        return super().init_poolmanager(*args, **kwargs)
 
 
 class RetryPolicy:

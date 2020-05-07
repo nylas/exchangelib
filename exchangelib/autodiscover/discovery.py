@@ -9,7 +9,7 @@ from ..configuration import Configuration
 from ..credentials import OAuth2Credentials
 from ..errors import AutoDiscoverFailed, AutoDiscoverCircularRedirect, TransportError, RedirectError, UnauthorizedError
 from ..protocol import Protocol, FailFast
-from ..transport import get_auth_method_from_response, DEFAULT_HEADERS, NOAUTH, OAUTH2
+from ..transport import get_auth_method_from_response, DEFAULT_HEADERS, NOAUTH, OAUTH2, CREDENTIALS_REQUIRED
 from ..util import post_ratelimited, get_domain, get_redirect_url, _back_off_if_needed, _may_retry_on_error, \
     is_valid_hostname, DummyResponse, CONNECTION_ERRORS, TLS_ERRORS
 from ..version import Version
@@ -292,6 +292,8 @@ class Autodiscovery:
             if isinstance(self.credentials, OAuth2Credentials):
                 # This type of credentials *must* use the OAuth auth type
                 auth_type = OAUTH2
+            elif self.credentials is None and auth_type in CREDENTIALS_REQUIRED:
+                raise ValueError('Auth type %r was detected but no credentials were provided' % auth_type)
             ad_protocol = AutodiscoverProtocol(
                 config=Configuration(
                     service_endpoint=url,
