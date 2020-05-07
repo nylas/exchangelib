@@ -163,6 +163,19 @@ class OAuth2Credentials(BaseCredentials):
         # 'identity' is just informational and should also not affect the hash signature.
         return (getattr(self, k) for k in self.__dict__.keys() if k not in ('_lock', 'identity', 'access_token'))
 
+    def sig(self):
+        # Like hash(self), but pulls in the access token. Protocol.refresh_credentials() uses this to find out
+        # if the access_token needs to be refreshed.
+        res = []
+        for k in self.__dict__.keys():
+            if k in ('_lock', 'identity'):
+                continue
+            if k == 'access_token':
+                res.append(self.access_token['access_token'] if self.access_token else None)
+                continue
+            res.append(getattr(self, k))
+        return hash(tuple(res))
+
     def __repr__(self):
         return self.__class__.__name__ + repr((self.client_id, '********'))
 

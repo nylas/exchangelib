@@ -212,7 +212,7 @@ class BaseProtocol:
         # application didn't provide an OAuth client secret, so we can't
         # handle token refreshing for it.
         with self.credentials.lock:
-            if hash(self.credentials) == session.credentials_hash:
+            if self.credentials.sig() == session.credentials_sig:
                 # Credentials have not been refreshed by another thread:
                 # they're the same as the session was created with. If
                 # this isn't the case, we can just go ahead with a new
