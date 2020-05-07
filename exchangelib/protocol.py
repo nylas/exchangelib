@@ -144,14 +144,6 @@ class BaseProtocol:
         # Autodetect and return authentication type
         raise NotImplementedError()
 
-    @classmethod
-    def get_useragent(cls):
-        if not cls.USERAGENT:
-            # import here to avoid a cyclic import
-            from exchangelib import __version__
-            cls.USERAGENT = "exchangelib/%s (%s)" % (__version__, requests.utils.default_user_agent())
-        return cls.USERAGENT
-
     def _create_session_pool(self):
         # Create a pool to reuse sessions containing connections to the server
         session_pool = LifoQueue(maxsize=self._session_pool_size)
@@ -330,7 +322,7 @@ class BaseProtocol:
         else:
             session = requests.sessions.Session()
         session.headers.update(DEFAULT_HEADERS)
-        session.headers["User-Agent"] = cls.get_useragent()
+        session.headers['User-Agent'] = cls.USERAGENT
         session.mount('http://', adapter=cls.get_adapter())
         session.mount('https://', adapter=cls.get_adapter())
         return session
