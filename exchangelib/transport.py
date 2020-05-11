@@ -143,6 +143,7 @@ def get_service_authtype(service_endpoint, retry_policy, api_versions, name):
                 try:
                     r = s.post(url=service_endpoint, headers=headers, data=data, allow_redirects=False,
                                timeout=BaseProtocol.TIMEOUT)
+                    r.close()  # Release memory
                     break
                 except CONNECTION_ERRORS as e:
                     # Don't retry on TLS errors. They will most likely be persistent.

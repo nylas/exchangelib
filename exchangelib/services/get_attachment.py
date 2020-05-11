@@ -48,12 +48,13 @@ class GetAttachment(EWSAccountService):
             return super()._get_soap_messages(body, **parse_opts)
 
         # 'body' is actually the raw response passed on by '_get_soap_parts'
+        r = body
         from ..attachments import FileAttachment
         parser = StreamingBase64Parser()
         field = FileAttachment.get_field_by_fieldname('_content')
         handler = StreamingContentHandler(parser=parser, ns=field.namespace, element_name=field.field_uri)
         parser.setContentHandler(handler)
-        return parser.parse(body)
+        return parser.parse(r)
 
     def stream_file_content(self, attachment_id):
         # The streaming XML parser can only stream content of one attachment

@@ -319,8 +319,8 @@ class StreamingBase64Parser(DefusedExpatParser):
         self.buffer = None
         self.element_found = None
 
-    def parse(self, source):
-        raw_source = source.raw
+    def parse(self, r):
+        raw_source = r.raw
         # Like upstream but yields the return value of self.feed()
         raw_source = prepare_input_source(raw_source)
         self.prepareParser(raw_source)
@@ -337,7 +337,7 @@ class StreamingBase64Parser(DefusedExpatParser):
             buffer = file.read(self._bufsize)
         # Any remaining data in self.buffer should be padding chars now
         self.buffer = None
-        source.close()
+        r.close()  # Release memory
         self.close()
         if not self.element_found:
             data = bytes(collected_data)
@@ -544,16 +544,20 @@ class DummyRequest:
 
 
 class DummyResponse:
-    def __init__(self, url, headers, request_headers, content=b'', status_code=503):
+    def __init__(self, url, headers, request_headers, content=b'', status_code=503, history=None):
         self.status_code = status_code
         self.url = url
         self.headers = headers
         self.content = content
         self.text = content.decode('utf-8', errors='ignore')
         self.request = DummyRequest(headers=request_headers)
+        self.history = history
 
     def iter_content(self):
         return self.content
+
+    def close(self):
+        pass
 
 
 def get_domain(email):
@@ -732,10 +736,12 @@ Response data: %(xml_response)s
                 )
             log.debug(log_msg, log_vals)
             if _need_new_credentials(response=r):
+                r.close()  # Release memory
                 session = protocol.refresh_credentials(session)
                 continue
             total_wait = time.monotonic() - t_start
             if _may_retry_on_error(response=r, retry_policy=protocol.retry_policy, wait=total_wait):
+                r.close()  # Release memory
                 log.info("Session %s thread %s: Connection error on URL %s (code %s). Cool down %s secs",
                          session.session_id, thread_id, r.url, r.status_code, wait)
                 protocol.retry_policy.back_off(wait)
@@ -743,8 +749,7 @@ Response data: %(xml_response)s
                 wait *= 2  # Increase delay for every retry
                 continue
             if r.status_code in (301, 302):
-                if stream:
-                    r.close()
+                r.close()  # Release memory
                 url, redirects = _redirect_or_fail(r, redirects, allow_redirects)
                 continue
             break
@@ -762,11 +767,7 @@ Response data: %(xml_response)s
         log.debug('Got status code %s but trying to parse content anyway', r.status_code)
     elif r.status_code != 200:
         protocol.retire_session(session)
-        try:
-            _raise_response_errors(r, protocol, log_msg, log_vals)  # Always raises an exception
-        finally:
-            if stream:
-                r.close()
+        _raise_response_errors(r, protocol, log_msg, log_vals)  # Always raises an exception
     log.debug('Session %s thread %s: Useful response from %s', session.session_id, thread_id, url)
     return r, session
 

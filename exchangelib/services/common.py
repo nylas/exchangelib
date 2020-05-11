@@ -161,15 +161,17 @@ class EWSService(metaclass=abc.ABCMeta):
                 allow_redirects=False,
                 stream=self.streaming,
             )
+            # TODO: We should only release the session when we have fully consumed the response, but that requires fully
+            # consuming the generator returned by _get_soap_messages. The caller may not always do that. This
+            # seems to work anyway.
+            self.protocol.release_session(session)
             if self.streaming:
                 # Let 'requests' decode raw data automatically
                 r.raw.decode_content = True
-            else:
-                # If we're streaming, we want to wait to release the session until we have consumed the stream.
-                self.protocol.release_session(session)
             try:
                 header, body = self._get_soap_parts(response=r, **parse_opts)
             except ParseError as e:
+                r.close()  # Release memory
                 raise SOAPError('Bad SOAP response: %s' % e)
             # The body may contain error messages from Exchange, but we still want to collect version info
             if header is not None:
@@ -179,7 +181,7 @@ class EWSService(metaclass=abc.ABCMeta):
                 except TransportError as te:
                     log.debug('Failed to update version info (%s)', te)
             try:
-                res = self._get_soap_messages(body=body, **parse_opts)
+                return self._get_soap_messages(body=body, **parse_opts)
             except (ErrorInvalidServerVersion, ErrorIncorrectSchemaVersion, ErrorInvalidRequest):
                 # The guessed server version is wrong. Try the next version
                 log.debug('API version %s was invalid', api_version)
@@ -191,16 +193,12 @@ class EWSService(metaclass=abc.ABCMeta):
             except ErrorExceededConnectionCount as e:
                 # ErrorExceededConnectionCount indicates that the connecting user has too many open TCP connections to
                 # the server. Decrease our session pool size.
-                if self.streaming:
-                    # In streaming mode, we haven't released the session yet, so we can't discard the session
-                    raise
-                else:
-                    try:
-                        self.protocol.decrease_poolsize()
-                        continue
-                    except SessionPoolMinSizeReached:
-                        # We're already as low as we can go. Let the user handle this.
-                        raise e
+                try:
+                    self.protocol.decrease_poolsize()
+                    continue
+                except SessionPoolMinSizeReached:
+                    # We're already as low as we can go. Let the user handle this.
+                    raise e
             except (ErrorTooManyObjectsOpened, ErrorTimeoutExpired) as e:
                 # ErrorTooManyObjectsOpened means there are too many connections to the Exchange database. This is very
                 # often a symptom of sending too many requests.
@@ -216,11 +214,10 @@ class EWSService(metaclass=abc.ABCMeta):
                 # Re-raise as an ErrorServerBusy with a default delay of 5 minutes
                 raise ErrorServerBusy(msg='Reraised from %s(%s)' % (e.__class__.__name__, e), back_off=300)
             finally:
-                if self.streaming:
-                    # TODO: We shouldn't release the session yet if we still haven't fully consumed the stream. It seems
-                    # a Session can handle multiple unfinished streaming requests, though.
-                    self.protocol.release_session(session)
-            return res
+                if not self.streaming:
+                    # In streaming mode, we may not have accessed the raw stream yet. Caller must handle this.
+                    r.close()  # Release memory
+
         if isinstance(self, EWSAccountService):
             raise ErrorInvalidSchemaVersionForMailboxVersion('Tried versions %s but all were invalid' % api_versions)
         raise ErrorInvalidServerVersion('Tried versions %s but all were invalid' % api_versions)

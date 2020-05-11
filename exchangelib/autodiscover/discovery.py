@@ -231,6 +231,7 @@ class Autodiscovery:
             with AutodiscoverProtocol.raw_session() as s:
                 try:
                     r = getattr(s, method)(**kwargs)
+                    r.close()  # Release memory
                     break
                 except TLS_ERRORS as e:
                     # Don't retry on TLS errors. They will most likely be persistent.
@@ -271,7 +272,7 @@ class Autodiscovery:
         try:
             session = protocol.get_session()
             r, session = post_ratelimited(protocol=protocol, session=session, url=protocol.service_endpoint,
-                                          headers=headers, data=data, allow_redirects=False)
+                                          headers=headers, data=data, allow_redirects=False, stream=False)
             protocol.release_session(session)
         except UnauthorizedError as e:
             # It's entirely possible for the endpoint to ask for login. We should continue if login fails because this

@@ -26,6 +26,7 @@ from exchangelib.indexed_properties import EmailAddress, PhysicalAddress, PhoneN
 from exchangelib.properties import Attendee, Mailbox, PermissionSet, Permission, UserId
 from exchangelib.protocol import BaseProtocol, NoVerifyHTTPAdapter, FaultTolerance
 from exchangelib.recurrence import Recurrence, DailyPattern
+from exchangelib.util import DummyResponse
 
 mock_account = namedtuple('mock_account', ('protocol', 'version'))
 mock_protocol = namedtuple('mock_protocol', ('version', 'service_endpoint'))
@@ -33,11 +34,9 @@ mock_version = namedtuple('mock_version', ('build',))
 
 
 def mock_post(url, status_code, headers, text=''):
-    req = namedtuple('request', ['headers'])(headers={})
-    c = text.encode('utf-8')
-    return lambda **kwargs: namedtuple(
-        'response', ['status_code', 'headers', 'text', 'content', 'request', 'history', 'url']
-    )(status_code=status_code, headers=headers, text=text, content=c, request=req, history=None, url=url)
+    return lambda **kwargs: DummyResponse(
+        url=url, headers=headers, request_headers={}, content=text.encode('utf-8'), status_code=status_code
+    )
 
 
 def mock_session_exception(exc_cls):
@@ -47,12 +46,9 @@ def mock_session_exception(exc_cls):
     return raise_exc
 
 
-class MockResponse:
+class MockResponse(DummyResponse):
     def __init__(self, c):
-        self.c = c
-
-    def iter_content(self):
-        return self.c
+        super().__init__(url='', headers={}, request_headers={}, content=c)
 
 
 class TimedTestCase(unittest.TestCase):
