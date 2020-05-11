@@ -44,6 +44,9 @@ class BaseProtocol:
     # so a connection can only handle requests for one credential). Having multiple connections ser Session could
     # quickly exhaust the maximum number of concurrent connections the Exchange server allows from one client.
     CONNECTIONS_PER_SESSION = 1
+    # The number of times a session may be reused before creating a new session object. 'None' means "infinite".
+    # Discarding sessions after a certain number of usages may limit memory leaks in the Session object.
+    MAX_SESSION_USAGE_COUNT = 100
     # Timeout for HTTP requests
     TIMEOUT = 120
 
@@ -179,6 +182,7 @@ class BaseProtocol:
                 log.debug('Server %s: Waiting for session', self.server)
                 session = self._session_pool.get(timeout=_timeout)
                 log.debug('Server %s: Got session %s', self.server, session.session_id)
+                session.usage_count += 1
                 return session
             except Empty:
                 # This is normal when we have many worker threads starving for available sessions
@@ -187,6 +191,9 @@ class BaseProtocol:
     def release_session(self, session):
         # This should never fail, as we don't have more sessions than the queue contains
         log.debug('Server %s: Releasing session %s', self.server, session.session_id)
+        if self.MAX_SESSION_USAGE_COUNT and session.usage_count > self.MAX_SESSION_USAGE_COUNT:
+            log.debug('Server %s: session %s usage exceeded limit. Discarding', self.server, session.session_id)
+            session = self.renew_session(session)
         try:
             self._session_pool.put(session, block=False)
         except Full:
@@ -249,6 +256,7 @@ class BaseProtocol:
 
         # Add some extra info
         session.session_id = sum(map(ord, str(os.urandom(100))))  # Used for debugging messages in services
+        session.usage_count = 0
         session.protocol = self
         log.debug('Server %s: Created session %s', self.server, session.session_id)
         return session
