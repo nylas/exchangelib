@@ -29,6 +29,7 @@ HEAD
     `upn` will often be the same as `primary_smtp_address`, but it is not guaranteed. If you have
     access to your organization's AD servers, you can look up these values once and add them to your
     `Account` object to improve performance of the following requests.
+-   Added support for CBA authentication
 
 
 3.1.1

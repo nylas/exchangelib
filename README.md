@@ -92,10 +92,7 @@ fails to install.
 ## Setup and connecting
 
 ```python
-from exchangelib import DELEGATE, IMPERSONATION, Account, Credentials, OAuth2Credentials, \
-    OAuth2AuthorizationCodeCredentials, FaultTolerance, Configuration, NTLM, GSSAPI, SSPI, \
-    OAUTH2, Build, Version, Identity
-from exchangelib.autodiscover import AutodiscoverProtocol
+from exchangelib import DELEGATE, IMPERSONATION, Account, Credentials
 
 # Specify your credentials. Username is usually in WINDOMAIN\username format, where WINDOMAIN is
 # the name of the Windows Domain your username is connected to, but some servers also
@@ -127,7 +124,7 @@ marys_account = Account(primary_smtp_address='mary@example.com', credentials=cre
 still_marys_account = Account(primary_smtp_address='alias_for_mary@example.com',
                               credentials=credentials, autodiscover=True, access_type=DELEGATE)
 
-# Full autodiscover data is availale on the Account object:
+# Full autodiscover data is available on the Account object:
 my_account.ad_response
 
 # Set up a target account and do an autodiscover lookup to find the target EWS endpoint.
@@ -138,14 +135,21 @@ account = Account(primary_smtp_address='john@example.com', credentials=credentia
 # different 'access_type':
 account = Account(primary_smtp_address='john@example.com', credentials=credentials,
                   autodiscover=True, access_type=IMPERSONATION)
+```
+
+### Optimizing connections
+```python
+from exchangelib import DELEGATE, Account, Configuration, Credentials, NTLM, Build, Version
 # According to MSDN docs, you can avoid a per-request AD lookup if you specify the UPN or SID
 # of the account when you are using impersonation. To do this, set one of these values. EWS cannot
 # provide you with these values - you have to fetch them by some other means, e.g. via AD lookup:
+account = Account(...)
 account.identity.sid = 'S-my-sid'
 account.identity.upn = 'john@subdomain.example.com'
 
 # If the server doesn't support autodiscover, or you want to avoid the overhead of autodiscover,
 # use a Configuration object to set the server location instead:
+credentials = Credentials(...)
 config = Configuration(server='mail.example.com', credentials=credentials)
 account = Account(primary_smtp_address='john@example.com', config=config,
                   autodiscover=False, access_type=DELEGATE)
@@ -157,30 +161,48 @@ version = Version(build=Build(15, 0, 12, 34))
 config = Configuration(
     server='example.com', credentials=credentials, version=version, auth_type=NTLM
 )
+```
 
+### Fault tolerance
+```python
+from exchangelib import Account, FaultTolerance, Configuration, Credentials
+from exchangelib.autodiscover import Autodiscovery
 # By default, we fail on all exceptions from the server. If you want to enable fault
 # tolerance, add a retry policy to your configuration. We will then retry on certain
 # transient errors. By default, we back off exponentially and retry for up to an hour.
 # This is configurable:
+credentials = Credentials(...)
 config = Configuration(retry_policy=FaultTolerance(max_wait=3600), credentials=credentials)
 account = Account(primary_smtp_address='john@example.com', config=config)
 
 # Autodiscovery will also use this policy, but only for the final autodiscover endpoint.
 # Here's how to change the policy for connecting to autodiscover candidate servers.
-# Old autodiscover implementation
-import exchangelib.autodiscover.legacy
-exchangelib.autodiscover.legacy.INITIAL_RETRY_POLICY = FaultTolerance(max_wait=30)
-# New autodiscover implementation
-from exchangelib.autodiscover import Autodiscovery
 Autodiscovery.INITIAL_RETRY_POLICY = FaultTolerance(max_wait=30)
+```
 
+### Kerberos and SSPI authentication
+```python
+from exchangelib import Configuration, GSSAPI, SSPI
 # Kerberos and SSPI authentication are supported via the GSSAPI and SSPI auth types.
-config = Configuration(server='example.com', auth_type=GSSAPI)
-config = Configuration(server='example.com', auth_type=SSPI)
+config = Configuration(auth_type=GSSAPI)
+config = Configuration(auth_type=SSPI)
+```
 
+### Certificate Based Authentication (CBA)
+```python
+from exchangelib import Configuration, BaseProtocol, CBA, TLSClientAuth
+TLSClientAuth.cert_file = '/path/to/client.pem'
+BaseProtocol.HTTP_ADAPTER_CLS = TLSClientAuth
+config = Configuration(auth_type=CBA)
+```
+
+### OAuth authentication
+```python
 # OAuth is supported via the OAUTH2 auth type and the OAuth2Credentials class.
 # Use OAuth2AuthorizationCodeCredentials for the authorization code flow (useful
 # for applications that access multiple accounts).
+from exchangelib import Configuration, OAuth2Credentials, OAuth2AuthorizationCodeCredentials, \
+    Identity, OAUTH2
 from oauthlib.oauth2 import OAuth2Token
 credentials = OAuth2Credentials(client_id='MY_ID', client_secret='MY_SECRET', tenant_id='TENANT_ID')
 # The OAuth2Credentials flow may need to have impersonation headers set. If you get
@@ -212,9 +234,14 @@ class MyCredentials(OAuth2AuthorizationCodeCredentials):
 class MyCredentials(OAuth2AuthorizationCodeCredentials):
     def refresh(self):
         self.access_token = ...
+```
 
+### Caching autodiscover results
+```python
+from exchangelib import Configuration, Credentials, Account, DELEGATE
 # If you're connecting to the same account very often, you can cache the autodiscover result for
 # later so you can skip the autodiscover lookup:
+account = Account(...)
 ews_url = account.protocol.service_endpoint
 ews_auth_type = account.protocol.auth_type
 primary_smtp_address = account.primary_smtp_address
@@ -223,6 +250,7 @@ primary_smtp_address = account.primary_smtp_address
 version = account.version
 
 # You can now create the Account without autodiscovering, using the cached values:
+credentials = Credentials(...)
 config = Configuration(service_endpoint=ews_url, credentials=credentials, auth_type=ews_auth_type, version=version)
 account = Account(
     primary_smtp_address=primary_smtp_address, 
@@ -241,7 +269,7 @@ from exchangelib.autodiscover import clear_cache
 clear_cache()
 ```
 
-## Proxies and custom TLS validation
+### Proxies and custom TLS validation
 
 If you need proxy support or custom TLS validation, you can supply a
 custom 'requests' transport adapter class, as described in
