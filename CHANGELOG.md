@@ -23,7 +23,8 @@ HEAD
 -   Remove support for `len(some_queryset)`. It had the nasty side-effect of forcing
     `list(some_queryset)` to run the query twice, once for pre-allocating the list via the result
     of `len(some_queryset)`, and then once more to fetch the results. All occurrences of
-    `len(some_queryset)` can be replaced with `some_queryset.count()`.
+    `len(some_queryset)` can be replaced with `some_queryset.count()`. Unfortunately, there is
+    no way to keep backwards-compatibility for this feature.
 -   Added `Account.identity`, an attribute to contain extra information for impersonation. Setting
     `Account.identity.upn` or `Account.identity.sid` removes the need for an AD lookup on every request.
     `upn` will often be the same as `primary_smtp_address`, but it is not guaranteed. If you have
