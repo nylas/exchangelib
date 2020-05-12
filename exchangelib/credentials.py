@@ -156,6 +156,7 @@ class OAuth2Credentials(BaseCredentials):
         if not isinstance(access_token, dict):
             raise ValueError("'access_token' must be an OAuth2Token")
         with self.lock:
+            log.debug('%s auth token for %s', 'Refreshing' if self.access_token else 'Setting', self.client_id)
             self.access_token = access_token
 
     def _get_hash_values(self):

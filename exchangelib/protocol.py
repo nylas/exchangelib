@@ -310,7 +310,7 @@ class BaseProtocol:
             token_url = 'https://login.microsoftonline.com/%s/oauth2/v2.0/token' % self.credentials.tenant_id
             client = BackendApplicationClient(client_id=self.credentials.client_id)
 
-        session = self.raw_session(client, session_params)
+        session = self.raw_session(oauth2_client=client, oauth2_session_params=session_params)
         if not has_token:
             # Fetch the token explicitly -- it doesn't occur implicitly
             token = session.fetch_token(token_url=token_url, client_id=self.credentials.client_id,
