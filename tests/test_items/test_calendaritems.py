@@ -3,7 +3,7 @@ import datetime
 from exchangelib.errors import ErrorInvalidOperation, ErrorItemNotFound
 from exchangelib.ewsdatetime import EWSDateTime, UTC
 from exchangelib.folders import Calendar
-from exchangelib.items import CalendarItem
+from exchangelib.items import CalendarItem, BulkCreateResult
 from exchangelib.items.calendar_item import SINGLE, OCCURRENCE, EXCEPTION, RECURRING_MASTER
 from exchangelib.recurrence import Recurrence, DailyPattern, Occurrence, FirstOccurrence, LastOccurrence, \
     DeletedOccurrence
@@ -23,7 +23,7 @@ class CalendarTest(CommonItemTest):
     def test_cancel(self):
         item = self.get_test_item().save()
         res = item.cancel()  # Returns (id, changekey) of cancelled item
-        self.assertEqual(len(res), 2)
+        self.assertIsInstance(res, BulkCreateResult)
         with self.assertRaises(ErrorItemNotFound):
             # Item is already cancelled
             item.cancel()

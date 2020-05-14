@@ -179,7 +179,6 @@ class BaseReplyItem(EWSElement):
     @require_account
     def send(self, save_copy=True, copy_to_folder=None):
         from .calendar_item import CancelCalendarItem
-        from .item import Item
         if copy_to_folder:
             if not save_copy:
                 raise AttributeError("'save_copy' must be True when 'copy_to_folder' is set")
@@ -194,7 +193,7 @@ class BaseReplyItem(EWSElement):
         )
         if res is None:
             return
-        return Item.id_from_xml(res)
+        return BulkCreateResult.from_xml(elem=res, account=self)
 
     @require_account
     def save(self, folder):
