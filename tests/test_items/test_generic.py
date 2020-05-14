@@ -109,19 +109,19 @@ class GenericItemTest(CommonItemTest):
 
     def test_invalid_kwargs_on_send(self):
         # Only Message class has the send() method
+        item = self.get_test_item()
+        item.account = None
         with self.assertRaises(ValueError):
-            item = self.get_test_item()
-            item.account = None
             item.send()  # Must have account on send
+        item = self.get_test_item()
+        item.save()
+        item_id, changekey = item.id, item.changekey
+        item.delete()
+        item.id, item.changekey = item_id, changekey
         with self.assertRaises(ErrorItemNotFound):
-            item = self.get_test_item()
-            item.save()
-            item_id, changekey = item.id, item.changekey
-            item.delete()
-            item.id, item.changekey = item_id, changekey
             item.send()  # Item disappeared
+        item = self.get_test_item()
         with self.assertRaises(AttributeError):
-            item = self.get_test_item()
             item.send(copy_to_folder=self.account.trash, save_copy=False)  # Inconsistent args
 
     def test_unsupported_fields(self):
