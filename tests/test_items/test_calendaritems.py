@@ -20,6 +20,14 @@ class CalendarTest(CommonItemTest):
     def match_cat(self, i):
         return set(i.categories or []) == set(self.categories)
 
+    def test_cancel(self):
+        item = self.get_test_item().save()
+        res = item.cancel()  # Returns (id, changekey) of cancelled item
+        self.assertEqual(len(res), 2)
+        with self.assertRaises(ErrorItemNotFound):
+            # Item is already cancelled
+            item.cancel()
+
     def test_updating_timestamps(self):
         # Test that we can update an item without changing anything, and maintain the hidden timezone fields as local
         # timezones, and that returned timestamps are in UTC.
