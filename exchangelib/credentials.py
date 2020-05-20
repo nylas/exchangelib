@@ -126,7 +126,7 @@ class OAuth2Credentials(BaseCredentials):
     credentials are connected to.
     """
 
-    def __init__(self, client_id, client_secret, tenant_id, identity=None):
+    def __init__(self, client_id, client_secret, tenant_id=None, identity=None):
         super().__init__()
         self.client_id = client_id
         self.client_secret = client_secret
@@ -203,19 +203,21 @@ class OAuth2AuthorizationCodeCredentials(OAuth2Credentials):
     token (and the authorization code used to get the access token) is
     restricted to a single tenant.
 
-    :params client_id: ID of an authorized OAuth application, required
+    :param client_id: ID of an authorized OAuth application, required
         for automatic token fetching and refreshing
-    :params client_secret: Secret associated with the OAuth application
+    :param client_secret: Secret associated with the OAuth application
     :params authorization_code: Code obtained when authorizing the
         application to access an account. In combination with client_id
         and client_secret, will be used to obtain an access token.
-    :params access_token: Previously-obtained access token. If a token
+    :param access_token: Previously-obtained access token. If a token
         exists and the application will handle refreshing by itself (or
         opts not to handle it), this parameter alone is sufficient.
+    :param identity: An Identity object representing the account that these
+    credentials are connected to.
     """
 
-    def __init__(self, client_id=None, client_secret=None, authorization_code=None, access_token=None):
-        super().__init__(client_id, client_secret, tenant_id=None)
+    def __init__(self, authorization_code=None, access_token=None, **kwargs):
+        super().__init__(**kwargs)
         self.authorization_code = authorization_code
         if access_token is not None and not isinstance(access_token, dict):
             raise ValueError("'access_token' must be an OAuth2Token")

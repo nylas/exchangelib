@@ -205,11 +205,11 @@ from exchangelib import Configuration, OAuth2Credentials, OAuth2AuthorizationCod
     Identity, OAUTH2
 from oauthlib.oauth2 import OAuth2Token
 credentials = OAuth2Credentials(client_id='MY_ID', client_secret='MY_SECRET', tenant_id='TENANT_ID')
-# The OAuth2Credentials flow may need to have impersonation headers set. If you get
-# impersonation errors, add information about the account that the OAuth2Credentials
+# The OAuth2 flow may need to have impersonation headers set. If you get
+# impersonation errors, add information about the account that the OAuth2 credentials
 # was created for:
 credentials = OAuth2Credentials(..., identity=Identity(primary_smtp_address='svc_acct@example.com'))
-credentials = OAuth2Credentials(..., identity=Identity(upn='svc_acct@subdomain.example.com'))
+credentials = OAuth2AuthorizationCodeCredentials(..., identity=Identity(upn='svc_acct@subdomain.example.com'))
 
 credentials = OAuth2AuthorizationCodeCredentials(client_id='MY_ID', client_secret='MY_SECRET', authorization_code='AUTH_CODE')
 credentials = OAuth2AuthorizationCodeCredentials(
