@@ -23,7 +23,7 @@ from .properties import ItemId, Mailbox, EWSElement, ParentFolderId
 from .queryset import QuerySet, SearchableMixIn
 from .restriction import Restriction
 from .services import FindFolder, GetFolder, FindItem, CreateFolder, UpdateFolder, DeleteFolder, EmptyFolder, FindPeople, \
-    SyncFolderItems
+    SyncFolderItems, MoveFolder
 from .util import TNS, MNS
 from .version import EXCHANGE_2007_SP1, EXCHANGE_2010_SP1, EXCHANGE_2013, EXCHANGE_2013_SP1
 
@@ -741,6 +741,9 @@ class Folder(RegisterMixIn, SearchableMixIn):
         if delete_sub_folders:
             # We don't know exactly what was deleted, so invalidate the entire folder cache to be safe
             self.account.root.clear_cache()
+
+    def move(self, to_folder):
+        return MoveFolder(account=self.account).call(folders=[self], to_folder=to_folder)
 
     def wipe(self):
         # Recursively deletes all items in this folder, and all subfolders and their content. Attempts to protect
