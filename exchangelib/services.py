@@ -2360,6 +2360,40 @@ class GetSearchableMailboxes(EWSService):
                         yield c
 
 
+class MoveFolder(EWSAccountService):
+    """
+    https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/movefolder-operation
+    """
+
+    SERVICE_NAME = "MoveFolder"
+    element_container_name = None
+
+    def call(self, folders, to_folder):
+        return list(self._get_elements(payload=self.get_payload(folders, to_folder)))
+
+    def get_payload(self, folders, to_folder):
+        from .folders import Folder, FolderId, DistinguishedFolderId
+
+        payload = create_element("m:{}".format(self.SERVICE_NAME))
+
+        to_folder_elem = create_element("m:ToFolderId")
+        if not isinstance(to_folder, (Folder, FolderId, DistinguishedFolderId)):
+            to_folder = to_item_id(to_folder, FolderId)
+        set_xml_value(to_folder_elem, to_folder, version=self.account.version)
+
+        folder_ids = create_element("m:FolderIds")
+        for folder in folders:
+            if not isinstance(folder, (Folder, FolderId, DistinguishedFolderId)):
+                folder = to_item_id(folder, FolderId)
+            set_xml_value(folder_ids, folder, version=self.account.version)
+        if not len(folder_ids):
+            raise ValueError('"folders" must not be empty')
+
+        payload.append(to_folder_elem)
+        payload.append(folder_ids)
+        return payload
+
+
 def to_item_id(item, item_cls):
     # Coerce a tuple, dict or object to an 'item_cls' instance. Used to create [Parent][Item|Folder]Id instances from a
     # variety of input.
