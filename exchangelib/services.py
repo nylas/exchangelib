@@ -520,9 +520,37 @@ class EWSService(object):
                 field_path = FieldPath(field=field)
             additional_field_paths.append(field_path)
 
+        # In order to receive the Additional Properties FieldPath xml data from exchangelib
+        # in the same order consistently, we need to sort based on the FieldPath attributes.
+        # It's possible to have FieldPaths' field with the same `path` names, for example:
+        # <t:FieldURI FieldURI="contacts:Companies"/>
+        # <t:FieldURI FieldURI="task:Companies"/>
+        # where path name "Companies" is the same for both contacts and task, so the order of data
+        # returned could be flipped. So we need to sort based on the full FieldURI "contacts:Companies"
+        # instead of simply "Companies."
+        #
+        # Similarly,`field_uri` values could also be the same, for example:
+        # <t:IndexedFieldURI FieldIndex="EmailAddress1" FieldURI="contacts:EmailAddress"/>
+        # <t:IndexedFieldURI FieldIndex="EmailAddress3" FieldURI="contacts:EmailAddress"/>
+        # where FieldURI "contacts:EmailAddress" is the same.
+        #
+        # So, in order to have sorted() return consistently ordered results, we sort based on
+        # the path, field_uri, and the field index value which is derived specifically from
+        # value_cls.FIELDS[0].default.
+        def consistent_key(field_path):
+            known_attrs = ["field_uri", "value_cls.FIELDS[0].default"]
+            key = [field_path.path]
+
+            for attr in known_attrs:
+                val = getattr(field_path.field, attr, None)
+                if val is not None:
+                    key.append(val)
+
+            return key
+
         additional_properties = create_element('t:AdditionalProperties')
         expanded_fields = chain(*(f.expand(version=self.account.version) for f in additional_field_paths))
-        set_xml_value(additional_properties, sorted(expanded_fields, key=lambda f: f.path), self.account.version)
+        set_xml_value(additional_properties, sorted(expanded_fields, key=consistent_key), self.account.version)
         shape_element.append(additional_properties)
 
 
