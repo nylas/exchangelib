@@ -21,6 +21,7 @@ from pygments.lexers.html import XmlLexer
 from pygments.formatters.terminal import TerminalFormatter
 import requests.auth
 import requests.exceptions
+from requests import Request
 from six import text_type, string_types
 
 from .errors import TransportError, RateLimitError, RedirectError, RelativeRedirect, CASError, UnauthorizedError, \
@@ -511,9 +512,10 @@ Response data: %(xml_response)s
             # Always create a dummy response for logging purposes, in case we fail in the following
             r = DummyResponse(url=url, headers={}, request_headers=headers)
             try:
-                r = session.post(url=url,
-                                 headers=headers,
-                                 data=data,
+                data = data.decode('utf-8')
+                request = session.prepare_request(Request('POST', url=url, data=data, headers=headers))
+                request.headers['Content-Length'] = len(data.encode('utf-8'))
+                r = session.send(request,
                                  allow_redirects=False,
                                  timeout=(timeout or protocol.TIMEOUT),
                                  stream=stream)
