@@ -514,7 +514,7 @@ Response data: %(xml_response)s
             try:
                 data = data.decode('utf-8')
                 request = session.prepare_request(Request('POST', url=url, data=data, headers=headers))
-                request.headers['Content-Length'] = len(data.encode('utf-8'))
+                request.headers['Content-Length'] = str(len(data.encode('utf-8')))
                 r = session.send(request,
                                  allow_redirects=False,
                                  timeout=(timeout or protocol.TIMEOUT),
