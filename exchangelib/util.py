@@ -512,10 +512,15 @@ Response data: %(xml_response)s
             # Always create a dummy response for logging purposes, in case we fail in the following
             r = DummyResponse(url=url, headers={}, request_headers=headers)
             try:
-                data = data.decode('utf-8')
-                request = session.prepare_request(Request('POST', url=url, data=data, headers=headers))
-                request.headers['Content-Length'] = str(len(data.encode('utf-8')))
-                r = session.send(request,
+                data = data.encode('utf-8')
+            except UnicodeDecodeError:
+                import chardet
+                encoding_info = chardet.detect(data)
+                data = data.decode('utf-8').encode(encoding_info['encoding'])
+            try:
+                r = session.post(url=url,
+                                 headers=headers,
+                                 data=data,
                                  allow_redirects=False,
                                  timeout=(timeout or protocol.TIMEOUT),
                                  stream=stream)
@@ -681,5 +686,5 @@ class HTTPOAuthAuth(requests.auth.AuthBase):  # type: ignore
         self.token = token
 
     def __call__(self, r):
-        r.headers['Authorization'] = 'Bearer {}'.format(self.token)
+        r.headers[b'Authorization'] = b'Bearer {}'.format(self.token.encode('utf-8'))
         return r
