@@ -514,11 +514,11 @@ Response data: %(xml_response)s
             try:
                 data = data.encode('utf-8')
             except UnicodeDecodeError:
-                import chardet
-                encoding_info = chardet.detect(data)
-                if encoding_info['encoding'] in ['ISO-8859-1', 'Windows-1252']:
-                    data = data.decode("utf-8").encode("utf-8")
-                else:
+                try:
+                    data = data.decode('utf-8').encode('utf-8')
+                except UnicodeDecodeError:
+                    import chardet
+                    encoding_info = chardet.detect(data)
                     data = data.decode('utf-8').encode(encoding_info['encoding'])
             try:
                 r = session.post(url=url,
