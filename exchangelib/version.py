@@ -102,6 +102,13 @@ class Build(object):
     def api_version(self):
         if EXCHANGE_2013_SP1 <= self < EXCHANGE_2016:
             return 'Exchange2013_SP1'
+
+        # Force Exchange 2016 protocol version for Exchange 2019
+        # because Exchangelib doesn't work out of the box with
+        # service accounts on these servers.
+        if self >= EXCHANGE_2019:
+            return 'Exchange2016'
+
         try:
             return self.API_VERSION_MAP[self.major_version][self.minor_version]
         except KeyError:
