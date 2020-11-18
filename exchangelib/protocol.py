@@ -39,6 +39,7 @@ class BaseProtocol(object):
     # The maximum number of sessions (== TCP connections, see below) we will open to this service endpoint. Keep this
     # low unless you have an agreement with the Exchange admin on the receiving end to hammer the server and
     # rate-limiting policies have been disabled for the connecting user.
+    # This pool is shared across all accounts using the same service account in a single process
     SESSION_POOLSIZE = 4
     # We want only 1 TCP connection per Session object. We may have lots of different credentials hitting the server and
     # each credential needs its own session (NTLM auth will only send credentials once and then secure the connection,
@@ -51,7 +52,7 @@ class BaseProtocol(object):
     # The adapter class to use for HTTP requests. Override this if you need e.g. proxy support or specific TLS versions
     HTTP_ADAPTER_CLS = requests.adapters.HTTPAdapter
 
-    def __init__(self, service_endpoint, credentials, auth_type):
+    def __init__(self, service_endpoint, credentials, auth_type, is_service_account=False):
         if not isinstance(credentials, Credentials):
             raise ValueError("'credentials' %r must be a Credentials instance" % credentials)
         if auth_type is not None:
@@ -62,6 +63,7 @@ class BaseProtocol(object):
         self.service_endpoint = service_endpoint
         self.auth_type = auth_type
         self._session_pool = None  # Consumers need to fill the session pool themselves
+        self.is_service_account = is_service_account
 
     def __del__(self):
         # pylint: disable=bare-except
@@ -225,8 +227,13 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
 
         # Try to behave nicely with the Exchange server. We want to keep the connection open between requests.
         # We also want to re-use sessions, to avoid the NTLM auth handshake on every request.
-        self._session_pool = LifoQueue(maxsize=self.SESSION_POOLSIZE)
-        for _ in range(self.SESSION_POOLSIZE):
+        pool_size = self.SESSION_POOLSIZE
+        if self.is_service_account:
+            # We run 110 accounts per process, so this gives us a session per-streaming connection
+            # along with some headroom for background polling and historical sync
+            pool_size = 150
+        self._session_pool = LifoQueue(maxsize=pool_size)
+        for _ in range(pool_size):
             self._session_pool.put(self.create_session(), block=False)
 
         if version:
@@ -246,6 +253,8 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
         # Create the pool as the last thing here, since we may fail in the version or auth type guessing, which would
         # leave open threads around to be garbage collected.
         thread_poolsize = 4 * self.SESSION_POOLSIZE
+        if self.is_service_account:
+            thread_poolsize = pool_size
         self.thread_pool = ThreadPool(processes=thread_poolsize)
 
     def get_timezones(self, timezones=None, return_full_timezone_data=False):
