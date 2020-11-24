@@ -39,11 +39,7 @@ class BaseProtocol(object):
     # The maximum number of sessions (== TCP connections, see below) we will open to this service endpoint. Keep this
     # low unless you have an agreement with the Exchange admin on the receiving end to hammer the server and
     # rate-limiting policies have been disabled for the connecting user.
-    # This pool is shared across all accounts that are using the same service account in a single
-    # process, so we need it to be high enough that our greenlets aren't blocking waiting for a session.
-    # Since we manage our own connections well, we don't need to worry about exchangelib throttling
-    # our connections for us.
-    SESSION_POOLSIZE = 500
+    SESSION_POOLSIZE = 4
     # We want only 1 TCP connection per Session object. We may have lots of different credentials hitting the server and
     # each credential needs its own session (NTLM auth will only send credentials once and then secure the connection,
     # so a connection can only handle requests for one credential). Having multiple connections ser Session could
