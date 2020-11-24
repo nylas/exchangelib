@@ -1,6 +1,6 @@
 from __future__ import unicode_literals
 
-from exchangelib.fields import ItemField, FolderField, IdAndChangekeyField
+from exchangelib.fields import BooleanField, ItemField, FolderField, IdAndChangekeyField
 from exchangelib.properties import EWSElement
 from exchangelib.util import TNS
 
@@ -33,7 +33,12 @@ class DeleteItemChange(ItemChange):
 
 
 class ReadFlagChange(ItemChange):
-    ELEMENT_NAME = 'ReadFlagChange'
+    ELEMENT_NAME = "ReadFlagChange"
+    FIELDS = [
+        IdAndChangekeyField("item_id", field_uri="ItemId"),
+        BooleanField("is_read", field_uri="message:IsRead"),
+    ]
+    __slots__ = ("item_id", "is_read")
 
 
 class FolderChange(Change):
