@@ -229,9 +229,10 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
         # We also want to re-use sessions, to avoid the NTLM auth handshake on every request.
         pool_size = self.SESSION_POOLSIZE
         if self.is_service_account:
-            # We run 110 accounts per process, so this gives us a session per-streaming connection
-            # along with some headroom for background polling and historical sync
-            pool_size = 150
+            # We've seen in testing that a 1024 pool size prevents accounts from blocking on the
+            # session pool in case there are a lot of accounts using the same service account creds
+            # in a single sync process.
+            pool_size = 1024
         self._session_pool = LifoQueue(maxsize=pool_size)
         for _ in range(pool_size):
             self._session_pool.put(self.create_session(), block=False)
