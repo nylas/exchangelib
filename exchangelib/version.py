@@ -106,7 +106,7 @@ class Build(object):
         # Force Exchange 2016 protocol version for Exchange 2019
         # because Exchangelib doesn't work out of the box with
         # service accounts on these servers.
-        if self >= EXCHANGE_2019:
+        if self == EXCHANGE_2019:
             return 'Exchange2016'
 
         try:
