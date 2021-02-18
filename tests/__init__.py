@@ -2405,9 +2405,9 @@ class AutodiscoverTest(EWSTest):
 
     def test_canonical_lookup(self):
         from exchangelib.autodiscover import _get_canonical_name
-        self.assertEqual(_get_canonical_name('example.com'), None)
-        self.assertEqual(_get_canonical_name('example.com.'), 'example.com')
-        self.assertEqual(_get_canonical_name('example.XXXXX.'), None)
+        self.assertEqual(_get_canonical_name('httpbin.org'), None)
+        self.assertEqual(_get_canonical_name('httpbin.org.'), 'httpbin.org')
+        self.assertEqual(_get_canonical_name('httpbin.XXXXX.'), None)
 
     def test_srv(self):
         from exchangelib.autodiscover import _get_hostname_from_srv
