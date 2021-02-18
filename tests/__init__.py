@@ -302,13 +302,13 @@ class ProtocolTest(unittest.TestCase):
     def test_close(self):
         proc = psutil.Process()
         ip_addresses = {info[4][0] for info in socket.getaddrinfo(
-            'example.com', 80, socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_IP
+            'httpbin.org', 80, socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_IP
         )}
         self.assertGreater(len(ip_addresses), 0)
-        protocol = Protocol(service_endpoint='http://example.com', credentials=Credentials('A', 'B'),
+        protocol = Protocol(service_endpoint='http://httpbin.org', credentials=Credentials('A', 'B'),
                             auth_type=NOAUTH, version=Version(Build(15, 1)))
         session = protocol.get_session()
-        session.get('http://example.com')
+        session.get('http://httpbin.org')
         self.assertEqual(len({p.raddr[0] for p in proc.connections() if p.raddr[0] in ip_addresses}), 1)
         protocol.release_session(session)
         protocol.close()
