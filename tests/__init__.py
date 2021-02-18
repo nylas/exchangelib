@@ -1304,7 +1304,7 @@ class UtilTest(unittest.TestCase):
         h.stream.seek(0)
         self.assertEqual(
             h.stream.read()[:50],  # Different versions of pygments produce different color codes. Just test a snippet
-            "hello \x1b[36m<?xml version='1.0' encoding='utf-8'?>"
+            "hello \x1b[36m<?xml version='1.0' encoding='utf-8'?>\x1b"
         )
 
 
@@ -2276,6 +2276,7 @@ class AutodiscoverTest(EWSTest):
     @requests_mock.mock(real_http=True)
     def test_autodiscover_cache(self, m):
         # Empty the cache
+        import exchangelib.autodiscover
         from exchangelib.autodiscover import _autodiscover_cache
         _autodiscover_cache.clear()
         cache_key = (self.account.domain, self.account.protocol.credentials)
@@ -2356,6 +2357,7 @@ class AutodiscoverTest(EWSTest):
         del _autodiscover_cache
 
     def test_autodiscover_redirect(self):
+        import exchangelib.autodiscover
         # Prime the cache
         email, p = discover(email=self.account.primary_smtp_address, credentials=self.account.protocol.credentials)
         _orig = exchangelib.autodiscover._autodiscover_quick
@@ -3034,6 +3036,8 @@ class BaseItemTest(EWSTest):
     def get_random_insert_kwargs(self):
         insert_kwargs = {}
         for f in self.ITEM_CLASS.FIELDS:
+            if f.is_syncback_only:
+                continue
             if not f.supports_version(self.account.version):
                 # Cannot be used with this EWS version
                 continue
@@ -3094,6 +3098,8 @@ class BaseItemTest(EWSTest):
         update_kwargs = {}
         now = UTC_NOW()
         for f in self.ITEM_CLASS.FIELDS:
+            if f.is_syncback_only:
+                continue
             if not f.supports_version(self.account.version):
                 # Cannot be used with this EWS version
                 continue
