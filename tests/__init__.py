@@ -74,7 +74,7 @@ from exchangelib.transport import NOAUTH, BASIC, DIGEST, NTLM, wrap, _get_auth_m
 from exchangelib.util import chunkify, peek, get_redirect_url, to_xml, BOM, get_domain, value_to_xml_text, \
     post_ratelimited, create_element, CONNECTION_ERRORS, PrettyXmlHandler, xml_to_str, ParseError
 from exchangelib.version import Build, Version, EXCHANGE_2007, EXCHANGE_2010, EXCHANGE_2013
-from exchangelib.winzone import generate_map, CLDR_TO_MS_TIMEZONE_MAP
+from exchangelib.winzone import generate_map, CLDR_TO_MS_TIMEZONE_MAP, CLDR_WINZONE_VERSION
 
 if PY2:
     FileNotFoundError = IOError
@@ -469,11 +469,13 @@ class EWSDateTimeTest(unittest.TestCase):
 
     def test_generate(self):
         try:
-            self.assertDictEqual(generate_map(), CLDR_TO_MS_TIMEZONE_MAP)
+            version, tz_map = generate_map()
         except CONNECTION_ERRORS:
             # generate_map() requires access to unicode.org, which may be unavailable. Don't fail test, since this is
             # out of our control.
-            pass
+            return
+        self.assertEqual(version, CLDR_WINZONE_VERSION)
+        self.assertDictEqual(tz_map, CLDR_TO_MS_TIMEZONE_MAP)
 
     def test_ewsdate(self):
         self.assertEqual(EWSDate(2000, 1, 1).ewsformat(), '2000-01-01')
