@@ -340,7 +340,8 @@ class Q(object):
             raise ValueError("EWS does not support filtering on field '%s'" % field_path.field.name)
         if field_path.subfield and not field_path.subfield.is_searchable:
             raise ValueError("EWS does not support filtering on subfield '%s'" % field_path.subfield.name)
-        if issubclass(field_path.field.value_cls, MultiFieldIndexedElement) and not field_path.subfield:
+        if field_path.field.value_cls is not None and issubclass(field_path.field.value_cls, MultiFieldIndexedElement) \
+                and not field_path.subfield:
             raise ValueError("Field path '%s' must contain a subfield" % self.field_path)
 
     def _get_field_path(self, folders):
@@ -372,6 +373,7 @@ class Q(object):
         # return None.
         from .indexed_properties import SingleFieldIndexedElement
         from .extended_properties import ExtendedProperty
+        from .fields import GenericDateField
         # Don't check self.value just yet. We want to return error messages on the field path first, and then the value.
         # This is done in _get_field_path() and _get_clean_value(), respectively.
         self._check_integrity()
@@ -381,7 +383,9 @@ class Q(object):
             elem = self._op_to_xml(self.op)
             field_path = self._get_field_path(folders)
             clean_value = self._get_clean_value(field_path=field_path, version=version)
-            if issubclass(field_path.field.value_cls, ExtendedProperty) and field_path.field.value_cls.is_binary_type():
+            if isinstance(field_path.field, GenericDateField):
+                pass
+            elif issubclass(field_path.field.value_cls, ExtendedProperty) and field_path.field.value_cls.is_binary_type():
                 # We need to base64-encode binary data
                 clean_value = base64.b64encode(clean_value.value).decode('ascii')
             elif issubclass(field_path.field.value_cls, SingleFieldIndexedElement) and not field_path.label:
