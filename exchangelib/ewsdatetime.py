@@ -10,7 +10,7 @@ import pytz.exceptions
 import tzlocal
 
 from .errors import NaiveDateTimeNotAllowed, UnknownTimeZone, AmbiguousTimeError, NonExistentTimeError
-from .winzone import PYTZ_TO_MS_TIMEZONE_MAP, MS_TIMEZONE_TO_PYTZ_MAP
+from .winzone import IANA_TO_MS_TIMEZONE_MAP, MS_TIMEZONE_TO_IANA_MAP
 
 log = logging.getLogger(__name__)
 
@@ -175,8 +175,8 @@ class EWSTimeZone(object):
     Represents a timezone as expected by the EWS TimezoneContext / TimezoneDefinition XML element, and returned by
     services.GetServerTimeZones.
     """
-    PYTZ_TO_MS_MAP = PYTZ_TO_MS_TIMEZONE_MAP
-    MS_TO_PYTZ_MAP = MS_TIMEZONE_TO_PYTZ_MAP
+    IANA_TO_MS_MAP = IANA_TO_MS_TIMEZONE_MAP
+    MS_TO_IANA_MAP = MS_TIMEZONE_TO_IANA_MAP
 
     def __eq__(self, other):
         # Microsoft timezones are less granular than pytz, so an EWSTimeZone created from 'Europe/Copenhagen' may return
@@ -193,7 +193,7 @@ class EWSTimeZone(object):
         # Create a timezone instance from a Microsoft timezone ID. This is lossy because there is not a 1:1 translation
         # from MS timezone ID to pytz timezone.
         try:
-            return cls.timezone(cls.MS_TO_PYTZ_MAP[ms_id])
+            return cls.timezone(cls.MS_TO_IANA_MAP[ms_id])
         except KeyError:
             if '/' in ms_id:
                 # EWS sometimes returns an ID that has a region/location format, e.g. 'Europe/Copenhagen'. Try the
@@ -210,7 +210,7 @@ class EWSTimeZone(object):
         base_classes = (cls,) if cls == tz.__class__ else (cls, tz.__class__)
         self_cls = type(cls.__name__, base_classes, dict(tz.__class__.__dict__))
         try:
-            self_cls.ms_id = cls.PYTZ_TO_MS_MAP[tz.zone]
+            self_cls.ms_id = cls.IANA_TO_MS_MAP[tz.zone][0]
         except KeyError:
             raise UnknownTimeZone('No Windows timezone name found for timezone "%s"' % tz.zone)
 

@@ -357,13 +357,15 @@ class EWSDateTimeTest(unittest.TestCase):
         tz = EWSTimeZone.timezone('GMT')
         self.assertIsInstance(tz, EWSTimeZone)
         self.assertEqual(tz.zone, 'GMT')
-        self.assertEqual(tz.ms_id, 'GMT Standard Time')
+        self.assertEqual(tz.ms_id, 'UTC')
 
         # Test mapper contents. Latest map from unicode.org has 394 entries
-        self.assertGreater(len(EWSTimeZone.PYTZ_TO_MS_MAP), 300)
-        for k, v in EWSTimeZone.PYTZ_TO_MS_MAP.items():
+        self.assertGreater(len(EWSTimeZone.IANA_TO_MS_MAP), 300)
+        for k, v in EWSTimeZone.IANA_TO_MS_MAP.items():
             self.assertIsInstance(k, str)
-            self.assertIsInstance(v, str)
+            self.assertIsInstance(v, tuple)
+            self.assertEqual(len(v), 2)
+            self.assertIsInstance(v[0], str)
 
         # Test timezone unknown by pytz
         with self.assertRaises(UnknownTimeZone):
