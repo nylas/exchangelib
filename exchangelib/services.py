@@ -34,7 +34,8 @@ from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, 
     ErrorItemSave, ErrorInvalidIdMalformed, ErrorMessageSizeExceeded, UnauthorizedError, \
     ErrorCannotDeleteTaskOccurrence, ErrorMimeContentConversionFailed, ErrorRecurrenceHasNoOccurrence, \
     ErrorNameResolutionMultipleResults, ErrorNameResolutionNoResults, ErrorNoPublicFolderReplicaAvailable, \
-    ErrorInvalidOperation, ErrorSubscriptionUnsubscribed, MalformedResponseError
+    ErrorInvalidOperation, ErrorSubscriptionUnsubscribed, MalformedResponseError, ErrorIncorrectSchemaVersion, \
+    ErrorInvalidRequest
 from .ewsdatetime import EWSDateTime, NaiveDateTimeNotAllowed
 from .transport import wrap, extra_headers
 from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, \
@@ -321,7 +322,7 @@ class EWSService(object):
                 raise SOAPError('Bad SOAP response: %s' % e)
             try:
                 res = self._get_soap_payload(soap_response=soap_response_payload)
-            except ErrorInvalidServerVersion:
+            except (ErrorInvalidServerVersion, ErrorIncorrectSchemaVersion, ErrorInvalidRequest):
                 # The guessed server version is wrong. Try the next version
                 log.debug('API version %s was invalid', api_version)
                 continue
