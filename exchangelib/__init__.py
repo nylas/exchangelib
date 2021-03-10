@@ -38,6 +38,9 @@ __all__ = [
     'Build', 'Version',
 ]
 
+# Set a default user agent, e.g. "exchangelib/3.1.1"
+BaseProtocol.USERAGENT = "%s/%s (%s)" % (__name__, __version__)
+
 
 def close_connections():
     from .autodiscover import close_connections as close_autodiscover_connections
