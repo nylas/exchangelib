@@ -40,7 +40,7 @@ __all__ = [
 ]
 
 # Set a default user agent, e.g. "exchangelib/3.1.1"
-BaseProtocol.USERAGENT = "%s/%s (%s)" % (__name__, __version__)
+BaseProtocol.USERAGENT = "%s/%s" % (__name__, __version__)
 
 
 def close_connections():
