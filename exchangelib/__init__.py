@@ -12,6 +12,7 @@ from .folders import Folder, FolderCollection, SHALLOW, DEEP
 from .items import AcceptItem, TentativelyAcceptItem, DeclineItem, CalendarItem, CancelCalendarItem, Contact, \
     DistributionList, Message, PostItem, Task
 from .properties import Body, HTMLBody, ItemId, Mailbox, Attendee, Room, RoomList, UID
+from .protocol import BaseProtocol
 from .restriction import Q
 from .transport import BASIC, DIGEST, NTLM, GSSAPI
 from .version import Build, Version
@@ -37,6 +38,9 @@ __all__ = [
     'BASIC', 'DIGEST', 'NTLM', 'GSSAPI',
     'Build', 'Version',
 ]
+
+# Set a default user agent, e.g. "exchangelib/3.1.1"
+BaseProtocol.USERAGENT = "%s/%s (%s)" % (__name__, __version__)
 
 
 def close_connections():

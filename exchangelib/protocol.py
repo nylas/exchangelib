@@ -48,6 +48,8 @@ class BaseProtocol(object):
     CONNECTIONS_PER_SESSION = 1
     # Timeout for HTTP requests
     TIMEOUT = 120
+    # The User-Agent header to use for HTTP requests. Override this to set an app-specific one
+    USERAGENT = None
 
     # The adapter class to use for HTTP requests. Override this if you need e.g. proxy support or specific TLS versions
     HTTP_ADAPTER_CLS = requests.adapters.HTTPAdapter
@@ -133,6 +135,7 @@ class BaseProtocol(object):
         session.auth = get_auth_instance(credentials=self.credentials, auth_type=self.auth_type)
         # Create a copy of the headers because headers are mutable and session users may modify headers
         session.headers.update(DEFAULT_HEADERS.copy())
+        session.headers['User-Agent'] = self.USERAGENT
         session.mount('http://', adapter=self.get_adapter())
         session.mount('https://', adapter=self.get_adapter())
         log.debug('Server %s: Created session %s', self.server, session.session_id)
