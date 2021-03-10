@@ -12,6 +12,7 @@ from .folders import Folder, FolderCollection, SHALLOW, DEEP
 from .items import AcceptItem, TentativelyAcceptItem, DeclineItem, CalendarItem, CancelCalendarItem, Contact, \
     DistributionList, Message, PostItem, Task
 from .properties import Body, HTMLBody, ItemId, Mailbox, Attendee, Room, RoomList, UID
+from .protocol import BaseProtocol
 from .restriction import Q
 from .transport import BASIC, DIGEST, NTLM, GSSAPI
 from .version import Build, Version
