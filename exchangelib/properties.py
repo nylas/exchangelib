@@ -145,6 +145,9 @@ class EWSElement(object):
             value = getattr(self, f.name)
             if value is None or (f.is_list and not value):
                 continue
+            if f.name == "ResponseCode" and value != "NoError":
+                log.error("Error in exchange response "+value)
+                continue
             set_xml_value(elem, f.to_xml(value, version=version), version)
         return elem
 
