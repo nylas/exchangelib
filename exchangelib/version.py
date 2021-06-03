@@ -191,48 +191,12 @@ class Version(object):
         Tries to ask the server which version it has. We haven't set up an Account object yet, so we generate requests
         by hand. We only need a response header containing a ServerVersionInfo element.
 
-        The types.xsd document contains a 'shortname' value that we can use as a key for VERSIONS to get the API version
-        that we need in SOAP headers to generate valid requests. Unfortunately, the Exchagne server may be misconfigured
-        to either block access to types.xsd or serve up a wrong version of the document. Therefore, we only use
-        'shortname' as a hint, but trust the SOAP version returned in response headers.
-
         To get API version and build numbers from the server, we need to send a valid SOAP request. We can't do that
         without a valid API version. To solve this chicken-and-egg problem, we try all possible API versions that this
-        package supports, until we get a valid response. If we managed to get a 'shortname' previously, we try the
-        corresponding API version first.
+        package supports, until we get a valid response.
         """
         log.debug('Asking server for version info')
-        # We can't use a session object from the protocol pool for docs because sessions are created with service auth.
-        auth = get_auth_instance(credentials=protocol.credentials, auth_type=protocol.docs_auth_type)
-        try:
-            shortname = cls._get_shortname_from_docs(auth=auth, types_url=protocol.types_url)
-            log.debug('Shortname according to %s: %s', protocol.types_url, shortname)
-        except (TransportError, ParseError) as e:
-            log.info(text_type(e))
-            shortname = None
-        api_version = VERSIONS[shortname][0] if shortname else None
-        return cls._guess_version_from_service(protocol=protocol, hint=api_version)
-
-    @staticmethod
-    def _get_shortname_from_docs(auth, types_url):
-        # Get the server version from types.xsd. We can't necessarily use the service auth type since it may not be the
-        # same as the auth type for docs.
-        log.debug('Getting %s with auth type %s', types_url, auth.__class__.__name__)
-        # Some servers send an empty response if we send 'Connection': 'close' header
-        from .protocol import BaseProtocol
-        with BaseProtocol.raw_session() as s:
-            r = s.get(url=types_url, auth=auth, allow_redirects=False, stream=False)
-        log.debug('Request headers: %s', r.request.headers)
-        log.debug('Response code: %s', r.status_code)
-        log.debug('Response headers: %s', r.headers)
-        if r.status_code != 200:
-            raise TransportError('Unexpected HTTP status %s when getting %s (%s)' % (r.status_code, types_url, r.text))
-        if not is_xml(r.content):
-            raise TransportError('Unexpected result when getting %s. Maybe this is not an EWS server?%s' % (
-                types_url,
-                '\n\n%s[...]' % r.text[:200] if len(r.text) > 200 else '\n\n%s' % r.text if r.text else '',
-            ))
-        return to_xml(r.content).get('version')
+        return cls._guess_version_from_service(protocol=protocol)
 
     @classmethod
     def _guess_version_from_service(cls, protocol, hint=None):
