@@ -22,7 +22,7 @@ from .errors import TransportError
 from .properties import FreeBusyViewOptions, MailboxData, TimeWindow, TimeZone
 from .services import GetServerTimeZones, GetRoomLists, GetRooms, ResolveNames, GetUserAvailability, \
     GetSearchableMailboxes
-from .transport import get_auth_instance, get_service_authtype, get_docs_authtype, AUTH_TYPE_MAP, DEFAULT_HEADERS
+from .transport import get_auth_instance, get_service_authtype, AUTH_TYPE_MAP, DEFAULT_HEADERS
 from .util import split_url
 from .version import Version, API_VERSIONS
 
@@ -225,9 +225,6 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
             self.auth_type = get_service_authtype(service_endpoint=self.service_endpoint, versions=API_VERSIONS,
                                                   name=self.credentials.username)
 
-        # Default to the auth type used by the service. We only need this if 'version' is None
-        self.docs_auth_type = self.auth_type
-
         # Try to behave nicely with the Exchange server. We want to keep the connection open between requests.
         # We also want to re-use sessions, to avoid the NTLM auth handshake on every request.
         pool_size = self.pool_size or self.SESSION_POOLSIZE
@@ -240,11 +237,6 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
             self.version = version
         else:
             # Version.guess() needs auth objects and a working session pool
-            try:
-                # Try to get the auth_type of 'types.xsd' so we can fetch it and look at the version contained there
-                self.docs_auth_type = get_docs_authtype(docs_url=self.types_url)
-            except TransportError:
-                pass
             self.version = Version.guess(self)
 
         # Used by services to process service requests that are able to run in parallel. Thread pool should be
@@ -365,14 +357,12 @@ EWS url: %s
 Product name: %s
 EWS API version: %s
 Build number: %s
-EWS auth: %s
-XSD auth: %s''' % (
+EWS auth: %s''' % (
             self.service_endpoint,
             self.version.fullname,
             self.version.api_version,
             self.version.build,
             self.auth_type,
-            self.docs_auth_type,
         )
 
 
