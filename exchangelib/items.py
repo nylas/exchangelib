@@ -142,7 +142,7 @@ class Item(RegisterMixIn):
         EWSElementField('parent_folder_id', field_uri='item:ParentFolderId', value_cls=ParentFolderId,
                         is_read_only=True),
         CharField('item_class', field_uri='item:ItemClass', is_read_only=True),
-        CharField('subject', field_uri='item:Subject'),
+        TextField('subject', field_uri='item:Subject'),
         ChoiceField('sensitivity', field_uri='item:Sensitivity', choices={
             Choice('Normal'), Choice('Personal'), Choice('Private'), Choice('Confidential')
         }, is_required=True, default='Normal'),
