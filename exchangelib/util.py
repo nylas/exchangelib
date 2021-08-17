@@ -22,7 +22,7 @@ from pygments.formatters.terminal import TerminalFormatter
 import requests.auth
 import requests.exceptions
 from requests import Request
-from six import text_type, string_types
+from six import ensure_binary, string_types, text_type
 
 from .errors import TransportError, RateLimitError, RedirectError, RelativeRedirect, CASError, UnauthorizedError, \
     InvalidTokenError, ErrorInvalidSchemaVersionForMailboxVersion
@@ -512,7 +512,7 @@ Response data: %(xml_response)s
             # Always create a dummy response for logging purposes, in case we fail in the following
             r = DummyResponse(url=url, headers={}, request_headers=headers)
             try:
-                data = data.encode('utf-8')
+                data = ensure_binary(data)
             except UnicodeDecodeError:
                 try:
                     data = data.decode('utf-8').encode('utf-8')
