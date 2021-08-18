@@ -21,7 +21,7 @@ import logging
 from sys import stdout
 import traceback
 
-from six import text_type
+from six import ensure_text, text_type
 
 from . import errors
 from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, ErrorBatchProcessingStopped, \
@@ -279,6 +279,7 @@ class EWSService(object):
             for chunk in response.iter_content():
                 if not chunk:
                     continue
+                chunk = ensure_text(chunk)
                 curr_envelope += chunk
                 index = curr_envelope.find(envelope_str)
                 if index == -1:
