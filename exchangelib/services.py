@@ -270,7 +270,7 @@ class EWSService(object):
         elif ftype == 'streaming-response':
             stdout.write(u'STREAMING RESPONSE {} <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< {}\n'.format(req_id, now))
 
-        stdout.write(PrettyXmlHandler.prettify_xml(xml_str) + b'\n')
+        stdout.write(ensure_text(PrettyXmlHandler.prettify_xml(xml_str) + b'\n'))
 
     def _parse_envelopes(self, response):
         try:

@@ -22,13 +22,16 @@ from pygments.formatters.terminal import TerminalFormatter
 import requests.auth
 import requests.exceptions
 from requests import Request
-from six import ensure_binary, string_types, text_type
+from six import PY3, ensure_binary, string_types, text_type
 
 from .errors import TransportError, RateLimitError, RedirectError, RelativeRedirect, CASError, UnauthorizedError, \
     InvalidTokenError, ErrorInvalidSchemaVersionForMailboxVersion
 
 time_func = time.time if PY2 else time.monotonic
 log = logging.getLogger(__name__)
+
+if PY3:
+    unicode = str
 
 
 class ParseError(_etree.ParseError):
