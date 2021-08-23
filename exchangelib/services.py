@@ -1578,7 +1578,7 @@ class Subscribe(EWSFolderService):
             assert event_type in CONCRETE_EVENT_TYPES
             deduped_event_types.add(event_type.ELEMENT_NAME)
 
-        for event_type_name in deduped_event_types:
+        for event_type_name in sorted(deduped_event_types):
             if event_type_name == 'StatusEvent':
                 continue
             event_type_elem = create_element('t:EventType')
