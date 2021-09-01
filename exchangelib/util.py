@@ -22,16 +22,13 @@ from pygments.formatters.terminal import TerminalFormatter
 import requests.auth
 import requests.exceptions
 from requests import Request
-from six import PY3, ensure_binary, string_types, text_type
+from six import ensure_binary, string_types, text_type
 
 from .errors import TransportError, RateLimitError, RedirectError, RelativeRedirect, CASError, UnauthorizedError, \
     InvalidTokenError, ErrorInvalidSchemaVersionForMailboxVersion
 
 time_func = time.time if PY2 else time.monotonic
 log = logging.getLogger(__name__)
-
-if PY3:
-    unicode = str
 
 
 class ParseError(_etree.ParseError):
@@ -299,8 +296,7 @@ class PrettyXmlHandler(logging.StreamHandler):
     @classmethod
     def prettify_xml(cls, xml_bytes):
         # Re-formats an XML document to a consistent style
-        if isinstance(xml_bytes, unicode):
-            xml_bytes = xml_bytes.encode('utf-8')
+        xml_bytes = ensure_binary(xml_bytes)
         return tostring(
             cls.parse_bytes(xml_bytes),
             xml_declaration=True,
