@@ -21,7 +21,7 @@ import logging
 from sys import stdout
 import traceback
 
-from six import text_type
+from six import ensure_text, text_type
 
 from . import errors
 from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, ErrorBatchProcessingStopped, \
@@ -270,7 +270,7 @@ class EWSService(object):
         elif ftype == 'streaming-response':
             stdout.write(u'STREAMING RESPONSE {} <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< {}\n'.format(req_id, now))
 
-        stdout.write(PrettyXmlHandler.prettify_xml(xml_str) + b'\n')
+        stdout.write(ensure_text(PrettyXmlHandler.prettify_xml(xml_str) + b'\n'))
 
     def _parse_envelopes(self, response):
         try:
@@ -279,6 +279,7 @@ class EWSService(object):
             for chunk in response.iter_content():
                 if not chunk:
                     continue
+                chunk = ensure_text(chunk)
                 curr_envelope += chunk
                 index = curr_envelope.find(envelope_str)
                 if index == -1:
@@ -1577,7 +1578,7 @@ class Subscribe(EWSFolderService):
             assert event_type in CONCRETE_EVENT_TYPES
             deduped_event_types.add(event_type.ELEMENT_NAME)
 
-        for event_type_name in deduped_event_types:
+        for event_type_name in sorted(deduped_event_types):
             if event_type_name == 'StatusEvent':
                 continue
             event_type_elem = create_element('t:EventType')
