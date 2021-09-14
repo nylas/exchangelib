@@ -688,5 +688,5 @@ class HTTPOAuthAuth(requests.auth.AuthBase):  # type: ignore
         self.token = token
 
     def __call__(self, r):
-        r.headers[b'Authorization'] = b'Bearer {}'.format(self.token.encode('utf-8'))
+        r.headers[b'Authorization'] = ensure_binary('Bearer {}'.format(self.token))
         return r
