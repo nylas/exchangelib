@@ -143,6 +143,7 @@ CLDR_TO_MS_TIMEZONE_MAP = {
     'America/Indiana/Vevay': 'US Eastern Standard Time',
     'America/Indiana/Vincennes': 'Eastern Standard Time',
     'America/Indiana/Winamac': 'Eastern Standard Time',
+    'America/Indiana/Indianapolis': 'US Eastern Standard Time',
     'America/Indianapolis': 'US Eastern Standard Time',
     'America/Inuvik': 'Mountain Standard Time',
     'America/Iqaluit': 'Eastern Standard Time',
