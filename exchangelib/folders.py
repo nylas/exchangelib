@@ -1024,7 +1024,7 @@ class Root(Folder):
             fld = folder_cls(account=self.account, name=folder_cls.DISTINGUISHED_FOLDER_ID, is_distinguished=True)
             fld.test_access()
             return self._folders_map.get(fld.id, fld)  # Use cached instance if available
-        except ErrorFolderNotFound:
+        except (ErrorFolderNotFound, ErrorItemNotFound, ErrorNoPublicFolderReplicaAvailable):
             # The Exchange server does not return a distinguished folder of this type
             pass
 
