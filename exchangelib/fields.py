@@ -558,7 +558,7 @@ class GenericDateField(FieldURIField):
                         # timezone of the account.
                         local_dt = e.args[0]
                         tz = account.default_timezone if account else UTC
-                        log.info('Found naive datetime %s on field %s. Assuming timezone %s', local_dt, self.name, tz)
+                        log.debug('Found naive datetime %s on field %s. Assuming timezone %s', local_dt, self.name, tz)
                         return tz.localize(local_dt)
                     log.warning("Cannot convert value '%s' on field '%s' to type %s", val, self.name, self.value_cls)
                     return None
@@ -598,7 +598,7 @@ class DateTimeField(FieldURIField):
                     # the account.
                     local_dt = e.args[0]
                     tz = account.default_timezone if account else UTC
-                    log.info('Found naive datetime %s on field %s. Assuming timezone %s', local_dt, self.name, tz)
+                    log.debug('Found naive datetime %s on field %s. Assuming timezone %s', local_dt, self.name, tz)
                     return tz.localize(local_dt)
                 log.warning("Cannot convert value '%s' on field '%s' to type %s", val, self.name, self.value_cls)
                 return None
