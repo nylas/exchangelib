@@ -672,7 +672,7 @@ def _raise_response_errors(response, protocol, log_msg, log_vals):
 
         if protocol.credentials.fail_fast:
             # This is a login failure
-            raise UnauthorizedError('Wrong username or password for %s' % response.url)
+            raise UnauthorizedError('Wrong username or password for {}. Provider error: {}'.format(response.url, response.text))
 
     if 'TimeoutException' in response.headers:
         raise response.headers['TimeoutException']
