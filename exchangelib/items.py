@@ -611,12 +611,12 @@ class CalendarItem(Item):
         if version:
             self.clean_timezone_fields(version=version)
 
-    def accept(self, **kwargs):
+    def accept(self, message_disposition=SEND_AND_SAVE_COPY, **kwargs):
         return AcceptItem(
             account=self.account,
             reference_item_id=ReferenceItemId(id=self.id, changekey=self.changekey),
             **kwargs
-        ).send()
+        ).send(message_disposition)
 
     def cancel(self, **kwargs):
         return CancelCalendarItem(
@@ -625,19 +625,19 @@ class CalendarItem(Item):
             **kwargs
         ).send()
 
-    def decline(self, **kwargs):
+    def decline(self, message_disposition=SEND_AND_SAVE_COPY, **kwargs):
         return DeclineItem(
             account=self.account,
             reference_item_id=ReferenceItemId(id=self.id, changekey=self.changekey),
             **kwargs
-        ).send()
+        ).send(message_disposition)
 
-    def tentatively_accept(self, **kwargs):
+    def tentatively_accept(self, message_disposition=SEND_AND_SAVE_COPY, **kwargs):
         return TentativelyAcceptItem(
             account=self.account,
             reference_item_id=ReferenceItemId(id=self.id, changekey=self.changekey),
             **kwargs
-        ).send()
+        ).send(message_disposition)
 
     def _update_fieldnames(self):
         update_fields = super(CalendarItem, self)._update_fieldnames()
