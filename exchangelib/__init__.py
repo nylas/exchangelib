@@ -7,7 +7,7 @@ from .autodiscover import discover
 from .configuration import Configuration
 from .credentials import DELEGATE, IMPERSONATION, Credentials, OAuthCredentials, ServiceAccount
 from .ewsdatetime import EWSDate, EWSDateTime, EWSTimeZone, UTC, UTC_NOW
-from .extended_properties import ExtendedProperty, ExternId, Flag
+from .extended_properties import ExtendedProperty, ExternId, Flag, CalendarColor
 from .folders import Folder, FolderCollection, SHALLOW, DEEP
 from .items import AcceptItem, TentativelyAcceptItem, DeclineItem, CalendarItem, CancelCalendarItem, Contact, \
     DistributionList, Message, PostItem, Task
@@ -60,4 +60,4 @@ Task.register('extern_id', ExternId)
 
 ############# Nylas Registered Extended Properties ###########
 Message.register('flag', Flag)
-
+Folder.register('color', CalendarColor)

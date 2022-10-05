@@ -274,3 +274,8 @@ class Flag(ExtendedProperty):
 	property_tag = 0x1090
 	property_type = 'Integer'
 
+
+# Implementation of https://learn.microsoft.com/en-us/openspecs/exchange_server_protocols/ms-oxprops/1fdd4d65-8c85-4ea3-95c4-5d5f55e33eb8
+class CalendarColor(ExtendedProperty):
+    property_tag = 0x6853
+    property_type = "Integer"
