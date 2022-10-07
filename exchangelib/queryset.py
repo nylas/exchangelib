@@ -8,7 +8,7 @@ import warnings
 
 from future.utils import python_2_unicode_compatible
 
-from .items import CalendarItem, ID_ONLY
+from .items import CalendarItem, Item, Persona, ALL_OCCURRENCIES, ID_ONLY, SHALLOW
 from .fields import FieldPath, FieldOrder
 from .restriction import Q
 from .version import EXCHANGE_2010
@@ -78,6 +78,7 @@ class QuerySet(SearchableMixIn):
         self.calendar_view = None
         self.page_size = None
         self.max_items = None
+        self._depth = SHALLOW
 
         self._cache = None
 
@@ -108,6 +109,7 @@ class QuerySet(SearchableMixIn):
         new_qs.calendar_view = self.calendar_view
         new_qs.page_size = self.page_size
         new_qs.max_items = self.max_items
+        new_qs._depth = self._depth
         return new_qs
 
     @property
@@ -115,7 +117,6 @@ class QuerySet(SearchableMixIn):
         return self._cache is not None
 
     def _get_field_path(self, field_path):
-        from .items import Persona
         if self.request_type == self.PERSONA:
             return FieldPath(field=Persona.get_field_by_fieldname(field_path))
         for folder in self.folder_collection:
@@ -126,7 +127,6 @@ class QuerySet(SearchableMixIn):
         raise ValueError("Unknown fieldname '%s' on folders '%s'" % (field_path, self.folder_collection.folders))
 
     def _get_field_order(self, field_path):
-        from .items import Persona
         if self.request_type == self.PERSONA:
             return FieldOrder(
                 field_path=FieldPath(field=Persona.get_field_by_fieldname(field_path.lstrip('-'))),
@@ -178,8 +178,6 @@ class QuerySet(SearchableMixIn):
         }[return_format](items)
 
     def _query(self):
-        from .folders import SHALLOW
-        from .items import Persona
         if self.only_fields is None:
             # We didn't restrict list of field paths. Get all fields from the server, including extended properties.
             if self.request_type == self.PERSONA:
@@ -227,6 +225,7 @@ class QuerySet(SearchableMixIn):
         else:
             find_item_kwargs = dict(
                 shape=ID_ONLY,  # Always use IdOnly here, because AllProperties doesn't actually get *all* properties
+                depth=self._depth,
                 additional_fields=additional_fields,
                 order_fields=order_fields,
                 calendar_view=self.calendar_view,
@@ -369,7 +368,6 @@ class QuerySet(SearchableMixIn):
             yield item_func(i)
 
     def _as_items(self, iterable):
-        from .items import Item
         return self._item_yielder(
             iterable=iterable,
             item_func=lambda i: i,
@@ -515,6 +513,13 @@ class QuerySet(SearchableMixIn):
         new_qs.return_format = self.FLAT if flat else self.VALUES_LIST
         return new_qs
 
+    def depth(self, depth):
+        """Specify the search depth (SHALLOW, ASSOCIATED or DEEP)
+        """
+        new_qs = self.copy()
+        new_qs._depth = depth
+        return new_qs
+
     ###########################
     #
     # Methods that end chaining
@@ -576,7 +581,6 @@ class QuerySet(SearchableMixIn):
     def delete(self, page_size=1000):
         """ Delete the items matching the query, with as little effort as possible. 'page_size' is the number of items
         to fetch and delete from the server per request. We're only fetching the IDs, so keep it high"""
-        from .items import ALL_OCCURRENCIES
         if self.is_cached:
             res = self.folder_collection.account.bulk_delete(
                 ids=self._cache,
