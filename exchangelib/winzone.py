@@ -490,14 +490,14 @@ CLDR_TO_MS_TIMEZONE_MAP = {
 #
 PYTZ_TO_MS_TIMEZONE_MAP = dict(CLDR_TO_MS_TIMEZONE_MAP, **{
     'Asia/Kolkata': 'India Standard Time',
-    'Canada/Pacific': 'America/Vancouver',
-    'EST': 'America/Cancun',
+    'Canada/Pacific': 'Pacific Standard Time',
+    'EST': 'Eastern Standard Time (Mexico)',
     'UTC': 'UTC',
-    'US/Arizona': 'America/Phoenix',
-    'US/Central': 'America/Chicago',
-    'US/Eastern': 'America/New_York',
-    'US/Mountain': 'America/Denver',
-    'US/Pacific': 'America/Los_Angeles',
+    'US/Arizona': 'US Mountain Standard Time',
+    'US/Central': 'Central Standard Time',
+    'US/Eastern': 'Eastern Standard Time',
+    'US/Mountain': 'Mountain Standard Time',
+    'US/Pacific': 'Pacific Standard Time',
     'GMT': 'GMT Standard Time',
 })
 
