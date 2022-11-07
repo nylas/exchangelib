@@ -186,7 +186,6 @@ def set_xml_value(elem, value, version):
     from .ewsdatetime import EWSDateTime, EWSDate
     from .fields import FieldPath, FieldOrder
     from .folders import EWSElement
-    from .version import Version
     if isinstance(value, string_types + (bool, bytes, int, Decimal, datetime.time, EWSDate, EWSDateTime)):
         elem.text = value_to_xml_text(value)
     elif isinstance(value, RestrictedElement):
@@ -196,8 +195,6 @@ def set_xml_value(elem, value, version):
             if isinstance(v, (FieldPath, FieldOrder)):
                 elem.append(v.to_xml())
             elif isinstance(v, EWSElement):
-                if not isinstance(version, Version):
-                    raise ValueError("'version' %r must be a Version instance" % version)
                 elem.append(v.to_xml(version=version))
             elif isinstance(v, RestrictedElement):
                 elem.append(v)
@@ -208,8 +205,6 @@ def set_xml_value(elem, value, version):
     elif isinstance(value, (FieldPath, FieldOrder)):
         elem.append(value.to_xml())
     elif isinstance(value, EWSElement):
-        if not isinstance(version, Version):
-            raise ValueError("'version' %s must be a Version instance" % version)
         elem.append(value.to_xml(version=version))
     else:
         raise ValueError('Unsupported type %s for value %s on elem %s' % (type(value), value, elem))
