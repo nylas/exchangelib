@@ -222,8 +222,7 @@ class Protocol(with_metaclass(CachingProtocol, BaseProtocol)):
         # Autodetect authentication type if necessary
         # pylint: disable=access-member-before-definition
         if self.auth_type is None:
-            self.auth_type = get_service_authtype(service_endpoint=self.service_endpoint, versions=API_VERSIONS,
-                                                  name=self.credentials.username)
+            self.auth_type = get_service_authtype(service_endpoint=self.service_endpoint, versions=API_VERSIONS)
 
         # Try to behave nicely with the Exchange server. We want to keep the connection open between requests.
         # We also want to re-use sessions, to avoid the NTLM auth handshake on every request.

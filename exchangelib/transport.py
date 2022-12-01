@@ -115,7 +115,7 @@ def get_autodiscover_authtype(service_endpoint, data):
     return _get_auth_method_from_response(response=r)
 
 
-def get_service_authtype(service_endpoint, versions, name):
+def get_service_authtype(service_endpoint, versions):
     # Get auth type by tasting headers from the server. Only do POST requests. HEAD is too error prone, and some servers
     # are set up to redirect to OWA on all requests except POST to /EWS/Exchange.asmx
     log.debug('Getting service auth type for %s', service_endpoint)
@@ -124,7 +124,7 @@ def get_service_authtype(service_endpoint, versions, name):
     from .protocol import BaseProtocol
     with BaseProtocol.raw_session() as s:
         for version in versions:
-            data = dummy_xml(version=version, name=name)
+            data = dummy_xml(version=version)
             log.debug('Requesting %s from %s', data, service_endpoint)
             r = s.post(url=service_endpoint, headers=DEFAULT_HEADERS.copy(), data=data, allow_redirects=True,
                        timeout=BaseProtocol.TIMEOUT)
@@ -197,13 +197,11 @@ def _tokenize(val):
     return auth_tokens
 
 
-def dummy_xml(version, name):
+def dummy_xml(version):
     # Generate a minimal, valid EWS request
-    from .services import ResolveNames  # Avoid circular import
-    return wrap(content=ResolveNames(protocol=None).get_payload(
-        unresolved_entries=[name],
-        parent_folders=None,
-        return_full_contact_data=False,
-        search_scope=None,
-        contact_data_shape=None,
+    from .properties import ENTRY_ID, EWS_ID, AlternateId
+    from .services import ConvertId
+    return wrap(content=ConvertId(protocol=None).get_payload(
+        items=[AlternateId(id="DUMMY", format=EWS_ID, mailbox="DUMMY")],
+        destination_format=ENTRY_ID,
     ), version=version)
