@@ -2005,7 +2005,7 @@ class ConvertId(EWSService):
             yield cls_map[elem.tag].from_xml(elem, account=None)
 
     def get_payload(self, items, destination_format):
-        payload = create_element(f"m:{self.SERVICE_NAME}", DestinationFormat=destination_format)
+        payload = create_element("m:{}".format(self.SERVICE_NAME), DestinationFormat=destination_format)
         item_ids = create_element("m:SourceIds")
         for item in items:
             set_xml_value(item_ids, item, version=None)
