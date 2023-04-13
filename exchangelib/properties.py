@@ -790,7 +790,7 @@ class AlternateId(EWSElement):
     @classmethod
     def response_tag(cls):
         # This element is in TNS in the request and MNS in the response...
-        return f"{{{MNS}}}{cls.ELEMENT_NAME}"
+        return "{{{}}}{}".format(MNS, cls.ELEMENT_NAME)
 
 
 class AlternatePublicFolderId(EWSElement):
