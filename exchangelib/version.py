@@ -201,13 +201,12 @@ class Version(object):
     @classmethod
     def _guess_version_from_service(cls, protocol, hint=None):
         # The protocol doesn't have a version yet, so add one with our hint, or default to latest supported version.
-        # Use ConvertId as a minimal request to the server to test if the version is correct. If not, ConvertId will
-        # try to guess the version automatically. Make sure the call to ConvertId does not require a version build.
-        from .properties import ENTRY_ID, EWS_ID, AlternateId
-        from .services import ConvertId
+        # Use ResolveNames as a minimal request to the server to test if the version is correct. If not, ResolveNames
+        # will try to guess the version automatically.
+        from .services import ResolveNames
         protocol.version = Version(build=None, api_version=hint or API_VERSIONS[-1])
         try:
-            list(ConvertId(protocol=protocol).call([AlternateId(id="DUMMY", format=EWS_ID, mailbox="DUMMY")], ENTRY_ID))
+            list(ResolveNames(protocol=protocol).call(unresolved_entries=[protocol.credentials.username]))
         except (ErrorInvalidSchemaVersionForMailboxVersion, ErrorInvalidServerVersion):
             raise TransportError('Unable to guess version')
         except ResponseMessageError:
