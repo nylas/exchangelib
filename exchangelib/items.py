@@ -288,9 +288,11 @@ class Item(RegisterMixIn):
         res = self.account.bulk_create(
             items=[self], folder=self.folder, message_disposition=message_disposition,
             send_meeting_invitations=send_meeting_invitations)
-        if not res:
+        if message_disposition in (SEND_ONLY, SEND_AND_SAVE_COPY):
+            if res:
+                raise ValueError('Got a response in non-save mode')
             return None
-        if len(res) > 1:
+        if len(res) != 1:
             raise ValueError('Expected result length 1, but got %s' % res)
         if isinstance(res[0], Exception):
             raise res[0]
@@ -711,7 +713,10 @@ class Message(Item):
                                send_meeting_invitations=send_meeting_invitations)
             return None
 
-        return self._create(message_disposition=SEND_ONLY, send_meeting_invitations=send_meeting_invitations)
+        res = self._create(message_disposition=SEND_ONLY, send_meeting_invitations=send_meeting_invitations)
+        if res:
+            raise ValueError('Unexpected response in send-only mode')
+        return None
 
     def send_and_save(self, update_fields=None, conflict_resolution=AUTO_RESOLVE,
                       send_meeting_invitations=SEND_TO_NONE):
@@ -732,10 +737,12 @@ class Message(Item):
                 self.send(save_copy=False, conflict_resolution=conflict_resolution,
                           send_meeting_invitations=send_meeting_invitations)
             else:
-                return self._create(
+                res = self._create(
                     message_disposition=SEND_AND_SAVE_COPY,
                     send_meeting_invitations=send_meeting_invitations
                 )
+                if res:
+                    raise ValueError('Unexpected response in send-only mode')
 
     def reply(self, subject, body, to_recipients=None, cc_recipients=None, bcc_recipients=None):
         if not self.account:
