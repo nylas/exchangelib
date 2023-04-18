@@ -1010,11 +1010,13 @@ class Root(Folder):
         if not folder_cls.DISTINGUISHED_FOLDER_ID:
             raise ValueError("'folder_cls' %s must have a DISTINGUISHED_FOLDER_ID value" % folder_cls)
 
-        for f in self._folders_map.values():
-            # Require exact class, to not match subclasses, e.g. RecipientCache instead of Contacts
-            if f.__class__ == folder_cls and f.is_distinguished:
-                log.debug('Found cached distinguished %s folder', folder_cls)
-                return f
+        if self._subfolders is not None:
+            for f in self._folders_map.values():
+                # Require exact class, to not match subclasses, e.g. RecipientCache instead of Contacts
+                if f.__class__ == folder_cls and f.is_distinguished:
+                    log.debug('Found cached distinguished %s folder', folder_cls)
+                    return f
+
         try:
             log.debug('Requesting distinguished %s folder explicitly', folder_cls)
             return folder_cls.get_distinguished(account=self.account)
