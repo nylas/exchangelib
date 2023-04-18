@@ -491,7 +491,6 @@ CLDR_TO_MS_TIMEZONE_MAP = {
 PYTZ_TO_MS_TIMEZONE_MAP = dict(CLDR_TO_MS_TIMEZONE_MAP, **{
     'Asia/Kolkata': 'India Standard Time',
     'Canada/Pacific': 'Pacific Standard Time',
-    'Canada/Eastern': 'Eastern Standard Time',
     'EST': 'Eastern Standard Time (Mexico)',
     'UTC': 'UTC',
     'US/Arizona': 'US Mountain Standard Time',
