@@ -1979,50 +1979,6 @@ class GetPersona(EWSService):
             cls._raise_soap_errors(fault=fault)  # Will throw SOAPError or custom EWS error
         return [response]
 
-
-class ConvertId(EWSService):
-    """Take a list of IDs to convert. Returns a list of converted IDs or exception instances, in the same order as the
-    input list.
-
-    MSDN: https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/convertid-operation
-    """
-
-    SERVICE_NAME = "ConvertId"
-
-    def call(self, items, destination_format):
-        from .properties import AlternateId, AlternatePublicFolderId, AlternatePublicFolderItemId
-        elements = self._get_elements(payload=self.get_payload(
-            items=items,
-            destination_format=destination_format,
-        ))
-        cls_map = {cls.response_tag(): cls for cls in
-                   (AlternateId, AlternatePublicFolderId, AlternatePublicFolderItemId)}
-        for elem in elements:
-            # Allow None here. Some services don't return an ID if the target folder is outside the mailbox.
-            if isinstance(elem, (Exception, type(None))):
-                yield elem
-                continue
-            yield cls_map[elem.tag].from_xml(elem, account=None)
-
-    def get_payload(self, items, destination_format):
-        payload = create_element("m:{}".format(self.SERVICE_NAME), DestinationFormat=destination_format)
-        item_ids = create_element("m:SourceIds")
-        for item in items:
-            set_xml_value(item_ids, item, version=None)
-        payload.append(item_ids)
-        return payload
-
-    @classmethod
-    def _get_elements_in_container(cls, container):
-        # We may have other elements in here, e.g. 'ResponseCode'. Filter away those.
-        from .properties import AlternateId, AlternatePublicFolderId, AlternatePublicFolderItemId
-        return [
-            container.findall(AlternateId.response_tag())
-            + container.findall(AlternatePublicFolderId.response_tag())
-            + container.findall(AlternatePublicFolderItemId.response_tag())
-        ]
-
-
 class ResolveNames(EWSService):
     """
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa565329(v=exchg.150).aspx
