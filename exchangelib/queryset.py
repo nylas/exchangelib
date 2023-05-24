@@ -548,7 +548,12 @@ class QuerySet(SearchableMixIn):
             account = self.folder_collection.account
             item_id = self._item_id_field.field.clean(kwargs['id'], version=account.version)
             changekey = self._changekey_field.field.clean(kwargs.get('changekey'), version=account.version)
-            items = list(account.fetch(ids=[(item_id, changekey)], only_fields=self.only_fields))
+            # The folders we're querying may not support all fields
+            if self.only_fields is None:
+                only_fields = {FieldPath(field=f) for f in self.folder_collection.allowed_fields()}
+            else:
+                only_fields = self.only_fields
+            items = list(account.fetch(ids=[(item_id, changekey)], only_fields=only_fields))
         else:
             new_qs = self.filter(*args, **kwargs)
             items = list(new_qs.__iter__())

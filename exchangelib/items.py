@@ -354,7 +354,7 @@ class Item(RegisterMixIn):
             raise ValueError('%s must have an account' % self.__class__.__name__)
         if not self.id:
             raise ValueError('%s must have an ID' % self.__class__.__name__)
-        res = list(self.account.fetch(ids=[self]))
+        res = list(self.account.fetch(ids=[self], only_fields=self.supported_fields(self.account.version)))
         if len(res) != 1:
             raise ValueError('Expected result length 1, but got %s' % res)
         if isinstance(res[0], Exception):
@@ -799,7 +799,8 @@ class Task(Item):
     ELEMENT_NAME = 'Task'
     NOT_STARTED = 'NotStarted'
     COMPLETED = 'Completed'
-    FIELDS = Item.FIELDS + [
+    # O365 throws ErrorInternalServerError "[0x004f0102] MapiReplyToBlob" if UniqueBody is requested
+    FIELDS = Item.FIELDS[:-1] + [
         IntegerField('actual_work', field_uri='task:ActualWork', min=0),
         DateTimeField('assigned_time', field_uri='task:AssignedTime', is_read_only=True),
         TextField('billing_information', field_uri='task:BillingInformation'),
@@ -879,7 +880,8 @@ class Contact(Item):
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa581315(v=exchg.150).aspx
     """
     ELEMENT_NAME = 'Contact'
-    FIELDS = Item.FIELDS + [
+    # O365 throws ErrorInternalServerError "[0x004f0102] MapiReplyToBlob" if UniqueBody is requested
+    FIELDS = Item.FIELDS[:-1] + [
         TextField('file_as', field_uri='contacts:FileAs'),
         ChoiceField('file_as_mapping', field_uri='contacts:FileAsMapping', choices={
             Choice('None'), Choice('LastCommaFirst'), Choice('FirstSpaceLast'), Choice('Company'),
@@ -944,7 +946,8 @@ class DistributionList(Item):
     MSDN: https://msdn.microsoft.com/en-us/library/office/aa566353(v=exchg.150).aspx
     """
     ELEMENT_NAME = 'DistributionList'
-    FIELDS = Item.FIELDS + [
+    # O365 throws ErrorInternalServerError "[0x004f0102] MapiReplyToBlob" if UniqueBody is requested
+    FIELDS = Item.FIELDS[:-1] + [
         CharField('display_name', field_uri='contacts:DisplayName', is_required=True),
         CharField('file_as', field_uri='contacts:FileAs', is_read_only=True),
         ChoiceField('contact_source', field_uri='contacts:ContactSource', choices={
