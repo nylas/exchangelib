@@ -60,4 +60,4 @@ Task.register('extern_id', ExternId)
 
 ############# Nylas Registered Extended Properties ###########
 Message.register('flag', Flag)
-CalendarItem.register('color', CalendarColor)
+Message.register('color', CalendarColor)

@@ -186,6 +186,7 @@ class Item(RegisterMixIn):
         EWSElementField('conversation_id', field_uri='item:ConversationId', value_cls=ConversationId,
                         is_read_only=True, supported_from=EXCHANGE_2010),
         BodyField('unique_body', field_uri='item:UniqueBody', is_read_only=True, supported_from=EXCHANGE_2010),
+        TextField('color', field_uri='calendar:Color', is_read_only=True, is_required=False),
     ]
 
     # Used to register extended properties
