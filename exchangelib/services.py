@@ -30,11 +30,13 @@ from .errors import EWSWarning, TransportError, SOAPError, ErrorTimeoutExpired, 
     ErrorInternalServerTransientError, ErrorNoRespondingCASInDestinationSite, ErrorImpersonationFailed, \
     ErrorMailboxMoveInProgress, ErrorAccessDenied, ErrorConnectionFailed, RateLimitError, ErrorServerBusy, \
     ErrorTooManyObjectsOpened, ErrorInvalidLicense, ErrorInvalidSchemaVersionForMailboxVersion, \
-    ErrorInvalidServerVersion, ErrorInvalidSyncStateData, ErrorItemNotFound, ErrorADUnavailable, ResponseMessageError, ErrorInvalidChangeKey, \
+    ErrorInvalidServerVersion, ErrorInvalidSyncStateData, ErrorItemNotFound, ErrorADUnavailable, ResponseMessageError, \
+    ErrorInvalidChangeKey, \
     ErrorItemSave, ErrorInvalidIdMalformed, ErrorMessageSizeExceeded, UnauthorizedError, \
     ErrorCannotDeleteTaskOccurrence, ErrorMimeContentConversionFailed, ErrorRecurrenceHasNoOccurrence, \
     ErrorNameResolutionMultipleResults, ErrorNameResolutionNoResults, ErrorNoPublicFolderReplicaAvailable, \
-    ErrorInvalidOperation, ErrorSubscriptionUnsubscribed, MalformedResponseError
+    ErrorInvalidOperation, ErrorSubscriptionUnsubscribed, MalformedResponseError, \
+    ErrorInvalidIdMalformedEwsLegacyIdFormat
 from .ewsdatetime import EWSDateTime, NaiveDateTimeNotAllowed
 from .transport import wrap, extra_headers
 from .util import chunkify, create_element, add_xml_child, get_xml_attr, to_xml, post_ratelimited, \
@@ -496,12 +498,16 @@ class EWSService(object):
 
     def _get_elements_in_response(self, response):
         for msg in response:
-            container_or_exc = self._get_element_container(message=msg, name=self.element_container_name)
-            if isinstance(container_or_exc, (bool, Exception)):
-                yield container_or_exc
-            else:
-                for c in self._get_elements_in_container(container=container_or_exc):
-                    yield c
+            try:
+                container_or_exc = self._get_element_container(message=msg, name=self.element_container_name)
+                if isinstance(container_or_exc, (bool, Exception)):
+                    yield container_or_exc
+                else:
+                    for c in self._get_elements_in_container(container=container_or_exc):
+                        yield c
+            except ErrorInvalidIdMalformedEwsLegacyIdFormat as e:
+                log.error('Caught ErrorInvalidIdMalformedEwsLegacyIdFormat error', e=e, exc_info=True, msg=msg)
+                continue
 
     @staticmethod
     def _get_elements_in_container(container):
