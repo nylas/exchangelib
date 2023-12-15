@@ -507,7 +507,15 @@ class EWSService(object):
                         yield c
             except ErrorInvalidIdMalformedEwsLegacyIdFormat as e:
                 msg_text = get_xml_attr(msg, '{%s}MessageText' % MNS)
-                log.error('Caught ErrorInvalidIdMalformedEwsLegacyIdFormat error', error=str(e), exc_info=True, response_msg=msg_text)
+                log.error(
+                    'Caught ErrorInvalidIdMalformedEwsLegacyIdFormat'
+                    '\nerror: %s'
+                    '\nmsg_response: %s',
+                    str(e),
+                    msg_text,
+                    exc_info=True
+                )
+
                 continue
 
     @staticmethod
